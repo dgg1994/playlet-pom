@@ -1,0 +1,74 @@
+server:
+  port: 8082
+  max-http-header-size: 2MB
+  tomcat.max-http-form-post-size: 50MB
+
+spring:
+  application:
+    name: playlet-oversea-server
+  cloud:
+    nacos:
+      discovery:
+        server-addr: http://16.163.6.237:8848
+        namespace: 9d71b331-4907-4e19-b982-fc0b121330bc
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+  servlet:
+    multipart:
+       max-file-size: 255MB
+       max-request-size: 255MB
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+    
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/playlet_oversea?useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT%2B8
+    username: root
+    password: Root@123
+    type: com.alibaba.druid.pool.DruidDataSource
+    initialSize: 30
+    minIdle: 30
+    maxActive: 50
+    maxWait: 100000
+    timeBetweenEvictionRunsMillis: 30000  # 改为30秒
+    minEvictableIdleTimeMillis: 50000     # 改为50秒（小于60秒）
+    validationQuery: SELECT 1
+    testWhileIdle: true
+    testOnBorrow: true   # 获取连接时验证，保证拿到的连接可用
+    testOnReturn: false
+    connectionErrorRetryAttempts: 3
+    breakAfterAcquireFailure: false
+        
+  redis: 
+    database: 0
+    timeout: 5000  #连接超时时间（毫秒）
+    host: 127.0.0.1  #Redis服务器地址
+    port: 6379  #Redis服务器连接端口
+    jedis: 
+       pool: 
+          max-active: 8  #连接池最大连接数（使用负值表示没有限制）
+          max-wait: -1  #连接池最大阻塞等待时间（使用负值表示没有限制）
+          max-idle: 8   #连接池中的最大空闲连接
+          min-idle: 0   #连接池中的最小空闲连接
+          
+dscoins:
+  login:
+    ipLimit:
+      enable: false
+    googleLimit:
+      enable: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+# SpringDoc 配置
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
