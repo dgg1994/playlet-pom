@@ -1,4 +1,4 @@
-package com.onetoken.enums;
+package com.playlet.internal.enums;
 
 /**
  * 类描述：注册来源

@@ -38,28 +38,26 @@ public class IpRegionRouteFilter implements GlobalFilter, Ordered {
 
         String path = exchange.getRequest().getURI().getPath();
 
-        // 管理端路由直接放行，不做IP判断
-        if (path.startsWith("/china/admin/") || path.startsWith("/global/admin/")) {
+        // 仅处理 ToC /api/**；管理端走 yaml 固定路由
+        if (!path.startsWith("/api/")) {
+            return chain.filter(exchange);
+        }
+
+        // 1=固定国内：直接用 api-route 的 lb://playlet-internal-server，不改写
+        if (routeMode == 1) {
+            log.debug("Route mode: 1 (fixed domestic), path={}", path);
             return chain.filter(exchange);
         }
 
         String clientIp = getClientIp(exchange);
-
         Mono<Boolean> isDomestic;
 
-        switch (routeMode) {
-            case 1:
-                log.info("Route mode: 1 (fixed domestic)");
-                isDomestic = Mono.just(true);
-                break;
-            case 2:
-                log.info("Route mode: 2 (fixed oversea)");
-                isDomestic = Mono.just(false);
-                break;
-            default:
-                log.info("Route mode: 3 (IP region)");
-                isDomestic = checkIpRegion(clientIp);
-                break;
+        if (routeMode == 2) {
+            log.info("Route mode: 2 (fixed oversea)");
+            isDomestic = Mono.just(false);
+        } else {
+            log.info("Route mode: 3 (IP region), clientIp={}", clientIp);
+            isDomestic = checkIpRegion(clientIp);
         }
 
         return isDomestic

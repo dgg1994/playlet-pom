@@ -1,26 +1,32 @@
 package com.playlet.internal.service.impl;
 
-import com.github.pagehelper.PageHelper;
-import com.github.pagehelper.PageInfo;
+import com.playlet.internal.api.request.UserRegisterEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
+import com.playlet.internal.config.OauthLoginProperties;
 import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.account.AppAccountDao;
+import com.playlet.internal.dao.account.AppOauthAccountDao;
 import com.playlet.internal.dao.template.EmailTemplateDao;
 import com.playlet.internal.entity.account.AppAccountEntity;
-import com.playlet.internal.entity.system.EmailTemplateEntity;
-import com.playlet.internal.enums.MessageEnums;
-import com.playlet.internal.enums.UserStateEnums;
-import com.playlet.internal.query.pub.UpdatePwdEntity;
+import com.playlet.internal.entity.account.AppOauthAccountEntity;
+import com.playlet.internal.entity.template.EmailTemplateEntity;
+import com.playlet.internal.enums.*;
+import com.playlet.internal.filter.JWTAuthenticationFilter;
+import com.playlet.internal.query.account.UpdatePwdEntity;
 import com.playlet.internal.service.AppUserService;
 import com.playlet.internal.utils.*;
+import com.playlet.internal.utils.oidc.OidcIdTokenPayload;
+import com.playlet.internal.utils.oidc.OidcTokenVerifier;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -54,6 +60,12 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	@Autowired
 	private EmailTemplateDao emailTemplateDao;
 
+	@Autowired
+	private OauthLoginProperties oauthLoginProperties;
+
+	@Autowired
+	private AppOauthAccountDao appOauthAccountDao;
+
 	@Override
 	public ResponseBase signUp(@RequestBody AppAccountEntity entity) {
 		if (entity == null || StringUtils.isEmpty(entity.getUserEmail())
@@ -61,7 +73,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
 		// 校验邮箱验证码
-		if (!verifyCode(entity.getUserEmail(), entity.getEmailCode())) {
+		if (!verifyCode(EMAIL_CODE_PREFIX + entity.getUserEmail(), entity.getEmailCode())) {
 			return setResultError("验证码错误或已过期");
 		}
 		// 邮箱唯一性校验
@@ -73,7 +85,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		account.setUserAccount(StringUtils.isNotEmpty(entity.getUserAccount()) ? entity.getUserAccount()
 				: entity.getUserEmail());
 		account.setUserEmail(entity.getUserEmail());
-		account.setUserPassword(MD5Util.digest(entity.getUserPassword()));
+		account.setUserPassword(DigestUtils.md5DigestAsHex((entity.getUserPassword()).getBytes()));
 		account.setMobileNumber(entity.getMobileNumber());
 		account.setMobilePrefix(entity.getMobilePrefix());
 		account.setInvitationCode(generateInvitationCode());
@@ -85,84 +97,238 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		appAccountDao.insert(account);
 		// 清除验证码
 		redisUtil.del(EMAIL_CODE_PREFIX + entity.getUserEmail());
-		return buildLoginResult(account);
+		return setResultSuccess();
 	}
 
 	@Override
 	public ResponseBase login(@RequestBody AppAccountEntity entity, HttpServletRequest req) {
-		if (entity == null || StringUtils.isEmpty(entity.getUserPassword())) {
-			return setResultError(I18nUtil.getMessage("base_error"));
+		try {
+			if(entity.getLoginType() == null) {
+				return setResultError(I18nUtil.getMessage("user.account_error"));
+			}
+			AppAccountEntity appUserEntity = null;
+			if(PublicEnums.ONE.getIndex().equals(entity.getLoginType())) {//邮箱登录
+				appUserEntity = appAccountDao.findByEmail(entity.getUserAccount());
+			}else if(PublicEnums.TOW.getIndex().equals(entity.getLoginType())) {//手机号登录
+				appUserEntity = appAccountDao.findByTel(entity.getUserAccount(),entity.getMobilePrefix());
+			}
+			if (appUserEntity == null) {
+				return setResultError(I18nUtil.getMessage("user.account_error"));
+			}
+			if (!UserStateEnums.NORMAL.getIndex().equals(appUserEntity.getUserState())) {
+				return setResultError(I18nUtil.getMessage("user.account_null"));
+			}
+			if (entity.getUserPassword() != null
+					&& DigestUtils.md5DigestAsHex((entity.getUserPassword()).getBytes())
+					.equals(appUserEntity.getUserPassword())) {
+				String token = Jwts.builder()
+						// 设置主题
+						.setSubject(appUserEntity.getUserAccount())
+						// 设置到期时间
+						.setExpiration(new Date(System.currentTimeMillis() + Constants.USER_JWT_EXPIRE_TIME))
+						// 选择 加密算法和私钥
+						.signWith(SignatureAlgorithm.HS512, Constants.SIGNING_KEY).compact();
+				redisUtil.set(Constants.APP_PACKAGE_NAME + appUserEntity.getUserAccount(),
+						Constants.AUTH_HEADER_START_WITH + token, Constants.USER_REDIS_EXPIRE_TIME);
+				//保存更换jpush appUserEntity
+				if(entity.getRegistrationId() != null) {
+					appUserEntity.setRegistrationId(entity.getRegistrationId());
+					appAccountDao.updateById(appUserEntity);
+				}
+				return setResultSuccess(Constants.AUTH_HEADER_START_WITH + token, I18nUtil.getMessage("base_success"));
+			} else {
+				return setResultError(I18nUtil.getMessage("user.password_error"));
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException();
 		}
-		AppAccountEntity account = null;
-		if (StringUtils.isNotEmpty(entity.getUserEmail())) {
-			account = appAccountDao.findByEmail(entity.getUserEmail());
-		} else if (StringUtils.isNotEmpty(entity.getUserAccount())) {
-			account = appAccountDao.findByAccount(entity.getUserAccount());
-		} else if (StringUtils.isNotEmpty(entity.getMobileNumber())) {
-			account = appAccountDao.findByMobile(entity.getMobileNumber());
-		}
-		if (account == null) {
-			return setResultError(I18nUtil.getMessage("user.account_error"));
-		}
-		if (UserStateEnums.LOGOUT.getIndex().equals(account.getUserState())) {
-			return setResultError(I18nUtil.getMessage("user.account_null"));
-		}
-		if (UserStateEnums.DISABLE.getIndex().equals(account.getUserState())) {
-			return setResultError("账户已被禁用");
-		}
-		if (!MD5Util.digest(entity.getUserPassword()).equals(account.getUserPassword())) {
-			return setResultError(I18nUtil.getMessage("user.password_error"));
-		}
-		// 更新推送 id
-		if (StringUtils.isNotEmpty(entity.getRegistrationId())) {
-			account.setRegistrationId(entity.getRegistrationId());
-			account.setGmtModified(new Date());
-			appAccountDao.updateById(account);
-		}
-		return buildLoginResult(account);
 	}
 
 	@Override
-	public ResponseBase oneClickLogin(@RequestBody AppAccountEntity entity, HttpServletRequest req) {
-		if (entity == null || StringUtils.isEmpty(entity.getIdToken()) || entity.getType() == null) {
-			return setResultError(I18nUtil.getMessage("base_error"));
+	public ResponseBase oneClickLogin(@RequestBody AppAccountEntity entity, HttpServletRequest request) {
+		Integer type = entity.getType();
+		if (type == null || entity.getIdToken() == null || entity.getIdToken().trim().isEmpty()) {
+			return setResultError(I18nUtil.getMessage("user.account_error"));
 		}
-		// TODO 校验 Apple/Google 的 idToken 合法性并解析出三方唯一 id，此处暂以 idToken 作为三方 uid
-		String thirdUid = entity.getIdToken();
-		AppAccountEntity account = appAccountDao.findByUid(thirdUid);
+		boolean isApple = LoginTypeEnums.APPLE.getIndex().equals(type);
+		if (!isApple && !LoginTypeEnums.GOOGLE.getIndex().equals(type)) {
+			return setResultError(I18nUtil.getMessage("user.account_error"));
+		}
+		try {
+			if (isApple) {
+				List<String> appleAud = oauthLoginProperties.resolveAppleClientIds();
+				if (appleAud.isEmpty()) {
+					log.warn("oauth.apple 未配置，无法校验 id_token");
+					return setResultError("服务器未配置苹果登录");
+				}
+				OidcIdTokenPayload payload = OidcTokenVerifier.verifyAppleIdToken(entity.getIdToken(), appleAud);
+				if ((payload.getEmail() == null || payload.getEmail().trim().isEmpty())
+						&& entity.getUserEmail() != null && !entity.getUserEmail().trim().isEmpty()) {
+					payload = new OidcIdTokenPayload(payload.getSub(), entity.getUserEmail().trim(), payload.getEmailVerified());
+				}
+				return thirdPartyLogin("apple", payload, entity, request);
+			}
+			List<String> googleClients = oauthLoginProperties.getGoogle().getClientIds();
+			if (googleClients == null || googleClients.isEmpty()) {
+				log.warn("oauth.google.clientIds 未配置，无法校验 id_token");
+				return setResultError("服务器未配置谷歌登录");
+			}
+			OidcIdTokenPayload payload = OidcTokenVerifier.verifyGoogleIdToken(entity.getIdToken(), googleClients);
+			return thirdPartyLogin("google", payload, entity, request);
+		} catch (Exception e) {
+			log.warn("oneClickLogin 失败 type={}", type, e);
+			return setResultError(isApple ? "苹果登录失败" : "谷歌登录失败");
+		}
+	}
+
+	@SuppressWarnings("deprecation")
+	private ResponseBase thirdPartyLogin(String provider, OidcIdTokenPayload payload, AppAccountEntity entity, HttpServletRequest request) {
+		if (payload == null || payload.getSub() == null || payload.getSub().trim().isEmpty()) {
+			return setResultError(I18nUtil.getMessage("user.account_error"));
+		}
+
+		AppOauthAccountEntity binding = appOauthAccountDao.findByProviderAndSub(provider, payload.getSub());
+		AppAccountEntity account = null;
+
+		if (binding != null && binding.getUid() != null) {
+			account = appAccountDao.findByUid(binding.getUid());
+		}
+
 		if (account == null) {
-			// 无用户则自动注册
-			account = new AppAccountEntity();
-			account.setUid(thirdUid);
-			account.setUserAccount(entity.getType() + "_" + generateInvitationCode());
-			account.setUserEmail(entity.getUserEmail());
-			account.setInvitationCode(generateInvitationCode());
-			account.setRegisterSource(1);
-			account.setRegistrationId(entity.getRegistrationId());
-			account.setUserState(UserStateEnums.NORMAL.getIndex());
-			account.setSetTime(new Date());
-			account.setGmtModified(new Date());
-			appAccountDao.insert(account);
-		} else if (UserStateEnums.DISABLE.getIndex().equals(account.getUserState())) {
-			return setResultError("账户已被禁用");
+			String email = payload.getEmail();
+			if (email != null && !email.trim().isEmpty()) {
+				if ("google".equals(provider) && Boolean.FALSE.equals(payload.getEmailVerified())) {
+					return setResultError("谷歌邮箱未验证");
+				}
+				account = appAccountDao.findByEmail(email.trim());
+			}
 		}
-		return buildLoginResult(account);
+
+		if (account == null) {
+			String email = payload.getEmail() == null ? null : payload.getEmail().trim();
+			if (email == null || email.isEmpty()) {
+				return setResultError("缺少邮箱，无法创建账号");
+			}
+			if ("google".equals(provider) && Boolean.FALSE.equals(payload.getEmailVerified())) {
+				return setResultError("谷歌邮箱未验证");
+			}
+			UserRegisterEntity apiEntity = new UserRegisterEntity();
+			apiEntity.setEmail(email);
+			AppAccountEntity newEntity = new AppAccountEntity();
+			newEntity.setUserEmail(email);
+			newEntity.setUserAccount(email);
+			newEntity.setUserPassword("");
+			newEntity.setUserState(UserStateEnums.NORMAL.getIndex());
+			this.addAccount(newEntity, RegisterSourceEnums.ONE_CLICK_LOGIN.getIndex());
+
+			if (entity.getEnterInvitationCode() != null && !entity.getEnterInvitationCode().isEmpty()) {
+				AppAccountEntity inviter = appAccountDao.findByIncitationCode(entity.getEnterInvitationCode());
+				if (inviter != null) {
+					this.inviteRelation(newEntity, inviter);
+				}
+			}
+
+			account = appAccountDao.findByEmail(email);
+		}
+
+		if (account == null) {
+			return setResultError(I18nUtil.getMessage("user.account_error"));
+		}
+		if (!UserStateEnums.NORMAL.getIndex().equals(account.getUserState())) {
+			return setResultError(I18nUtil.getMessage("user.account_null"));
+		}
+
+		if (binding == null) {
+			AppOauthAccountEntity row = new AppOauthAccountEntity();
+			row.setProvider(provider);
+			row.setProviderSub(payload.getSub());
+			row.setUid(account.getUid());
+			row.setEmail(payload.getEmail());
+			try {
+				GenericityUtil.setDate(row);
+				appOauthAccountDao.insert(row);
+			} catch (Exception ex) {
+				log.debug("oauth 绑定已存在或并发: provider={} sub={}", provider, payload.getSub());
+			}
+		}
+
+		String token = Jwts.builder()
+				.setSubject(account.getUserAccount())
+				.setExpiration(new Date(System.currentTimeMillis() + Constants.USER_JWT_EXPIRE_TIME))
+				.signWith(SignatureAlgorithm.HS512, Constants.SIGNING_KEY).compact();
+		redisUtil.set(Constants.APP_PACKAGE_NAME + account.getUserAccount(),
+				Constants.AUTH_HEADER_START_WITH + token, Constants.USER_REDIS_EXPIRE_TIME);
+
+		if (entity.getRegistrationId() != null) {
+			account.setRegistrationId(entity.getRegistrationId());
+			appAccountDao.updateById(account);
+		}
+
+		return setResultSuccess(Constants.AUTH_HEADER_START_WITH + token, I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * @category 处理绑定邀请关系
+	 * @param entity 被邀请人
+	 * @param accountEntity 邀请人
+	 */
+	public void inviteRelation(AppAccountEntity entity, AppAccountEntity accountEntity) {
+		try {
+			//@todo 待定处理
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException();
+		}
+	}
+
+	//创建各账户
+	public void addAccount(AppAccountEntity entity,Integer source) {
+		try {
+			entity.setUserAccount(entity.getUserEmail());
+			entity.setUserPassword(DigestUtils.md5DigestAsHex((entity.getUserPassword()).getBytes()));
+			entity.setUserState(UserStateEnums.NORMAL.getIndex());
+			//添加注册来源 1：一键注册用户 2:正常注册用户
+			entity.setRegisterSource(source);
+			entity.setInvitationCode(RandomSuffixInviteCodeUtil.generateUniqueCode(Long.parseLong(entity.getId().toString()), 4, 6));
+			GenericityUtil.setDate(entity);
+			appAccountDao.insert(entity);
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException();
+		}
 	}
 
 	@Override
 	public ResponseBase findToken(HttpServletRequest request) {
-		String uid = parseUidFromRequest(request);
-		if (uid == null) {
-			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
+		try {
+			String header = request.getHeader(Constants.HEADER_AUTH);
+			if (header == null) {
+				return setResult(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"), null);
+			}
+			UsernamePasswordAuthenticationToken userData = JWTAuthenticationFilter.getAuthentication(request);
+			if (userData == null) {
+				return setResult(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"), null);
+			} else {
+				String key = userData.getName();
+				String redisKey = Constants.APP_PACKAGE_NAME + key;
+				if (redisUtil.get(redisKey) == null || redisUtil.get(redisKey).toString().length() < 1) {
+					return setResult(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"), null);
+				}
+				if (!redisUtil.get(redisKey).equals(header)) {
+					return setResult(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"), null);
+				}
+			}
+			String username = userData.getName();
+			AppAccountEntity entity = appAccountDao.findByAccount(username);
+			entity.setUserPassword(null);
+			entity.setPayPassword(null);
+			entity.setGoogleSecretkey(null);
+			return setResultSuccess(entity);
+		} catch (Exception e) {
+			e.printStackTrace();
+			return setResult(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"), null);
 		}
-		AppAccountEntity account = appAccountDao.findByUid(uid);
-		if (account == null) {
-			return setResultError(I18nUtil.getMessage("user.not_null"));
-		}
-		account.setUserPassword(null);
-		account.setPayPassword(null);
-		account.setGoogleSecretkey(null);
-		return setResultSuccess(account, I18nUtil.getMessage("base_success"));
 	}
 
 	@Override
@@ -181,7 +347,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 				//组装html内容
 				String html = MessageFormatUtils.saveHtml(htmlContent, language);
 				EmailUtil.sendEmail(userEmail, templateEntity.getTemplateSubject(), html);
-				redisUtil.set(APP_PACKAGE_NAME + userEmail, code, Constants.CODE_EXPIRE_TIME);
+				redisUtil.set(EMAIL_CODE_PREFIX + userEmail, code, Constants.CODE_EXPIRE_TIME);
 				return setResultSuccess(I18nUtil.getMessage("send_success"));
 			} else {
 				return setResultError(I18nUtil.getMessage("Template_null"));
@@ -201,7 +367,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	}
 
 	@Override
-	public ResponseBase updaePwd(@RequestBody UpdatePwdEntity entity, HttpServletRequest request) {
+	public ResponseBase updatePwd(@RequestBody UpdatePwdEntity entity, HttpServletRequest request) {
 		String uid = parseUidFromRequest(request);
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
@@ -301,40 +467,35 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 
 	@Override
 	public ResponseBase sendTelCode(String tel) {
-		if (StringUtils.isEmpty(tel)) {
-			return setResultError(I18nUtil.getMessage("base_error"));
+		try {
+			String code = OrderCodeFactory.getRandomStr(6);
+			ResponseBase base = SmsUtil.sendVerificationCode(tel, code);
+			if(Constants.HTTP_RES_CODE_200.equals(base.getCode())) {
+				redisUtil.set(tel, code, Constants.CODE_EXPIRE_TIME);
+			}
+			return base;
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException();
 		}
-		String code = generateCode();
-		redisUtil.set(TEL_CODE_PREFIX + tel, code, Constants.CODE_EXPIRE_TIME);
-		// TODO 接入短信服务发送验证码，当前仅缓存并打印
-		log.info("send tel code to {} : {}", tel, code);
-		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
 	@Override
 	public ResponseBase checkTelCode(String tel, String telCode) {
-		if (verifyCode(TEL_CODE_PREFIX + tel, telCode)) {
-			return setResultSuccess(I18nUtil.getMessage("base_success"));
-		}
-		return setResultError("验证码错误或已过期");
-	}
-
-	@Override
-	public ResponseBase findList(@RequestBody AppAccountEntity entity) {
-		if (entity == null) {
-			entity = new AppAccountEntity();
-		}
-		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
-		List<AppAccountEntity> list = appAccountDao.findList(entity);
-		if (list != null) {
-			for (AppAccountEntity item : list) {
-				item.setUserPassword(null);
-				item.setPayPassword(null);
-				item.setGoogleSecretkey(null);
+		try {
+			String temp = null;
+			if (redisUtil.get(tel) != null) {
+				temp = redisUtil.get(tel).toString();
 			}
+			if (temp != null && telCode.equals(temp)) {
+				return setResultSuccess();
+			} else {
+				return setResultError(I18nUtil.getMessage("verification_error"));
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException();
 		}
-		PageInfo<AppAccountEntity> pageInfo = new PageInfo<>(list);
-		return setResultSuccess(pageInfo, I18nUtil.getMessage("base_success"));
 	}
 
 	// ==================== 私有工具方法 ====================

@@ -1,4 +1,4 @@
-package com.onetoken.config;
+package com.playlet.internal.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

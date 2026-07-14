@@ -1,9 +1,9 @@
-package com.onetoken.api.response;
-
-import java.util.Date;
+package com.playlet.internal.api.response;
 
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+
+import java.util.Date;
 
 @Data
 public class AppUserInfoReqEntity {

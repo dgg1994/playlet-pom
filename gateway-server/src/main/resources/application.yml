@@ -6,8 +6,9 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: http://16.163.6.237:8848
-        namespace: 9d71b331-4907-4e19-b982-fc0b121330bc
+        server-addr: http://127.0.0.1:8848
+        namespace: 6ed7d1da-d7db-4007-b4cb-6fe448c775e4
+        password: qwerdf
     gateway:
       discovery:
         locator:
@@ -33,7 +34,7 @@ spring:
           filters:
             - StripPrefix=2
 
-        # ToC用户端: /api/** -> 根据IP地域路由
+        # ToC用户端: /api/** -> 由 playlet.gateway.route-mode 决定国内外
         - id: api-route
           uri: lb://playlet-internal-server
           predicates:
@@ -41,10 +42,10 @@ spring:
           filters:
             - StripPrefix=1
 
-# 路由模式: 1=固定国内, 2=固定海外, 3=IP地域路由
+# 路由模式: 1=固定国内(推荐本地/联调), 2=固定海外, 3=按客户端IP走 ip-api.com 判国内外
 playlet:
   gateway:
-    route-mode: 3
+    route-mode: 1
 
 management:
   endpoints:

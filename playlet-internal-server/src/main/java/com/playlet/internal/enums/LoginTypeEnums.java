@@ -1,4 +1,4 @@
-package com.onetoken.enums;
+package com.playlet.internal.enums;
 
 /**
  * 一键登录渠道（与 App 传参 type 一致）

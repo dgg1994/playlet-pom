@@ -9,8 +9,9 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: http://16.163.6.237:8848
-        namespace: 9d71b331-4907-4e19-b982-fc0b121330bc
+        server-addr: http://127.0.0.1:8848
+        namespace: 6ed7d1da-d7db-4007-b4cb-6fe448c775e4
+        password: qwerdf
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
@@ -24,9 +25,9 @@ spring:
     
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://127.0.0.1:3306/playlet_internal?useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT%2B8
+    url: jdbc:mysql://16.163.6.237:3306/playlet_internal?useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT%2B8
     username: root
-    password: Root@123
+    password: A8PmYdz6r7AXCRDi
     type: com.alibaba.druid.pool.DruidDataSource
     initialSize: 30
     minIdle: 30
@@ -72,3 +73,20 @@ springdoc:
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
+
+#邮件发送
+yunmail:
+  host: smtp.ezmail.vip  # 改为正确的 SMTP 服务器
+  port: 465              # 或尝试 587（如果465不行）
+  username: support@1token.me #账号
+  password: "Aasd147258!@#$"  # 用引号包裹
+  sendeName: Playlet #发件人名称
+  # 可选：添加以下配置
+  auth: true
+  ssl:
+    enable: true
+#短信发送
+sms:
+  url: http://api2.santo.cc/submit
+  account: D4fHZloE
+  password: LpQaKN8a

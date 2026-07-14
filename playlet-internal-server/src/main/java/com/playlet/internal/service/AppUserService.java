@@ -3,7 +3,7 @@ package com.playlet.internal.service;
 
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.entity.account.AppAccountEntity;
-import com.playlet.internal.query.pub.UpdatePwdEntity;
+import com.playlet.internal.query.account.UpdatePwdEntity;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
@@ -11,10 +11,11 @@ import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import javax.servlet.http.HttpServletRequest;
 
-@RequestMapping("/appUser")
+@RequestMapping("/api/appUser")
 @Api(value = "app用户", tags = "app用户")
 public interface AppUserService {
 
@@ -39,7 +40,7 @@ public interface AppUserService {
             @ApiImplicitParam(name = "userEmail", value = "邮箱地址", required = true, dataType = "String", paramType = "query"),
     })
     @ApiOperation(value = "发送邮件验证码", notes = "发送邮件验证码", response = ResponseBase.class)
-    ResponseBase sendEmailCode(String userEmail);
+    ResponseBase sendEmailCode(@RequestParam String userEmail);
 
     @GetMapping("/checkEmailCode")
     @ApiImplicitParams({
@@ -47,11 +48,11 @@ public interface AppUserService {
             @ApiImplicitParam(name = "emailCode", value = "验证码", required = true, dataType = "String", paramType = "query"),
     })
     @ApiOperation(value = "校验邮件验证码", notes = "校验邮件验证码", response = ResponseBase.class)
-    ResponseBase checkEmailCode(String userEmail, String emailCode);
+    ResponseBase checkEmailCode(@RequestParam String userEmail, @RequestParam String emailCode);
     
-    @PostMapping("/updaePwd")
+    @PostMapping("/updatePwd")
 	@ApiOperation(value = "修改密码",notes="修改密码",response=ResponseBase.class)
-    ResponseBase updaePwd(UpdatePwdEntity entity, HttpServletRequest request);
+    ResponseBase updatePwd(UpdatePwdEntity entity, HttpServletRequest request);
 	
 	@GetMapping("/logout")
 	@ApiOperation(value = "注销账户",notes="注销账户",response=ResponseBase.class)
@@ -80,9 +81,6 @@ public interface AppUserService {
     })
     @ApiOperation(value = "校验手机验证码", notes = "校验手机验证码", response = ResponseBase.class)
     ResponseBase checkTelCode(String tel, String telCode);
-	
-	@PostMapping("/findList")
-	@ApiOperation(value = "用户查询列表",notes="用户查询列表",response=ResponseBase.class)
-    ResponseBase findList(AppAccountEntity entity);
+
 
 }

@@ -80,6 +80,17 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
                 .antMatchers("/configuration/ui").permitAll()
                 .antMatchers("/configuration/security").permitAll()
                 .antMatchers( "/*.html","/**/*.html","/**/*.css", "/**/*.js","/webSocket/**").permitAll()
+                // App 端匿名接口（注册/登录/验证码等）
+                .antMatchers(
+                        "/appUser/signUp",
+                        "/appUser/login",
+                        "/appUser/oneClickLogin",
+                        "/appUser/sendEmailCode",
+                        "/appUser/checkEmailCode",
+                        "/appUser/forgetPassword",
+                        "/appUser/sendTelCode",
+                        "/appUser/checkTelCode"
+                ).permitAll()
                 .anyRequest().authenticated()
                 .and()
                 .logout()

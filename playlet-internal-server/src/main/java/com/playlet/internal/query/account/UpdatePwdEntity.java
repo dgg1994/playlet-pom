@@ -1,4 +1,4 @@
-package com.playlet.internal.query.pub;
+package com.playlet.internal.query.account;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;

@@ -1,9 +1,10 @@
-package com.onetoken.utils;
+package com.playlet.internal.utils;
 
 
 import java.security.SecureRandom;
 import java.util.HashSet;
 import java.util.Set;
+
 /**
  * 带随机后缀的绝对唯一邀请码生成器
  */

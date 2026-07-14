@@ -1,4 +1,4 @@
-package com.onetoken.entity.account;
+package com.playlet.internal.entity.account;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;

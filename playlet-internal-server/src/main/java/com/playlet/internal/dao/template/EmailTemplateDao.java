@@ -1,7 +1,7 @@
 package com.playlet.internal.dao.template;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.playlet.internal.entity.system.EmailTemplateEntity;
+import com.playlet.internal.entity.template.EmailTemplateEntity;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.springframework.stereotype.Repository;

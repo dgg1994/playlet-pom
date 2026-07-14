@@ -1,4 +1,4 @@
-package com.onetoken.utils.oidc;
+package com.playlet.internal.utils.oidc;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

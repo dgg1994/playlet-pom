@@ -1,23 +1,24 @@
-package com.onetoken.utils;
+package com.playlet.internal.utils;
 
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.net.URLDecoder;
+import com.playlet.internal.base.BaseApiService;
+import com.playlet.internal.base.ResponseBase;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpStatus;
 import org.apache.commons.httpclient.NameValuePair;
 import org.apache.commons.httpclient.SimpleHttpConnectionManager;
-import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.params.HttpClientParams;
 import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import com.onetoken.base.BaseApiService;
-import com.onetoken.base.ResponseBase;
+
 import javax.annotation.PostConstruct;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.net.URLDecoder;
 
 /**
  * 短信发送工具类

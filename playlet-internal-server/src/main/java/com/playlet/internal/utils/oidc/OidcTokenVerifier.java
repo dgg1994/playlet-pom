@@ -1,4 +1,4 @@
-package com.onetoken.utils.oidc;
+package com.playlet.internal.utils.oidc;
 
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;

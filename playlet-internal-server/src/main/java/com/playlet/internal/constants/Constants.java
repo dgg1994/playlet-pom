@@ -27,6 +27,10 @@ public interface Constants {
 	Integer ZERO_INT = 0;
 			
 	long REDIS_EXPIRE_TIME = 24 * 60 * 60 * 1000;
+
+	Integer USER_JWT_EXPIRE_TIME = 240 * 60 * 60 * 1000;
+
+	long USER_REDIS_EXPIRE_TIME = 240 * 60 * 60 * 1000;
 	
 	long CODE_EXPIRE_TIME = 5 * 60;
 			

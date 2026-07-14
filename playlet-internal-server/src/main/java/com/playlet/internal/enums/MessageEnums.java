@@ -6,7 +6,8 @@ package com.playlet.internal.enums;
  *
  */
 public enum MessageEnums {
-	
+
+	SEND_CODE_ZH(1000, "zh", "发送验证码", "您的账户有新的验证活动{}。以下是你的 playlet 验证码。请注意，该验证码将在 10 分钟后过期，请尽快完成验证。{}playlet"),
 	// 注册成功通知
 	REGISTER_ZH(1004, "zh", "注册成功通知", "您的账号{}已注册成功"),
 	// 登录成功通知

@@ -1,7 +1,7 @@
-package com.onetoken.dao.account;
+package com.playlet.internal.dao.account;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.onetoken.entity.account.AppOauthAccountEntity;
+import com.playlet.internal.entity.account.AppOauthAccountEntity;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.springframework.stereotype.Repository;

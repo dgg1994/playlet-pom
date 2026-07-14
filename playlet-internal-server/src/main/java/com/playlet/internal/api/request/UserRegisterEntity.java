@@ -1,4 +1,4 @@
-package com.onetoken.api.request;
+package com.playlet.internal.api.request;
 
 import lombok.Data;
 

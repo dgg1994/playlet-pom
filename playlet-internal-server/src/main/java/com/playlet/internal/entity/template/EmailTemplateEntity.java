@@ -1,4 +1,4 @@
-package com.playlet.internal.entity.system;
+package com.playlet.internal.entity.template;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
