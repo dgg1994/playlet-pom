@@ -24,8 +24,8 @@ public class DramaTagRelEntity {
 	private String dramaId;
 
 	@TableField("tag_id")
-	@ApiModelProperty(name = "tagId", value = "业务标签ID", required = true, dataType = "String")
-	private String tagId;
+	@ApiModelProperty(name = "tagId", value = "标签主键 drama_tag.id", required = true, dataType = "Integer")
+	private Integer tagId;
 
 	@TableField("sort_weight")
 	@ApiModelProperty(name = "sortWeight", value = "该剧下标签排序", required = false, dataType = "Integer")

@@ -23,4 +23,9 @@ public interface TagDao extends BaseMapper<TagEntity> {
 			+ "</script>")
 	List<TagEntity> findAdminList(TagEntity entity);
 
+	@Select("select t.* from drama_tag t "
+			+ "inner join drama_tag_rel r on t.id = r.tag_id "
+			+ "where r.drama_id = #{dramaId} and t.status = 1 "
+			+ "order by r.sort_weight desc, t.sort_weight desc, t.id desc")
+	List<TagEntity> findByDramaId(@Param("dramaId") String dramaId);
 }

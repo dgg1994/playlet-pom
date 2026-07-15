@@ -572,4 +572,28 @@ public final class RedisUtil {
 
     }
 
+    /**
+     * 从左侧推入列表（最新在前）
+     */
+    public boolean lLeftPush(String key, Object value) {
+        try {
+            redisTemplate.opsForList().leftPush(key, value);
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * 截断 list，仅保留 [0, maxLen)
+     */
+    public void lTrim(String key, long start, long end) {
+        try {
+            redisTemplate.opsForList().trim(key, start, end);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
 }
