@@ -34,4 +34,8 @@ public class DramaTagRelEntity {
 	@TableField("setTime")
 	@ApiModelProperty(name = "setTime", value = "创建时间", required = false, dataType = "Date")
 	private Date setTime;
+
+	@TableField(exist = false)
+	@ApiModelProperty(name = "drama", value = "短剧信息", required = false, dataType = "DramaEntity")
+	private DramaEntity drama;
 }

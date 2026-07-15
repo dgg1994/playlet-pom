@@ -35,4 +35,8 @@ public interface TagService {
 	@ApiOperation("启用/停用标签")
 	ResponseBase changeStatus(TagEntity entity);
 
+	@GetMapping("/findDramas")
+	@ApiOperation("根据标签id查询绑定的短剧")
+	ResponseBase findDramas(String tagName);
+
 }
