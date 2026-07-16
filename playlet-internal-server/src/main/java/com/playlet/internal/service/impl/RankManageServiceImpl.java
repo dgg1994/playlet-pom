@@ -191,23 +191,23 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
             entity.setBoardCode(entity.getBoardCode().trim().toUpperCase());
             RankBoardEntity board = rankBoardDao.findByBoardCode(entity.getBoardCode());
             if (board == null) {
-                return setResultError("榜单不存在");
+                return setResultError(I18nUtil.getMessage("rank_board_null"));
             }
             if (rankListDao.findByBoardAndDrama(entity.getBoardCode(), entity.getDramaId()) != null) {
-                return setResultError("该剧已在此榜中");
+                return setResultError(I18nUtil.getMessage("rank_drama_exist"));
             }
             if (entity.getRankNo() == null || entity.getRankNo() < 1) {
-                return setResultError("名次必须从1开始");
+                return setResultError(I18nUtil.getMessage("rank_no_min"));
             }
             if (rankListDao.findByBoardAndRankNo(entity.getBoardCode(), entity.getRankNo()) != null) {
-                return setResultError("该名次已被占用");
+                return setResultError(I18nUtil.getMessage("rank_no_occupied"));
             }
             if (board.getTopN() != null && entity.getRankNo() > board.getTopN()) {
-                return setResultError("名次超过榜单 topN=" + board.getTopN());
+                return setResultError(I18nUtil.getMessage("rank_no_exceed_topn", board.getTopN()));
             }
             DramaEntity drama = dramaDao.findByDramaId(entity.getDramaId());
             if (drama == null) {
-                return setResultError("短剧不存在");
+                return setResultError(I18nUtil.getMessage("drama_null"));
             }
             fillFromDrama(entity, drama);
             entity.setStatus(entity.getStatus() == null ? 1 : entity.getStatus());
@@ -235,7 +235,7 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
             }
             if (entity.getRankNo() != null && !entity.getRankNo().equals(exist.getRankNo())) {
                 if (entity.getRankNo() < 1) {
-                    return setResultError("名次必须从1开始");
+                    return setResultError(I18nUtil.getMessage("rank_no_min"));
                 }
                 RankListEntity occupied = rankListDao.findByBoardAndRankNo(exist.getBoardCode(), entity.getRankNo());
                 if (occupied != null && !occupied.getId().equals(exist.getId())) {
@@ -255,11 +255,11 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
             }
             if (StringUtils.isNotEmpty(entity.getDramaId()) && !entity.getDramaId().equals(exist.getDramaId())) {
                 if (rankListDao.findByBoardAndDrama(exist.getBoardCode(), entity.getDramaId()) != null) {
-                    return setResultError("该剧已在此榜中");
+                    return setResultError(I18nUtil.getMessage("rank_drama_exist"));
                 }
                 DramaEntity drama = dramaDao.findByDramaId(entity.getDramaId());
                 if (drama == null) {
-                    return setResultError("短剧不存在");
+                    return setResultError(I18nUtil.getMessage("drama_null"));
                 }
                 exist.setDramaId(entity.getDramaId());
                 fillFromDrama(exist, drama);
@@ -329,7 +329,7 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
             String boardCode = entity.getBoardCode().trim().toUpperCase();
             RankBoardEntity board = rankBoardDao.findByBoardCode(boardCode);
             if (board == null) {
-                return setResultError("榜单不存在");
+                return setResultError(I18nUtil.getMessage("rank_board_null"));
             }
             List<RankListEntity> items = entity.getItems();
             rankListDao.deleteByBoardCode(boardCode);
@@ -351,7 +351,7 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
                 }
                 DramaEntity drama = dramaDao.findByDramaId(item.getDramaId());
                 if (drama == null) {
-                    return setResultError("短剧不存在: " + item.getDramaId());
+                    return setResultError(I18nUtil.getMessage("drama_null") + ": " + item.getDramaId());
                 }
                 RankListEntity row = new RankListEntity();
                 row.setBoardCode(boardCode);
