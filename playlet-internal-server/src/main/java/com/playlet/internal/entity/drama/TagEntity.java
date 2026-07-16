@@ -23,6 +23,14 @@ public class TagEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "id", value = "主键", required = false, dataType = "Integer")
 	private Integer id;
 
+	@TableField("group_id")
+	@ApiModelProperty(name = "groupId", value = "分组id", required = true, dataType = "String")
+	private String groupId;
+
+	@TableField("langue")
+	@ApiModelProperty(name = "langue", value = "语言", required = true, dataType = "String")
+	private String langue;
+
 	@TableField("tag_name")
 	@ApiModelProperty(name = "tagName", value = "标签名称", required = true, dataType = "String")
 	private String tagName;

@@ -10,8 +10,8 @@ import lombok.Data;
 @ApiModel("剧场榜单分页")
 public class TheaterRankPageRespEntity {
 
-	@ApiModelProperty("榜编码")
-	private String boardCode;
+	@ApiModelProperty("榜分组ID")
+	private String groupId;
 
 	@ApiModelProperty("榜展示名")
 	private String boardName;

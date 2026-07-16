@@ -18,4 +18,14 @@ public interface DramaTagRelDao extends BaseMapper<DramaTagRelEntity> {
 
 	@Delete("delete from drama_tag_rel where drama_id = #{dramaId}")
 	void deleteByDramaId(@Param("dramaId") Integer dramaId);
+	@Select("select dtr.* from drama_tag_rel dtr "
+			+ "left join dic_drama_tag dt on dtr.tag_group_id = dt.group_id "
+			+ "where dt.tag_name = #{tagName}")
+	List<DramaTagRelEntity> selectByTagName(@Param("tagName") String tagName);
+
+	@Select("select * from drama_tag_rel where drama_id = #{dramaId}")
+	List<DramaTagRelEntity> findByDramaId(@Param("dramaId") Integer dramaId);
+
+	@Delete("delete from drama_tag_rel where drama_id = #{dramaId}")
+	int deleteByDramaId(@Param("dramaId") Integer dramaId);
 }

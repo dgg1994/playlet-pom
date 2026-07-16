@@ -14,14 +14,15 @@ import java.util.List;
 @Repository
 public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 
-	@Select("select * from drama_asset where drama_id = #{dramaId} and asset_type = #{assetType} "
-			+ "and status = 1 and deleted = 0 limit 1")
-	DramaAssetEntity findByDramaAndType(@Param("dramaId") Integer dramaId, @Param("assetType") String assetType);
+	/** 按剧取一条可用资源（未删除且 video_status=1） */
+	@Select("select * from drama_asset where drama_id = #{dramaId} "
+			+ "and video_status = 1 and delete_state = 0 order by id desc limit 1")
+	DramaAssetEntity findEnabledByDramaId(@Param("dramaId") Integer dramaId);
 
 	@Select("<script>"
-			+ "select * from drama_asset where deleted = 0 "
-			+ "<if test='dramaId != null and dramaId != \"\"'> and drama_id = #{dramaId} </if>"
-			+ "<if test='assetType != null and assetType != \"\"'> and asset_type = #{assetType} </if>"
+			+ "select * from drama_asset where delete_state = 0 "
+			+ "<if test='dramaId != null'> and drama_id = #{dramaId} </if>"
+			+ "<if test='videoStatus != null'> and video_status = #{videoStatus} </if>"
 			+ "order by id desc"
 			+ "</script>")
 	List<DramaAssetEntity> findAdminList(DramaAssetEntity entity);

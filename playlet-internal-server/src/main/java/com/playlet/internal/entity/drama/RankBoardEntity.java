@@ -22,9 +22,13 @@ public class RankBoardEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "id", value = "主键", dataType = "Integer")
 	private Integer id;
 
-	@TableField("board_code")
-	@ApiModelProperty(name = "boardCode", value = "RECOMMEND/HOT/NEW", dataType = "String")
-	private String boardCode;
+	@TableField("group_id")
+	@ApiModelProperty(name = "groupId", value = "分组id", dataType = "String")
+	private String groupId;
+
+	@TableField("langue")
+	@ApiModelProperty(name = "langue", value = "语言", dataType = "String")
+	private String langue;
 
 	@TableField("board_name")
 	@ApiModelProperty(name = "boardName", value = "展示名", dataType = "String")

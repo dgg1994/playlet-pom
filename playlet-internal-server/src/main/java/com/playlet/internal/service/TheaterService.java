@@ -3,11 +3,14 @@ package com.playlet.internal.service;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.RankListEntity;
+import com.playlet.internal.entity.drama.UserWatchHistoryEntity;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import javax.servlet.http.HttpServletRequest;
@@ -28,8 +31,9 @@ public interface TheaterService {
 	ResponseBase rankList();
 
 	@GetMapping("/rank")
+	@ApiImplicitParam(name = "groupId", value = "榜单分组ID", required = true, dataType = "string", paramType = "query")
 	@ApiOperation(value = "榜单分页", notes = "读 rank_list，仅 status=1；data=TheaterRankPageRespEntity")
-	ResponseBase rank(String boardCode, RankListEntity entity);
+	ResponseBase rank(String groupId, RankListEntity entity);
 
 	@GetMapping("/search")
 	@ApiImplicitParams({
@@ -52,4 +56,25 @@ public interface TheaterService {
 	@GetMapping("/search/history/clear")
 	@ApiOperation(value = "清空搜索历史", notes = "需 x-playlet-token")
 	ResponseBase clearSearchHistory(HttpServletRequest request);
+
+	@PostMapping("/view/report")
+	@ApiOperation(value = "上报浏览/观看进度", notes = "需 x-playlet-token；MySQL 持久化 + Redis 缓存")
+	ResponseBase reportWatch(@RequestBody UserWatchHistoryEntity entity, HttpServletRequest request);
+
+	@GetMapping("/view/history")
+	@ApiImplicitParams({
+			@ApiImplicitParam(name = "pageNumber", value = "页码", required = false, dataType = "int", paramType = "query"),
+			@ApiImplicitParam(name = "pageSize", value = "每页", required = false, dataType = "int", paramType = "query")
+	})
+	@ApiOperation(value = "浏览历史列表", notes = "需 x-playlet-token；PageHelper 分页读 MySQL，Redis 写后缓存")
+	ResponseBase watchHistory(UserWatchHistoryEntity entity, HttpServletRequest request);
+
+	@GetMapping("/view/history/delete")
+	@ApiImplicitParam(name = "dramaId", value = "要删除的短剧业务ID", required = true, dataType = "string", paramType = "query")
+	@ApiOperation(value = "删除单条浏览历史", notes = "需 x-playlet-token")
+	ResponseBase deleteWatchHistory(Integer dramaId, HttpServletRequest request);
+
+	@GetMapping("/view/history/clear")
+	@ApiOperation(value = "清空浏览历史", notes = "需 x-playlet-token")
+	ResponseBase clearWatchHistory(HttpServletRequest request);
 }

@@ -1,5 +1,6 @@
 package com.playlet.internal.service;
 
+import com.playlet.internal.api.request.RankBoardRequestEntity;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.entity.drama.RankBoardEntity;
 import com.playlet.internal.entity.drama.RankListEntity;
@@ -26,11 +27,7 @@ public interface RankManageService {
 
 	@PostMapping("/board/save")
 	@ApiOperation("新增榜单定义")
-	ResponseBase boardSave(RankBoardEntity entity);
-
-	@PostMapping("/board/update")
-	@ApiOperation("编辑榜单定义")
-	ResponseBase boardUpdate(RankBoardEntity entity);
+	ResponseBase boardSave(RankBoardRequestEntity entity);
 
 	@PostMapping("/board/changeStatus")
 	@ApiOperation("启用/停用榜单")
@@ -60,7 +57,4 @@ public interface RankManageService {
 	@ApiOperation("启用/停用条目")
 	ResponseBase listChangeStatus(RankListEntity entity);
 
-	@PostMapping("/list/replaceAll")
-	@ApiOperation("整榜覆盖（boardCode + items，适合人工调序）")
-	ResponseBase listReplaceAll(RankListEntity entity);
 }
