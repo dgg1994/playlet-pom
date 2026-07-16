@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.playlet.internal.entity.drama.DramaEntity;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -43,4 +44,16 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 			+ ") "
 			+ "order by d.hot_score desc, d.id desc")
 	List<DramaEntity> searchOnline(@Param("keyword") String keyword);
+
+	@Update("update drama set collect_score = ifnull(collect_score,0) + 1, gmtModified = now() where id = #{dramaId}")
+	int incrCollectScore(@Param("dramaId") Integer dramaId);
+
+	@Update("update drama set collect_score = greatest(ifnull(collect_score,0) - 1, 0), gmtModified = now() where id = #{dramaId}")
+	int decrCollectScore(@Param("dramaId") Integer dramaId);
+
+	@Update("update drama set like_score = ifnull(like_score,0) + 1, gmtModified = now() where id = #{dramaId}")
+	int incrLikeScore(@Param("dramaId") Integer dramaId);
+
+	@Update("update drama set like_score = greatest(ifnull(like_score,0) - 1, 0), gmtModified = now() where id = #{dramaId}")
+	int decrLikeScore(@Param("dramaId") Integer dramaId);
 }

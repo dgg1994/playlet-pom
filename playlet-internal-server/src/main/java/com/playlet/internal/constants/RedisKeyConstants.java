@@ -22,4 +22,13 @@ public class RedisKeyConstants {
     public static final String VIEW_LIST_KEY = "theater:view:list:uid:";
     public static final String VIEW_META_KEY = "theater:view:meta:uid:";
     public static final String VIEW_EMPTY_KEY = "theater:view:empty:uid:";
+
+    /** 用户收藏 Set：member=dramaId */
+    public static final String COLLECT_SET_UID = "theater:collect:uid:";
+    /** 用户整剧点赞 Set：member=dramaId */
+    public static final String LIKE_DRAMA_SET_UID = "theater:like:drama:uid:";
+    /** 用户单集点赞 Set：member=dramaId:episodeId */
+    public static final String LIKE_EP_SET_UID = "theater:like:ep:uid:";
+    /** 互动状态缓存 TTL：7 天 */
+    public static final long INTERACT_TTL_SEC = 7L * 24 * 60 * 60;
 }

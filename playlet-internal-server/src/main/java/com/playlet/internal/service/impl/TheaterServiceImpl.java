@@ -12,25 +12,22 @@ import com.playlet.internal.api.response.TheaterWatchHistoryItemEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
-import com.playlet.internal.constants.Constants;
-import com.playlet.internal.dao.account.AppAccountDao;
 import com.playlet.internal.dao.drama.DramaDao;
 import com.playlet.internal.dao.drama.RankBoardDao;
 import com.playlet.internal.dao.drama.RankListDao;
 import com.playlet.internal.dao.drama.TagDao;
 import com.playlet.internal.dao.drama.UserWatchHistoryDao;
-import com.playlet.internal.entity.account.AppAccountEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.RankBoardEntity;
 import com.playlet.internal.entity.drama.RankListEntity;
 import com.playlet.internal.entity.drama.TagEntity;
 import com.playlet.internal.entity.drama.UserWatchHistoryEntity;
 import com.playlet.internal.service.TheaterService;
+import com.playlet.internal.utils.AppTokenUtil;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.RedisUtil;
 import com.playlet.internal.utils.StringUtils;
-import io.jsonwebtoken.Jwts;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -63,8 +60,6 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 	private UserWatchHistoryDao userWatchHistoryDao;
 	@Autowired
 	private RedisUtil redisUtil;
-	@Autowired
-	private AppAccountDao appAccountDao;
 
 	@Override
 	public ResponseBase home() {
@@ -220,7 +215,7 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 	@Override
 	public ResponseBase reportWatch(@RequestBody UserWatchHistoryEntity entity, HttpServletRequest request) {
         try {
-            String uid = resolveUid(request);
+            String uid = AppTokenUtil.resolveUid(request);
             if (StringUtils.isEmpty(uid)) {
                 return setResultError(I18nUtil.getMessage("login_required"));
             }
@@ -251,7 +246,7 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 
 	@Override
 	public ResponseBase watchHistory(UserWatchHistoryEntity entity, HttpServletRequest request) {
-		String uid = resolveUid(request);
+		String uid = AppTokenUtil.resolveUid(request);
 		if (StringUtils.isEmpty(uid)) {
 			return setResultError(I18nUtil.getMessage("login_required"));
 		}
@@ -278,7 +273,7 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 	@Override
 	public ResponseBase deleteWatchHistory(@RequestParam Integer dramaId, HttpServletRequest request) {
         try {
-            String uid = resolveUid(request);
+            String uid = AppTokenUtil.resolveUid(request);
             if (StringUtils.isEmpty(uid)) {
                 return setResultError(I18nUtil.getMessage("login_required"));
             }
@@ -286,7 +281,7 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
                 return setResultError(I18nUtil.getMessage("base_error"));
             }
             userWatchHistoryDao.deleteByUidAndDrama(uid, dramaId);
-			// Redis 写入时 dramaId 为 String，删除必须同类型，否则 ClassCastException
+			// Redis 写入时 dramaId 为 String
 			String dramaIdStr = String.valueOf(dramaId);
             redisUtil.lRemove(VIEW_LIST_KEY + uid, 0, dramaIdStr);
             redisUtil.hdel(VIEW_META_KEY + uid, dramaIdStr);
@@ -298,7 +293,7 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 
 	@Override
 	public ResponseBase clearWatchHistory(HttpServletRequest request) {
-		String uid = resolveUid(request);
+		String uid = AppTokenUtil.resolveUid(request);
 		if (StringUtils.isEmpty(uid)) {
 			return setResultError(I18nUtil.getMessage("login_required"));
 		}
@@ -405,39 +400,10 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 		if (request == null) {
 			return null;
 		}
-		String uid = resolveUid(request);
+		String uid = AppTokenUtil.resolveUid(request);
 		if (StringUtils.isNotEmpty(uid)) {
 			return HISTORY_KEY_UID + uid;
 		}
 		return null;
-	}
-
-	private String resolveUid(HttpServletRequest request) {
-		String header = request.getHeader(Constants.HEADER_AUTH);
-		if (StringUtils.isEmpty(header) || !header.startsWith(Constants.AUTH_HEADER_START_WITH)) {
-			return null;
-		}
-		try {
-			String subject = Jwts.parser()
-					.setSigningKey(Constants.SIGNING_KEY)
-					.parseClaimsJws(header.replace(Constants.AUTH_HEADER_START_WITH, ""))
-					.getBody()
-					.getSubject();
-			if (StringUtils.isEmpty(subject)) {
-				return null;
-			}
-			AppAccountEntity byUid = appAccountDao.findByUid(subject);
-			if (byUid != null) {
-				return byUid.getUid();
-			}
-			AppAccountEntity byAccount = appAccountDao.findByAccount(subject);
-			if (byAccount != null) {
-				return byAccount.getUid();
-			}
-			return subject;
-		} catch (Exception e) {
-			log.debug("resolveUid skip: {}", e.getMessage());
-			return null;
-		}
 	}
 }
