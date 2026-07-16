@@ -13,6 +13,9 @@ import lombok.EqualsAndHashCode;
 import java.util.Date;
 import java.util.List;
 
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
+
 @Data
 @EqualsAndHashCode(callSuper = true)
 @TableName("drama")
@@ -114,5 +117,6 @@ public class DramaEntity extends PageQueryHelperEntity {
 	@TableField(exist = false)
 	@ApiModelProperty(name = "tagList",value = "标签类型集合",required = false,dataType = "List<Integer>")
 	private List<TagEntity> tagList;
+
 
 }

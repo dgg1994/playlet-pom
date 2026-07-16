@@ -5,17 +5,17 @@ public enum DeleteStateEnum {
 	NORMAL(0, "否 正常");
 
     
-    private final Integer code;
+    private final Integer index;
 
     private final String name;
 
-    DeleteStateEnum(Integer code, String name) {
-        this.code = code;
+    DeleteStateEnum(Integer index, String name) {
+        this.index = index;
         this.name = name;
     }
 
-	public Integer getCode() {
-		return code;
+	public Integer getIndex() {
+		return index;
 	}
 
 	public String getName() {

@@ -89,6 +89,8 @@ public interface Constants {
     
     public static final String GOOGLE_COCE = "googleCoce";
     
+    public String FILE_UPLOAD_SITE = "VD_%s/cover/";
+    
     
 
 }

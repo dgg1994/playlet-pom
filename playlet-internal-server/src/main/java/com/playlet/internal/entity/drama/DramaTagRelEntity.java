@@ -23,9 +23,9 @@ public class DramaTagRelEntity {
 	@ApiModelProperty(name = "dramaId", value = "剧ID", required = true, dataType = "String")
 	private Integer dramaId;
 
-	@TableField("tag_id")
-	@ApiModelProperty(name = "tagId", value = "标签主键", required = true, dataType = "Integer")
-	private Integer tagId;
+	@TableField("tag_group_id")
+	@ApiModelProperty(name = "tagGroupId", value = "标签分组id ", required = true, dataType = "Integer")
+	private String tagGroupId;
 
 	@TableField("setTime")
 	@ApiModelProperty(name = "setTime", value = "创建时间", required = false, dataType = "Date")
