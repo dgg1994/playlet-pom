@@ -13,7 +13,7 @@ import java.util.List;
 public class TheaterSearchItemEntity {
 
 	@ApiModelProperty("业务剧ID")
-	private String dramaId;
+	private Integer dramaId;
 
 	@ApiModelProperty("标题")
 	private String title;

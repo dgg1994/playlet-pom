@@ -380,7 +380,7 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 
 	private void fillFromDrama(RankListEntity entity, DramaEntity drama) {
 		if (StringUtils.isEmpty(entity.getTitle())) {
-			entity.setTitle(drama.getTitle());
+			entity.setTitle(drama.getDramaTitle());
 		}
 		if (StringUtils.isEmpty(entity.getHotScoreText())) {
 			entity.setHotScoreText(drama.getHotScoreText());
@@ -389,7 +389,7 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 			entity.setTotalEpisodes(drama.getTotalEpisodes());
 		}
 		if (entity.getFinished() == null) {
-			entity.setFinished(drama.getFinished());
+			entity.setFinished(drama.getFinishedState());
 		}
 		if (StringUtils.isEmpty(entity.getCoverUrl())) {
 			String cover = resolveCover(drama);
@@ -403,15 +403,15 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 	private String resolveCover(DramaEntity drama) {
 		try {
 			if (dramaAssetDao != null) {
-				DramaAssetEntity asset = dramaAssetDao.findByDramaAndType(drama.getDramaId(),
+				DramaAssetEntity asset = dramaAssetDao.findByDramaAndType(drama.getId(),
 						DramaAssetTypeEnums.COVER_H.getCode());
-				if (asset != null && StringUtils.isNotEmpty(asset.getUrl())) {
-					return asset.getUrl();
+				if (asset != null && StringUtils.isNotEmpty(asset.getVideoUrl())) {
+					return asset.getVideoUrl();
 				}
-				asset = dramaAssetDao.findByDramaAndType(drama.getDramaId(),
+				asset = dramaAssetDao.findByDramaAndType(drama.getId(),
 						DramaAssetTypeEnums.COVER_V.getCode());
-				if (asset != null && StringUtils.isNotEmpty(asset.getUrl())) {
-					return asset.getUrl();
+				if (asset != null && StringUtils.isNotEmpty(asset.getVideoUrl())) {
+					return asset.getVideoUrl();
 				}
 			}
 		} catch (Exception e) {

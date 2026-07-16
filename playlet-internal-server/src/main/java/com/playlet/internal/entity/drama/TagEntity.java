@@ -15,7 +15,7 @@ import java.util.List;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-@TableName("drama_tag")
+@TableName("dic_drama_tag")
 @ApiModel(value = "短剧标签", description = "短剧标签")
 public class TagEntity extends PageQueryHelperEntity {
 

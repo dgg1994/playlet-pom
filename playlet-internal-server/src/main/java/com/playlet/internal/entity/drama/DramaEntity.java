@@ -11,6 +11,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.util.Date;
+import java.util.List;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -22,21 +23,41 @@ public class DramaEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "id",value = "主键",required = false,dataType = "Integer")
     private Integer id;
 
-	@TableField("drama_id")
-	@ApiModelProperty(name = "dramaId",value = "业务剧ID",required = false,dataType = "String")
-	private String dramaId;
+	@TableField("drama_title")
+	@ApiModelProperty(name = "dramaTitle",value = "短剧标题",required = true,dataType = "String")
+	private String dramaTitle;
 	
-	@TableField("title")
-	@ApiModelProperty(name = "title",value = "标题",required = true,dataType = "String")
-	private String title;
+	@TableField("producer_firm")
+	@ApiModelProperty(name = "producerFirm",value = "出品方",required = true,dataType = "String")
+	private String producerFirm;
 	
 	@TableField("cover_url")
 	@ApiModelProperty(name = "coverUrl",value = "默认封面URL",required = false,dataType = "String")
 	private String coverUrl;
 	
+	@TableField("score_num")
+	@ApiModelProperty(name = "scoreNum",value = "评分",required = false,dataType = "Long")
+	private Long scoreNum;
+	
 	@TableField("hot_score")
 	@ApiModelProperty(name = "hotScore",value = "热度值",required = false,dataType = "Long")
 	private Long hotScore;
+	
+	@TableField("collect_score")
+	@ApiModelProperty(name = "collectScore",value = "收藏量",required = false,dataType = "Long")
+	private Long collectScore;
+	
+	@TableField("like_score")
+	@ApiModelProperty(name = "likeScore",value = "点赞量",required = false,dataType = "Long")
+	private Long likeScore;
+	
+	@TableField("share_score")
+	@ApiModelProperty(name = "shareScore",value = "分享量",required = false,dataType = "Long")
+	private Long shareScore;
+	
+	@TableField("discuss_score")
+	@ApiModelProperty(name = "discussScore",value = "评论量",required = false,dataType = "Long")
+	private Long discussScore;
 	
 	@TableField("hot_score_text")
 	@ApiModelProperty(name = "hotScoreText",value = "热度文案",required = false,dataType = "String")
@@ -46,37 +67,41 @@ public class DramaEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "totalEpisodes",value = "总集数",required = false,dataType = "Integer")
 	private Integer totalEpisodes;
 	
-	@TableField("finished")
-	@ApiModelProperty(name = "finished",value = "是否完结（1是0否）",required = false,dataType = "Integer")
-	private Integer finished;
+	@TableField("finished_state")
+	@ApiModelProperty(name = "finishedState",value = "是否完结（1是0否）",required = false,dataType = "Integer")
+	private Integer finishedState;
 	
-	@TableField("description")
-	@ApiModelProperty(name = "description",value = "简介",required = false,dataType = "String")
-	private String description;
+	@TableField("video_width")
+	@ApiModelProperty(name = "videoWidth",value = "宽",required = false,dataType = "Integer")
+	private Integer videoWidth;
 	
-	@TableField("status")
-	@ApiModelProperty(name = "status",value = "0草稿1待审2已上架3已下架",required = false,dataType = "Integer")
-	private Integer status;
+	@TableField("video_height")
+	@ApiModelProperty(name = "videoHeight",value = "高",required = false,dataType = "Integer")
+	private Integer videoHeight;
+	
+	@TableField("description_info")
+	@ApiModelProperty(name = "descriptionInfo",value = "简介",required = false,dataType = "String")
+	private String descriptionInfo;
+	
+	@TableField("verify_status")
+	@ApiModelProperty(name = "verifyStatus",value = "0草稿1待审2已上架3已下架",required = false,dataType = "Integer")
+	private Integer verifyStatus;
 
-	@TableField("deleted")
-	@ApiModelProperty(name = "deleted",value = "0正常1软删",required = false,dataType = "Integer")
-	private Integer deleted;
+	@TableField("delete_state")
+	@ApiModelProperty(name = "deleteState",value = "1是0否",required = false,dataType = "Integer")
+	private Integer deleteState;
 
 	@TableField("offline_reason")
 	@ApiModelProperty(name = "offlineReason",value = "下架原因",required = false,dataType = "String")
 	private String offlineReason;
 
-	@TableField("remark")
-	@ApiModelProperty(name = "remark",value = "运营备注",required = false,dataType = "String")
-	private String remark;
+	@TableField("remark_info")
+	@ApiModelProperty(name = "remarkInfo",value = "运营备注",required = false,dataType = "String")
+	private String remarkInfo;
 
-	@TableField("create_by")
-	@ApiModelProperty(name = "createBy",value = "创建人",required = false,dataType = "String")
-	private String createBy;
-
-	@TableField("update_by")
-	@ApiModelProperty(name = "updateBy",value = "更新人",required = false,dataType = "String")
-	private String updateBy;
+	@TableField("belong_user")
+	@ApiModelProperty(name = "belongUser",value = "所属人",required = false,dataType = "String")
+	private Integer belongUser;
 	
 	@TableField("setTime")
 	@ApiModelProperty(name = "setTime",value = "创建时间",required = false,dataType = "Date")
@@ -85,25 +110,9 @@ public class DramaEntity extends PageQueryHelperEntity {
 	@TableField("gmtModified")
 	@ApiModelProperty(name = "gmtModified",value = "更新时间",required = false,dataType = "Date")
 	private Date gmtModified;
-
+	
 	@TableField(exist = false)
-	@ApiModelProperty(name = "orientation",value = "方向（1竖2横）查询用",required = false,dataType = "Integer")
-	private Integer orientation;
-
-	@TableField(exist = false)
-	@ApiModelProperty(name = "episodeId",value = "推荐起播分集ID",required = false,dataType = "String")
-	private String episodeId;
-
-	@TableField(exist = false)
-	@ApiModelProperty(name = "episodeNo",value = "推荐起播集序号",required = false,dataType = "Integer")
-	private Integer episodeNo;
-
-	@TableField(exist = false)
-	@ApiModelProperty(name = "playUrl",value = "默认播放地址",required = false,dataType = "String")
-	private String playUrl;
-
-	@TableField(exist = false)
-	@ApiModelProperty(name = "statusName",value = "状态名称",required = false,dataType = "String")
-	private String statusName;
+	@ApiModelProperty(name = "tagList",value = "标签类型集合",required = false,dataType = "List<Integer>")
+	private List<TagEntity> tagList;
 
 }

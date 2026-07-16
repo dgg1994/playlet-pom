@@ -20,22 +20,22 @@ public class DramaTagRelEntity {
 	private Integer id;
 
 	@TableField("drama_id")
-	@ApiModelProperty(name = "dramaId", value = "业务剧ID", required = true, dataType = "String")
-	private String dramaId;
+	@ApiModelProperty(name = "dramaId", value = "剧ID", required = true, dataType = "String")
+	private Integer dramaId;
 
 	@TableField("tag_id")
-	@ApiModelProperty(name = "tagId", value = "标签主键 drama_tag.id", required = true, dataType = "Integer")
+	@ApiModelProperty(name = "tagId", value = "标签主键", required = true, dataType = "Integer")
 	private Integer tagId;
-
-	@TableField("sort_weight")
-	@ApiModelProperty(name = "sortWeight", value = "该剧下标签排序", required = false, dataType = "Integer")
-	private Integer sortWeight;
 
 	@TableField("setTime")
 	@ApiModelProperty(name = "setTime", value = "创建时间", required = false, dataType = "Date")
 	private Date setTime;
+	
+	@TableField("gmtModified")
+	@ApiModelProperty(name = "gmtModified",value = "更新时间",required = false,dataType = "Date")
+	private Date gmtModified;
 
 	@TableField(exist = false)
-	@ApiModelProperty(name = "drama", value = "短剧信息", required = false, dataType = "DramaEntity")
 	private DramaEntity drama;
+
 }

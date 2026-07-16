@@ -151,15 +151,15 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 
 	private TheaterSearchItemEntity toSearchItem(DramaEntity d) {
 		TheaterSearchItemEntity item = new TheaterSearchItemEntity();
-		item.setDramaId(d.getDramaId());
-		item.setTitle(d.getTitle());
+		item.setDramaId(d.getId());
+		item.setTitle(d.getDramaTitle());
 		item.setCoverUrl(d.getCoverUrl());
 		item.setHotScore(d.getHotScore());
 		item.setHotScoreText(d.getHotScoreText());
 		item.setTotalEpisodes(d.getTotalEpisodes());
-		item.setFinished(d.getFinished());
-		item.setDescription(d.getDescription());
-		List<TagEntity> tags = tagDao.findByDramaId(d.getDramaId());
+		item.setFinished(d.getFinishedState());
+		item.setDescription(d.getDescriptionInfo());
+		List<TagEntity> tags = tagDao.findByDramaId(d.getId());
 		if (tags != null) {
 			item.setTags(tags);
 		}

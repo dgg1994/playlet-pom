@@ -13,7 +13,7 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 
 	@Select("select * from drama_asset where drama_id = #{dramaId} and asset_type = #{assetType} "
 			+ "and status = 1 and deleted = 0 limit 1")
-	DramaAssetEntity findByDramaAndType(@Param("dramaId") String dramaId, @Param("assetType") String assetType);
+	DramaAssetEntity findByDramaAndType(@Param("dramaId") Integer dramaId, @Param("assetType") String assetType);
 
 	@Select("<script>"
 			+ "select * from drama_asset where deleted = 0 "

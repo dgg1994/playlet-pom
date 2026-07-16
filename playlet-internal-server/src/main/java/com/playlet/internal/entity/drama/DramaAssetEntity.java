@@ -24,43 +24,51 @@ public class DramaAssetEntity extends PageQueryHelperEntity {
 
 	@TableField("drama_id")
 	@ApiModelProperty(name = "dramaId",value = "业务剧ID",required = true,dataType = "String")
-	private String dramaId;
+	private Integer dramaId;
 	
-	@TableField("asset_type")
-	@ApiModelProperty(name = "assetType",value = "COVER_V/COVER_H/POSTER/SHARE",required = true,dataType = "String")
-	private String assetType;
+	@TableField("collect_score")
+	@ApiModelProperty(name = "collectScore",value = "收藏量",required = false,dataType = "Long")
+	private Long collectScore;
 	
-	@TableField("url")
-	@ApiModelProperty(name = "url",value = "资源URL",required = true,dataType = "String")
-	private String url;
+	@TableField("like_score")
+	@ApiModelProperty(name = "likeScore",value = "点赞量",required = false,dataType = "Long")
+	private Long likeScore;
 	
-	@TableField("width")
-	@ApiModelProperty(name = "width",value = "宽",required = false,dataType = "Integer")
-	private Integer width;
+	@TableField("share_score")
+	@ApiModelProperty(name = "shareScore",value = "分享量",required = false,dataType = "Long")
+	private Long shareScore;
 	
-	@TableField("height")
-	@ApiModelProperty(name = "height",value = "高",required = false,dataType = "Integer")
-	private Integer height;
+	@TableField("discuss_score")
+	@ApiModelProperty(name = "discussScore",value = "评论量",required = false,dataType = "Long")
+	private Long discussScore;
 	
-	@TableField("status")
-	@ApiModelProperty(name = "status",value = "1可用0禁用",required = false,dataType = "Integer")
-	private Integer status;
+	@TableField("video_url")
+	@ApiModelProperty(name = "videoUrl",value = "视频资源URL",required = true,dataType = "String")
+	private String videoUrl;
+	
+	@TableField("video_width")
+	@ApiModelProperty(name = "videoWidth",value = "宽",required = false,dataType = "Integer")
+	private Integer videoWidth;
+	
+	@TableField("video_height")
+	@ApiModelProperty(name = "videoHeight",value = "高",required = false,dataType = "Integer")
+	private Integer videoHeight;
+	
+	@TableField("video_status")
+	@ApiModelProperty(name = "videoStatus",value = "可用状态 1是0否",required = false,dataType = "Integer")
+	private Integer videoStatus;
 
-	@TableField("deleted")
-	@ApiModelProperty(name = "deleted",value = "0正常1软删",required = false,dataType = "Integer")
-	private Integer deleted;
+	@TableField("delete_state")
+	@ApiModelProperty(name = "deleteState",value = "删除状态 1是0否",required = false,dataType = "Integer")
+	private Integer deleteState;
 
-	@TableField("remark")
-	@ApiModelProperty(name = "remark",value = "备注",required = false,dataType = "String")
-	private String remark;
+	@TableField("remark_info")
+	@ApiModelProperty(name = "remarkInfo",value = "备注",required = false,dataType = "String")
+	private String remarkInfo;
 
-	@TableField("create_by")
-	@ApiModelProperty(name = "createBy",value = "创建人",required = false,dataType = "String")
-	private String createBy;
-
-	@TableField("update_by")
-	@ApiModelProperty(name = "updateBy",value = "更新人",required = false,dataType = "String")
-	private String updateBy;
+	@TableField("belong_user")
+	@ApiModelProperty(name = "belongUser",value = "所属人",required = false,dataType = "String")
+	private Integer belongUser;
 	
 	@TableField("setTime")
 	@ApiModelProperty(name = "setTime",value = "创建时间",required = false,dataType = "Date")

@@ -27,5 +27,5 @@ public interface TagDao extends BaseMapper<TagEntity> {
 			+ "inner join drama_tag_rel r on t.id = r.tag_id "
 			+ "where r.drama_id = #{dramaId} and t.status = 1 "
 			+ "order by r.sort_weight desc, t.sort_weight desc, t.id desc")
-	List<TagEntity> findByDramaId(@Param("dramaId") String dramaId);
+	List<TagEntity> findByDramaId(@Param("dramaId") Integer dramaId);
 }

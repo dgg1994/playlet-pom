@@ -9,9 +9,9 @@ spring:
   cloud:
     nacos:
       discovery:
-        server-addr: http://127.0.0.1:8848
-        namespace: 6ed7d1da-d7db-4007-b4cb-6fe448c775e4
-        password: qwerdf
+        server-addr: http://16.163.6.237:8848
+        namespace: 9d71b331-4907-4e19-b982-fc0b121330bc
+        #password: qwerdf
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
