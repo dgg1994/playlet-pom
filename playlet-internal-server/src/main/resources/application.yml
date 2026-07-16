@@ -54,6 +54,12 @@ spring:
           max-idle: 8   #连接池中的最大空闲连接
           min-idle: 0   #连接池中的最小空闲连接
           
+qiniu:
+  access-key: _-kITMkw7LIfn8B42GArIyGTi1yxBIYmbSBkixPf
+  secret-key: v2GPTtydb6AhMfLjyCLERN4G8GJLY3DvLlzrJ6xD
+  bucket: strawberryplaylet
+  domain: https://caomei.debai.com # 用于生成可访问的URL
+          
 dscoins:
   login:
     ipLimit:
