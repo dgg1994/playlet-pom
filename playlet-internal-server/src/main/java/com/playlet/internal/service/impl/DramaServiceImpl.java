@@ -54,11 +54,11 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			dramaDao.insert(entity);
 			//添加短剧标签关联
 			System.out.println(JSON.toJSON(entity.getTagList()));
-			if(createPay.getTagIdList() != null && createPay.getTagIdList().size() > 0) {
-				for (int i = 0; i < createPay.getTagIdList().size(); i++) {
+			if(createPay.getTagGroupIdList() != null && createPay.getTagGroupIdList().size() > 0) {
+				for (int i = 0; i < createPay.getTagGroupIdList().size(); i++) {
 					DramaTagRelEntity dramaTagRelEntity = new DramaTagRelEntity();
 					dramaTagRelEntity.setDramaId(entity.getId());
-					dramaTagRelEntity.setTagId(createPay.getTagIdList().get(i));
+					dramaTagRelEntity.setTagGroupId(createPay.getTagGroupIdList().get(i));;
 					GenericityUtil.setDate(dramaTagRelEntity);
 					dramaTagRelDao.insert(dramaTagRelEntity);
 				}
