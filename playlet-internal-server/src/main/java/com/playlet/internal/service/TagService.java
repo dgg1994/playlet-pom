@@ -21,6 +21,6 @@ public interface TagService {
 
 	@GetMapping("/findDramas")
 	@ApiOperation("根据标签id查询绑定的短剧")
-	ResponseBase findDramas(String tagName);
+	ResponseBase findDramas(Integer tagId);
 
 }

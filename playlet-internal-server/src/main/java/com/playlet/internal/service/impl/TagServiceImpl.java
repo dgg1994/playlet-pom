@@ -58,8 +58,8 @@ public class TagServiceImpl extends BaseApiService implements TagService {
 
     @Override
     @SysLogAnnotation(module = "根据标签id查询绑定的短剧", type = "GET", remark = "根据标签id查询绑定的短剧")
-    public ResponseBase findDramas(@RequestParam String tagName) {
-        List<DramaTagRelEntity> entitys = dramaTagRelDao.selectByTagName(tagName);
+    public ResponseBase findDramas(@RequestParam Integer tagId) {
+        List<DramaTagRelEntity> entitys = dramaTagRelDao.selectByTagId(tagId);
         if (entitys == null){
             entitys = new ArrayList<>();
             return setResultSuccess(entitys, I18nUtil.getMessage("base_success"));
