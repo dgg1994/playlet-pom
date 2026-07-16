@@ -38,7 +38,7 @@ spring:
         - id: api-route
           uri: lb://playlet-internal-server
           predicates:
-            - Path=/api/**
+            - Path=/entrance/**
           filters:
             - StripPrefix=1
 
