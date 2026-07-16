@@ -30,6 +30,10 @@ public interface TagDao extends BaseMapper<TagEntity> {
 			+ "where r.drama_id = #{dramaId} and t.status = 1 "
 			+ "order by t.sort_weight desc, t.id desc")
 	List<TagEntity> findByDramaId(@Param("dramaId") Integer dramaId);
+	
+	@Select("select * from dic_drama_tag where langue = #{language} and group_id in "
+			+ "(select tag_group_id from drama_tag_rel where drama_id = #{dramaId})")
+	List<TagEntity> findGroupLang(@Param("language") String language,@Param("dramaId") Integer dramaId);
 
 	@Update("update dic_drama_tag set status = #{status},gmtModified = NOW() where group_id = #{groupId}")
 	void updateStatusByGroupId(@Param("status") Integer status, @Param("groupId") String groupId);
