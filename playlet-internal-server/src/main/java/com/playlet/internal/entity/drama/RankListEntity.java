@@ -24,9 +24,9 @@ public class RankListEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "id", value = "主键", dataType = "Integer")
 	private Integer id;
 
-	@TableField("board_code")
-	@ApiModelProperty(name = "boardCode", value = "所属榜", dataType = "String")
-	private String boardCode;
+	@TableField("board_group_id")
+	@ApiModelProperty(name = "boardGroupId", value = "所属榜id", dataType = "String")
+	private String boardGroupId;
 
 	@TableField("rank_no")
 	@ApiModelProperty(name = "rankNo", value = "名次从1开始", dataType = "Integer")

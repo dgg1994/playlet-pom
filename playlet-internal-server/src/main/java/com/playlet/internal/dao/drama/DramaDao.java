@@ -11,33 +11,34 @@ import java.util.List;
 @Repository
 public interface DramaDao extends BaseMapper<DramaEntity> {
 
-	/** C端：仅已上架未删除 */
-	@Select("select * from drama where drama_id = #{dramaId} and status = 2 and deleted = 0 limit 1")
-	DramaEntity findOnlineByDramaId(@Param("dramaId") String dramaId);
+	/** C端：仅已上架未删除（id 为主键） */
+	@Select("select * from drama where id = #{dramaId} and verify_status = 2 and delete_state = 0 limit 1")
+	DramaEntity findOnlineByDramaId(@Param("dramaId") Integer dramaId);
 
-	/** 管理端：按业务ID查（含草稿，不含软删） */
-	@Select("select * from drama where drama_id = #{dramaId} and deleted = 0 limit 1")
-	DramaEntity findByDramaId(@Param("dramaId") String dramaId);
+	/** 管理端：按主键查（含草稿，不含软删） */
+	@Select("select * from drama where id = #{dramaId} and delete_state = 0 limit 1")
+	DramaEntity findByDramaId(@Param("dramaId") Integer dramaId);
 
 	@Select("<script>"
-			+ "select * from drama where deleted = 0 "
-			+ "<if test='status != null'> and status = #{status} </if>"
-			+ "<if test='title != null and title != \"\"'> and title like concat('%',#{title},'%') </if>"
-			+ "<if test='dramaId != null and dramaId != \"\"'> and drama_id = #{dramaId} </if>"
+			+ "select * from drama where delete_state = 0 "
+			+ "<if test='verifyStatus != null'> and verify_status = #{verifyStatus} </if>"
+			+ "<if test='dramaTitle != null and dramaTitle != \"\"'> and drama_title like concat('%',#{dramaTitle},'%') </if>"
+			+ "<if test='id != null'> and id = #{id} </if>"
+			+ "<if test='producerFirm != null and producerFirm != \"\"'> and producer_firm like concat('%',#{producerFirm},'%') </if>"
 			+ "order by id desc"
 			+ "</script>")
 	List<DramaEntity> findAdminList(DramaEntity entity);
 
 	/** C端剧场搜索：标题/简介/标签名，仅已上架 */
 	@Select("select distinct d.* from drama d "
-			+ "where d.status = 2 and d.deleted = 0 "
+			+ "where d.verify_status = 2 and d.delete_state = 0 "
 			+ "and ( "
-			+ "  d.title like concat('%', #{keyword}, '%') "
-			+ "  or ifnull(d.description, '') like concat('%', #{keyword}, '%') "
+			+ "  d.drama_title like concat('%', #{keyword}, '%') "
+			+ "  or ifnull(d.description_info, '') like concat('%', #{keyword}, '%') "
 			+ "  or exists ( "
 			+ "    select 1 from drama_tag_rel r "
-			+ "    inner join drama_tag t on t.id = r.tag_id and t.status = 1 "
-			+ "    where r.drama_id = d.drama_id and t.tag_name like concat('%', #{keyword}, '%') "
+			+ "    inner join dic_drama_tag t on t.id = r.tag_id and t.status = 1 "
+			+ "    where r.drama_id = d.id and t.tag_name like concat('%', #{keyword}, '%') "
 			+ "  ) "
 			+ ") "
 			+ "order by d.hot_score desc, d.id desc")

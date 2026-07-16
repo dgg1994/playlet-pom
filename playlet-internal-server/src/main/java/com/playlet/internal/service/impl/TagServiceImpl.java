@@ -6,6 +6,7 @@ import com.github.pagehelper.PageInfo;
 import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
+import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.dao.drama.DramaDao;
 import com.playlet.internal.dao.drama.DramaTagRelDao;
 import com.playlet.internal.dao.drama.TagDao;
@@ -14,6 +15,7 @@ import com.playlet.internal.entity.drama.DramaTagRelEntity;
 import com.playlet.internal.entity.drama.TagEntity;
 import com.playlet.internal.service.TagService;
 import com.playlet.internal.utils.I18nUtil;
+import com.playlet.internal.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,8 +48,11 @@ public class TagServiceImpl extends BaseApiService implements TagService {
 		if (entity == null) {
 			entity = new TagEntity();
 		}
+		if (StringUtils.isEmpty(entity.getLangue())) {
+			entity.setLangue(LanguageContext.getLanguage());
+		}
 		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
-		List<TagEntity> list = tagDao.findAdminList(entity);
+		List<TagEntity> list = tagDao.findAppList(entity);
 		return setResultSuccess(new PageInfo<>(list), I18nUtil.getMessage("base_success"));
 	}
 
@@ -60,7 +65,7 @@ public class TagServiceImpl extends BaseApiService implements TagService {
             return setResultSuccess(entitys, I18nUtil.getMessage("base_success"));
         }
         for (DramaTagRelEntity entity : entitys) {
-            entity.setDrama(dramaDao.selectOne(new QueryWrapper<DramaEntity>().eq("drama_id", entity.getDramaId())));
+            entity.setDrama(dramaDao.selectOne(new QueryWrapper<DramaEntity>().eq("id", entity.getDramaId())));
         }
         return setResultSuccess(entitys, I18nUtil.getMessage("base_success"));
     }

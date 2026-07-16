@@ -12,8 +12,8 @@ import java.util.List;
 @ApiModel("剧场首页分块")
 public class TheaterRankBlockEntity {
 
-	@ApiModelProperty("榜编码 RECOMMEND/HOT/NEW")
-	private String boardCode;
+	@ApiModelProperty("榜分组ID")
+	private String groupId;
 
 	@ApiModelProperty("榜展示名")
 	private String boardName;
