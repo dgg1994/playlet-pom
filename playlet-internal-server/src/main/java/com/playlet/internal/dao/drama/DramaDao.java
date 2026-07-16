@@ -2,6 +2,8 @@ package com.playlet.internal.dao.drama;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.playlet.internal.entity.drama.DramaEntity;
+import com.playlet.internal.query.drama.QueryDramaQuery;
+
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.springframework.stereotype.Repository;
@@ -42,4 +44,24 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 			+ ") "
 			+ "order by d.hot_score desc, d.id desc")
 	List<DramaEntity> searchOnline(@Param("keyword") String keyword);
+
+	@Select("<script>"
+	        + "select * from drama where 1=1"
+	        + "<if test='dramaTitle != null'> and drama_title like CONCAT('%', #{dramaTitle}, '%')</if>"
+	        + "<if test='finishedState != null'> and finished_state = #{finishedState}</if>"
+	        + "<if test='videoType != null'> and video_type = #{videoType}</if>"
+	        + "<if test='belongUser != null'> and belong_user = #{belongUser}</if>"
+	        + "<if test='deleteState != null'> and delete_state = #{deleteState}</if>"
+	        + "<if test='verifyStatus != null'> and verify_status = #{verifyStatus}</if>"
+	        + "<if test='tagGroupIdList != null and tagGroupIdList.size() > 0'>"
+	        + " and id in ("
+	        + "   select drama_id from drama_tag_rel where tag_group_id in "
+	        + "   <foreach collection='tagGroupIdList' item='tagId' open='(' separator=',' close=')'>"
+	        + "     #{tagId}"
+	        + "   </foreach>"
+	        + " )"
+	        + "</if>"
+	        + "order by setTime desc"
+	        + "</script>")
+	List<DramaEntity> findList(QueryDramaQuery entity);
 }

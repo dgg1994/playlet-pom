@@ -9,7 +9,11 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 @Data
-public class AddDramaQuery {
+public class UpdateDramaQuery {
+	
+	@NotBlank(message = "id不能为空")
+	@ApiModelProperty(name = "id",value = "短剧主键id",required = true,dataType = "String")
+	private Integer id;
 	
 	@NotBlank(message = "短剧标题不能为空")
 	@ApiModelProperty(name = "dramaTitle",value = "短剧标题",required = true,dataType = "String")
@@ -46,7 +50,6 @@ public class AddDramaQuery {
 	@ApiModelProperty(name = "belongUser",value = "所属人",required = false,dataType = "String")
 	private Integer belongUser;
 	
-	@NotNull(message = "标签不能为空")
 	@ApiModelProperty(name = "tagGroupIdList",value = "标签语言分组Id类型集合",required = false,dataType = "List<Integer>")
 	private List<String> tagGroupIdList;
 

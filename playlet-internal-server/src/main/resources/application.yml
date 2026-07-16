@@ -17,8 +17,8 @@ spring:
       matching-strategy: ant_path_matcher
   servlet:
     multipart:
-       max-file-size: 255MB
-       max-request-size: 255MB
+       max-file-size: 500MB
+       max-request-size: 500MB
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: GMT+8

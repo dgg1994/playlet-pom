@@ -13,8 +13,6 @@ import lombok.EqualsAndHashCode;
 import java.util.Date;
 import java.util.List;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -74,6 +72,10 @@ public class DramaEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "finishedState",value = "是否完结（1是0否）",required = false,dataType = "Integer")
 	private Integer finishedState;
 	
+	@TableField("video_type")
+	@ApiModelProperty(name = "videoType",value = "视频类型 1横屏 2竖屏",required = false,dataType = "Integer")
+	private Integer videoType;
+	
 	@TableField("video_width")
 	@ApiModelProperty(name = "videoWidth",value = "宽",required = false,dataType = "Integer")
 	private Integer videoWidth;
@@ -117,6 +119,10 @@ public class DramaEntity extends PageQueryHelperEntity {
 	@TableField(exist = false)
 	@ApiModelProperty(name = "tagList",value = "标签类型集合",required = false,dataType = "List<Integer>")
 	private List<TagEntity> tagList;
+	
+	@TableField(exist = false)
+	@ApiModelProperty(name = "uploadSetNum",value = "已上传集数",required = false,dataType = "Integer")
+	private Integer uploadSetNum;
 
 
 }

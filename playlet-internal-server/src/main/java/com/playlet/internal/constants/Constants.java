@@ -91,6 +91,8 @@ public interface Constants {
     
     public String FILE_UPLOAD_SITE = "VD_%s/cover/";
     
+    public String VIDEO_UPLOAD_SITE = "VD_%s/EP_%s/";
     
+    public String M3U8 = "m3u8";
 
 }

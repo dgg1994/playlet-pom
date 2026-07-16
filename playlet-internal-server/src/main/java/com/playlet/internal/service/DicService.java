@@ -28,5 +28,8 @@ public interface DicService {
 	@Operation(summary = "查询订单状态", description = "查询订单状态")
 	ResponseBase findOrderState();
 	
+	@GetMapping("/findVerifyStatus")
+	@Operation(summary = "查询审核状态类型", description = "查询审核状态类型")
+	ResponseBase findVerifyStatus();
 }
 

@@ -1,6 +1,9 @@
 package com.playlet.internal.enums;
 
+import java.util.ArrayList;
+import java.util.List;
 
+import com.playlet.internal.entity.system.DicEntity;
 
 /**
  * @category 审核状态
@@ -39,5 +42,16 @@ public enum VerifyStateEnums {
 		this.name = name;
 	}
 
+    public static List<DicEntity> getList() {
+    	VerifyStateEnums[] typeEnums = values();
+		List<DicEntity> list = new ArrayList<>();
+		for (VerifyStateEnums typeEnum : typeEnums) {
+			DicEntity dicEntity = new DicEntity();
+			dicEntity.setId(typeEnum.getIndex());
+			dicEntity.setName(typeEnum.getName());
+			list.add(dicEntity);
+		}
+		return list;
+	}
 
 }

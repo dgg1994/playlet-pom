@@ -14,6 +14,7 @@ import com.playlet.internal.enums.DeviceTypeEnums;
 import com.playlet.internal.enums.LanguageEnums;
 import com.playlet.internal.enums.OrderStatusEnum;
 import com.playlet.internal.enums.UserStateEnums;
+import com.playlet.internal.enums.VerifyStateEnums;
 import com.playlet.internal.service.DicService;
 import com.playlet.internal.utils.I18nUtil;
 
@@ -46,6 +47,12 @@ public class DicServiceImpl extends BaseApiService implements DicService{
 	@Override
 	public ResponseBase findOrderState() {
 		List<DicEntity> list = OrderStatusEnum.getList();
+		return setResultSuccess(list, I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	public ResponseBase findVerifyStatus() {
+		List<DicEntity> list = VerifyStateEnums.getList();
 		return setResultSuccess(list, I18nUtil.getMessage("base_success"));
 	}
 

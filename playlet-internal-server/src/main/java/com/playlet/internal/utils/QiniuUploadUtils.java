@@ -370,4 +370,15 @@ public class QiniuUploadUtils {
         }
         return dir + fileName;
     }
+    
+    public static String replaceFileExtension(String url, String newExtension) {
+        if (url == null || url.isEmpty()) {
+            return url;
+        }
+        int lastDotIndex = url.lastIndexOf(".");
+        if (lastDotIndex == -1) {
+            return url + "." + newExtension; // 如果没有扩展名，直接追加
+        }
+        return url.substring(0, lastDotIndex) + "." + newExtension;
+    }
 }
