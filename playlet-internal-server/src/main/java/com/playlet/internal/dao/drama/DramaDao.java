@@ -89,4 +89,6 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 	@Select("SELECT * from drama where id = (SELECT drama_id from drama_asset where id = #{id})")
 	DramaEntity findByVideoId(@Param("id") Integer id);
 
+	@Update("update drama set share_score = ifnull(share_score,0) + 1, gmtModified = now() where id = #{dramaId}")
+	void incrShareScore(@Param("dramaId") Integer dramaId);
 }

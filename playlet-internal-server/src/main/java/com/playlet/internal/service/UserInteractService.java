@@ -72,4 +72,9 @@ public interface UserInteractService {
 	})
 	@ApiOperation(value = "我的点赞列表", notes = "需登录；含整剧/单集点赞")
 	ResponseBase likeList(UserDramaLikeEntity entity, HttpServletRequest request);
+
+	@PostMapping("/share/drama")
+	@ApiImplicitParam(name = "dramaId", value = "短剧ID", required = true, dataType = "int", paramType = "query")
+	@ApiOperation(value = "分享上报", notes = "需登录；同一用户同一剧 60 秒内只计一次")
+	ResponseBase shareDrama(Integer dramaId, HttpServletRequest request);
 }

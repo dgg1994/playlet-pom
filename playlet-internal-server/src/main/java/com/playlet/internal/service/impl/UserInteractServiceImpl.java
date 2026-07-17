@@ -33,6 +33,8 @@ import static com.playlet.internal.constants.RedisKeyConstants.COLLECT_SET_UID;
 import static com.playlet.internal.constants.RedisKeyConstants.INTERACT_TTL_SEC;
 import static com.playlet.internal.constants.RedisKeyConstants.LIKE_DRAMA_SET_UID;
 import static com.playlet.internal.constants.RedisKeyConstants.LIKE_EP_SET_UID;
+import static com.playlet.internal.constants.RedisKeyConstants.SHARE_CD_SEC;
+import static com.playlet.internal.constants.RedisKeyConstants.SHARE_CD_UID_DRAMA;
 import static com.playlet.internal.entity.drama.UserDramaLikeEntity.LIKE_TYPE_DRAMA;
 import static com.playlet.internal.entity.drama.UserDramaLikeEntity.LIKE_TYPE_EPISODE;
 
@@ -182,6 +184,39 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		page.setTotal(rows.size());
 		return setResultSuccess(page, I18nUtil.getMessage("base_success"));
 	}
+
+	@Override
+	public ResponseBase shareDrama(@RequestParam Integer dramaId, HttpServletRequest request) {
+        try {
+            String uid = AppTokenUtil.resolveUid(request);
+            if (uid == null) {
+                return setResultError(I18nUtil.getMessage("login_required"));
+            }
+            if (dramaId == null) {
+                return setResultError(I18nUtil.getMessage("base_error"));
+            }
+            if (dramaDao.findOnlineByDramaId(dramaId) == null && dramaDao.findByDramaId(dramaId) == null) {
+                return setResultError(I18nUtil.getMessage("drama_null"));
+            }
+            String cdKey = SHARE_CD_UID_DRAMA + uid + ":" + dramaId;
+            try {
+                if (redisUtil.hasKey(cdKey)) {
+                    return setResultSuccess(I18nUtil.getMessage("base_success"));
+                }
+            } catch (Exception e) {
+                log.warn("share cooldown check failed: {}", e.getMessage());
+            }
+            dramaDao.incrShareScore(dramaId);
+            try {
+                redisUtil.set(cdKey, "1", SHARE_CD_SEC);
+            } catch (Exception e) {
+                log.warn("share cooldown set failed: {}", e.getMessage());
+            }
+            return setResultSuccess(I18nUtil.getMessage("base_success"));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 
 	/**
 	 * 喜欢

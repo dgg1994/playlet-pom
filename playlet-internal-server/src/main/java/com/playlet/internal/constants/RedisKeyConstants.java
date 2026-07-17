@@ -31,4 +31,8 @@ public class RedisKeyConstants {
     public static final String LIKE_EP_SET_UID = "theater:like:ep:uid:";
     /** 互动状态缓存 TTL：7 天 */
     public static final long INTERACT_TTL_SEC = 7L * 24 * 60 * 60;
+
+    /** 分享计数冷却：同一用户同一剧 */
+    public static final String SHARE_CD_UID_DRAMA = "theater:share:cd:uid:";
+    public static final long SHARE_CD_SEC = 30L;
 }
