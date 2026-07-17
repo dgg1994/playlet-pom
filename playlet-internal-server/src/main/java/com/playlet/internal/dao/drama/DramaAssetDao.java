@@ -39,5 +39,12 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 
 	@Select("SELECT * from drama_asset where drama_id = 11 and delete_state =0 order by set_num limit 1")
 	RecommendVidoeRes findDramaIdOne(@Param("dramaId") Integer dramaId,@Param("deleteState") Integer deleteState);
-	
+
+	@Update("update drama_asset set like_score = ifnull(like_score,0) + 1, gmtModified = now() where id = #{assetId}")
+	int incrLikeScore(@Param("assetId") Integer assetId);
+
+	@Update("update drama_asset set like_score = greatest(ifnull(like_score,0) - 1, 0), gmtModified = now() where id = #{assetId}")
+	int decrLikeScore(@Param("assetId") Integer assetId);
+
+
 }
