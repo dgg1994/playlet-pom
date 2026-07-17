@@ -31,5 +31,9 @@ public interface DicService {
 	@GetMapping("/findVerifyStatus")
 	@Operation(summary = "查询审核状态类型", description = "查询审核状态类型")
 	ResponseBase findVerifyStatus();
+
+	@GetMapping("/findWelfareActionType")
+	@Operation(summary = "查询每日任务类型", description = "查询每日任务类型")
+	ResponseBase findWelfareActionType();
 }
 

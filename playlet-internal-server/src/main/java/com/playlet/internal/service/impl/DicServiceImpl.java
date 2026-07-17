@@ -2,6 +2,7 @@ package com.playlet.internal.service.impl;
 
 import java.util.List;
 
+import com.playlet.internal.enums.*;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RestController;
@@ -10,11 +11,6 @@ import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.entity.system.DicEntity;
-import com.playlet.internal.enums.DeviceTypeEnums;
-import com.playlet.internal.enums.LanguageEnums;
-import com.playlet.internal.enums.OrderStatusEnum;
-import com.playlet.internal.enums.UserStateEnums;
-import com.playlet.internal.enums.VerifyStateEnums;
 import com.playlet.internal.service.DicService;
 import com.playlet.internal.utils.I18nUtil;
 
@@ -53,6 +49,12 @@ public class DicServiceImpl extends BaseApiService implements DicService{
 	@Override
 	public ResponseBase findVerifyStatus() {
 		List<DicEntity> list = VerifyStateEnums.getList();
+		return setResultSuccess(list, I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	public ResponseBase findWelfareActionType() {
+		List<DicEntity> list = WelfareActionTypeEnums.getList();
 		return setResultSuccess(list, I18nUtil.getMessage("base_success"));
 	}
 
