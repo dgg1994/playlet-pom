@@ -5,9 +5,11 @@ import com.playlet.internal.api.response.TheaterCollectItemEntity;
 import com.playlet.internal.api.response.TheaterLikeItemEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
+import com.playlet.internal.dao.drama.DramaAssetDao;
 import com.playlet.internal.dao.drama.DramaDao;
 import com.playlet.internal.dao.drama.UserDramaCollectDao;
 import com.playlet.internal.dao.drama.UserDramaLikeDao;
+import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.UserDramaCollectEntity;
 import com.playlet.internal.entity.drama.UserDramaLikeEntity;
@@ -45,6 +47,8 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	private UserDramaLikeDao userDramaLikeDao;
 	@Autowired
 	private DramaDao dramaDao;
+	@Autowired
+	private DramaAssetDao dramaAssetDao;
 	@Autowired
 	private RedisUtil redisUtil;
 
@@ -200,6 +204,13 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 			return setResultError(I18nUtil.getMessage("drama_null"));
 		}
 		String ep = episodeId == null ? "" : episodeId;
+		Integer assetId = null;
+		if (likeType == LIKE_TYPE_EPISODE) {
+			assetId = parseAssetId(ep);
+			if (assetId == null || !isEpisodeOfDrama(dramaId, assetId)) {
+				return setResultError(I18nUtil.getMessage("base_error"));
+			}
+		}
 		if (userDramaLikeDao.findOne(uid, dramaId, likeType, ep) != null) {
 			cacheLike(uid, dramaId, likeType, ep, true);
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
@@ -213,6 +224,9 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 			GenericityUtil.setDate(row);
 			userDramaLikeDao.insert(row);
 			dramaDao.incrLikeScore(dramaId);
+			if (assetId != null) {
+				dramaAssetDao.incrLikeScore(assetId);
+			}
 			cacheLike(uid, dramaId, likeType, ep, true);
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
@@ -241,9 +255,31 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		int deleted = userDramaLikeDao.deleteOne(uid, dramaId, likeType, ep);
 		if (deleted > 0) {
 			dramaDao.decrLikeScore(dramaId);
+			if (likeType == LIKE_TYPE_EPISODE) {
+				Integer assetId = parseAssetId(ep);
+				if (assetId != null) {
+					dramaAssetDao.decrLikeScore(assetId);
+				}
+			}
 		}
 		cacheLike(uid, dramaId, likeType, ep, false);
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	private Integer parseAssetId(String episodeId) {
+		if (StringUtils.isEmpty(episodeId)) {
+			return null;
+		}
+		try {
+			return Integer.valueOf(episodeId.trim());
+		} catch (NumberFormatException e) {
+			return null;
+		}
+	}
+
+	private boolean isEpisodeOfDrama(Integer dramaId, Integer assetId) {
+		DramaAssetEntity asset = dramaAssetDao.selectById(assetId);
+		return asset != null && dramaId.equals(asset.getDramaId());
 	}
 
 	/**
