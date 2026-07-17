@@ -34,10 +34,10 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 	@Select("select ifnull(count(*),0) from drama_asset where drama_id = #{dramaId}")
 	Integer findByDramaIdNum(@Param("dramaId") Integer dramaId);
 
-	@Select("select * from drama_asset where drama_id = #{dramaId}")
+	@Select("select * from drama_asset where drama_id = #{dramaId} order by set_num")
 	List<DramaAssetRes> findByDramaId(@Param("dramaId") Integer dramaId);
 
-	@Select("SELECT * from drama_asset where drama_id = 11 and delete_state =0 order by set_num limit 1")
+	@Select("SELECT * from drama_asset where drama_id = #{dramaId} and delete_state = #{deleteState} order by set_num limit 1")
 	RecommendVidoeRes findDramaIdOne(@Param("dramaId") Integer dramaId,@Param("deleteState") Integer deleteState);
 
 	@Update("update drama_asset set like_score = ifnull(like_score,0) + 1, gmtModified = now() where id = #{assetId}")
@@ -47,4 +47,9 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 	int decrLikeScore(@Param("assetId") Integer assetId);
 
 
+
+	@Select("select video_url from drama_asset where id = #{id}")
+	String findVideoUrl(@Param("id") Integer id);
+
+	
 }
