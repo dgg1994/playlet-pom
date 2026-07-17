@@ -7,18 +7,20 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
-
-import com.alibaba.fastjson.JSON;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
+import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.dao.drama.DramaAssetDao;
 import com.playlet.internal.dao.drama.DramaDao;
+import com.playlet.internal.dao.drama.TagDao;
 import com.playlet.internal.entity.drama.DramaEntity;
+import com.playlet.internal.entity.drama.TagEntity;
 import com.playlet.internal.enums.DeleteStateEnum;
 import com.playlet.internal.enums.VerifyStateEnums;
 import com.playlet.internal.query.drama.RecommendDramaQuery;
+import com.playlet.internal.response.drama.DramaAssetRes;
 import com.playlet.internal.response.drama.RecommendDramaRes;
 import com.playlet.internal.response.drama.RecommendVidoeRes;
 import com.playlet.internal.service.DramaApiService;
@@ -34,6 +36,9 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
 	
 	@Autowired
 	private DramaAssetDao dramaAssetDao;
+	
+	@Autowired
+	private TagDao tagDao;
 
 	@Override
 	public ResponseBase recommend(@RequestBody RecommendDramaQuery entity) {
@@ -48,19 +53,81 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
 					vidoeRes.setCollectScore(list.get(i).getCollectScore());
 					vidoeRes.setShareScore(list.get(i).getShareScore());
 					list.get(i).setVidoeRes(vidoeRes);
-					System.out.println(JSON.toJSON(vidoeRes));
-					System.out.println(JSON.toJSON(list.get(i)));
 				}
 			}
-			 // 👇 在创建 PageInfo 之前打印
-	        System.out.println("创建 PageInfo 之前: " + JSON.toJSONString(list));
-	        
-	        PageInfo<RecommendDramaRes> info = new PageInfo<>(list);
-	        
-	        // 👇 在创建 PageInfo 之后打印
-	        System.out.println("创建 PageInfo 之后: " + JSON.toJSONString(info.getList()));
-//			PageInfo<RecommendDramaRes> info = new PageInfo<>(list);
+			PageInfo<RecommendDramaRes> info = new PageInfo<>(list);
 			return setResultSuccess(info, I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException();
+		}
+	}
+
+	@Override
+	public ResponseBase playVideoReport(Integer id) {
+		try {
+			DramaEntity dramaEntity = dramaDao.findByVideoId(id);
+			if(dramaEntity != null) {
+				dramaEntity.setHotScore(dramaEntity.getHotScore() + 1);
+				dramaDao.updateById(dramaEntity);
+			}
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException();
+		}
+	}
+
+	@Override
+	public ResponseBase selections(Integer id) {
+		try {
+			List<DramaAssetRes> list = dramaAssetDao.findByDramaId(id);
+			return setResultSuccess(list, I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException();
+		}
+	}
+
+	@Override
+	public ResponseBase getVideoUrl(Integer id) {
+		try {
+			String url = dramaAssetDao.findVideoUrl(id);
+			return setResultSuccess(url, I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException();
+		}
+	}
+
+	@Override
+	public ResponseBase workInfo(Integer id) {
+		try {
+			String language = LanguageContext.getLanguage();
+			DramaEntity entity = dramaDao.selectById(id);
+			if(entity == null) {
+				return  setResultError(I18nUtil.getMessage("base_error"));
+			}
+			if(VerifyStateEnums.REMOVED_SHELVES.getIndex().equals(entity.getVerifyStatus())) {
+				return  setResultError(I18nUtil.getMessage("video_removed_shelves"));
+			}
+			if(DeleteStateEnum.DELETE.getIndex().equals(entity.getDeleteState())) {
+				return  setResultError(I18nUtil.getMessage("video_delete"));
+			}
+			List<TagEntity> tagList = tagDao.findGroupLang(language,entity.getId());
+			entity.setTagList(tagList);
+			return setResultSuccess(entity, I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException();
+		}
+	}
+
+	@Override
+	public ResponseBase relatedWork(Integer id) {
+		try {
+			List<RecommendDramaRes> list = dramaDao.relatedWork(id,DeleteStateEnum.NORMAL.getIndex(),VerifyStateEnums.AVAILABLE_NOW.getIndex());
+			return setResultSuccess(list, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			e.printStackTrace();
 			throw new RuntimeException();
@@ -70,12 +137,8 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
 	@Override
 	public ResponseBase playVideo(Integer id) {
 		try {
-			DramaEntity dramaEntity = dramaDao.findByVideoId(id);
-			if(dramaEntity != null) {
-				dramaEntity.setHotScore(dramaEntity.getHotScore() + 1);
-				dramaDao.updateById(dramaEntity);
-			}
-			return setResultSuccess(I18nUtil.getMessage("base_success"));
+			RecommendVidoeRes res = dramaAssetDao.findDramaIdOne(id,DeleteStateEnum.NORMAL.getIndex());
+			return setResultSuccess(res.getVideoUrl(), I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			e.printStackTrace();
 			throw new RuntimeException();

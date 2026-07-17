@@ -91,4 +91,22 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 
 	@Update("update drama set share_score = ifnull(share_score,0) + 1, gmtModified = now() where id = #{dramaId}")
 	void incrShareScore(@Param("dramaId") Integer dramaId);
+	@Select("SELECT d.* "
+	        + "FROM drama d "
+	        + "WHERE d.delete_state = #{deleteState} "
+	        + "  AND d.verify_status = #{verifyStatus} "
+	        + "  AND d.id != #{id} "
+	        + "  AND EXISTS ("
+	        + "      SELECT 1 "
+	        + "      FROM drama_tag_rel dtr "
+	        + "      WHERE dtr.drama_id = d.id "
+	        + "        AND dtr.tag_group_id IN ( "
+	        + "            SELECT tag_group_id "
+	        + "            FROM drama_tag_rel "
+	        + "            WHERE drama_id = #{id} "
+	        + "        )"
+	        + "  ) "
+	        + "LIMIT 20")
+	List<RecommendDramaRes> relatedWork(@Param("id") Integer id,@Param("deleteState") Integer deleteState,@Param("verifyStatus") Integer verifyStatus);
+
 }

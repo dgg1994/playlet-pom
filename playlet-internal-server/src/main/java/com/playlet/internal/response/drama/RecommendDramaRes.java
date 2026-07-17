@@ -37,6 +37,9 @@ public class RecommendDramaRes {
 	@ApiModelProperty(name = "videoType",value = "视频类型 1横屏 2竖屏",required = false,dataType = "Integer")
 	private Integer videoType;
 	
+	@ApiModelProperty(name = "coverUrl",value = "封面",required = false,dataType = "String")
+	private String coverUrl;
+	
 	@ApiModelProperty(name = "vidoeRes",value = "视频内容",required = false,dataType = "RecommendVidoeRes")
 	private RecommendVidoeRes vidoeRes;
 

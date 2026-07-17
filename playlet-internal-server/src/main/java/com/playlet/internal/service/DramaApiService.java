@@ -25,6 +25,46 @@ public interface DramaApiService {
 	 * @param entity
 	 * @return
 	 */
+	@GetMapping("/playVideoReport")
+	ResponseBase playVideoReport(Integer id);
+	
+	/**
+	 * @category 选集视频列表
+	 * @param id
+	 * @return
+	 */
+	@GetMapping("/selections")
+	ResponseBase selections(Integer id);
+	
+	/**
+	 * @category 获取视频播放地址
+	 * @param id
+	 * @return
+	 */
+	@GetMapping("/getVideoUrl")
+	ResponseBase getVideoUrl(Integer id);
+	
+	/**
+	 * @category 作品详情
+	 * @param id
+	 * @return
+	 */
+	@GetMapping("/workInfo")
+	ResponseBase workInfo(Integer id);
+	
+	/**
+	 * @category 相关作品
+	 * @param id
+	 * @return
+	 */
+	@GetMapping("/relatedWork")
+	ResponseBase relatedWork(Integer id);
+	
+	/**
+	 * @category 开始播放查询第一集播放地址
+	 * @param id
+	 * @return
+	 */
 	@GetMapping("/playVideo")
 	ResponseBase playVideo(Integer id);
 
