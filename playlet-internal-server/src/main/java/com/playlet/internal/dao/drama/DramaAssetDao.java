@@ -3,6 +3,7 @@ package com.playlet.internal.dao.drama;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.response.drama.DramaAssetRes;
+import com.playlet.internal.response.drama.RecommendVidoeRes;
 
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -35,5 +36,8 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 
 	@Select("select * from drama_asset where drama_id = #{dramaId}")
 	List<DramaAssetRes> findByDramaId(@Param("dramaId") Integer dramaId);
+
+	@Select("SELECT * from drama_asset where drama_id = 11 and delete_state =0 order by set_num limit 1")
+	RecommendVidoeRes findDramaIdOne(@Param("dramaId") Integer dramaId,@Param("deleteState") Integer deleteState);
 	
 }

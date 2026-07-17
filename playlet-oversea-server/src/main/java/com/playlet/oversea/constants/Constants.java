@@ -75,7 +75,7 @@ public interface Constants {
     
     public static final String HEADER_VERSION = "x-playlet-version";
     
-    public static final String HEADER_LANGUAGE = "x-mergpay-language";
+    public static final String HEADER_LANGUAGE = "x-playlet-language";
     
     //配置前端响应头
     public static final String HEADER_ACCESS = "Access-Control-Expose-Headers";

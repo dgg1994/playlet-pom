@@ -1,5 +1,7 @@
 package com.playlet.internal.service.impl;
 
+import javax.validation.Valid;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -33,7 +35,7 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 	private DramaAssetDao dramaAssetDao;
 
 	@Override
-	public ResponseBase addDrama(AddDramaAssetQuery createPay, MultipartFile file) {
+	public ResponseBase addDrama(@Valid AddDramaAssetQuery createPay, MultipartFile file) {
 		try {
 			DramaEntity entity = dramaDao.selectById(createPay.getDramaId());
 			if(entity == null) {

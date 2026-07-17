@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
+import com.playlet.internal.response.drama.DramaAssetRes;
+
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -89,7 +91,7 @@ public class DramaEntity extends PageQueryHelperEntity {
 	private String descriptionInfo;
 	
 	@TableField("verify_status")
-	@ApiModelProperty(name = "verifyStatus",value = "0草稿1待审2已上架3已下架",required = false,dataType = "Integer")
+	@ApiModelProperty(name = "verifyStatus",value = "是否上架 1是0否 0下架1上架",required = false,dataType = "Integer")
 	private Integer verifyStatus;
 
 	@TableField("delete_state")
@@ -132,5 +134,8 @@ public class DramaEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "tagGroupId",value = "标签分组id（drama_tag_rel.tag_group_id）",required = false,dataType = "String")
 	private String tagGroupId;
 
+	@TableField(exist = false)
+	@ApiModelProperty(name = "voideList",value = "已上传视频",required = false,dataType = "List<DramaAssetRes>")
+	private List<DramaAssetRes> voideList;
 
 }

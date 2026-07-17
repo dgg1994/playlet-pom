@@ -11,10 +11,10 @@ import com.playlet.internal.entity.system.DicEntity;
  *
  */
 public enum VerifyStateEnums {
-	DRAFT(0, "草稿"),
-	PENDING_REVIEW(1, "待审核"),
-	AVAILABLE_NOW(2, "已上架"),
-	REMOVED_SHELVES(3, "已下架");
+//	DRAFT(0, "草稿"),
+//	PENDING_REVIEW(1, "待审核"),
+	AVAILABLE_NOW(1, "已上架"),
+	REMOVED_SHELVES(0, "未上架");
 	
 
 	private Integer index;

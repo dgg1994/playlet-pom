@@ -3,6 +3,8 @@ package com.playlet.internal.dao.drama;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.query.drama.QueryDramaQuery;
+import com.playlet.internal.query.drama.RecommendDramaQuery;
+import com.playlet.internal.response.drama.RecommendDramaRes;
 
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -80,4 +82,8 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 
 	@Update("update drama set like_score = greatest(ifnull(like_score,0) - 1, 0), gmtModified = now() where id = #{dramaId}")
 	int decrLikeScore(@Param("dramaId") Integer dramaId);
+
+	@Select("SELECT * FROM drama WHERE delete_state = #{deleteState} AND verify_status = #{verifyStatus} ORDER BY RAND() ")
+	List<RecommendDramaRes> recommendList(RecommendDramaQuery entity);
+
 }
