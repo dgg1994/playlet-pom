@@ -44,10 +44,13 @@ public interface UserDramaLikeDao extends BaseMapper<UserDramaLikeEntity> {
 	int deleteOne(@Param("uid") String uid, @Param("dramaId") Integer dramaId,
 			@Param("likeType") Integer likeType, @Param("episodeId") String episodeId);
 
-	@Select("select count(1) from user_drama_like where drama_id = #{dramaId}")
+	@Select("select count(*) from user_drama_like where drama_id = #{dramaId}")
 	long countByDramaId(@Param("dramaId") Integer dramaId);
 
-	@Select("select count(1) from user_drama_like where drama_id = #{dramaId} "
+	@Select("select count(*) from user_drama_like where drama_id = #{dramaId} "
 			+ "and like_type = 2 and episode_id = #{episodeId}")
 	long countByEpisode(@Param("dramaId") Integer dramaId, @Param("episodeId") String episodeId);
+
+	@Select("select count(*) from user_drama_like where uid = #{uid}")
+	Long countLike(@Param("uid") String uid);
 }

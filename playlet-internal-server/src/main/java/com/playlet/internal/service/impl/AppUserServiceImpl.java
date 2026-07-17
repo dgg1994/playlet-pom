@@ -8,6 +8,8 @@ import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.account.AppAccountDao;
 import com.playlet.internal.dao.account.AppOauthAccountDao;
+import com.playlet.internal.dao.account.UserFollowDao;
+import com.playlet.internal.dao.drama.UserDramaLikeDao;
 import com.playlet.internal.dao.template.EmailTemplateDao;
 import com.playlet.internal.entity.account.AppAccountEntity;
 import com.playlet.internal.entity.account.AppOauthAccountEntity;
@@ -65,6 +67,12 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 
 	@Autowired
 	private AppOauthAccountDao appOauthAccountDao;
+
+	@Autowired
+	private UserFollowDao userFollowDao;
+
+	@Autowired
+	private UserDramaLikeDao UserDramaLikeDao;
 
 	@Override
 	public ResponseBase signUp(@RequestBody AppAccountEntity entity) {
@@ -324,6 +332,9 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			entity.setUserPassword(null);
 			entity.setPayPassword(null);
 			entity.setGoogleSecretkey(null);
+			entity.setFollowCount(userFollowDao.countFollowing(entity.getUid()));
+			entity.setFansCount(userFollowDao.countFans(entity.getUid()));
+			entity.setLikeCount(UserDramaLikeDao.countLike(entity.getUid()));
 			return setResultSuccess(entity);
 		} catch (Exception e) {
 			e.printStackTrace();

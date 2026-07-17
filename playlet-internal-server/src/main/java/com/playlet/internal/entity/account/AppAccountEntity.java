@@ -127,4 +127,16 @@ public class AppAccountEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "idToken", value = "Apple/Google 返回的 id_token", required = false, dataType = "String")
 	private String idToken;
 
+	@TableField(exist = false)
+	@ApiModelProperty(name = "followCount",value = "我的关注",required = false,dataType = "Long")
+	private Long followCount;
+
+	@TableField(exist = false)
+	@ApiModelProperty(name = "fansCount",value = "我的粉丝",required = false,dataType = "Long")
+	private Long fansCount;
+
+	@TableField(exist = false)
+	@ApiModelProperty(name = "likeCount",value = "获赞数",required = false,dataType = "Long")
+	private Long likeCount;
+
 }
