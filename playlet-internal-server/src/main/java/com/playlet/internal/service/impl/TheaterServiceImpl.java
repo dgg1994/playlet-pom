@@ -123,38 +123,46 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 	}
 
 	@Override
-	public ResponseBase search(@RequestParam String keyword, DramaEntity entity,
-			HttpServletRequest request) {
-		if (StringUtils.isEmpty(keyword) || StringUtils.isEmpty(keyword.trim())) {
-			return setResultError("请输入关键词");
-		}
-		keyword = keyword.trim();
-		if (keyword.length() > KEYWORD_MAX_LEN) {
-			keyword = keyword.substring(0, KEYWORD_MAX_LEN);
-		}
+	public ResponseBase search(@RequestBody DramaEntity entity, HttpServletRequest request) {
 		if (entity == null) {
 			entity = new DramaEntity();
 		}
-
-		List<DramaEntity> dramaEntities = dramaDao.searchOnline(keyword);
+		if (StringUtils.isNotEmpty(entity.getDramaTitle())) {
+			entity.setDramaTitle(entity.getDramaTitle().trim());
+		}
+		// 关联表存的是 tag_group_id，前端常传标签主键 tagId，先解析成 groupId
+		if (StringUtils.isEmpty(entity.getTagGroupId()) && entity.getTagId() != null) {
+			TagEntity tag = tagDao.selectById(entity.getTagId());
+			if (tag == null || StringUtils.isEmpty(tag.getGroupId())) {
+				PageInfo<TheaterSearchItemEntity> empty = new PageInfo<>(new ArrayList<>());
+				empty.setTotal(0);
+				return setResultSuccess(empty, I18nUtil.getMessage("base_success"));
+			}
+			entity.setTagGroupId(tag.getGroupId());
+		}
+		List<DramaEntity> dramaEntities = dramaDao.searchOnline(entity);
 		if (dramaEntities == null) {
 			dramaEntities = new ArrayList<>();
 		}
+		log.info("theater search title={}, tagId={}, tagGroupId={}, hit={}",
+				entity.getDramaTitle(), entity.getTagId(), entity.getTagGroupId(), dramaEntities.size());
 		List<DramaEntity> pageDramas = GenericityUtil.Page(dramaEntities, entity.getPageNumber(), entity.getPageSize());
 
+		String langue = LanguageContext.getLanguage();
 		List<TheaterSearchItemEntity> items = new ArrayList<>();
 		for (DramaEntity d : pageDramas) {
-			items.add(toSearchItem(d));
+			items.add(toSearchItem(d, langue));
 		}
 
 		PageInfo<TheaterSearchItemEntity> page = new PageInfo<>(items);
 		page.setTotal(dramaEntities.size());
-		// 保存搜索历史
-		saveSearchHistory(request, keyword);
+		if (StringUtils.isNotEmpty(entity.getDramaTitle())) {
+			saveSearchHistory(request, entity.getDramaTitle());
+		}
 		return setResultSuccess(page, I18nUtil.getMessage("base_success"));
 	}
 
-	private TheaterSearchItemEntity toSearchItem(DramaEntity d) {
+	private TheaterSearchItemEntity toSearchItem(DramaEntity d, String langue) {
 		TheaterSearchItemEntity item = new TheaterSearchItemEntity();
 		item.setDramaId(d.getId());
 		item.setTitle(d.getDramaTitle());
@@ -164,7 +172,12 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 		item.setTotalEpisodes(d.getTotalEpisodes());
 		item.setFinished(d.getFinishedState());
 		item.setDescription(d.getDescriptionInfo());
-		List<TagEntity> tags = tagDao.findByDramaId(d.getId());
+		List<TagEntity> tags;
+		if (StringUtils.isNotEmpty(langue)) {
+			tags = tagDao.findGroupLang(langue, d.getId());
+		} else {
+			tags = tagDao.findByDramaId(d.getId());
+		}
 		if (tags != null) {
 			item.setTags(tags);
 		}

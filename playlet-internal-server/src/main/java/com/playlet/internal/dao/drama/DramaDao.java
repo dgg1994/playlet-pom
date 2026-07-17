@@ -32,20 +32,22 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 			+ "</script>")
 	List<DramaEntity> findAdminList(DramaEntity entity);
 
-	/** C端剧场搜索：标题/简介/标签名，仅已上架 */
-	@Select("select distinct d.* from drama d "
-			+ "where d.verify_status = 2 and d.delete_state = 0 "
-			+ "and ( "
-			+ "  d.drama_title like concat('%', #{keyword}, '%') "
-			+ "  or ifnull(d.description_info, '') like concat('%', #{keyword}, '%') "
-			+ "  or exists ( "
+	/** C端剧场搜索：标题模糊 + 标签分组精确，仅已上架；条件可单独或组合 */
+	@Select("<script>"
+			+ "select distinct d.* from drama d "
+			+ "where d.verify_status = 2 and ifnull(d.delete_state, 0) = 0 "
+			+ "<if test='entity.dramaTitle != null and entity.dramaTitle != \"\"'> "
+			+ "  and d.drama_title like concat('%', #{entity.dramaTitle}, '%') "
+			+ "</if>"
+			+ "<if test='entity.tagGroupId != null and entity.tagGroupId != \"\"'> "
+			+ "  and exists ( "
 			+ "    select 1 from drama_tag_rel r "
-			+ "    inner join dic_drama_tag t on t.id = r.tag_id and t.status = 1 "
-			+ "    where r.drama_id = d.id and t.tag_name like concat('%', #{keyword}, '%') "
+			+ "    where r.drama_id = d.id and r.tag_group_id = #{entity.tagGroupId} "
 			+ "  ) "
-			+ ") "
-			+ "order by d.hot_score desc, d.id desc")
-	List<DramaEntity> searchOnline(@Param("keyword") String keyword);
+			+ "</if>"
+			+ "order by ifnull(d.hot_score, 0) desc, d.id desc"
+			+ "</script>")
+	List<DramaEntity> searchOnline(@Param("entity") DramaEntity entity);
 
 	@Select("<script>"
 	        + "select * from drama where 1=1"

@@ -76,7 +76,4 @@ public class RankListEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "gmtModified", value = "更新时间", dataType = "Date")
 	private Date gmtModified;
 
-	@TableField(exist = false)
-	@ApiModelProperty(name = "items", value = "整榜覆盖写入用", dataType = "List")
-	private List<RankListEntity> items;
 }

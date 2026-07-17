@@ -124,5 +124,13 @@ public class DramaEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "uploadSetNum",value = "已上传集数",required = false,dataType = "Integer")
 	private Integer uploadSetNum;
 
+	@TableField(exist = false)
+	@ApiModelProperty(name = "tagId",value = "标签主键id（会解析为 groupId 再检索）",required = false,dataType = "Integer")
+	private Integer tagId;
+
+	@TableField(exist = false)
+	@ApiModelProperty(name = "tagGroupId",value = "标签分组id（drama_tag_rel.tag_group_id）",required = false,dataType = "String")
+	private String tagGroupId;
+
 
 }

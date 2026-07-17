@@ -35,14 +35,9 @@ public interface TheaterService {
 	@ApiOperation(value = "榜单分页", notes = "读 rank_list，仅 status=1；data=TheaterRankPageRespEntity")
 	ResponseBase rank(String groupId, RankListEntity entity);
 
-	@GetMapping("/search")
-	@ApiImplicitParams({
-			@ApiImplicitParam(name = "keyword", value = "关键词（标题/简介/标签）", required = true, dataType = "string", paramType = "query"),
-			@ApiImplicitParam(name = "pageNumber", value = "页码", required = false, dataType = "int", paramType = "query"),
-			@ApiImplicitParam(name = "pageSize", value = "每页", required = false, dataType = "int", paramType = "query")
-	})
-	@ApiOperation(value = "剧场搜索", notes = "模糊搜已上架剧；已登录时写入搜索历史")
-	ResponseBase search(String keyword, DramaEntity entity, HttpServletRequest request);
+	@PostMapping("/search")
+	@ApiOperation(value = "剧场搜索", notes = "按 dramaTitle 模糊；按 tagId（标签主键，内部转 groupId）或 tagGroupId 精确筛选已上架剧；可单独或组合")
+	ResponseBase search(@RequestBody DramaEntity entity, HttpServletRequest request);
 
 	@GetMapping("/search/history")
 	@ApiOperation(value = "搜索历史列表", notes = "需 x-playlet-token")
