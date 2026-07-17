@@ -48,7 +48,6 @@ public class DramaTagServiceImpl implements DramaTagService {
         if (entity == null) {
             entity = new TagEntity();
         }
-        // 优先用请求体 langue；未传时回落请求头 x-playlet-language
         if (StringUtils.isEmpty(entity.getLangue())) {
             entity.setLangue(LanguageContext.getLanguage());
         }

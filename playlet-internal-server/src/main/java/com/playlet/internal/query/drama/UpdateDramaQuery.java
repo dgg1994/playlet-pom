@@ -11,7 +11,7 @@ import lombok.Data;
 @Data
 public class UpdateDramaQuery {
 	
-	@NotBlank(message = "id不能为空")
+	@NotNull(message = "id不能为空")
 	@ApiModelProperty(name = "id",value = "短剧主键id",required = true,dataType = "String")
 	private Integer id;
 	

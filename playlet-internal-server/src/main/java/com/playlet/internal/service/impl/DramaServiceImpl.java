@@ -1,6 +1,8 @@
 package com.playlet.internal.service.impl;
 import java.util.List;
 
+import javax.validation.Valid;
+
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,7 +57,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 	
 	
 	@Override
-	public ResponseBase addDrama(AddDramaQuery createPay, MultipartFile file) {
+	public ResponseBase addDrama(@Valid AddDramaQuery createPay, MultipartFile file) {
 		try {
 			//上传图片
 			if(file == null) {
@@ -64,7 +66,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			DramaEntity entity = new DramaEntity();
 			BeanUtils.copyProperties(createPay, entity);
 			//新增短剧基础信息
-			entity.setVerifyStatus(VerifyStateEnums.DRAFT.getIndex());
+			entity.setVerifyStatus(VerifyStateEnums.REMOVED_SHELVES.getIndex());
 			entity.setDeleteState(DeleteStateEnum.NORMAL.getIndex());
 			GenericityUtil.setDate(entity);
 			dramaDao.insert(entity);
@@ -91,12 +93,19 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 
 
 	@Override
-	public ResponseBase update(UpdateDramaQuery createPay, MultipartFile file) {
+	public ResponseBase update(@Valid UpdateDramaQuery createPay, MultipartFile file) {
 		try {
 			DramaEntity entity = dramaDao.selectById(createPay.getId());
 			if(entity == null) {
 				return  setResultError(I18nUtil.getMessage("base_error"));
 			}
+			entity.setDramaTitle(createPay.getDramaTitle());
+			entity.setProducerFirm(createPay.getProducerFirm());
+			entity.setTotalEpisodes(createPay.getTotalEpisodes());
+			entity.setFinishedState(createPay.getFinishedState());
+			entity.setVideoType(createPay.getVideoType());
+			entity.setDescriptionInfo(createPay.getDescriptionInfo());
+			entity.setBelongUser(createPay.getBelongUser());
 			if(file != null) {
 				String path = String.format(Constants.FILE_UPLOAD_SITE, entity.getId());
 				String url = QiniuUploadUtils.uploadFile(file,path);
@@ -122,7 +131,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 
 
 	@Override
-	public ResponseBase findList(@RequestBody QueryDramaQuery entity) {
+	public ResponseBase findList(@Valid @RequestBody QueryDramaQuery entity) {
 		try {
 			String language = LanguageContext.getLanguage();
 			PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
@@ -170,6 +179,13 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			if(entity == null) {
 				return  setResultError(I18nUtil.getMessage("base_error"));
 			}
+			if(VerifyStateEnums.AVAILABLE_NOW.getIndex().equals(verifyStatus)) {//发布视频
+				//查询是否已上传视频
+				List<DramaAssetRes> list = dramaAssetDao.findByDramaId(id);
+				if(list == null || list.size() < 1) {
+					return  setResultError(I18nUtil.getMessage("video_not_release"));
+				}
+			}
 			entity.setVerifyStatus(verifyStatus);
 			dramaDao.updateById(entity);
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
@@ -189,6 +205,28 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			}
 			List<DramaAssetRes> list = dramaAssetDao.findByDramaId(id);
 			return setResultSuccess(list, I18nUtil.getMessage("base_success")); 
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException();
+		}
+	}
+
+
+	@Override
+	public ResponseBase findInfo(Integer id) {
+		try {
+			String language = LanguageContext.getLanguage();
+			DramaEntity entity = dramaDao.selectById(id);
+			if(entity == null) {
+				return  setResultError(I18nUtil.getMessage("base_error"));
+			}
+			List<TagEntity> tagList = tagDao.findGroupLang(language,entity.getId());
+			entity.setTagList(tagList);
+			Integer uploadSetNum = dramaAssetDao.findByDramaIdNum(entity.getId());
+			entity.setUploadSetNum(uploadSetNum);
+			List<DramaAssetRes> list = dramaAssetDao.findByDramaId(id);
+			entity.setVoideList(list);
+			return setResultSuccess(entity, I18nUtil.getMessage("base_success")); 
 		} catch (Exception e) {
 			e.printStackTrace();
 			throw new RuntimeException();

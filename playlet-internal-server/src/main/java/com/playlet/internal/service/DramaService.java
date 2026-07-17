@@ -52,7 +52,7 @@ public interface DramaService {
 	ResponseBase delete(Integer id);
 	
 	/**
-	 * @category 修改审核状态
+	 * @category 修改发布状态
 	 * @param id
 	 * @return
 	 */
@@ -66,5 +66,13 @@ public interface DramaService {
 	 */
 	@GetMapping("/findVideo")
 	ResponseBase findVideo(Integer id);
+	
+	/**
+	 * @category 短剧详情
+	 * @param id
+	 * @return
+	 */
+	@GetMapping("/findInfo")
+	ResponseBase findInfo(Integer id);
 
 }

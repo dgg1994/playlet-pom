@@ -25,9 +25,12 @@ spring:
     
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://16.163.6.237:3306/playlet_internal?useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT%2B8
+    #url: jdbc:mysql://16.163.6.237:3306/playlet_internal?useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT%2B8
+    #username: root
+    #password: A8PmYdz6r7AXCRDi
+    url: jdbc:mysql://127.0.0.1:3306/playlet_internal?useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT%2B8
     username: root
-    password: A8PmYdz6r7AXCRDi
+    password: Root@123
     type: com.alibaba.druid.pool.DruidDataSource
     initialSize: 30
     minIdle: 30
