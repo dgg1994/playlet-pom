@@ -86,4 +86,7 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 	@Select("SELECT * FROM drama WHERE delete_state = #{deleteState} AND verify_status = #{verifyStatus} ORDER BY RAND() ")
 	List<RecommendDramaRes> recommendList(RecommendDramaQuery entity);
 
+	@Select("SELECT * from drama where id = (SELECT drama_id from drama_asset where id = #{id})")
+	DramaEntity findByVideoId(@Param("id") Integer id);
+
 }

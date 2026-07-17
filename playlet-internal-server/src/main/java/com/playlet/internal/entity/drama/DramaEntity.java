@@ -50,13 +50,13 @@ public class DramaEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "collectScore",value = "收藏量",required = false,dataType = "Long")
 	private Long collectScore;
 	
-	@TableField("like_score")
-	@ApiModelProperty(name = "likeScore",value = "点赞量",required = false,dataType = "Long")
-	private Long likeScore;
-	
 	@TableField("share_score")
 	@ApiModelProperty(name = "shareScore",value = "分享量",required = false,dataType = "Long")
 	private Long shareScore;
+	
+	@TableField("like_score")
+	@ApiModelProperty(name = "likeScore",value = "点赞量",required = false,dataType = "Long")
+	private Long likeScore;
 	
 	@TableField("discuss_score")
 	@ApiModelProperty(name = "discussScore",value = "评论量",required = false,dataType = "Long")
