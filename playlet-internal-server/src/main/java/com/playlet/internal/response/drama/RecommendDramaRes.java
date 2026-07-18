@@ -43,6 +43,9 @@ public class RecommendDramaRes {
 	@ApiModelProperty(name = "coverUrl",value = "封面",required = false,dataType = "String")
 	private String coverUrl;
 	
+	@ApiModelProperty(name = "isAi",value = "是否ai生成 1是0否",required = false,dataType = "Integer")
+	private Integer isAi;
+	
 	@ApiModelProperty(name = "vidoeRes",value = "视频内容",required = false,dataType = "RecommendVidoeRes")
 	private RecommendVidoeRes vidoeRes;
 

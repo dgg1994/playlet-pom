@@ -1,5 +1,6 @@
 package com.playlet.internal.query.drama;
 import java.util.List;
+
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
 
 import io.swagger.annotations.ApiModelProperty;
@@ -24,6 +25,9 @@ public class QueryDramaQuery extends PageQueryHelperEntity{
 	
 	@ApiModelProperty(name = "verifyStatus",value = "0草稿1待审2已上架3已下架",required = false,dataType = "Integer")
 	private Integer verifyStatus;
+	
+	@ApiModelProperty(name = "isAi",value = "是否ai生成 1是0否",required = false,dataType = "Integer")
+	private Integer isAi;
 	
 	@ApiModelProperty(name = "tagGroupIdList",value = "标签语言分组Id类型集合",required = false,dataType = "List<Integer>")
 	private List<String> tagGroupIdList;

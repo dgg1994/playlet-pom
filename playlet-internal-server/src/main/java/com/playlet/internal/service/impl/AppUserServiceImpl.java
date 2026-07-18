@@ -108,6 +108,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		return setResultSuccess();
 	}
 
+	@SuppressWarnings("deprecation")
 	@Override
 	public ResponseBase login(@RequestBody AppAccountEntity entity, HttpServletRequest req) {
 		try {
@@ -514,6 +515,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	/**
 	 * 生成登录结果：签发 token 并写入 redis，返回脱敏后的账户信息
 	 */
+	@SuppressWarnings("unused")
 	private ResponseBase buildLoginResult(AppAccountEntity account) {
 		String token = createToken(account.getUid());
 		redisUtil.set(APP_TOKEN_PREFIX + account.getUid(), token, Constants.REDIS_EXPIRE_TIME / 1000);
@@ -529,6 +531,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	/**
 	 * 使用 uid 作为 subject 签发 JWT
 	 */
+	@SuppressWarnings("deprecation")
 	private String createToken(String uid) {
 		return Jwts.builder()
 				.setSubject(uid)
@@ -540,6 +543,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	/**
 	 * 从请求头解析 token 得到 uid，并与 redis 中的 token 双重校验
 	 */
+	@SuppressWarnings("deprecation")
 	private String parseUidFromRequest(HttpServletRequest request) {
 		String header = request.getHeader(Constants.HEADER_AUTH);
 		if (StringUtils.isEmpty(header)) {
@@ -583,6 +587,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	/**
 	 * 生成 6 位数字验证码
 	 */
+	@SuppressWarnings("unused")
 	private String generateCode() {
 		return String.format("%06d", new Random().nextInt(1000000));
 	}

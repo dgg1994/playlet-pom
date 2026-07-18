@@ -46,6 +46,10 @@ public class AddDramaQuery {
 	@ApiModelProperty(name = "belongUser",value = "所属人",required = false,dataType = "String")
 	private Integer belongUser;
 	
+	@NotNull(message = "是否ai生成不能为空")
+	@ApiModelProperty(name = "isAi",value = "是否ai生成 1是0否",required = false,dataType = "Integer")
+	private Integer isAi;
+	
 	@NotNull(message = "标签不能为空")
 	@ApiModelProperty(name = "tagGroupIdList",value = "标签语言分组Id类型集合",required = false,dataType = "List<Integer>")
 	private List<String> tagGroupIdList;
