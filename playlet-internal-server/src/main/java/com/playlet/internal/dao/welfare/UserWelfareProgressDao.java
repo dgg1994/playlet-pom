@@ -13,20 +13,20 @@ import java.util.List;
 @Repository
 public interface UserWelfareProgressDao extends BaseMapper<UserWelfareProgressEntity> {
 
-	@Select("select * from user_welfare_progress where uid = #{uid} and task_code = #{taskCode} "
+	@Select("select * from user_welfare_progress where uid = #{uid} and task_id = #{taskId} "
 			+ "and biz_date = #{bizDate} limit 1")
-	UserWelfareProgressEntity findOne(@Param("uid") String uid, @Param("taskCode") String taskCode,
+	UserWelfareProgressEntity findOne(@Param("uid") String uid, @Param("taskId") Integer taskId,
 			@Param("bizDate") String bizDate);
 
 	@Select("select * from user_welfare_progress where uid = #{uid} order by gmtModified desc")
 	List<UserWelfareProgressEntity> findByUid(@Param("uid") String uid);
 
 	@Select("<script>"
-			+ "select * from user_welfare_progress where uid = #{uid} and task_code in "
-			+ "<foreach collection='taskCodes' item='code' open='(' separator=',' close=')'>#{code}</foreach>"
+			+ "select * from user_welfare_progress where uid = #{uid} and task_id in "
+			+ "<foreach collection='taskIds' item='tid' open='(' separator=',' close=')'>#{tid}</foreach>"
 			+ "</script>")
-	List<UserWelfareProgressEntity> findByUidAndTaskCodes(@Param("uid") String uid,
-			@Param("taskCodes") List<String> taskCodes);
+	List<UserWelfareProgressEntity> findByUidAndTaskIds(@Param("uid") String uid,
+			@Param("taskIds") List<Integer> taskIds);
 
 	@Update("update user_welfare_progress set progress = #{progress}, progress_status = #{progressStatus}, "
 			+ "gmtModified = now() where id = #{id}")

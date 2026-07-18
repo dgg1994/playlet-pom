@@ -23,6 +23,8 @@ import com.playlet.internal.entity.drama.RankListEntity;
 import com.playlet.internal.entity.drama.TagEntity;
 import com.playlet.internal.entity.drama.UserWatchHistoryEntity;
 import com.playlet.internal.service.TheaterService;
+import com.playlet.internal.service.WelfareTaskService;
+import com.playlet.internal.enums.WelfareActionTypeEnums;
 import com.playlet.internal.utils.AppTokenUtil;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
@@ -58,6 +60,8 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 	private UserWatchHistoryDao userWatchHistoryDao;
 	@Autowired
 	private RedisUtil redisUtil;
+	@Autowired
+	private WelfareTaskService welfareTaskService;
 
 	@Override
 	public ResponseBase home() {
@@ -249,6 +253,16 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
             userWatchHistoryDao.upsert(row);
 
             cacheWatchAfterWrite(uid, dramaId, row);
+            if (!StringUtils.isEmpty(row.getEpisodeId())) {
+                try {
+                    JSONObject ext = new JSONObject();
+                    ext.put("dramaId", Integer.valueOf(dramaId));
+                    ext.put("episodeId", row.getEpisodeId());
+                    welfareTaskService.onAction(uid, WelfareActionTypeEnums.WATCH, 1, ext.toJSONString());
+                } catch (Exception e) {
+                    log.warn("welfare watch progress failed: {}", e.getMessage());
+                }
+            }
             return setResultSuccess(I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
 			throw new RuntimeException(e);

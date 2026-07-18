@@ -8,12 +8,16 @@ import com.playlet.internal.dao.welfare.WelfareTaskDao;
 import com.playlet.internal.dao.welfare.WelfareTaskI18nDao;
 import com.playlet.internal.entity.welfare.WelfareTaskEntity;
 import com.playlet.internal.entity.welfare.WelfareTaskI18nEntity;
+import com.playlet.internal.enums.WelfareActionTypeEnums;
+import com.playlet.internal.enums.WelfareCycleTypeEnums;
+import com.playlet.internal.enums.WelfareTaskEnums;
 import com.playlet.internal.service.WelfareTaskManageService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import static com.playlet.internal.base.BaseApiService.setResultError;
 import static com.playlet.internal.base.BaseApiService.setResultSuccess;
@@ -32,6 +37,8 @@ import static com.playlet.internal.base.BaseApiService.setResultSuccess;
 @CrossOrigin
 @Transactional(rollbackFor = Exception.class)
 public class WelfareTaskManageServiceImpl implements WelfareTaskManageService {
+
+	private static final Pattern TASK_CODE_PATTERN = Pattern.compile("^[A-Z][A-Z0-9_]{1,31}$");
 
 	@Autowired
 	private WelfareTaskDao welfareTaskDao;
@@ -85,10 +92,15 @@ public class WelfareTaskManageServiceImpl implements WelfareTaskManageService {
 				return setResultError(err);
 			}
 			if (entity.getStatus() == null) {
-				entity.setStatus(WelfareTaskEntity.STATUS_ENABLED);
+				entity.setStatus(WelfareTaskEnums.STATUS_ENABLED.getIndex());
 			}
+			entity.setTaskCode(normalizeTaskCode(entity.getTaskCode()));
 			GenericityUtil.setDate(entity);
-			welfareTaskDao.insert(entity);
+			try {
+				welfareTaskDao.insert(entity);
+			} catch (DuplicateKeyException e) {
+				return setResultError(I18nUtil.getMessage("task_code_exist"));
+			}
 			saveI18nList(entity);
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
@@ -111,6 +123,12 @@ public class WelfareTaskManageServiceImpl implements WelfareTaskManageService {
 			if (err != null) {
 				return setResultError(err);
 			}
+			// taskCode 不可修改
+			if (entity.getTaskCode() != null
+					&& !normalizeTaskCode(entity.getTaskCode()).equals(old.getTaskCode())) {
+				return setResultError(I18nUtil.getMessage("task_code_immutable"));
+			}
+			entity.setTaskCode(old.getTaskCode());
 			GenericityUtil.updateDate(entity);
 			welfareTaskDao.updateById(entity);
 			if (entity.getI18nList() != null) {
@@ -186,6 +204,10 @@ public class WelfareTaskManageServiceImpl implements WelfareTaskManageService {
 			return I18nUtil.getMessage("base_error");
 		}
 		if (creating) {
+			String codeErr = validateTaskCode(request.getTaskCode(), true);
+			if (codeErr != null) {
+				return codeErr;
+			}
 			if (request.getI18nList() == null || request.getI18nList().isEmpty()) {
 				return I18nUtil.getMessage("task_i18n_required");
 			}
@@ -193,9 +215,17 @@ public class WelfareTaskManageServiceImpl implements WelfareTaskManageService {
 			if (i18nErr != null) {
 				return i18nErr;
 			}
+			String actionErr = validateActionType(request.getExtraConfig());
+			if (actionErr != null) {
+				return actionErr;
+			}
+		} else if (request.getExtraConfig() != null) {
+			String actionErr = validateActionType(request.getExtraConfig());
+			if (actionErr != null) {
+				return actionErr;
+			}
 		}
-		if (request.getCycleType() != null
-				&& (request.getCycleType() < 1 || request.getCycleType() > 4)) {
+		if (request.getCycleType() != null && !WelfareCycleTypeEnums.isValid(request.getCycleType())) {
 			return I18nUtil.getMessage("base_error");
 		}
 		if (request.getTargetCount() != null && request.getTargetCount() < 1) {
@@ -208,6 +238,42 @@ public class WelfareTaskManageServiceImpl implements WelfareTaskManageService {
 			return I18nUtil.getMessage("base_error");
 		}
 		return null;
+	}
+
+	private String validateTaskCode(String taskCode, boolean creating) {
+		if (StringUtils.isEmpty(taskCode) || StringUtils.isEmpty(taskCode.trim())) {
+			return I18nUtil.getMessage("task_code_required");
+		}
+		String code = normalizeTaskCode(taskCode);
+		if (!TASK_CODE_PATTERN.matcher(code).matches()) {
+			return I18nUtil.getMessage("task_code_invalid");
+		}
+		if (creating && welfareTaskDao.findByTaskCode(code) != null) {
+			return I18nUtil.getMessage("task_code_exist");
+		}
+		return null;
+	}
+
+	private String validateActionType(String extraConfig) {
+		if (StringUtils.isEmpty(extraConfig)) {
+			return I18nUtil.getMessage("task_action_type_required");
+		}
+		try {
+			com.alibaba.fastjson.JSONObject json = com.alibaba.fastjson.JSON.parseObject(extraConfig);
+			if (json == null || StringUtils.isEmpty(json.getString("actionType"))) {
+				return I18nUtil.getMessage("task_action_type_required");
+			}
+			if (WelfareActionTypeEnums.fromName(json.getString("actionType")) == null) {
+				return I18nUtil.getMessage("task_action_type_invalid");
+			}
+		} catch (Exception e) {
+			return I18nUtil.getMessage("task_action_type_required");
+		}
+		return null;
+	}
+
+	private static String normalizeTaskCode(String taskCode) {
+		return taskCode == null ? null : taskCode.trim().toUpperCase();
 	}
 
 	/**

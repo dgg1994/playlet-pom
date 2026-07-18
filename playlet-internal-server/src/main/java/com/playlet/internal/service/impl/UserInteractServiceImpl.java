@@ -14,6 +14,8 @@ import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.UserDramaCollectEntity;
 import com.playlet.internal.entity.drama.UserDramaLikeEntity;
 import com.playlet.internal.service.UserInteractService;
+import com.playlet.internal.service.WelfareTaskService;
+import com.playlet.internal.enums.WelfareActionTypeEnums;
 import com.playlet.internal.utils.AppTokenUtil;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
@@ -53,6 +55,8 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	private DramaAssetDao dramaAssetDao;
 	@Autowired
 	private RedisUtil redisUtil;
+	@Autowired
+	private WelfareTaskService welfareTaskService;
 
 	@Override
 	public ResponseBase collectAdd(@RequestParam Integer dramaId, HttpServletRequest request) {
@@ -211,6 +215,12 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
                 redisUtil.set(cdKey, "1", SHARE_CD_SEC);
             } catch (Exception e) {
                 log.warn("share cooldown set failed: {}", e.getMessage());
+            }
+            try {
+                welfareTaskService.onAction(uid, WelfareActionTypeEnums.SHARE, 1,
+                        "{\"dramaId\":" + dramaId + "}");
+            } catch (Exception e) {
+                log.warn("welfare share progress failed: {}", e.getMessage());
             }
             return setResultSuccess(I18nUtil.getMessage("base_success"));
         } catch (Exception e) {

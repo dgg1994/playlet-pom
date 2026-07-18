@@ -18,17 +18,6 @@ import java.util.Date;
 @ApiModel(value = "用户任务进度", description = "福利任务用户进度")
 public class UserWelfareProgressEntity extends PageQueryHelperEntity {
 
-	/** 进行中 */
-	public static final int STATUS_DOING = 0;
-	/** 可领取 */
-	public static final int STATUS_CLAIMABLE = 1;
-	/** 已领取 */
-	public static final int STATUS_CLAIMED = 2;
-	/** 已过期 */
-	public static final int STATUS_EXPIRED = 3;
-	/** 已放弃 */
-	public static final int STATUS_ABANDONED = 4;
-
 	@TableId(type = IdType.AUTO)
 	@ApiModelProperty(name = "id", value = "主键", dataType = "Long")
 	private Long id;
@@ -38,8 +27,8 @@ public class UserWelfareProgressEntity extends PageQueryHelperEntity {
 	private String uid;
 
 	@TableField("task_id")
-	@ApiModelProperty(name = "taskId", value = "任务id", dataType = "String")
-	private String taskId;
+	@ApiModelProperty(name = "taskId", value = "任务id", dataType = "Integer")
+	private Integer taskId;
 
 	@TableField("biz_date")
 	@ApiModelProperty(name = "bizDate", value = "周期键", dataType = "String")
@@ -54,7 +43,7 @@ public class UserWelfareProgressEntity extends PageQueryHelperEntity {
 	private Integer target;
 
 	@TableField("progress_status")
-	@ApiModelProperty(name = "progressStatus", value = "0进行中 1可领取 2已领取 3已过期 4已放弃", dataType = "Integer")
+	@ApiModelProperty(name = "progressStatus", value = "见 WelfareProgressStatusEnums：-1未领任务 0进行中 1可领奖 2已领奖 3过期 4放弃", dataType = "Integer")
 	private Integer progressStatus;
 
 	@TableField("claim_time")

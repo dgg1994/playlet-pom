@@ -58,5 +58,11 @@ public class DicServiceImpl extends BaseApiService implements DicService{
 		return setResultSuccess(list, I18nUtil.getMessage("base_success"));
 	}
 
+	@Override
+	public ResponseBase findWelfareCycleType() {
+		List<DicEntity> list = WelfareCycleTypeEnums.getList();
+		return setResultSuccess(list, I18nUtil.getMessage("base_success"));
+	}
+
 }
 

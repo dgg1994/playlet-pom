@@ -21,4 +21,8 @@ public interface WelfareTaskI18nDao extends BaseMapper<WelfareTaskI18nEntity> {
 	@Select("select task_name from welfare_task_i18n where task_id = #{taskId} and langue = #{language}")
 	String selectNameById(@Param("taskId") Integer taskId, @Param("language") String language);
 
+	@Select("select * from welfare_task_i18n where task_id = #{taskId} and langue = #{language} limit 1")
+	WelfareTaskI18nEntity findByTaskIdAndLangue(@Param("taskId") Integer taskId,
+			@Param("language") String language);
+
 }

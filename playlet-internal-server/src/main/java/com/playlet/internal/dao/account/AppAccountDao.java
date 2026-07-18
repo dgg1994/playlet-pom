@@ -5,6 +5,7 @@ import com.playlet.internal.api.response.AppUserInfoReqEntity;
 import com.playlet.internal.entity.account.AppAccountEntity;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -41,4 +42,8 @@ public interface AppAccountDao extends BaseMapper<AppAccountEntity> {
 
 	@Select("select * from app_account where invitation_code = #{enterInvitationCode}")
 	AppAccountEntity findByIncitationCode(@Param("enterInvitationCode") String enterInvitationCode);
+
+	@Update("update app_account set coin_balance = ifnull(coin_balance,0) + #{amt}, gmtModified = now() "
+			+ "where uid = #{uid}")
+	int addCoinBalance(@Param("uid") String uid, @Param("amt") int amt);
 }
