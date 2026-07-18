@@ -11,6 +11,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.util.Date;
+import java.util.List;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -33,10 +34,6 @@ public class WelfareTaskEntity extends PageQueryHelperEntity {
 	@TableId(type = IdType.AUTO)
 	@ApiModelProperty(name = "id", value = "主键", dataType = "Integer")
 	private Integer id;
-
-	@TableField("task_code")
-	@ApiModelProperty(name = "taskCode", value = "任务编码", dataType = "String")
-	private String taskCode;
 
 	@TableField("reward_coin")
 	@ApiModelProperty(name = "rewardCoin", value = "基础奖励金币", dataType = "Integer")
@@ -89,4 +86,12 @@ public class WelfareTaskEntity extends PageQueryHelperEntity {
 	@TableField("gmtModified")
 	@ApiModelProperty(name = "gmtModified", value = "更新时间", dataType = "Date")
 	private Date gmtModified;
+
+	@TableField(exist = false)
+	@ApiModelProperty(name = "taskName", value = "当前语言任务名（列表展示）", dataType = "String")
+	private String taskName;
+
+	@TableField(exist = false)
+	@ApiModelProperty(name = "i18nList", value = "多语言文案", dataType = "List")
+	private List<WelfareTaskI18nEntity> i18nList;
 }
