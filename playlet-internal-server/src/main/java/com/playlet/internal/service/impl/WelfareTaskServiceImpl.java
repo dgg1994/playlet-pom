@@ -61,8 +61,8 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 
 	@Override
 	public ResponseBase home(HttpServletRequest request) {
-		String uid = AppTokenUtil.resolveUid(request);
-		if (StringUtils.isEmpty(uid)) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
 			return setResultError(I18nUtil.getMessage("login_required"));
 		}
 		WelfareHomeRespEntity resp = new WelfareHomeRespEntity();
@@ -74,8 +74,8 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 
 	@Override
 	public ResponseBase tasks(HttpServletRequest request) {
-		String uid = AppTokenUtil.resolveUid(request);
-		if (StringUtils.isEmpty(uid)) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
 			return setResultError(I18nUtil.getMessage("login_required"));
 		}
 		return setResultSuccess(buildTaskItems(uid), I18nUtil.getMessage("base_success"));
@@ -83,8 +83,8 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 
 	@Override
 	public ResponseBase accept(@RequestParam Integer taskId, HttpServletRequest request) {
-		String uid = AppTokenUtil.resolveUid(request);
-		if (StringUtils.isEmpty(uid)) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
 			return setResultError(I18nUtil.getMessage("login_required"));
 		}
 		if (taskId == null) {
@@ -121,8 +121,8 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 	public ResponseBase claim(@RequestParam Integer taskId,
 			@RequestParam(required = false, defaultValue = "false") Boolean adBoost,
 			HttpServletRequest request) {
-		String uid = AppTokenUtil.resolveUid(request);
-		if (StringUtils.isEmpty(uid)) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
 			return setResultError(I18nUtil.getMessage("login_required"));
 		}
 		if (taskId == null) {
@@ -158,8 +158,8 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 
 	@Override
 	public ResponseBase ledger(String bizType, PageQueryHelperEntity page, HttpServletRequest request) {
-		String uid = AppTokenUtil.resolveUid(request);
-		if (StringUtils.isEmpty(uid)) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
 			return setResultError(I18nUtil.getMessage("login_required"));
 		}
 		if (page == null) {
@@ -196,8 +196,8 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 	}
 
 	@Override
-	public void onAction(String uid, WelfareActionTypeEnums action, int delta, String extInfo) {
-		if (StringUtils.isEmpty(uid) || action == null || delta <= 0
+	public void onAction(Integer uid, WelfareActionTypeEnums action, int delta, String extInfo) {
+		if (uid == null || action == null || delta <= 0
 				|| !action.isAutoProgress()) {
 			return;
 		}
@@ -245,7 +245,7 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 	 * @return
 	 * @throws Exception
 	 */
-	private boolean tryRecordWatch(String uid, String extInfo) throws Exception {
+	private boolean tryRecordWatch(Integer uid, String extInfo) throws Exception {
 		JSONObject json = parseExt(extInfo);
 		Integer dramaId = json.getInteger("dramaId");
 		String episodeId = json.getString("episodeId");
@@ -270,7 +270,7 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 	 * @param extInfo 扩展信息
 	 * @throws Exception
 	 */
-	private void increaseProgress(String uid, WelfareTaskEntity task, int delta, String extInfo)
+	private void increaseProgress(Integer uid, WelfareTaskEntity task, int delta, String extInfo)
 			throws Exception {
 		String bizDate = resolveBizDate(task.getCycleType());
 		// 必须先领取任务（accept）才会有进度行；此处不再自动创建
@@ -312,7 +312,7 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 	 * @return 进度行
 	 * @throws Exception 创建失败
 	 */
-	private UserWelfareProgressEntity ensureProgress(String uid, WelfareTaskEntity task, String bizDate,
+	private UserWelfareProgressEntity ensureProgress(Integer uid, WelfareTaskEntity task, String bizDate,
 			String extInfo) throws Exception {
 		UserWelfareProgressEntity exist = userWelfareProgressDao.findOne(uid, task.getId(), bizDate);
 		if (exist != null) {
@@ -352,7 +352,7 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 	 * @param withAdBoost 是否发放广告加赠
 	 * @throws Exception
 	 */
-	private void grantReward(String uid, WelfareTaskEntity task, UserWelfareProgressEntity progress,
+	private void grantReward(Integer uid, WelfareTaskEntity task, UserWelfareProgressEntity progress,
 			boolean withAdBoost) throws Exception {
 		String bizDate = progress.getBizDate() == null ? "" : progress.getBizDate();
 		String code = StringUtils.isEmpty(task.getTaskCode()) ? String.valueOf(task.getId()) : task.getTaskCode();
@@ -375,7 +375,7 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 	/**
 	 * 积分流水
 	 */
-	private void creditCoin(String uid, int amt, String bizType, String bizId, String taskCode,
+	private void creditCoin(Integer uid, int amt, String bizType, String bizId, String taskCode,
 			int adBoostFlag, String remark) throws Exception {
 		if (amt <= 0) {
 			return;
@@ -410,7 +410,7 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 	 * @param uid 用户ID
 	 * @return 任务项
 	 */
-	private List<WelfareTaskItemEntity> buildTaskItems(String uid) {
+	private List<WelfareTaskItemEntity> buildTaskItems(Integer uid) {
 		List<WelfareTaskEntity> tasks = welfareTaskDao.findEnabledList();
 		if (tasks == null) {
 			tasks = new ArrayList<>();

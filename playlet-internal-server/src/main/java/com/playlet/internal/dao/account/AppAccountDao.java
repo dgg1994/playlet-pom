@@ -45,5 +45,5 @@ public interface AppAccountDao extends BaseMapper<AppAccountEntity> {
 
 	@Update("update app_account set coin_balance = ifnull(coin_balance,0) + #{amt}, gmtModified = now() "
 			+ "where uid = #{uid}")
-	int addCoinBalance(@Param("uid") String uid, @Param("amt") int amt);
+	int addCoinBalance(@Param("uid") Integer uid, @Param("amt") int amt);
 }

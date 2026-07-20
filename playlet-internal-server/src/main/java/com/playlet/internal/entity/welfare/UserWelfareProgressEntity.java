@@ -24,7 +24,7 @@ public class UserWelfareProgressEntity extends PageQueryHelperEntity {
 
 	@TableField("uid")
 	@ApiModelProperty(name = "uid", value = "用户uid", dataType = "String")
-	private String uid;
+	private Integer uid;
 
 	@TableField("task_id")
 	@ApiModelProperty(name = "taskId", value = "任务id", dataType = "Integer")

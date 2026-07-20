@@ -21,7 +21,7 @@ public class UserWelfareWatchLogEntity {
 
 	@TableField("uid")
 	@ApiModelProperty(name = "uid", value = "用户uid", dataType = "String")
-	private String uid;
+	private Integer uid;
 
 	@TableField("drama_id")
 	@ApiModelProperty(name = "dramaId", value = "短剧ID", dataType = "Integer")

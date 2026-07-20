@@ -15,7 +15,7 @@ public interface UserWelfareProgressDao extends BaseMapper<UserWelfareProgressEn
 
 	@Select("select * from user_welfare_progress where uid = #{uid} and task_id = #{taskId} "
 			+ "and biz_date = #{bizDate} limit 1")
-	UserWelfareProgressEntity findOne(@Param("uid") String uid, @Param("taskId") Integer taskId,
+	UserWelfareProgressEntity findOne(@Param("uid") Integer uid, @Param("taskId") Integer taskId,
 			@Param("bizDate") String bizDate);
 
 	@Select("select * from user_welfare_progress where uid = #{uid} order by gmtModified desc")

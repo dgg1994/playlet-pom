@@ -24,7 +24,7 @@ public class UserCoinLedgerEntity extends PageQueryHelperEntity {
 
 	@TableField("uid")
 	@ApiModelProperty(name = "uid", value = "用户uid", dataType = "String")
-	private String uid;
+	private Integer uid;
 
 	@TableField("change_amt")
 	@ApiModelProperty(name = "changeAmt", value = "变动金额，正加负减", dataType = "Integer")
