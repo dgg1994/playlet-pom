@@ -25,6 +25,30 @@ public interface TagDao extends BaseMapper<TagEntity> {
 			+ "</script>")
 	List<TagEntity> findAdminList(TagEntity entity);
 
+	/**
+	 * B端列表：按 group_id 聚合分页（不按语言过滤；tagName 命中任一同组语言即整组返回）
+	 */
+	@Select("<script>"
+			+ "select group_id as groupId, max(sort_weight) as sortWeight, max(status) as status, "
+			+ "min(setTime) as setTime, max(gmtModified) as gmtModified "
+			+ "from dic_drama_tag where 1=1 "
+			+ "<if test='tagName != null and tagName != \"\"'> and group_id in ("
+			+ "select distinct group_id from dic_drama_tag where tag_name like concat('%',#{tagName},'%')"
+			+ ") </if>"
+			+ "<if test='status != null'> and status = #{status} </if>"
+			+ "<if test='groupId != null and groupId != \"\"'> and group_id = #{groupId} </if>"
+			+ "group by group_id "
+			+ "order by max(sort_weight) desc, max(id) desc"
+			+ "</script>")
+	List<TagEntity> findAdminGroupList(TagEntity entity);
+
+	@Select("<script>"
+			+ "select * from dic_drama_tag where group_id in "
+			+ "<foreach collection='groupIds' item='gid' open='(' separator=',' close=')'>#{gid}</foreach> "
+			+ "order by sort_weight desc, id asc"
+			+ "</script>")
+	List<TagEntity> findByGroupIds(@Param("groupIds") List<String> groupIds);
+
 	@Select("select t.* from dic_drama_tag t "
 			+ "inner join drama_tag_rel r on t.group_id = r.tag_group_id "
 			+ "where r.drama_id = #{dramaId} and t.status = 1 "

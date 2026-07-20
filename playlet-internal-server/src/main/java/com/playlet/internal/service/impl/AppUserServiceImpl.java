@@ -305,9 +305,9 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			entity.setUserPassword(null);
 			entity.setPayPassword(null);
 			entity.setGoogleSecretkey(null);
-			entity.setFollowCount(userFollowDao.countFollowing(entity.getUid()));
-			entity.setFansCount(userFollowDao.countFans(entity.getUid()));
-			entity.setLikeCount(UserDramaLikeDao.countLike(entity.getUid()));
+			entity.setFollowCount(userFollowDao.countFollowing(entity.getId()));
+			entity.setFansCount(userFollowDao.countFans(entity.getId()));
+			entity.setLikeCount(UserDramaLikeDao.countLike(entity.getId()));
 			return setResultSuccess(entity);
 		} catch (Exception e) {
 			e.printStackTrace();

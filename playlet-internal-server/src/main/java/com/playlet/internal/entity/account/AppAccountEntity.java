@@ -21,10 +21,6 @@ public class AppAccountEntity extends PageQueryHelperEntity {
 	@TableId(type = IdType.AUTO)
 	@ApiModelProperty(name = "id",value = "主键",required = false,dataType = "Integer")
     private Integer id;
-
-	@TableField("uid")
-	@ApiModelProperty(name = "uid",value = "三方id",required = false,dataType = "String")
-	private Integer uid;
 	
 	@TableField("user_password")
 	@ApiModelProperty(name = "userPassword",value = "登录密码",required = true,dataType = "String")
