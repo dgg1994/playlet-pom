@@ -58,10 +58,12 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 			DramaEntity dramaEntity = dramaDao.selectById(entity.getDramaId());
 			if(dramaEntity != null) {
 				dramaEntity.setDiscussScore(dramaEntity.getDiscussScore() + 1);
+				dramaDao.updateById(dramaEntity);
 			}
 			DramaAssetEntity dramaAssetEntity= dramaAssetDao.selectById(entity.getVideoId());
 			if(dramaAssetEntity != null) {
 				dramaAssetEntity.setDiscussScore(dramaAssetEntity.getDiscussScore() + 1);
+				dramaAssetDao.updateById(dramaAssetEntity);
 			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
@@ -82,6 +84,7 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 			DramaVideoCommentEntity commentEntity = dramaVideoCommentDao.selectById(entity.getParentId());
 			if(commentEntity != null) {
 				commentEntity.setReplyCount(commentEntity.getReplyCount() + 1);
+				dramaVideoCommentDao.updateById(commentEntity);
 			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {

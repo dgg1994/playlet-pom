@@ -70,5 +70,12 @@ public interface DramaApiService {
 	@GetMapping("/playVideo")
 	ResponseBase playVideo(Integer id);
 	
-
+	/**
+	 * @category 获取视频详情
+	 * @param id
+	 * @return
+	 */
+	@GetMapping("/getVideoInfo")
+	ResponseBase getVideoInfo(Integer id);
+	
 }

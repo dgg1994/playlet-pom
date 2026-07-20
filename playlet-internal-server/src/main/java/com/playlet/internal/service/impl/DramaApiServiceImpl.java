@@ -19,6 +19,7 @@ import com.playlet.internal.dao.drama.DramaDao;
 import com.playlet.internal.dao.drama.TagDao;
 import com.playlet.internal.dao.drama.UserDramaCollectDao;
 import com.playlet.internal.dao.drama.UserDramaLikeDao;
+import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.TagEntity;
 import com.playlet.internal.entity.drama.UserDramaCollectEntity;
@@ -193,6 +194,26 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
 				dramaRes.setVidoeRes(vidoeRes);
 			}
 			return setResultSuccess(dramaRes, I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException();
+		}
+	}
+
+
+	@Override
+	public ResponseBase getVideoInfo(Integer id) {
+		try {
+			DramaAssetEntity vidoeRes = dramaAssetDao.selectById(id);
+			if(vidoeRes != null) {
+				DramaEntity dramaEntity = dramaDao.findByVideoId(id);				
+				if(dramaEntity != null) {
+					vidoeRes.setCollectScore(dramaEntity.getCollectScore());
+					vidoeRes.setShareScore(dramaEntity.getShareScore());
+					vidoeRes.setVideoUrl(null);					
+				}
+			}
+			return setResultSuccess(vidoeRes, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			e.printStackTrace();
 			throw new RuntimeException();
