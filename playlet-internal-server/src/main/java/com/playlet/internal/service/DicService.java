@@ -35,5 +35,9 @@ public interface DicService {
 	@GetMapping("/findWelfareActionType")
 	@Operation(summary = "查询每日任务类型", description = "查询每日任务类型")
 	ResponseBase findWelfareActionType();
+
+	@GetMapping("/findWelfareCycleType")
+	@Operation(summary = "查询福利任务周期类型", description = "查询福利任务周期类型")
+	ResponseBase findWelfareCycleType();
 }
 

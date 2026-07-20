@@ -11,6 +11,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.util.Date;
+import java.util.List;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -18,24 +19,12 @@ import java.util.Date;
 @ApiModel(value = "福利任务配置", description = "福利任务逻辑配置（文案见 welfare_task_i18n）")
 public class WelfareTaskEntity extends PageQueryHelperEntity {
 
-	/** 周期：每日 */
-	public static final int CYCLE_DAILY = 1;
-	/** 周期：一次性 */
-	public static final int CYCLE_ONCE = 2;
-	/** 周期：每周 */
-	public static final int CYCLE_WEEKLY = 3;
-	/** 周期：每月 */
-	public static final int CYCLE_MONTHLY = 4;
-
-	public static final int STATUS_ENABLED = 1;
-	public static final int STATUS_DISABLED = 0;
-
 	@TableId(type = IdType.AUTO)
 	@ApiModelProperty(name = "id", value = "主键", dataType = "Integer")
 	private Integer id;
 
 	@TableField("task_code")
-	@ApiModelProperty(name = "taskCode", value = "任务编码", dataType = "String")
+	@ApiModelProperty(name = "taskCode", value = "任务编码，新增后不可改，如 WATCH_EP", dataType = "String")
 	private String taskCode;
 
 	@TableField("reward_coin")
@@ -47,7 +36,7 @@ public class WelfareTaskEntity extends PageQueryHelperEntity {
 	private Integer adBoostCoin;
 
 	@TableField("cycle_type")
-	@ApiModelProperty(name = "cycleType", value = "1每日 2一次性 3每周 4每月", dataType = "Integer")
+	@ApiModelProperty(name = "cycleType", value = "周期：1每日 2一次性 3每周 4每月，见 WelfareCycleTypeEnums", dataType = "Integer")
 	private Integer cycleType;
 
 	@TableField("target_count")
@@ -89,4 +78,12 @@ public class WelfareTaskEntity extends PageQueryHelperEntity {
 	@TableField("gmtModified")
 	@ApiModelProperty(name = "gmtModified", value = "更新时间", dataType = "Date")
 	private Date gmtModified;
+
+	@TableField(exist = false)
+	@ApiModelProperty(name = "taskName", value = "当前语言任务名（列表展示）", dataType = "String")
+	private String taskName;
+
+	@TableField(exist = false)
+	@ApiModelProperty(name = "i18nList", value = "多语言文案", dataType = "List")
+	private List<WelfareTaskI18nEntity> i18nList;
 }

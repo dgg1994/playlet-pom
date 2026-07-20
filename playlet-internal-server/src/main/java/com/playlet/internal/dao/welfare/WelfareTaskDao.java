@@ -11,15 +11,16 @@ import java.util.List;
 @Repository
 public interface WelfareTaskDao extends BaseMapper<WelfareTaskEntity> {
 
-	@Select("select * from welfare_task where task_code = #{taskCode} limit 1")
-	WelfareTaskEntity findByTaskCode(@Param("taskCode") String taskCode);
-
 	@Select("select * from welfare_task where status = 1 order by sort_weight desc, id asc")
 	List<WelfareTaskEntity> findEnabledList();
+
+	@Select("select * from welfare_task where task_code = #{taskCode} limit 1")
+	WelfareTaskEntity findByTaskCode(@Param("taskCode") String taskCode);
 
 	@Select("<script>"
 			+ "select * from welfare_task where 1=1 "
 			+ "<if test='status != null'> and status = #{status} </if>"
+			+ "<if test='cycleType != null'> and cycle_type = #{cycleType} </if>"
 			+ "<if test='taskCode != null and taskCode != \"\"'> and task_code = #{taskCode} </if>"
 			+ "order by sort_weight desc, id asc"
 			+ "</script>")

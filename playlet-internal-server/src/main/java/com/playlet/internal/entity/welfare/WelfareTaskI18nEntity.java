@@ -19,9 +19,9 @@ public class WelfareTaskI18nEntity {
 	@ApiModelProperty(name = "id", value = "主键", dataType = "Integer")
 	private Integer id;
 
-	@TableField("task_code")
-	@ApiModelProperty(name = "taskCode", value = "任务编码", dataType = "String")
-	private String taskCode;
+	@TableField("task_id")
+	@ApiModelProperty(name = "taskId", value = "任务id", dataType = "Integer")
+	private Integer taskId;
 
 	@TableField("langue")
 	@ApiModelProperty(name = "langue", value = "语言", dataType = "String")
