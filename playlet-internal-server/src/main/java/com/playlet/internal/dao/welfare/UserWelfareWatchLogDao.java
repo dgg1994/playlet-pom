@@ -18,7 +18,4 @@ public interface UserWelfareWatchLogDao extends BaseMapper<UserWelfareWatchLogEn
 	@Insert("insert ignore into user_welfare_watch_log (uid, drama_id, episode_id, biz_date, setTime) "
 			+ "values (#{uid}, #{dramaId}, #{episodeId}, #{bizDate}, #{setTime})")
 	int insertIgnore(UserWelfareWatchLogEntity entity);
-
-	@Select("select count(1) from user_welfare_watch_log where uid = #{uid} and biz_date = #{bizDate}")
-	long countByUidAndDate(@Param("uid") String uid, @Param("bizDate") String bizDate);
 }
