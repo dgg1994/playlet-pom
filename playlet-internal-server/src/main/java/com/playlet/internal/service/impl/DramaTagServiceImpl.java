@@ -6,8 +6,8 @@ import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.api.request.TagRequest;
+import com.playlet.internal.api.response.TagGroupRespEntity;
 import com.playlet.internal.base.ResponseBase;
-import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.dao.drama.TagDao;
 import com.playlet.internal.entity.drama.TagEntity;
 import com.playlet.internal.service.DramaTagService;
@@ -20,7 +20,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static com.playlet.internal.base.BaseApiService.setResultError;
 import static com.playlet.internal.base.BaseApiService.setResultSuccess;
@@ -46,12 +51,48 @@ public class DramaTagServiceImpl implements DramaTagService {
         if (entity == null) {
             entity = new TagEntity();
         }
-        if (StringUtils.isEmpty(entity.getLangue())) {
-            entity.setLangue(LanguageContext.getLanguage());
-        }
+        // 按 groupId 分页；多语言字段平铺为 zh-cn / en 等
         PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
-        List<TagEntity> list = tagDao.findAdminList(entity);
-        return setResultSuccess(new PageInfo<>(list), I18nUtil.getMessage("base_success"));
+        List<TagEntity> groupRows = tagDao.findAdminGroupList(entity);
+        PageInfo<TagEntity> pageInfo = new PageInfo<>(groupRows);
+
+        Map<String, List<TagEntity>> tagsByGroup = new LinkedHashMap<>();
+        if (!groupRows.isEmpty()) {
+            //获取groupId的集合
+            List<String> groupIds = groupRows.stream()
+                    .map(TagEntity::getGroupId)
+                    .filter(gid -> !StringUtils.isEmpty(gid))
+                    .collect(Collectors.toList());
+            if (!groupIds.isEmpty()) {
+                List<TagEntity> allTags = tagDao.findByGroupIds(groupIds);
+                if (allTags != null) {
+                    for (TagEntity tag : allTags) {
+                        tagsByGroup.computeIfAbsent(tag.getGroupId(), k -> new ArrayList<>()).add(tag);
+                    }
+                }
+            }
+        }
+
+        List<TagGroupRespEntity> rows = new ArrayList<>();
+        for (TagEntity group : groupRows) {
+            TagGroupRespEntity row = new TagGroupRespEntity();
+            row.setGroupId(group.getGroupId());
+            row.setSortWeight(group.getSortWeight());
+            row.setStatus(group.getStatus());
+            row.setSetTime(group.getSetTime());
+            row.setGmtModified(group.getGmtModified());
+            List<TagEntity> tags = tagsByGroup.get(group.getGroupId());
+            if (tags != null) {
+                for (TagEntity tag : tags) {
+                    if (!StringUtils.isEmpty(tag.getLangue())) {
+                        row.putLangName(tag.getLangue(), tag.getTagName());
+                    }
+                }
+            }
+            rows.add(row);
+        }
+        PageInfo<TagGroupRespEntity> result = new PageInfo<>(rows);
+        return setResultSuccess(result, I18nUtil.getMessage("base_success"));
     }
 
     @Override

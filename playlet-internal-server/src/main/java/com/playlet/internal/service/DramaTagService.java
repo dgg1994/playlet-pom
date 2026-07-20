@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 public interface DramaTagService {
 
     @PostMapping("/findList")
-    @ApiOperation("标签分页列表")
+    @ApiOperation("标签分页列表（按groupId分组，多语言平铺）")
     ResponseBase findList(TagEntity entity);
 
     @PostMapping("/save")

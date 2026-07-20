@@ -51,8 +51,8 @@ public enum WelfareCycleTypeEnums {
 		List<DicEntity> list = new ArrayList<>();
 		for (WelfareCycleTypeEnums type : values()) {
 			DicEntity dic = new DicEntity();
-			dic.setName(String.valueOf(type.code));
-			dic.setLable(type.lable);
+			dic.setId(type.code);
+			dic.setName(type.lable);
 			list.add(dic);
 		}
 		return list;
