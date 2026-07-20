@@ -13,22 +13,22 @@ import java.util.List;
 public interface UserFollowDao extends BaseMapper<UserFollowEntity> {
 
 	@Select("select * from user_follow where uid = #{uid} and follow_uid = #{followUid} limit 1")
-	UserFollowEntity findOne(@Param("uid") String uid, @Param("followUid") String followUid);
+	UserFollowEntity findOne(@Param("uid") Integer uid, @Param("followUid") Integer followUid);
 
 	/** 我的关注列表 */
 	@Select("select * from user_follow where uid = #{uid} order by setTime desc")
-	List<UserFollowEntity> findFollowing(@Param("uid") String uid);
+	List<UserFollowEntity> findFollowing(@Param("uid") Integer uid);
 
 	/** 我的粉丝列表 */
 	@Select("select * from user_follow where follow_uid = #{followUid} order by setTime desc")
-	List<UserFollowEntity> findFans(@Param("followUid") String followUid);
+	List<UserFollowEntity> findFans(@Param("followUid") Integer followUid);
 
 	@Select("select count(*) from user_follow where uid = #{uid}")
-	long countFollowing(@Param("uid") String uid);
+	long countFollowing(@Param("uid") Integer uid);
 
 	@Select("select count(*) from user_follow where follow_uid = #{followUid}")
-	long countFans(@Param("followUid") String followUid);
+	long countFans(@Param("followUid") Integer followUid);
 
 	@Delete("delete from user_follow where uid = #{uid} and follow_uid = #{followUid}")
-	int deleteOne(@Param("uid") String uid, @Param("followUid") String followUid);
+	int deleteOne(@Param("uid") Integer uid, @Param("followUid") Integer followUid);
 }

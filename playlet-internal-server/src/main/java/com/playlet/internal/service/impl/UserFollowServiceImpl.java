@@ -33,15 +33,14 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
 	private AppAccountDao appAccountDao;
 
 	@Override
-	public ResponseBase followAdd(@RequestParam String followUid, HttpServletRequest request) {
-		String uid = AppTokenUtil.resolveUid(request);
+	public ResponseBase followAdd(@RequestParam Integer followUid, HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
 			return setResultError(I18nUtil.getMessage("login_required"));
 		}
-		if (StringUtils.isEmpty(followUid) || StringUtils.isEmpty(followUid.trim())) {
+		if (followUid == null) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
-		followUid = followUid.trim();
 		if (uid.equals(followUid)) {
 			return setResultError(I18nUtil.getMessage("follow_self_forbidden"));
 		}
@@ -64,16 +63,16 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
 	}
 
 	@Override
-	public ResponseBase followCancel(@RequestParam String followUid, HttpServletRequest request) {
+	public ResponseBase followCancel(@RequestParam Integer followUid, HttpServletRequest request) {
         try {
-            String uid = AppTokenUtil.resolveUid(request);
+        	Integer uid = AppTokenUtil.resolveUid(request);
             if (uid == null) {
                 return setResultError(I18nUtil.getMessage("login_required"));
             }
-            if (StringUtils.isEmpty(followUid) || StringUtils.isEmpty(followUid.trim())) {
+            if (followUid == null) {
                 return setResultError(I18nUtil.getMessage("base_error"));
             }
-            userFollowDao.deleteOne(uid, followUid.trim());
+            userFollowDao.deleteOne(uid, followUid);
             return setResultSuccess(I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -83,7 +82,7 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
 	@Override
 	public ResponseBase followingList(UserFollowEntity entity, HttpServletRequest request) {
         try {
-            String targetUid = resolveTargetUid(entity == null ? null : entity.getUid(), request);
+            Integer targetUid = resolveTargetUid(entity == null ? null : entity.getUid(), request);
             if (targetUid == null) {
                 return setResultError(I18nUtil.getMessage("login_required"));
             }
@@ -100,7 +99,7 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
 	@Override
 	public ResponseBase fansList(UserFollowEntity entity, HttpServletRequest request) {
         try {
-            String targetUid = resolveTargetUid(entity == null ? null : entity.getUid(), request);
+        	Integer targetUid = resolveTargetUid(entity == null ? null : entity.getUid(), request);
             if (targetUid == null) {
                 return setResultError(I18nUtil.getMessage("login_required"));
             }
@@ -124,14 +123,14 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
 			rows = new ArrayList<>();
 		}
 		List<UserFollowEntity> pageRows = GenericityUtil.Page(rows, pageNumber, pageSize);
-		String viewer = AppTokenUtil.resolveUid(request);
-		Map<String, AppAccountEntity> accountCache = new HashMap<>();
-		Set<String> followedSet = loadFollowedSet(viewer, pageRows, followingSide);
+		Integer viewer = AppTokenUtil.resolveUid(request);
+		Map<Integer, AppAccountEntity> accountCache = new HashMap<>();
+		Set<Integer> followedSet = loadFollowedSet(viewer, pageRows, followingSide);
 
 		List<UserFollowItemEntity> items = new ArrayList<>();
 		for (UserFollowEntity row : pageRows) {
-			String otherUid = followingSide ? row.getFollowUid() : row.getUid();
-			if (StringUtils.isEmpty(otherUid)) {
+			Integer otherUid = followingSide ? row.getFollowUid() : row.getUid();
+			if (otherUid == null) {
 				continue;
 			}
 			AppAccountEntity account = resolveAccount(otherUid, accountCache);
@@ -148,14 +147,14 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
 		return setResultSuccess(page, I18nUtil.getMessage("base_success"));
 	}
 
-	private Set<String> loadFollowedSet(String viewer, List<UserFollowEntity> pageRows, boolean followingSide) {
-		Set<String> set = new HashSet<>();
-		if (StringUtils.isEmpty(viewer) || pageRows == null) {
+	private Set<Integer> loadFollowedSet(Integer viewer, List<UserFollowEntity> pageRows, boolean followingSide) {
+		Set<Integer> set = new HashSet<>();
+		if (viewer == null || pageRows == null) {
 			return set;
 		}
 		for (UserFollowEntity row : pageRows) {
-			String otherUid = followingSide ? row.getFollowUid() : row.getUid();
-			if (StringUtils.isEmpty(otherUid) || viewer.equals(otherUid)) {
+			Integer otherUid = followingSide ? row.getFollowUid() : row.getUid();
+			if (otherUid == null || viewer.equals(otherUid)) {
 				continue;
 			}
 			if (userFollowDao.findOne(viewer, otherUid) != null) {
@@ -165,14 +164,14 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
 		return set;
 	}
 
-	private String resolveTargetUid(String uidParam, HttpServletRequest request) {
-		if (StringUtils.isNotEmpty(uidParam)) {
-			return uidParam.trim();
+	private Integer resolveTargetUid(Integer uidParam, HttpServletRequest request) {
+		if (uidParam != null) {
+			return uidParam;
 		}
 		return AppTokenUtil.resolveUid(request);
 	}
 
-	private AppAccountEntity resolveAccount(String uid, Map<String, AppAccountEntity> cache) {
+	private AppAccountEntity resolveAccount(Integer uid, Map<Integer, AppAccountEntity> cache) {
 		if (cache.containsKey(uid)) {
 			return cache.get(uid);
 		}
@@ -181,13 +180,13 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
 		return account;
 	}
 
-	private String displayName(AppAccountEntity account, String uid) {
+	private String displayName(AppAccountEntity account, Integer uid) {
 		if (account != null && StringUtils.isNotEmpty(account.getNickname())) {
 			return account.getNickname();
 		}
 		if (account != null && StringUtils.isNotEmpty(account.getUserAccount())) {
 			return account.getUserAccount();
 		}
-		return uid;
+		return uid.toString();
 	}
 }

@@ -51,6 +51,7 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
 					RecommendVidoeRes vidoeRes = dramaAssetDao.findDramaIdOne(list.get(i).getId(),DeleteStateEnum.NORMAL.getIndex());
 					vidoeRes.setCollectScore(list.get(i).getCollectScore());
 					vidoeRes.setShareScore(list.get(i).getShareScore());
+					vidoeRes.setVideoUrl(null);
 					list.get(i).setVidoeRes(vidoeRes);
 				}
 			}
@@ -61,6 +62,7 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
 			throw new RuntimeException();
 		}
 	}
+
 
 	@Override
 	public ResponseBase playVideoReport(Integer id) {
@@ -136,8 +138,14 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
 	@Override
 	public ResponseBase playVideo(Integer id) {
 		try {
-			RecommendVidoeRes res = dramaAssetDao.findDramaIdOne(id,DeleteStateEnum.NORMAL.getIndex());
-			return setResultSuccess(res.getVideoUrl(), I18nUtil.getMessage("base_success"));
+			RecommendDramaRes dramaRes = dramaDao.findById(id);
+			if(dramaRes != null ) {
+				RecommendVidoeRes vidoeRes = dramaAssetDao.findDramaIdOne(dramaRes.getId(),DeleteStateEnum.NORMAL.getIndex());
+				vidoeRes.setCollectScore(dramaRes.getCollectScore());
+				vidoeRes.setShareScore(dramaRes.getShareScore());
+				dramaRes.setVidoeRes(vidoeRes);
+			}
+			return setResultSuccess(dramaRes, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			e.printStackTrace();
 			throw new RuntimeException();

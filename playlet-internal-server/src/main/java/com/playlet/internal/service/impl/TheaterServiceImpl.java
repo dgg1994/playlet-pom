@@ -226,8 +226,8 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 	@Override
 	public ResponseBase reportWatch(@RequestBody UserWatchHistoryEntity entity, HttpServletRequest request) {
         try {
-            String uid = AppTokenUtil.resolveUid(request);
-            if (StringUtils.isEmpty(uid)) {
+        	Integer uid = AppTokenUtil.resolveUid(request);
+            if (uid == null) {
                 return setResultError(I18nUtil.getMessage("login_required"));
             }
             if (entity == null || StringUtils.isEmpty(entity.getDramaId())) {
@@ -257,8 +257,8 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 
 	@Override
 	public ResponseBase watchHistory(UserWatchHistoryEntity entity, HttpServletRequest request) {
-		String uid = AppTokenUtil.resolveUid(request);
-		if (StringUtils.isEmpty(uid)) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
 			return setResultError(I18nUtil.getMessage("login_required"));
 		}
 		if (entity == null) {
@@ -284,8 +284,8 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 	@Override
 	public ResponseBase deleteWatchHistory(@RequestParam Integer dramaId, HttpServletRequest request) {
         try {
-            String uid = AppTokenUtil.resolveUid(request);
-            if (StringUtils.isEmpty(uid)) {
+        	Integer uid = AppTokenUtil.resolveUid(request);
+            if (uid == null) {
                 return setResultError(I18nUtil.getMessage("login_required"));
             }
             if (dramaId == null) {
@@ -304,8 +304,8 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 
 	@Override
 	public ResponseBase clearWatchHistory(HttpServletRequest request) {
-		String uid = AppTokenUtil.resolveUid(request);
-		if (StringUtils.isEmpty(uid)) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
 			return setResultError(I18nUtil.getMessage("login_required"));
 		}
 		userWatchHistoryDao.deleteByUid(uid);
@@ -314,7 +314,7 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 	}
 
 	/** 写 MySQL 后同步 Redis：List 保序 + Hash 存进度 */
-	private void cacheWatchAfterWrite(String uid, String dramaId, UserWatchHistoryEntity row) {
+	private void cacheWatchAfterWrite(Integer uid, String dramaId, UserWatchHistoryEntity row) {
 		try {
 			redisUtil.del(VIEW_EMPTY_KEY + uid);
 			String listKey = VIEW_LIST_KEY + uid;
@@ -334,7 +334,7 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 		}
 	}
 
-	private void rebuildViewCache(String uid) {
+	private void rebuildViewCache(Integer uid) {
 		String listKey = VIEW_LIST_KEY + uid;
 		String metaKey = VIEW_META_KEY + uid;
 		String emptyKey = VIEW_EMPTY_KEY + uid;
@@ -411,8 +411,8 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 		if (request == null) {
 			return null;
 		}
-		String uid = AppTokenUtil.resolveUid(request);
-		if (StringUtils.isNotEmpty(uid)) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
 			return HISTORY_KEY_UID + uid;
 		}
 		return null;

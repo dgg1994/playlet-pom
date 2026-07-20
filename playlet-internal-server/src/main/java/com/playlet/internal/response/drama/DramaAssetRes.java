@@ -56,4 +56,10 @@ public class DramaAssetRes {
 	@ApiModelProperty(name = "gmtModified",value = "更新时间",required = false,dataType = "Date")
 	private Date gmtModified;
 	
+	@ApiModelProperty(name = "isLike",value = "是否点赞 1是0否",required = true,dataType = "String")
+	private Integer isLike;
+	
+	@ApiModelProperty(name = "isCollect",value = "是否收藏 1是0否",required = true,dataType = "String")
+	private Integer isCollect;
+	
 }

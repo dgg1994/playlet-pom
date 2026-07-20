@@ -24,7 +24,7 @@ public class UserWatchHistoryEntity extends PageQueryHelperEntity {
 
 	@TableField("uid")
 	@ApiModelProperty(name = "uid", value = "用户ID", dataType = "String")
-	private String uid;
+	private Integer uid;
 
 	@TableField("drama_id")
 	@ApiModelProperty(name = "dramaId", value = "短剧业务ID", dataType = "String")

@@ -17,10 +17,10 @@ public interface UserWatchHistoryDao extends BaseMapper<UserWatchHistoryEntity> 
 	UserWatchHistoryEntity findByUidAndDrama(@Param("uid") String uid, @Param("dramaId") String dramaId);
 
 	@Select("select * from user_watch_history where uid = #{uid} order by gmtModified desc")
-	List<UserWatchHistoryEntity> findByUid(@Param("uid") String uid);
+	List<UserWatchHistoryEntity> findByUid(@Param("uid") Integer uid);
 
 	@Select("select * from user_watch_history where uid = #{uid} order by gmtModified desc limit #{limit}")
-	List<UserWatchHistoryEntity> findByUidLimit(@Param("uid") String uid, @Param("limit") int limit);
+	List<UserWatchHistoryEntity> findByUidLimit(@Param("uid") Integer uid, @Param("limit") int limit);
 
 	@Insert("insert into user_watch_history "
 			+ "(uid, drama_id, episode_id, episode_no, watch_progress, setTime, gmtModified) "
@@ -33,8 +33,8 @@ public interface UserWatchHistoryDao extends BaseMapper<UserWatchHistoryEntity> 
 	int upsert(UserWatchHistoryEntity entity);
 
 	@Delete("delete from user_watch_history where uid = #{uid} and drama_id = #{dramaId}")
-	int deleteByUidAndDrama(@Param("uid") String uid, @Param("dramaId") Integer dramaId);
+	int deleteByUidAndDrama(@Param("uid") Integer uid, @Param("dramaId") Integer dramaId);
 
 	@Delete("delete from user_watch_history where uid = #{uid}")
-	int deleteByUid(@Param("uid") String uid);
+	int deleteByUid(@Param("uid") Integer uid);
 }

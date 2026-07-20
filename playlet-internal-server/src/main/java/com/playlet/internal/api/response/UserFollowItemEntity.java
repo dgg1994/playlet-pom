@@ -11,7 +11,7 @@ import java.util.Date;
 public class UserFollowItemEntity {
 
 	@ApiModelProperty("对方uid")
-	private String uid;
+	private Integer uid;
 
 	@ApiModelProperty("昵称")
 	private String nickname;

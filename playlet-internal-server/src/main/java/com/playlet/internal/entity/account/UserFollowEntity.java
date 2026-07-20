@@ -28,11 +28,11 @@ public class UserFollowEntity extends PageQueryHelperEntity {
 
 	@TableField("uid")
 	@ApiModelProperty(name = "uid", value = "关注人uid（粉丝）", dataType = "String")
-	private String uid;
+	private Integer uid;
 
 	@TableField("follow_uid")
 	@ApiModelProperty(name = "followUid", value = "被关注人uid", dataType = "String")
-	private String followUid;
+	private Integer followUid;
 
 	@TableField("setTime")
 	@ApiModelProperty(name = "setTime", value = "关注时间", dataType = "Date")

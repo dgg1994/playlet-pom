@@ -7,7 +7,7 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 @Data
-public class ReplyCommentQuery {
+public class ReplyVideoCommentQuery {
 
 	@NotNull(message = "剧ID不能为空")
 	@ApiModelProperty(name = "dramaId",value = "剧ID",required = true,dataType = "Integer")

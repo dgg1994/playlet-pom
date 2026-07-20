@@ -23,12 +23,12 @@ public interface UserFollowService {
 	@PostMapping("/follow/add")
 	@ApiImplicitParam(name = "followUid", value = "被关注用户uid", required = true, dataType = "string", paramType = "query")
 	@ApiOperation(value = "关注用户", notes = "需登录；幂等；不可关注自己")
-	ResponseBase followAdd(@RequestParam String followUid, HttpServletRequest request);
+	ResponseBase followAdd(@RequestParam Integer followUid, HttpServletRequest request);
 
 	@PostMapping("/follow/cancel")
 	@ApiImplicitParam(name = "followUid", value = "取消关注的用户uid", required = true, dataType = "string", paramType = "query")
 	@ApiOperation(value = "取消关注", notes = "需登录；幂等")
-	ResponseBase followCancel(@RequestParam String followUid, HttpServletRequest request);
+	ResponseBase followCancel(@RequestParam Integer followUid, HttpServletRequest request);
 
 	@GetMapping("/follow/following")
 	@ApiImplicitParams({

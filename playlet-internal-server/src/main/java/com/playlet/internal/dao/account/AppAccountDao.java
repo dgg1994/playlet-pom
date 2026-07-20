@@ -13,7 +13,7 @@ import java.util.List;
 public interface AppAccountDao extends BaseMapper<AppAccountEntity> {
 
 	@Select("select * from app_account where uid = #{uid}")
-	AppAccountEntity findByUid(@Param("uid") String uid);
+	AppAccountEntity findByUid(@Param("uid") Integer uid);
 
 	@Select("select * from app_account where user_email = #{userEmail}")
 	AppAccountEntity findByEmail(@Param("userEmail") String userEmail);

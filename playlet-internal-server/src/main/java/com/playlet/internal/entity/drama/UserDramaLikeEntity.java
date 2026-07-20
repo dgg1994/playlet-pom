@@ -29,7 +29,7 @@ public class UserDramaLikeEntity extends PageQueryHelperEntity {
 
 	@TableField("uid")
 	@ApiModelProperty(name = "uid", value = "用户ID", dataType = "String")
-	private String uid;
+	private Integer uid;
 
 	@TableField("drama_id")
 	@ApiModelProperty(name = "dramaId", value = "短剧主键 drama.id", dataType = "Integer")

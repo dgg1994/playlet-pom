@@ -54,10 +54,6 @@ public interface AppUserService {
 	@ApiOperation(value = "修改密码",notes="修改密码",response=ResponseBase.class)
     ResponseBase updatePwd(UpdatePwdEntity entity, HttpServletRequest request);
 	
-	@GetMapping("/logout")
-	@ApiOperation(value = "注销账户",notes="注销账户",response=ResponseBase.class)
-    ResponseBase logout(String uid,HttpServletRequest request);
-	
 	@GetMapping("/signOut")
 	@ApiOperation(value = "退出登录",notes="退出登录",response=ResponseBase.class)
     ResponseBase signOut(HttpServletRequest request);
@@ -65,22 +61,7 @@ public interface AppUserService {
 	@PostMapping("/forgetPassword")
 	@ApiOperation(value = "忘记密码",notes="忘记密码",response=ResponseBase.class)
     ResponseBase forgetPasswrod(UpdatePwdEntity entity);
-
-	@PostMapping("/bindingTel")
-	@ApiOperation(value = "账户绑定手机号",notes="账户绑定手机号",response=ResponseBase.class)
-    ResponseBase bindingTel(AppAccountEntity entity);
 	
-	@GetMapping("/sendTelCode")
-	@ApiOperation(value = "发送手机验证吗",notes="发送手机验证吗",response=ResponseBase.class)
-    ResponseBase sendTelCode(String tel);
-  
-    @GetMapping("/checkTelCode")
-    @ApiImplicitParams({
-            @ApiImplicitParam(name = "tel", value = "手机号", required = true, dataType = "String", paramType = "query"),
-            @ApiImplicitParam(name = "emailCode", value = "验证码", required = true, dataType = "String", paramType = "query"),
-    })
-    @ApiOperation(value = "校验手机验证码", notes = "校验手机验证码", response = ResponseBase.class)
-    ResponseBase checkTelCode(String tel, String telCode);
 
 
 }

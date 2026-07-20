@@ -106,6 +106,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			entity.setVideoType(createPay.getVideoType());
 			entity.setDescriptionInfo(createPay.getDescriptionInfo());
 			entity.setBelongUser(createPay.getBelongUser());
+			entity.setIsAi(createPay.getIsAi());
 			if(file != null) {
 				String path = String.format(Constants.FILE_UPLOAD_SITE, entity.getId());
 				String url = QiniuUploadUtils.uploadFile(file,path);

@@ -83,7 +83,7 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 	@Update("update drama set like_score = greatest(ifnull(like_score,0) - 1, 0), gmtModified = now() where id = #{dramaId}")
 	int decrLikeScore(@Param("dramaId") Integer dramaId);
 
-	@Select("SELECT * FROM drama WHERE delete_state = #{deleteState} AND verify_status = #{verifyStatus} ORDER BY RAND() ")
+	@Select("SELECT * FROM drama WHERE delete_state = #{deleteState} AND verify_status = #{verifyStatus} ORDER BY RAND()")
 	List<RecommendDramaRes> recommendList(RecommendDramaQuery entity);
 
 	@Select("SELECT * from drama where id = (SELECT drama_id from drama_asset where id = #{id})")
@@ -108,5 +108,8 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 	        + "  ) "
 	        + "LIMIT 20")
 	List<RecommendDramaRes> relatedWork(@Param("id") Integer id,@Param("deleteState") Integer deleteState,@Param("verifyStatus") Integer verifyStatus);
+
+	@Select("select * from drama where id = #{id}")
+	RecommendDramaRes findById(@Param("id") Integer id);
 
 }

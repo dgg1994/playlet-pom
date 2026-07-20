@@ -1,6 +1,7 @@
 package com.playlet.internal.entity.drama;
 
 import java.util.Date;
+import java.util.List;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -15,10 +16,10 @@ import lombok.EqualsAndHashCode;
 
 
 @Data
-@TableName("drama_comment")
+@TableName("drama_video_comment")
 @EqualsAndHashCode(callSuper = true)
 @ApiModel(value = "短剧评论",description = "短剧评论")
-public class DramaCommentEntity extends PageQueryHelperEntity{
+public class DramaVideoCommentEntity extends PageQueryHelperEntity{
 	
 	@TableId(type = IdType.AUTO)
 	@ApiModelProperty(name = "id",value = "主键",required = false,dataType = "Integer")
@@ -76,5 +77,7 @@ public class DramaCommentEntity extends PageQueryHelperEntity{
 	@ApiModelProperty(name = "gmtModified",value = "更新时间",required = false,dataType = "Date")
 	private Date gmtModified;
 
-	
+	@TableField(exist = false)
+	@ApiModelProperty(name = "subordinateList",value = "下级评论",required = false,dataType = "Date")
+	private List<DramaVideoCommentEntity> subordinateList;
 }

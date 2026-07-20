@@ -15,7 +15,7 @@ public interface UserDramaLikeDao extends BaseMapper<UserDramaLikeEntity> {
 
 	@Select("select * from user_drama_like where uid = #{uid} and drama_id = #{dramaId} "
 			+ "and like_type = #{likeType} and episode_id = #{episodeId} limit 1")
-	UserDramaLikeEntity findOne(@Param("uid") String uid, @Param("dramaId") Integer dramaId,
+	UserDramaLikeEntity findOne(@Param("uid") Integer uid, @Param("dramaId") Integer dramaId,
 			@Param("likeType") Integer likeType, @Param("episodeId") String episodeId);
 
 	@Select("select * from user_drama_like where uid = #{uid} and drama_id = #{dramaId} "
@@ -32,7 +32,7 @@ public interface UserDramaLikeDao extends BaseMapper<UserDramaLikeEntity> {
 			+ "<if test='likeType != null'> and like_type = #{likeType} </if>"
 			+ "order by setTime desc"
 			+ "</script>")
-	List<UserDramaLikeEntity> findByUid(@Param("uid") String uid, @Param("likeType") Integer likeType);
+	List<UserDramaLikeEntity> findByUid(@Param("uid") Integer uid, @Param("likeType") Integer likeType);
 
 	@Insert("insert into user_drama_like (uid, drama_id, like_type, episode_id, setTime, gmtModified) "
 			+ "values (#{uid}, #{dramaId}, #{likeType}, #{episodeId}, #{setTime}, #{gmtModified}) "
@@ -41,7 +41,7 @@ public interface UserDramaLikeDao extends BaseMapper<UserDramaLikeEntity> {
 
 	@Delete("delete from user_drama_like where uid = #{uid} and drama_id = #{dramaId} "
 			+ "and like_type = #{likeType} and episode_id = #{episodeId}")
-	int deleteOne(@Param("uid") String uid, @Param("dramaId") Integer dramaId,
+	int deleteOne(@Param("uid") Integer uid, @Param("dramaId") Integer dramaId,
 			@Param("likeType") Integer likeType, @Param("episodeId") String episodeId);
 
 	@Select("select count(*) from user_drama_like where drama_id = #{dramaId}")
@@ -52,5 +52,5 @@ public interface UserDramaLikeDao extends BaseMapper<UserDramaLikeEntity> {
 	long countByEpisode(@Param("dramaId") Integer dramaId, @Param("episodeId") String episodeId);
 
 	@Select("select count(*) from user_drama_like where uid = #{uid}")
-	Long countLike(@Param("uid") String uid);
+	Long countLike(@Param("uid") Integer uid);
 }

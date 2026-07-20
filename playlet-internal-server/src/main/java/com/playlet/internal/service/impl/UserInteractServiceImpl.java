@@ -56,7 +56,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 
 	@Override
 	public ResponseBase collectAdd(@RequestParam Integer dramaId, HttpServletRequest request) {
-		String uid = AppTokenUtil.resolveUid(request);
+		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
 			return setResultError(I18nUtil.getMessage("login_required"));
 		}
@@ -87,7 +87,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	@Override
 	public ResponseBase collectCancel(@RequestParam Integer dramaId, HttpServletRequest request) {
         try {
-            String uid = AppTokenUtil.resolveUid(request);
+        	Integer uid = AppTokenUtil.resolveUid(request);
             if (uid == null) {
                 return setResultError(I18nUtil.getMessage("login_required"));
             }
@@ -107,7 +107,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 
 	@Override
 	public ResponseBase collectList(UserDramaCollectEntity entity, HttpServletRequest request) {
-		String uid = AppTokenUtil.resolveUid(request);
+		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
 			return setResultError(I18nUtil.getMessage("login_required"));
 		}
@@ -161,7 +161,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 
 	@Override
 	public ResponseBase likeList(UserDramaLikeEntity entity, HttpServletRequest request) {
-		String uid = AppTokenUtil.resolveUid(request);
+		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
 			return setResultError(I18nUtil.getMessage("login_required"));
 		}
@@ -188,7 +188,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	@Override
 	public ResponseBase shareDrama(@RequestParam Integer dramaId, HttpServletRequest request) {
         try {
-            String uid = AppTokenUtil.resolveUid(request);
+        	Integer uid = AppTokenUtil.resolveUid(request);
             if (uid == null) {
                 return setResultError(I18nUtil.getMessage("login_required"));
             }
@@ -228,7 +228,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	 * @return
 	 */
 	private ResponseBase doLike(Integer dramaId, int likeType, String episodeId, HttpServletRequest request) {
-		String uid = AppTokenUtil.resolveUid(request);
+		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
 			return setResultError(I18nUtil.getMessage("login_required"));
 		}
@@ -279,7 +279,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	 * @return
 	 */
 	private ResponseBase doLikeCancel(Integer dramaId, int likeType, String episodeId, HttpServletRequest request) {
-		String uid = AppTokenUtil.resolveUid(request);
+		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
 			return setResultError(I18nUtil.getMessage("login_required"));
 		}
@@ -323,7 +323,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	 * @param dramaId 短剧id
 	 * @param add 是否添加
 	 */
-	private void cacheCollect(String uid, Integer dramaId, boolean add) {
+	private void cacheCollect(Integer uid, Integer dramaId, boolean add) {
 		try {
 			String key = COLLECT_SET_UID + uid;
 			String member = String.valueOf(dramaId);
@@ -345,7 +345,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	 * @param episodeId 剧集id
 	 * @param add 是否添加
 	 */
-	private void cacheLike(String uid, Integer dramaId, int likeType, String episodeId, boolean add) {
+	private void cacheLike(Integer uid, Integer dramaId, int likeType, String episodeId, boolean add) {
 		try {
 			if (likeType == LIKE_TYPE_DRAMA) {
 				String key = LIKE_DRAMA_SET_UID + uid;

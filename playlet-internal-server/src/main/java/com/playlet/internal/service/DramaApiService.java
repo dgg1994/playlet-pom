@@ -67,5 +67,6 @@ public interface DramaApiService {
 	 */
 	@GetMapping("/playVideo")
 	ResponseBase playVideo(Integer id);
+	
 
 }

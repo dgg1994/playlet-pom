@@ -1,5 +1,4 @@
 package com.playlet.internal.service.impl;
-
 import com.playlet.internal.api.request.UserRegisterEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
@@ -21,7 +20,6 @@ import com.playlet.internal.service.AppUserService;
 import com.playlet.internal.utils.*;
 import com.playlet.internal.utils.oidc.OidcIdTokenPayload;
 import com.playlet.internal.utils.oidc.OidcTokenVerifier;
-import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import lombok.extern.slf4j.Slf4j;
@@ -32,26 +30,15 @@ import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
-
 import javax.servlet.http.HttpServletRequest;
 import java.util.Date;
 import java.util.List;
-import java.util.Random;
-
-import static com.playlet.internal.constants.Constants.APP_PACKAGE_NAME;
 
 @Slf4j
 @RestController
 @Transactional
 @CrossOrigin
 public class AppUserServiceImpl extends BaseApiService implements AppUserService {
-
-	/** app 用户 token 在 redis 中的 key 前缀 */
-	private static final String APP_TOKEN_PREFIX = APP_PACKAGE_NAME + "app:token:";
-	/** 邮箱验证码 redis key 前缀 */
-	private static final String EMAIL_CODE_PREFIX = APP_PACKAGE_NAME + "app:emailCode:";
-	/** 手机验证码 redis key 前缀 */
-	private static final String TEL_CODE_PREFIX = APP_PACKAGE_NAME + "app:telCode:";
 
 	@Autowired
 	private RedisUtil redisUtil;
@@ -74,6 +61,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	@Autowired
 	private UserDramaLikeDao UserDramaLikeDao;
 
+	@SuppressWarnings("deprecation")
 	@Override
 	public ResponseBase signUp(@RequestBody AppAccountEntity entity) {
 		if (entity == null || StringUtils.isEmpty(entity.getUserEmail())
@@ -81,7 +69,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
 		// 校验邮箱验证码
-		if (!verifyCode(EMAIL_CODE_PREFIX + entity.getUserEmail(), entity.getEmailCode())) {
+		if (!verifyCode(entity.getUserEmail(), entity.getEmailCode())) {
 			return setResultError("验证码错误或已过期");
 		}
 		// 邮箱唯一性校验
@@ -89,23 +77,29 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			return setResultError(I18nUtil.getMessage("user.account_exist"));
 		}
 		AppAccountEntity account = new AppAccountEntity();
-		account.setUid(generateUid());
-		account.setUserAccount(StringUtils.isNotEmpty(entity.getUserAccount()) ? entity.getUserAccount()
-				: entity.getUserEmail());
+		account.setUserAccount(entity.getUserEmail());
 		account.setUserEmail(entity.getUserEmail());
 		account.setUserPassword(DigestUtils.md5DigestAsHex((entity.getUserPassword()).getBytes()));
 		account.setMobileNumber(entity.getMobileNumber());
 		account.setMobilePrefix(entity.getMobilePrefix());
-		account.setInvitationCode(generateInvitationCode());
+		account.setInvitationCode(RandomSuffixInviteCodeUtil.generateUniqueCode(entity.getId(), 4, 6));
 		account.setRegisterSource(2);
 		account.setRegistrationId(entity.getRegistrationId());
 		account.setUserState(UserStateEnums.NORMAL.getIndex());
 		account.setSetTime(new Date());
 		account.setGmtModified(new Date());
 		appAccountDao.insert(account);
-		// 清除验证码
-		redisUtil.del(EMAIL_CODE_PREFIX + entity.getUserEmail());
-		return setResultSuccess();
+		String token = Jwts.builder()
+				// 设置主题
+				.setSubject(entity.getUserAccount())
+				// 设置到期时间
+				.setExpiration(new Date(System.currentTimeMillis() + Constants.USER_JWT_EXPIRE_TIME))
+				// 选择 加密算法和私钥
+				.signWith(SignatureAlgorithm.HS512, Constants.SIGNING_KEY).compact();
+		redisUtil.set(Constants.APP_PACKAGE_NAME + entity.getUserAccount(),
+				Constants.AUTH_HEADER_START_WITH + token, Constants.USER_REDIS_EXPIRE_TIME);
+		return setResultSuccess(Constants.AUTH_HEADER_START_WITH + token,
+				I18nUtil.getMessage("base_success"));
 	}
 
 	@SuppressWarnings("deprecation")
@@ -201,7 +195,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		AppAccountEntity account = null;
 
 		if (binding != null && binding.getUid() != null) {
-			account = appAccountDao.findByUid(binding.getUid());
+			account = appAccountDao.selectById(binding.getId());
 		}
 
 		if (account == null) {
@@ -230,14 +224,6 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			newEntity.setUserPassword("");
 			newEntity.setUserState(UserStateEnums.NORMAL.getIndex());
 			this.addAccount(newEntity, RegisterSourceEnums.ONE_CLICK_LOGIN.getIndex());
-
-			if (entity.getEnterInvitationCode() != null && !entity.getEnterInvitationCode().isEmpty()) {
-				AppAccountEntity inviter = appAccountDao.findByIncitationCode(entity.getEnterInvitationCode());
-				if (inviter != null) {
-					this.inviteRelation(newEntity, inviter);
-				}
-			}
-
 			account = appAccountDao.findByEmail(email);
 		}
 
@@ -252,7 +238,6 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			AppOauthAccountEntity row = new AppOauthAccountEntity();
 			row.setProvider(provider);
 			row.setProviderSub(payload.getSub());
-			row.setUid(account.getUid());
 			row.setEmail(payload.getEmail());
 			try {
 				GenericityUtil.setDate(row);
@@ -277,20 +262,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		return setResultSuccess(Constants.AUTH_HEADER_START_WITH + token, I18nUtil.getMessage("base_success"));
 	}
 
-	/**
-	 * @category 处理绑定邀请关系
-	 * @param entity 被邀请人
-	 * @param accountEntity 邀请人
-	 */
-	public void inviteRelation(AppAccountEntity entity, AppAccountEntity accountEntity) {
-		try {
-			//@todo 待定处理
-		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
-		}
-	}
-
+	
 	//创建各账户
 	public void addAccount(AppAccountEntity entity,Integer source) {
 		try {
@@ -359,7 +331,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 				//组装html内容
 				String html = MessageFormatUtils.saveHtml(htmlContent, language);
 				EmailUtil.sendEmail(userEmail, templateEntity.getTemplateSubject(), html);
-				redisUtil.set(EMAIL_CODE_PREFIX + userEmail, code, Constants.CODE_EXPIRE_TIME);
+				redisUtil.set(userEmail, code, Constants.CODE_EXPIRE_TIME);
 				return setResultSuccess(I18nUtil.getMessage("send_success"));
 			} else {
 				return setResultError(I18nUtil.getMessage("Template_null"));
@@ -372,7 +344,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 
 	@Override
 	public ResponseBase checkEmailCode(String userEmail, String emailCode) {
-		if (verifyCode(EMAIL_CODE_PREFIX + userEmail, emailCode)) {
+		if (verifyCode(userEmail, emailCode)) {
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		}
 		return setResultError("验证码错误或已过期");
@@ -380,14 +352,14 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 
 	@Override
 	public ResponseBase updatePwd(@RequestBody UpdatePwdEntity entity, HttpServletRequest request) {
-		String uid = parseUidFromRequest(request);
+		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
 		}
 		if (entity == null || StringUtils.isEmpty(entity.getNewPassword())) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
-		AppAccountEntity account = appAccountDao.findByUid(uid);
+		AppAccountEntity account = appAccountDao.selectById(uid);
 		if (account == null) {
 			return setResultError(I18nUtil.getMessage("user.not_null"));
 		}
@@ -402,33 +374,26 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
-	@Override
-	public ResponseBase logout(String uid, HttpServletRequest request) {
-		if (StringUtils.isEmpty(uid)) {
-			uid = parseUidFromRequest(request);
-		}
-		if (uid == null) {
-			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
-		}
-		AppAccountEntity account = appAccountDao.findByUid(uid);
-		if (account == null) {
-			return setResultError(I18nUtil.getMessage("user.not_null"));
-		}
-		account.setUserState(UserStateEnums.LOGOUT.getIndex());
-		account.setGmtModified(new Date());
-		appAccountDao.updateById(account);
-		redisUtil.del(APP_TOKEN_PREFIX + uid);
-		return setResultSuccess(I18nUtil.getMessage("base_success"));
-	}
 
 	@Override
 	public ResponseBase signOut(HttpServletRequest request) {
-		String uid = parseUidFromRequest(request);
-		if (uid == null) {
-			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
+		try {
+			UsernamePasswordAuthenticationToken token = JWTAuthenticationFilter.getAuthentication(request);
+			if(token == null) {
+				return setResult(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"), null);
+			}
+			String username = token.getName();
+			AppAccountEntity userEntity = appAccountDao.findByEmail(username);
+			if(userEntity != null) {
+				redisUtil.del(Constants.APP_PACKAGE_NAME + userEntity.getUserEmail());
+				return setResultSuccess(I18nUtil.getMessage("base_success"));
+			}else {
+				return setResultError(I18nUtil.getMessage("base_success"));
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException();
 		}
-		redisUtil.del(APP_TOKEN_PREFIX + uid);
-		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
 	@Override
@@ -437,7 +402,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 				|| StringUtils.isEmpty(entity.getNewPassword())) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
-		if (!verifyCode(EMAIL_CODE_PREFIX + entity.getEmail(), entity.getEmailCode())) {
+		if (!verifyCode(entity.getEmail(), entity.getEmailCode())) {
 			return setResultError("验证码错误或已过期");
 		}
 		AppAccountEntity account = appAccountDao.findByEmail(entity.getEmail());
@@ -447,131 +412,12 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		account.setUserPassword(MD5Util.digest(entity.getNewPassword()));
 		account.setGmtModified(new Date());
 		appAccountDao.updateById(account);
-		redisUtil.del(EMAIL_CODE_PREFIX + entity.getEmail());
+		redisUtil.del(entity.getEmail());
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
-	@Override
-	public ResponseBase bindingTel(@RequestBody AppAccountEntity entity) {
-		if (entity == null || StringUtils.isEmpty(entity.getUid())
-				|| StringUtils.isEmpty(entity.getMobileNumber())) {
-			return setResultError(I18nUtil.getMessage("base_error"));
-		}
-		if (!verifyCode(TEL_CODE_PREFIX + entity.getMobileNumber(), entity.getTelCode())) {
-			return setResultError("验证码错误或已过期");
-		}
-		AppAccountEntity account = appAccountDao.findByUid(entity.getUid());
-		if (account == null) {
-			return setResultError(I18nUtil.getMessage("user.not_null"));
-		}
-		// 手机号唯一性校验
-		AppAccountEntity exist = appAccountDao.findByMobile(entity.getMobileNumber());
-		if (exist != null && !exist.getUid().equals(entity.getUid())) {
-			return setResultError(I18nUtil.getMessage("base_info_exist"));
-		}
-		account.setMobileNumber(entity.getMobileNumber());
-		account.setMobilePrefix(entity.getMobilePrefix());
-		account.setGmtModified(new Date());
-		appAccountDao.updateById(account);
-		redisUtil.del(TEL_CODE_PREFIX + entity.getMobileNumber());
-		return setResultSuccess(I18nUtil.getMessage("base_success"));
-	}
-
-	@Override
-	public ResponseBase sendTelCode(String tel) {
-		try {
-			String code = OrderCodeFactory.getRandomStr(6);
-			ResponseBase base = SmsUtil.sendVerificationCode(tel, code);
-			if(Constants.HTTP_RES_CODE_200.equals(base.getCode())) {
-				redisUtil.set(tel, code, Constants.CODE_EXPIRE_TIME);
-			}
-			return base;
-		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
-		}
-	}
-
-	@Override
-	public ResponseBase checkTelCode(String tel, String telCode) {
-		try {
-			String temp = null;
-			if (redisUtil.get(tel) != null) {
-				temp = redisUtil.get(tel).toString();
-			}
-			if (temp != null && telCode.equals(temp)) {
-				return setResultSuccess();
-			} else {
-				return setResultError(I18nUtil.getMessage("verification_error"));
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
-		}
-	}
 
 	// ==================== 私有工具方法 ====================
-
-	/**
-	 * 生成登录结果：签发 token 并写入 redis，返回脱敏后的账户信息
-	 */
-	@SuppressWarnings("unused")
-	private ResponseBase buildLoginResult(AppAccountEntity account) {
-		String token = createToken(account.getUid());
-		redisUtil.set(APP_TOKEN_PREFIX + account.getUid(), token, Constants.REDIS_EXPIRE_TIME / 1000);
-		account.setUserPassword(null);
-		account.setPayPassword(null);
-		account.setGoogleSecretkey(null);
-		com.alibaba.fastjson.JSONObject data = new com.alibaba.fastjson.JSONObject();
-		data.put("token", Constants.AUTH_HEADER_START_WITH + token);
-		data.put("user", account);
-		return setResultSuccess(data, I18nUtil.getMessage("base_success"));
-	}
-
-	/**
-	 * 使用 uid 作为 subject 签发 JWT
-	 */
-	@SuppressWarnings("deprecation")
-	private String createToken(String uid) {
-		return Jwts.builder()
-				.setSubject(uid)
-				.setExpiration(new Date(System.currentTimeMillis() + Constants.REDIS_EXPIRE_TIME))
-				.signWith(SignatureAlgorithm.HS512, Constants.SIGNING_KEY)
-				.compact();
-	}
-
-	/**
-	 * 从请求头解析 token 得到 uid，并与 redis 中的 token 双重校验
-	 */
-	@SuppressWarnings("deprecation")
-	private String parseUidFromRequest(HttpServletRequest request) {
-		String header = request.getHeader(Constants.HEADER_AUTH);
-		if (StringUtils.isEmpty(header)) {
-			return null;
-		}
-		String token = header.replace(Constants.AUTH_HEADER_START_WITH, "");
-		try {
-			String uid = Jwts.parser()
-					.setSigningKey(Constants.SIGNING_KEY)
-					.parseClaimsJws(token)
-					.getBody()
-					.getSubject();
-			if (StringUtils.isEmpty(uid)) {
-				return null;
-			}
-			Object cache = redisUtil.get(APP_TOKEN_PREFIX + uid);
-			if (cache == null || !cache.toString().equals(token)) {
-				return null;
-			}
-			return uid;
-		} catch (ExpiredJwtException e) {
-			log.warn("app token expired: {}", e.getMessage());
-			return null;
-		} catch (Exception e) {
-			log.warn("app token parse error: {}", e.getMessage());
-			return null;
-		}
-	}
 
 	/**
 	 * 校验验证码
@@ -584,31 +430,4 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		return cache != null && cache.toString().equals(code);
 	}
 
-	/**
-	 * 生成 6 位数字验证码
-	 */
-	@SuppressWarnings("unused")
-	private String generateCode() {
-		return String.format("%06d", new Random().nextInt(1000000));
-	}
-
-	/**
-	 * 生成唯一 uid
-	 */
-	private String generateUid() {
-		return java.util.UUID.randomUUID().toString().replace("-", "");
-	}
-
-	/**
-	 * 生成 8 位邀请码
-	 */
-	private String generateInvitationCode() {
-		String chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-		StringBuilder sb = new StringBuilder();
-		Random random = new Random();
-		for (int i = 0; i < 8; i++) {
-			sb.append(chars.charAt(random.nextInt(chars.length())));
-		}
-		return sb.toString();
-	}
 }
