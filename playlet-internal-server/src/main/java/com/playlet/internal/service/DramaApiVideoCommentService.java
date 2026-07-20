@@ -1,5 +1,6 @@
 package com.playlet.internal.service;
 
+import javax.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
@@ -18,6 +19,15 @@ public interface DramaApiVideoCommentService {
 	 * @return
 	 */
 	@PostMapping("/list")
-	ResponseBase list(QueryCommentVideoQuery entity);
+	ResponseBase list(QueryCommentVideoQuery entity, HttpServletRequest request);
+	
+	/**
+	 * @category 评论回复列表
+	 * @param commentId
+	 * @param request
+	 * @return
+	 */
+	@PostMapping("/reply/list")
+	ResponseBase replyList(QueryCommentVideoQuery entity, HttpServletRequest request);
 
 }
