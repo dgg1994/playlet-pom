@@ -1,6 +1,9 @@
 package com.playlet.internal.service.impl;
 
 import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -14,15 +17,21 @@ import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.dao.drama.DramaAssetDao;
 import com.playlet.internal.dao.drama.DramaDao;
 import com.playlet.internal.dao.drama.TagDao;
+import com.playlet.internal.dao.drama.UserDramaCollectDao;
+import com.playlet.internal.dao.drama.UserDramaLikeDao;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.TagEntity;
+import com.playlet.internal.entity.drama.UserDramaCollectEntity;
+import com.playlet.internal.entity.drama.UserDramaLikeEntity;
 import com.playlet.internal.enums.DeleteStateEnum;
+import com.playlet.internal.enums.PublicEnums;
 import com.playlet.internal.enums.VerifyStateEnums;
 import com.playlet.internal.query.drama.RecommendDramaQuery;
 import com.playlet.internal.response.drama.DramaAssetRes;
 import com.playlet.internal.response.drama.RecommendDramaRes;
 import com.playlet.internal.response.drama.RecommendVidoeRes;
 import com.playlet.internal.service.DramaApiService;
+import com.playlet.internal.utils.AppTokenUtil;
 import com.playlet.internal.utils.I18nUtil;
 
 @RestController
@@ -38,10 +47,17 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
 	
 	@Autowired
 	private TagDao tagDao;
+	
+	@Autowired
+	private UserDramaLikeDao userDramaLikeDao;
+	
+	@Autowired
+	private UserDramaCollectDao userDramaCollectDao;
 
 	@Override
-	public ResponseBase recommend(@RequestBody RecommendDramaQuery entity) {
+	public ResponseBase recommend(@RequestBody RecommendDramaQuery entity, HttpServletRequest request) {
 		try {
+			Integer uid = AppTokenUtil.resolveUid(request);
 			PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
 			entity.setDeleteState(DeleteStateEnum.NORMAL.getIndex());
 			entity.setVerifyStatus(VerifyStateEnums.AVAILABLE_NOW.getIndex());
@@ -52,6 +68,19 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
 					vidoeRes.setCollectScore(list.get(i).getCollectScore());
 					vidoeRes.setShareScore(list.get(i).getShareScore());
 					vidoeRes.setVideoUrl(null);
+					if(uid != null) {
+						UserDramaLikeEntity dramaLikeEntity = userDramaLikeDao.findByVoideId(vidoeRes.getId());
+						if(dramaLikeEntity != null) {
+							vidoeRes.setIsLike(PublicEnums.ONE.getIndex());
+						}
+						UserDramaCollectEntity collectEntity = userDramaCollectDao.findByVoideId(vidoeRes.getId());
+						if(collectEntity != null) {
+							vidoeRes.setIsCollect(PublicEnums.ONE.getIndex());
+						}
+					}else {
+						vidoeRes.setIsLike(PublicEnums.ZERO.getIndex());
+						vidoeRes.setIsCollect(PublicEnums.ZERO.getIndex());
+					}
 					list.get(i).setVidoeRes(vidoeRes);
 				}
 			}
@@ -80,9 +109,27 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
 	}
 
 	@Override
-	public ResponseBase selections(Integer id) {
+	public ResponseBase selections(Integer id, HttpServletRequest request) {
 		try {
+			Integer uid = AppTokenUtil.resolveUid(request);
 			List<DramaAssetRes> list = dramaAssetDao.findByDramaId(id);
+			if(list != null && list.size() > 0) {
+				for (int i = 0; i < list.size(); i++) {
+					if(uid != null) {
+						UserDramaLikeEntity dramaLikeEntity = userDramaLikeDao.findByVoideId(list.get(i).getId());
+						if(dramaLikeEntity != null) {
+							list.get(i).setIsLike(PublicEnums.ONE.getIndex());
+						}
+						UserDramaCollectEntity collectEntity = userDramaCollectDao.findByVoideId(list.get(i).getId());
+						if(collectEntity != null) {
+							list.get(i).setIsCollect(PublicEnums.ONE.getIndex());
+						}
+					}else {
+						list.get(i).setIsLike(PublicEnums.ZERO.getIndex());
+						list.get(i).setIsCollect(PublicEnums.ZERO.getIndex());
+					}
+				}
+			}
 			return setResultSuccess(list, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			e.printStackTrace();

@@ -29,4 +29,7 @@ public interface UserDramaCollectDao extends BaseMapper<UserDramaCollectEntity> 
 
 	@Select("select count(1) from user_drama_collect where drama_id = #{dramaId}")
 	long countByDramaId(@Param("dramaId") Integer dramaId);
+
+	@Select("select * from user_drama_collect where drama_id = #{dramaId}")
+	UserDramaCollectEntity findByVoideId(@Param("dramaId") Integer dramaId);
 }

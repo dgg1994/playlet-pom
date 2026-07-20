@@ -56,5 +56,5 @@ public interface WelfareTaskService {
 	/**
 	 * 行为推进进度（内部调用，非 HTTP）
 	 */
-	void onAction(String uid, WelfareActionTypeEnums action, int delta, String extInfo);
+	void onAction(Integer uid, WelfareActionTypeEnums action, int delta, String extInfo);
 }

@@ -1,0 +1,21 @@
+# IDE
+.idea/
+.settings/
+.vscode/
+*.iml
+.classpath
+.project
+
+# Build
+target/
+*.class
+*.jar
+*.war
+
+# Logs
+*.log
+startup.log
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,5 +1,7 @@
 package com.playlet.internal.service;
 
+import javax.servlet.http.HttpServletRequest;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,7 +20,7 @@ public interface DramaApiService {
 	 * @return
 	 */
 	@PostMapping("/recommend")
-	ResponseBase recommend(RecommendDramaQuery entity);
+	ResponseBase recommend(RecommendDramaQuery entity, HttpServletRequest request);
 	
 	/**
 	 * @category 视频播放上报
@@ -34,7 +36,7 @@ public interface DramaApiService {
 	 * @return
 	 */
 	@GetMapping("/selections")
-	ResponseBase selections(Integer id);
+	ResponseBase selections(Integer id, HttpServletRequest request);
 	
 	/**
 	 * @category 获取视频播放地址
