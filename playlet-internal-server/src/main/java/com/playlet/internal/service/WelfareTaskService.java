@@ -22,7 +22,7 @@ import javax.servlet.http.HttpServletRequest;
 public interface WelfareTaskService {
 
 	@GetMapping("/home")
-	@ApiOperation(value = "福利首页", notes = "余额 + 启用任务列表（含进度）；需登录")
+	@ApiOperation(value = "福利首页", notes = "余额 + 签到摘要 + 启用任务列表（含进度）；需登录")
 	ResponseBase home(HttpServletRequest request);
 
 	@GetMapping("/tasks")
