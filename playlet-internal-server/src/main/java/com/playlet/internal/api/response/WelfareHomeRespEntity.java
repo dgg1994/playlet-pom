@@ -16,6 +16,9 @@ public class WelfareHomeRespEntity {
 	@ApiModelProperty("签到摘要，未开启或未配置时为 null")
 	private SignInHomeSummaryEntity signIn;
 
+	@ApiModelProperty("观影礼摘要，未开启或未配置时为 null")
+	private WatchGiftHomeSummaryEntity watchGift;
+
 	@ApiModelProperty("任务列表")
 	private List<WelfareTaskItemEntity> tasks;
 }

@@ -39,8 +39,12 @@ public class UserWatchHistoryEntity extends PageQueryHelperEntity {
 	private Integer episodeNo;
 
 	@TableField("watch_progress")
-	@ApiModelProperty(name = "watchProgress", value = "分集内播放进度，单位：秒", dataType = "Integer")
+	@ApiModelProperty(name = "watchProgress", value = "分集内播放进度，单位：秒，用于续播", dataType = "Integer")
 	private Integer watchProgress;
+
+	@TableField(exist = false)
+	@ApiModelProperty(name = "deltaSeconds", value = "本次有效观看秒数（关闭播放器/心跳上报）；用于观影礼累计，不落观看历史表", dataType = "Integer")
+	private Integer deltaSeconds;
 
 	@TableField("setTime")
 	@ApiModelProperty(name = "setTime", value = "首次写入浏览历史的时间", dataType = "Date")

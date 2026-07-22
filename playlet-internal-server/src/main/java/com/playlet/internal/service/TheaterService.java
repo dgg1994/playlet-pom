@@ -53,7 +53,8 @@ public interface TheaterService {
 	ResponseBase clearSearchHistory(HttpServletRequest request);
 
 	@PostMapping("/view/report")
-	@ApiOperation(value = "上报浏览/观看进度", notes = "需 x-playlet-token；MySQL 持久化 + Redis 缓存")
+	@ApiOperation(value = "上报浏览/观看进度", notes = "需登录。body: dramaId 必填；episodeId/episodeNo/watchProgress 续播；"
+			+ "deltaSeconds=本次有效观看秒数（关闭播放器上报），用于观影礼累计。同时推进按集福利任务(WATCH)。")
 	ResponseBase reportWatch(@RequestBody UserWatchHistoryEntity entity, HttpServletRequest request);
 
 	@GetMapping("/view/history")

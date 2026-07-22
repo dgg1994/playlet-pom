@@ -13,6 +13,7 @@ public enum CoinBizTypeEnums {
 	TASK_REWARD("TASK_REWARD", "任务奖励"),
 	AD_BOOST("AD_BOOST", "广告加赠"),
 	SIGN_IN("SIGN_IN", "签到"),
+	WATCH_GIFT("WATCH_GIFT", "观影礼"),
 	RECHARGE("RECHARGE", "充值"),
 	CONSUME("CONSUME", "消费"),
 	SYSTEM("SYSTEM", "系统调整");

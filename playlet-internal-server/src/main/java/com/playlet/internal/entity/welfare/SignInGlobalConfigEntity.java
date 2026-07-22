@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.playlet.internal.query.pub.PageQueryHelperEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -13,7 +14,7 @@ import java.util.Date;
 @Data
 @TableName("sign_in_global_config")
 @ApiModel(value = "签到全局配置", description = "签到规则（通常一行）")
-public class SignInGlobalConfigEntity {
+public class SignInGlobalConfigEntity extends PageQueryHelperEntity {
 
 	@TableId(type = IdType.AUTO)
 	@ApiModelProperty(name = "id", value = "主键", dataType = "Integer")
@@ -24,7 +25,7 @@ public class SignInGlobalConfigEntity {
 	private String timezone;
 
 	@TableField("cycle_mode")
-	@ApiModelProperty(name = "cycleMode", value = "CAP封顶 / LOOP循环", dataType = "String")
+	@ApiModelProperty(name = "cycleMode", value = "CAP封顶 / LOOP循环，见 SignInCycleModeEnums", dataType = "String")
 	private String cycleMode;
 
 	@TableField("cycle_days")

@@ -23,6 +23,7 @@ import com.playlet.internal.entity.drama.RankListEntity;
 import com.playlet.internal.entity.drama.TagEntity;
 import com.playlet.internal.entity.drama.UserWatchHistoryEntity;
 import com.playlet.internal.service.TheaterService;
+import com.playlet.internal.service.WatchGiftService;
 import com.playlet.internal.service.WelfareTaskService;
 import com.playlet.internal.enums.WelfareActionTypeEnums;
 import com.playlet.internal.utils.AppTokenUtil;
@@ -62,6 +63,8 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 	private RedisUtil redisUtil;
 	@Autowired
 	private WelfareTaskService welfareTaskService;
+	@Autowired
+	private WatchGiftService watchGiftService;
 
 	@Override
 	public ResponseBase home() {
@@ -253,6 +256,8 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
             userWatchHistoryDao.upsert(row);
 
             cacheWatchAfterWrite(uid, dramaId, row);
+
+            // 按集福利任务：有 episodeId 才去重推进
             if (!StringUtils.isEmpty(row.getEpisodeId())) {
                 try {
                     JSONObject ext = new JSONObject();
@@ -263,6 +268,21 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
                     log.warn("welfare watch progress failed: {}", e.getMessage());
                 }
             }
+
+            // 观影礼：关闭播放器上报的本次有效秒数
+            Integer deltaSeconds = entity.getDeltaSeconds();
+            if (deltaSeconds != null && deltaSeconds > 0) {
+                try {
+                    JSONObject ext = new JSONObject();
+                    ext.put("dramaId", dramaId);
+                    ext.put("episodeId", row.getEpisodeId());
+                    ext.put("watchProgress", row.getWatchProgress());
+                    watchGiftService.addWatchSeconds(uid, deltaSeconds, ext.toJSONString());
+                } catch (Exception e) {
+                    log.warn("watch gift seconds failed: {}", e.getMessage());
+                }
+            }
+
             return setResultSuccess(I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
 			throw new RuntimeException(e);

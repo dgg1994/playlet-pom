@@ -42,7 +42,6 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
 
 	private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 	private static final DateTimeFormatter MONTH_FMT = DateTimeFormatter.ofPattern("yyyy-MM");
-	private static final String CYCLE_LOOP = "LOOP";
 	private static final String BIZ_ID_SIGN_PREFIX = "SIGN_IN:";
 	private static final String BIZ_ID_CARD_BUY_PREFIX = "SIGN_IN_MAKEUP_CARD_BUY:";
 
@@ -638,9 +637,12 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
 			return 1;
 		}
 		int safeStreak = Math.max(streak, 1);
-		String mode = config.getCycleMode() == null ? "CAP" : config.getCycleMode().trim();
+		SignInCycleModeEnums mode = SignInCycleModeEnums.fromCode(config.getCycleMode());
+		if (mode == null) {
+			mode = SignInCycleModeEnums.defaultMode();
+		}
 		int cycleDays = config.getCycleDays() == null || config.getCycleDays() <= 0 ? maxDay : config.getCycleDays();
-		if (CYCLE_LOOP.equalsIgnoreCase(mode)) {
+		if (mode == SignInCycleModeEnums.LOOP) {
 			return ((safeStreak - 1) % cycleDays) + 1;
 		}
 		return Math.min(safeStreak, maxDay);

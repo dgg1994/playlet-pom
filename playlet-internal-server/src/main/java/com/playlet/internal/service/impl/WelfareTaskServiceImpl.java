@@ -20,6 +20,7 @@ import com.playlet.internal.enums.WelfareProgressStatusEnums;
 import com.playlet.internal.enums.WelfareTaskEnums;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
 import com.playlet.internal.service.SignInService;
+import com.playlet.internal.service.WatchGiftService;
 import com.playlet.internal.service.WelfareTaskService;
 import com.playlet.internal.utils.AppTokenUtil;
 import com.playlet.internal.utils.GenericityUtil;
@@ -61,6 +62,8 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 	private AppAccountDao appAccountDao;
 	@Autowired
 	private SignInService signInService;
+	@Autowired
+	private WatchGiftService watchGiftService;
 
 	@Override
 	public ResponseBase home(HttpServletRequest request) {
@@ -72,6 +75,7 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 		AppAccountEntity account = appAccountDao.findByUid(uid);
 		resp.setCoinBalance(account == null || account.getCoinBalance() == null ? 0L : account.getCoinBalance());
 		resp.setSignIn(signInService.buildHomeSummary(uid));
+		resp.setWatchGift(watchGiftService.buildHomeSummary(uid));
 		resp.setTasks(buildTaskItems(uid));
 		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
 	}
