@@ -8,6 +8,7 @@ import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.api.request.TagRequest;
 import com.playlet.internal.api.response.TagGroupRespEntity;
 import com.playlet.internal.base.ResponseBase;
+import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.dao.drama.TagDao;
 import com.playlet.internal.entity.drama.TagEntity;
 import com.playlet.internal.service.DramaTagService;
@@ -19,12 +20,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.lang.reflect.InvocationTargetException;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.playlet.internal.base.BaseApiService.setResultError;
@@ -96,6 +96,14 @@ public class DramaTagServiceImpl implements DramaTagService {
     }
 
     @Override
+    public ResponseBase findListByLanguage() {
+        //获取当前请求语言
+        String language = LanguageContext.getLanguage();
+        List<TagEntity> tags = tagDao.selectList(new QueryWrapper<TagEntity>().eq("langue",language));
+        return setResultSuccess(tags, I18nUtil.getMessage("base_success"));
+    }
+
+    @Override
     @SysLogAnnotation(module = "短剧标签", type = "POST", remark = "新增标签")
     public ResponseBase save(@RequestBody TagRequest entity) {
         try {
@@ -126,6 +134,39 @@ public class DramaTagServiceImpl implements DramaTagService {
     }
 
     @Override
+    public ResponseBase update(@RequestBody TagRequest tagRequest) {
+        try {
+            String groupId = tagRequest.getGroupId();
+            Integer sortWeight = tagRequest.getSortWeight();
+            List<TagEntity> tags = tagRequest.getTags();
+            if (StringUtils.isEmpty(groupId) || tags == null || tags.isEmpty()) {
+                return setResultError(I18nUtil.getMessage("base_error"));
+            }
+            for (TagEntity tag : tags) {
+                TagEntity tagEntity = tagDao.selectOne(new QueryWrapper<TagEntity>().eq("group_id", groupId).eq("langue", tag.getLangue()));
+                if (tagEntity != null){
+                    tagEntity.setTagName(tag.getTagName());
+                    tagEntity.setGmtModified(new Date());
+                    tagEntity.setSortWeight(tag.getSortWeight());
+                    tagDao.updateById(tagEntity);
+                }else {
+                    tagEntity = new TagEntity();
+                    tagEntity.setLangue(tag.getLangue());
+                    tagEntity.setTagName(tag.getTagName());
+                    tagEntity.setGroupId(groupId);
+                    tagEntity.setStatus(1);
+                    tagEntity.setSortWeight(sortWeight);
+                    GenericityUtil.setDate(tagEntity);
+                    tagDao.insert(tagEntity);
+                }
+            }
+            return setResultSuccess(I18nUtil.getMessage("base_success"));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
     @SysLogAnnotation(module = "短剧标签", type = "POST", remark = "变更标签状态")
     public ResponseBase changeStatus(@RequestBody TagEntity entity) {
         try {
@@ -140,6 +181,24 @@ public class DramaTagServiceImpl implements DramaTagService {
                 return setResultError(I18nUtil.getMessage("base_data_null"));
             }
             tagDao.updateStatusByGroupId(entity.getStatus(),entity.getGroupId());
+            return setResultSuccess(I18nUtil.getMessage("base_success"));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    @SysLogAnnotation(module = "短剧标签", type = "POST", remark = "变更标签状态")
+    public ResponseBase changeStatus(@RequestParam String groupId) {
+        try {
+            if (StringUtils.isEmpty(groupId)) {
+                return setResultError(I18nUtil.getMessage("base_error"));
+            }
+            List<TagEntity> tagEntities = tagDao.selectList(new QueryWrapper<TagEntity>().eq("group_id",groupId));
+            if (tagEntities == null) {
+                return setResultError(I18nUtil.getMessage("base_data_null"));
+            }
+            tagDao.deleteTagByGroupId(groupId);
             return setResultSuccess(I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
             throw new RuntimeException(e);

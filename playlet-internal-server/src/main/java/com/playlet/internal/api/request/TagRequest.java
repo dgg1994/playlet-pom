@@ -18,4 +18,6 @@ public class TagRequest {
 
     private Integer sortWeight;
 
+    private String groupId;
+
 }

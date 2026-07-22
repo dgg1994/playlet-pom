@@ -2,6 +2,7 @@ package com.playlet.internal.dao.drama;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.playlet.internal.entity.drama.TagEntity;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -69,4 +70,7 @@ public interface TagDao extends BaseMapper<TagEntity> {
 			+ "order by sort_weight desc, id desc"
 			+ "</script>")
 	List<TagEntity> findAppList(TagEntity entity);
+
+	@Delete("delete from dic_drama_tag where group_id = #{groupId}")
+	void deleteTagByGroupId(@Param("groupId") String groupId);
 }
