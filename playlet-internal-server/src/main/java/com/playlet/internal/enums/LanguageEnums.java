@@ -18,8 +18,8 @@ public enum LanguageEnums {
 	TR(4, "tr-tr", "tr-tr", "土耳其"),
 	KO(5, "ko-kr", "ko-kr", "韩语"),
 	JA(6, "ja-jp", "ja-jp", "日语"),
-	BN(6, "bn-bd", "bn-bd", "孟加拉"),
-	PT_BR(7, "pt-br", "pt-br", "巴西语");
+	BN(7, "bn-bd", "bn-bd", "孟加拉"),
+	PT_BR(8, "pt-br", "pt-br", "巴西语");
 	
 
 	private Integer index;

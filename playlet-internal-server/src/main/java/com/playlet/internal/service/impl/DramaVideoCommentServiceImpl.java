@@ -55,16 +55,7 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 			GenericityUtil.setDate(entity);
 			dramaVideoCommentDao.insert(entity);
 			//视频、短剧添加评论量
-			DramaEntity dramaEntity = dramaDao.selectById(entity.getDramaId());
-			if(dramaEntity != null) {
-				dramaEntity.setDiscussScore(dramaEntity.getDiscussScore() + 1);
-				dramaDao.updateById(dramaEntity);
-			}
-			DramaAssetEntity dramaAssetEntity= dramaAssetDao.selectById(entity.getVideoId());
-			if(dramaAssetEntity != null) {
-				dramaAssetEntity.setDiscussScore(dramaAssetEntity.getDiscussScore() + 1);
-				dramaAssetDao.updateById(dramaAssetEntity);
-			}
+			addDiscussScore(entity);
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -86,10 +77,30 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 				commentEntity.setReplyCount(commentEntity.getReplyCount() + 1);
 				dramaVideoCommentDao.updateById(commentEntity);
 			}
+			//视频、短剧添加评论量
+			addDiscussScore(entity);
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			e.printStackTrace();
 			throw new RuntimeException();
+		}
+	}
+
+	/**
+	 * 视频、短剧添加评论量
+	 * @param entity
+	 */
+	public void addDiscussScore(DramaVideoCommentEntity entity){
+		//视频、短剧添加评论量
+		DramaEntity dramaEntity = dramaDao.selectById(entity.getDramaId());
+		if(dramaEntity != null) {
+			dramaEntity.setDiscussScore(dramaEntity.getDiscussScore() + 1);
+			dramaDao.updateById(dramaEntity);
+		}
+		DramaAssetEntity dramaAssetEntity= dramaAssetDao.selectById(entity.getVideoId());
+		if(dramaAssetEntity != null) {
+			dramaAssetEntity.setDiscussScore(dramaAssetEntity.getDiscussScore() + 1);
+			dramaAssetDao.updateById(dramaAssetEntity);
 		}
 	}
 
@@ -137,6 +148,17 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 			DramaVideoCommentEntity commentEntity = dramaVideoCommentDao.selectById(id);
 			if(commentEntity != null) {
 				dramaVideoCommentDao.deleteById(id);
+				//视频、短剧删除评论
+				DramaEntity dramaEntity = dramaDao.selectById(commentEntity.getDramaId());
+				if(dramaEntity != null) {
+					dramaEntity.setDiscussScore(dramaEntity.getDiscussScore() - 1);
+					dramaDao.updateById(dramaEntity);
+				}
+				DramaAssetEntity dramaAssetEntity= dramaAssetDao.selectById(commentEntity.getVideoId());
+				if(dramaAssetEntity != null) {
+					dramaAssetEntity.setDiscussScore(dramaAssetEntity.getDiscussScore() - 1);
+					dramaAssetDao.updateById(dramaAssetEntity);
+				}
 			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {

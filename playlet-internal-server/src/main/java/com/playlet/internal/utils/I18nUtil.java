@@ -56,6 +56,9 @@ public class I18nUtil {
 				case "pt-br": // 巴西葡萄牙语
 					locale = new Locale("pt", "BR");
 					break;
+				case "bn-bd": // 孟加拉语
+					locale = new Locale("bn", "BD");
+					break;
 				case "en": // 英文
 					locale = Locale.ENGLISH;
 					break;
