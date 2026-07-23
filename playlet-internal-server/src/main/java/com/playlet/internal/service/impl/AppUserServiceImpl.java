@@ -31,8 +31,11 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import javax.servlet.http.HttpServletRequest;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 @RestController
@@ -82,10 +85,17 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		account.setUserPassword(DigestUtils.md5DigestAsHex((entity.getUserPassword()).getBytes()));
 		account.setMobileNumber(entity.getMobileNumber());
 		account.setMobilePrefix(entity.getMobilePrefix());
-		account.setInvitationCode(RandomSuffixInviteCodeUtil.generateUniqueCode(entity.getId(), 4, 6));
+		Long seed = Long.parseLong(
+				System.currentTimeMillis() +
+						String.format("%04d", ThreadLocalRandom.current().nextInt(1000, 9999))
+		);
+		account.setInvitationCode(RandomSuffixInviteCodeUtil.generateUniqueCode(seed, 4, 6));
 		account.setRegisterSource(2);
 		account.setRegistrationId(entity.getRegistrationId());
 		account.setUserState(UserStateEnums.NORMAL.getIndex());
+		String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMddHHmmss"));
+		int randomNum = ThreadLocalRandom.current().nextInt(100, 999);
+		account.setNickname("user_" + timestamp + randomNum);
 		account.setSetTime(new Date());
 		account.setGmtModified(new Date());
 		appAccountDao.insert(account);
