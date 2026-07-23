@@ -30,8 +30,12 @@ public class DramaVideoCommentEntity extends PageQueryHelperEntity{
 	private Integer dramaId;
 	
 	@TableField("video_id")
-	@ApiModelProperty(name = "videoId",value = "视频id",required = true,dataType = "Integer")
+	@ApiModelProperty(name = "videoId",value = "视频id；剧评时为0",required = true,dataType = "Integer")
 	private Integer videoId;
+
+	@TableField("comment_type")
+	@ApiModelProperty(name = "commentType",value = "1视频评论 2短剧剧评",required = false,dataType = "Integer")
+	private Integer commentType;
 	
 	@TableField("user_id")
 	@ApiModelProperty(name = "userId",value = "评论用户ID",required = true,dataType = "Integer")
@@ -44,6 +48,10 @@ public class DramaVideoCommentEntity extends PageQueryHelperEntity{
 	@TableField("comment_info")
 	@ApiModelProperty(name = "commentInfo",value = "评论内容",required = true,dataType = "String")
 	private String commentInfo;
+
+	@TableField("score")
+	@ApiModelProperty(name = "score",value = "剧评评分1-5，仅一级剧评",required = false,dataType = "Integer")
+	private Integer score;
 	
 	@TableField("like_count")
 	@ApiModelProperty(name = "likeCount",value = "点赞数",required = true,dataType = "Integer")

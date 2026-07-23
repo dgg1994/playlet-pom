@@ -19,6 +19,7 @@ import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaCommentLikeEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.DramaVideoCommentEntity;
+import com.playlet.internal.enums.CommentTypeEnums;
 import com.playlet.internal.enums.DeleteStateEnum;
 import com.playlet.internal.enums.PublicEnums;
 import com.playlet.internal.query.drama.AddDramaVideoCommentQuery;
@@ -50,6 +51,8 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 		try {
 			DramaVideoCommentEntity entity = new DramaVideoCommentEntity();
 			BeanUtils.copyProperties(createPay, entity);
+			entity.setCommentType(CommentTypeEnums.VIDEO.getCode());
+			entity.setScore(null);
 			entity.setParentId(PublicEnums.ZERO.getIndex());
 			entity.setDeleteState(DeleteStateEnum.NORMAL.getIndex());
 			GenericityUtil.setDate(entity);
@@ -68,6 +71,8 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 		try {
 			DramaVideoCommentEntity entity = new DramaVideoCommentEntity();
 			BeanUtils.copyProperties(createPay, entity);
+			entity.setCommentType(CommentTypeEnums.VIDEO.getCode());
+			entity.setScore(null);
 			entity.setDeleteState(DeleteStateEnum.NORMAL.getIndex());
 			GenericityUtil.setDate(entity);
 			dramaVideoCommentDao.insert(entity);
@@ -111,8 +116,12 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 			if(commentEntity == null) {
 				return  setResultError(I18nUtil.getMessage("base_error"));
 			}
+			DramaCommentLikeEntity exist = dramaCommentLikeDao.findOne(
+					giveLikeQuery.getCommentId(), giveLikeQuery.getUserId());
 			if(PublicEnums.ONE.getIndex().equals(giveLikeQuery.getOperationType())) {
-				//新增记录
+				if (exist != null) {
+					return setResultSuccess(I18nUtil.getMessage("base_success"));
+				}
 				DramaCommentLikeEntity commentLikeEntity = new DramaCommentLikeEntity();
 				commentLikeEntity.setCommentId(commentEntity.getId());
 				commentLikeEntity.setDramaId(commentEntity.getDramaId());
@@ -123,22 +132,25 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 				}
 				commentLikeEntity.setUserId(giveLikeQuery.getUserId());
 				commentLikeEntity.setVideoId(commentEntity.getVideoId());
-				GenericityUtil.setDate(commentEntity);
+				GenericityUtil.setDate(commentLikeEntity);
 				dramaCommentLikeDao.insert(commentLikeEntity);
-				//评论添加点赞量
-				commentEntity.setLikeCount(commentEntity.getLikeCount() + 1);
+				commentEntity.setLikeCount((commentEntity.getLikeCount() == null ? 0 : commentEntity.getLikeCount()) + 1);
 				dramaVideoCommentDao.updateById(commentEntity);
 				return setResultSuccess(I18nUtil.getMessage("base_success"));
 			}else {
+				if (exist == null) {
+					return setResultSuccess(I18nUtil.getMessage("base_success"));
+				}
 				dramaCommentLikeDao.deleteByUser(giveLikeQuery.getCommentId(),giveLikeQuery.getUserId());
-				commentEntity.setLikeCount(commentEntity.getLikeCount() - 1);
+				int likeCount = (commentEntity.getLikeCount() == null ? 0 : commentEntity.getLikeCount()) - 1;
+				commentEntity.setLikeCount(Math.max(likeCount, 0));
 				dramaVideoCommentDao.updateById(commentEntity);
 				return setResultSuccess(I18nUtil.getMessage("base_success"));
 			}
 			
 		} catch (Exception e) {
 			e.printStackTrace();
-			throw new RuntimeException();
+			throw new RuntimeException(e);
 		}
 	}
 
