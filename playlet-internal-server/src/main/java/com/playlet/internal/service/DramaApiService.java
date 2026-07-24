@@ -76,6 +76,6 @@ public interface DramaApiService {
 	 * @return
 	 */
 	@GetMapping("/getVideoInfo")
-	ResponseBase getVideoInfo(Integer id);
+	ResponseBase getVideoInfo(Integer id,HttpServletRequest  request);
 	
 }

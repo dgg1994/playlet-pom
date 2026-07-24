@@ -90,4 +90,12 @@ public class DramaAssetEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "gmtModified",value = "更新时间",required = false,dataType = "Date")
 	private Date gmtModified;
 
+	@TableField(exist = false)
+	@ApiModelProperty(name = "isLike",value = "是否点赞 1是0否",required = true,dataType = "String")
+	private Integer isLike;
+
+	@TableField(exist = false)
+	@ApiModelProperty(name = "isCollect",value = "是否收藏 1是0否",required = true,dataType = "String")
+	private Integer isCollect;
+
 }
