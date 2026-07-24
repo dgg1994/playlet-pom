@@ -88,6 +88,9 @@ public class DramaVideoCommentEntity extends PageQueryHelperEntity{
 	@TableField(exist = false)
 	@ApiModelProperty(name = "subordinateList",value = "下级评论",required = false,dataType = "Date")
 	private List<DramaVideoCommentEntity> subordinateList;
+
+	@TableField(exist = false)
+	private DramaEntity drama;
 	
 	@TableField(exist = false)
 	@ApiModelProperty(name = "isDelete",value = "是否可以删除 1是0否",required = false,dataType = "Date")

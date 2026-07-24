@@ -50,5 +50,5 @@ public interface DramaVideoCommentDao extends BaseMapper<DramaVideoCommentEntity
 	@Select("select ifnull(avg(score),0) as avgScore from drama_video_comment "
 			+ "where drama_id = #{dramaId} and comment_type = 2 "
 			+ "and delete_state = #{deleteState} and score is not null")
-	Long avgScoreNumByDramaId(@Param("dramaId") Integer dramaId, @Param("deleteState") Integer deleteState);
+	Double avgScoreNumByDramaId(@Param("dramaId") Integer dramaId, @Param("deleteState") Integer deleteState);
 }

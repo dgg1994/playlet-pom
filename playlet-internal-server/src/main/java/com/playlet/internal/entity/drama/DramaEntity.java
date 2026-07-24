@@ -40,7 +40,7 @@ public class DramaEntity extends PageQueryHelperEntity {
 	
 	@TableField("score_num")
 	@ApiModelProperty(name = "scoreNum",value = "评分",required = false,dataType = "Long")
-	private Long scoreNum;
+	private Double scoreNum;
 	
 	@TableField("hot_score")
 	@ApiModelProperty(name = "hotScore",value = "热度值",required = false,dataType = "Long")

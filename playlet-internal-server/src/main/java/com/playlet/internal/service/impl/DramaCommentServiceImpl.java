@@ -192,7 +192,7 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 		}
 	}
 
-	/** 均分*10 写入 score_num，如 4.5 -> 45 */
+	/** 均分  */
 	private void refreshDramaScoreNum(Integer dramaId) {
 		Map<String, Object> agg = dramaVideoCommentDao.avgScoreByDramaId(dramaId, DeleteStateEnum.NORMAL.getIndex());
 		DramaEntity dramaEntity = dramaDao.selectById(dramaId);
@@ -205,7 +205,7 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 					.setScale(1, RoundingMode.HALF_UP)
 					.doubleValue();
 		}
-		dramaEntity.setScoreNum(Math.round(avg * 10));
+		dramaEntity.setScoreNum(avg);
 		dramaDao.updateById(dramaEntity);
 	}
 }

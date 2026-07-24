@@ -8,6 +8,8 @@ import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 
+import com.playlet.internal.dao.drama.DramaDao;
+import com.playlet.internal.entity.drama.DramaEntity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -40,6 +42,9 @@ public class DramaApiDramaCommentServiceImpl extends BaseApiService implements D
 	@Autowired
 	private DramaCommentLikeDao dramaCommentLikeDao;
 
+	@Autowired
+	private DramaDao dramaDao;
+
 	@Override
 	public ResponseBase list(@Valid @RequestBody QueryDramaCommentQuery entity, HttpServletRequest request) {
 		try {
@@ -56,6 +61,26 @@ public class DramaApiDramaCommentServiceImpl extends BaseApiService implements D
 			throw new RuntimeException(e);
 		}
 	}
+
+	@Override
+	public ResponseBase detail(@RequestBody QueryDramaCommentQuery entity, HttpServletRequest request) {
+		try {
+			Integer uid = AppTokenUtil.resolveUid(request);
+			PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
+			DramaVideoCommentEntity dramaVideoCommentEntity = dramaVideoCommentDao.selectById(entity.getParentId());
+			DramaEntity drama = dramaDao.selectById(entity.getDramaId());
+			dramaVideoCommentEntity.setDrama(drama);
+			List<DramaVideoCommentEntity> list = dramaVideoCommentDao.findParentId(
+					dramaVideoCommentEntity.getParentId(), DeleteStateEnum.NORMAL.getIndex());
+			fillFlags(list, uid);
+			dramaVideoCommentEntity.setSubordinateList(list);
+			return setResultSuccess(dramaVideoCommentEntity, I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		}
+	}
+
 
 	@Override
 	public ResponseBase replyList(@RequestBody QueryDramaCommentQuery entity, HttpServletRequest request) {

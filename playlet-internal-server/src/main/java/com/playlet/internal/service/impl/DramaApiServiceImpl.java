@@ -165,7 +165,7 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
                 return setResultError(I18nUtil.getMessage("video_delete"));
             }
             List<TagEntity> tagList = tagDao.findGroupLang(language, entity.getId());
-            Long scoreNum = dramaVideoCommentDao.avgScoreNumByDramaId(entity.getId(), DeleteStateEnum.NORMAL.getIndex());
+            Double scoreNum = dramaVideoCommentDao.avgScoreNumByDramaId(entity.getId(), DeleteStateEnum.NORMAL.getIndex());
             entity.setScoreNum(scoreNum == null ? 0 : scoreNum);
             entity.setTagList(tagList);
             return setResultSuccess(entity, I18nUtil.getMessage("base_success"));

@@ -23,6 +23,10 @@ public interface DramaApiDramaCommentService {
 	@ApiOperation("短剧评论列表")
 	ResponseBase list(QueryDramaCommentQuery entity, HttpServletRequest request);
 
+	@PostMapping("/detail")
+	@ApiOperation("短剧评论详情")
+	ResponseBase detail(QueryDramaCommentQuery entity, HttpServletRequest request);
+
 	@PostMapping("/reply/list")
 	@ApiOperation("短剧评论回复列表")
 	ResponseBase replyList(QueryDramaCommentQuery entity, HttpServletRequest request);
