@@ -1,36 +1,21 @@
 package com.playlet.internal.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
-import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
-import com.playlet.internal.api.response.TheaterHomeRespEntity;
-import com.playlet.internal.api.response.TheaterRankBlockEntity;
-import com.playlet.internal.api.response.TheaterRankPageRespEntity;
 import com.playlet.internal.api.response.TheaterSearchHistoryRespEntity;
 import com.playlet.internal.api.response.TheaterSearchItemEntity;
 import com.playlet.internal.api.response.TheaterWatchHistoryItemEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
-import com.playlet.internal.config.heard.LanguageContext;
-import com.playlet.internal.dao.drama.DramaDao;
-import com.playlet.internal.dao.drama.RankBoardDao;
-import com.playlet.internal.dao.drama.RankListDao;
-import com.playlet.internal.dao.drama.TagDao;
-import com.playlet.internal.dao.drama.UserWatchHistoryDao;
+import com.playlet.internal.dao.drama.*;
 import com.playlet.internal.entity.drama.DramaEntity;
-import com.playlet.internal.entity.drama.RankBoardEntity;
-import com.playlet.internal.entity.drama.RankListEntity;
 import com.playlet.internal.entity.drama.TagEntity;
 import com.playlet.internal.entity.drama.UserWatchHistoryEntity;
+import com.playlet.internal.enums.WelfareActionTypeEnums;
 import com.playlet.internal.service.TheaterService;
 import com.playlet.internal.service.WatchGiftService;
 import com.playlet.internal.service.WelfareTaskService;
-import com.playlet.internal.enums.WelfareActionTypeEnums;
-import com.playlet.internal.utils.AppTokenUtil;
-import com.playlet.internal.utils.GenericityUtil;
-import com.playlet.internal.utils.I18nUtil;
-import com.playlet.internal.utils.RedisUtil;
-import com.playlet.internal.utils.StringUtils;
+import com.playlet.internal.utils.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -50,10 +35,6 @@ import static com.playlet.internal.constants.RedisKeyConstants.*;
 public class TheaterServiceImpl extends BaseApiService implements TheaterService {
 
 	@Autowired
-	private RankBoardDao rankBoardDao;
-	@Autowired
-	private RankListDao rankListDao;
-	@Autowired
 	private DramaDao dramaDao;
 	@Autowired
 	private TagDao tagDao;
@@ -65,108 +46,6 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 	private WelfareTaskService welfareTaskService;
 	@Autowired
 	private WatchGiftService watchGiftService;
-
-	@Override
-	public ResponseBase home() {
-		TheaterHomeRespEntity resp = new TheaterHomeRespEntity();
-		List<RankBoardEntity> boards = rankBoardDao.findEnabledList(LanguageContext.getLanguage());
-		if (boards != null) {
-			for (RankBoardEntity board : boards) {
-				List<RankListEntity> all = rankListDao.findEnabledByBoardGroupId(board.getGroupId());
-				int limit = board.getTopN() == null ? 10 : Math.min(10, board.getTopN());
-				List<RankListEntity> preview = new ArrayList<>();
-				if (all != null) {
-					for (int i = 0; i < all.size() && i < limit; i++) {
-						preview.add(all.get(i));
-					}
-				}
-				TheaterRankBlockEntity block = new TheaterRankBlockEntity();
-				block.setGroupId(board.getGroupId());
-				block.setBoardName(board.getBoardName());
-				block.setBoardType(board.getBoardType());
-				block.setItems(preview);
-				resp.getBlocks().add(block);
-			}
-		}
-		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
-	}
-
-	@Override
-	public ResponseBase rankList() {
-		List<RankBoardEntity> rankBoardEntities = rankBoardDao.findEnabledList(LanguageContext.getLanguage());
-		return setResultSuccess(rankBoardEntities, I18nUtil.getMessage("base_success"));
-	}
-
-	@Override
-	public ResponseBase rank(@RequestParam(required = false) String groupId,
-			RankListEntity entity) {
-		if (StringUtils.isEmpty(groupId)) {
-			return setResultError(I18nUtil.getMessage("base_error"));
-		}
-		groupId = groupId.trim();
-		String langue = LanguageContext.getLanguage();
-		RankBoardEntity board = rankBoardDao.findByGroupIdAndLangue(groupId, langue);
-		if (board == null) {
-			board = rankBoardDao.findOneByGroupId(groupId);
-		}
-		if (board == null || board.getStatus() == null || board.getStatus() != 1) {
-			return setResultError(I18nUtil.getMessage("rank_board_null"));
-		}
-		if (entity == null) {
-			entity = new RankListEntity();
-		}
-		entity.setBoardGroupId(groupId);
-		entity.setStatus(1);
-		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
-		List<RankListEntity> list = rankListDao.findAdminList(entity);
-		PageInfo<RankListEntity> info = new PageInfo<>(list);
-		TheaterRankPageRespEntity resp = new TheaterRankPageRespEntity();
-		resp.setGroupId(board.getGroupId());
-		resp.setBoardName(board.getBoardName());
-		resp.setPage(info);
-		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
-	}
-
-	@Override
-	public ResponseBase search(@RequestBody DramaEntity entity, HttpServletRequest request) {
-		if (entity == null) {
-			entity = new DramaEntity();
-		}
-		if (StringUtils.isNotEmpty(entity.getDramaTitle())) {
-			entity.setDramaTitle(entity.getDramaTitle().trim());
-		}
-		// 关联表存的是 tag_group_id，前端常传标签主键 tagId，先解析成 groupId
-		if (StringUtils.isEmpty(entity.getTagGroupId()) && entity.getTagId() != null) {
-			TagEntity tag = tagDao.selectById(entity.getTagId());
-			if (tag == null || StringUtils.isEmpty(tag.getGroupId())) {
-				PageInfo<TheaterSearchItemEntity> empty = new PageInfo<>(new ArrayList<>());
-				empty.setTotal(0);
-				return setResultSuccess(empty, I18nUtil.getMessage("base_success"));
-			}
-			entity.setTagGroupId(tag.getGroupId());
-		}
-		List<DramaEntity> dramaEntities = dramaDao.searchOnline(entity);
-		if (dramaEntities == null) {
-			dramaEntities = new ArrayList<>();
-		}
-		log.info("theater search title={}, tagId={}, tagGroupId={}, hit={}",
-				entity.getDramaTitle(), entity.getTagId(), entity.getTagGroupId(), dramaEntities.size());
-		List<DramaEntity> pageDramas = GenericityUtil.Page(dramaEntities, entity.getPageNumber(), entity.getPageSize());
-
-		String langue = LanguageContext.getLanguage();
-		List<TheaterSearchItemEntity> items = new ArrayList<>();
-		for (DramaEntity d : pageDramas) {
-			items.add(toSearchItem(d, langue));
-		}
-
-		PageInfo<TheaterSearchItemEntity> page = new PageInfo<>(items);
-		page.setTotal(dramaEntities.size());
-		if (StringUtils.isNotEmpty(entity.getDramaTitle())) {
-			saveSearchHistory(request, entity.getDramaTitle());
-		}
-		return setResultSuccess(page, I18nUtil.getMessage("base_success"));
-	}
-
 	private TheaterSearchItemEntity toSearchItem(DramaEntity d, String langue) {
 		TheaterSearchItemEntity item = new TheaterSearchItemEntity();
 		item.setDramaId(d.getId());

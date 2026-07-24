@@ -15,13 +15,12 @@ import javax.servlet.http.HttpServletRequest;
 /**
  * C 端连续签到接口。
  * <p>
- * 路径前缀：{@code /api/welfare}（经网关 {@code /api/**} 路由）。
  * 补签消耗「补签卡」；福利首页通过 {@link #buildHomeSummary(Integer)} 组装摘要。
  * </p>
  *
  * @author GeminiSun
  */
-@RequestMapping("/api/welfare")
+@RequestMapping("/welfare")
 @Api(value = "签到", tags = "签到")
 public interface SignInService {
 

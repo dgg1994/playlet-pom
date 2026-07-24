@@ -16,7 +16,7 @@ import javax.servlet.http.HttpServletRequest;
 /**
  * C端收藏/点赞：网关 /china/admin/api/theater/**
  */
-@RequestMapping("/api/theater")
+@RequestMapping("/theater")
 @Api(value = "剧场互动", tags = "剧场互动")
 public interface UserInteractService {
 

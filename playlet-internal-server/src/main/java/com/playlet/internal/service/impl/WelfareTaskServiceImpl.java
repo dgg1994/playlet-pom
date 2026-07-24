@@ -4,7 +4,6 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.github.pagehelper.PageInfo;
 import com.playlet.internal.api.response.CoinLedgerItemEntity;
-import com.playlet.internal.api.response.WelfareHomeRespEntity;
 import com.playlet.internal.api.response.WelfareTaskItemEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
@@ -13,14 +12,8 @@ import com.playlet.internal.dao.account.AppAccountDao;
 import com.playlet.internal.dao.welfare.*;
 import com.playlet.internal.entity.account.AppAccountEntity;
 import com.playlet.internal.entity.welfare.*;
-import com.playlet.internal.enums.CoinBizTypeEnums;
-import com.playlet.internal.enums.WelfareActionTypeEnums;
-import com.playlet.internal.enums.WelfareCycleTypeEnums;
-import com.playlet.internal.enums.WelfareProgressStatusEnums;
-import com.playlet.internal.enums.WelfareTaskEnums;
+import com.playlet.internal.enums.*;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
-import com.playlet.internal.service.SignInService;
-import com.playlet.internal.service.WatchGiftService;
 import com.playlet.internal.service.WelfareTaskService;
 import com.playlet.internal.utils.AppTokenUtil;
 import com.playlet.internal.utils.GenericityUtil;
@@ -60,34 +53,6 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 	private UserWelfareWatchLogDao userWelfareWatchLogDao;
 	@Autowired
 	private AppAccountDao appAccountDao;
-	@Autowired
-	private SignInService signInService;
-	@Autowired
-	private WatchGiftService watchGiftService;
-
-	@Override
-	public ResponseBase home(HttpServletRequest request) {
-		Integer uid = AppTokenUtil.resolveUid(request);
-		if (uid == null) {
-			return setResultError(I18nUtil.getMessage("login_required"));
-		}
-		WelfareHomeRespEntity resp = new WelfareHomeRespEntity();
-		AppAccountEntity account = appAccountDao.findByUid(uid);
-		resp.setCoinBalance(account == null || account.getCoinBalance() == null ? 0L : account.getCoinBalance());
-		resp.setSignIn(signInService.buildHomeSummary(uid));
-		resp.setWatchGift(watchGiftService.buildHomeSummary(uid));
-		resp.setTasks(buildTaskItems(uid));
-		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
-	}
-
-	@Override
-	public ResponseBase tasks(HttpServletRequest request) {
-		Integer uid = AppTokenUtil.resolveUid(request);
-		if (uid == null) {
-			return setResultError(I18nUtil.getMessage("login_required"));
-		}
-		return setResultSuccess(buildTaskItems(uid), I18nUtil.getMessage("base_success"));
-	}
 
 	@Override
 	public ResponseBase accept(@RequestParam Integer taskId, HttpServletRequest request) {
@@ -411,57 +376,6 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 			return;
 		}
 		appAccountDao.addCoinBalance(uid, amt);
-	}
-
-	/**
-	 * 构建任务项
-	 * @param uid 用户ID
-	 * @return 任务项
-	 */
-	private List<WelfareTaskItemEntity> buildTaskItems(Integer uid) {
-		List<WelfareTaskEntity> tasks = welfareTaskDao.findEnabledList();
-		if (tasks == null) {
-			tasks = new ArrayList<>();
-		}
-		String language = LanguageContext.getLanguage();
-		List<WelfareTaskItemEntity> items = new ArrayList<>();
-		for (WelfareTaskEntity task : tasks) {
-			String bizDate = resolveBizDate(task.getCycleType());
-			UserWelfareProgressEntity progress = userWelfareProgressDao.findOne(uid, task.getId(), bizDate);
-			if (progress != null) {
-				refreshExpired(progress);
-			}
-			WelfareTaskItemEntity item = new WelfareTaskItemEntity();
-			item.setTaskId(task.getId());
-			item.setTaskCode(task.getTaskCode());
-			item.setTaskIcon(task.getTaskIcon());
-			item.setRewardCoin(task.getRewardCoin());
-			item.setAdBoostCoin(task.getAdBoostCoin());
-			item.setCycleType(task.getCycleType());
-			item.setTargetCount(task.getTargetCount());
-			item.setAutoClaim(task.getAutoClaim());
-			item.setActionType(parseActionType(task.getExtraConfig()));
-			log.info("福利首页语言:{}，taskId:{}",language,task.getId());
-			WelfareTaskI18nEntity byTaskIdAndLangue = welfareTaskI18nDao.findByTaskIdAndLangue(task.getId(), language);
-			if (byTaskIdAndLangue != null){
-				item.setTaskName(byTaskIdAndLangue.getTaskName());
-				item.setTaskDesc(byTaskIdAndLangue.getTaskDesc());
-			}
-			if (progress == null) {
-				item.setProgress(0);
-				item.setProgressStatus(WelfareProgressStatusEnums.NOT_ACCEPTED.getCode());
-				item.setAccepted(false);
-			} else {
-				item.setAccepted(true);
-				item.setProgress(progress.getProgress() == null ? 0 : progress.getProgress());
-				item.setProgressStatus(progress.getProgressStatus());
-				if (progress.getTarget() != null) {
-					item.setTargetCount(progress.getTarget());
-				}
-			}
-			items.add(item);
-		}
-		return items;
 	}
 
 	/**

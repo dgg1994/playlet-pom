@@ -18,7 +18,7 @@ public class TokenAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException) throws IOException, ServletException {
-        CustomUtils.sendJsonMessage(response, JsonData.buildError("请登录！！"));
+        CustomUtils.sendJsonMessage(response, JsonData.buildError("请登录"));
     }
 }
 

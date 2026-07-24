@@ -17,17 +17,10 @@ import javax.servlet.http.HttpServletRequest;
 /**
  * C端福利：网关 /api/welfare/**
  */
-@RequestMapping("/api/welfare")
+@RequestMapping("/welfare")
 @Api(value = "福利", tags = "福利")
 public interface WelfareTaskService {
 
-	@GetMapping("/home")
-	@ApiOperation(value = "福利首页", notes = "余额 + 签到摘要 + 启用任务列表（含进度）；需登录")
-	ResponseBase home(HttpServletRequest request);
-
-	@GetMapping("/tasks")
-	@ApiOperation(value = "任务列表", notes = "启用任务 + 本周期进度；需登录")
-	ResponseBase tasks(HttpServletRequest request);
 
 	@PostMapping("/task/accept")
 	@ApiImplicitParam(name = "taskId", value = "任务ID", required = true, dataType = "int", paramType = "query")
