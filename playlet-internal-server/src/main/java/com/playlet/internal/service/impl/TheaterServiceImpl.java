@@ -12,6 +12,7 @@ import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.TagEntity;
 import com.playlet.internal.entity.drama.UserWatchHistoryEntity;
 import com.playlet.internal.enums.WelfareActionTypeEnums;
+import com.playlet.internal.service.DramaRankStatService;
 import com.playlet.internal.service.TheaterService;
 import com.playlet.internal.service.WatchGiftService;
 import com.playlet.internal.service.WelfareTaskService;
@@ -46,6 +47,8 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
 	private WelfareTaskService welfareTaskService;
 	@Autowired
 	private WatchGiftService watchGiftService;
+	@Autowired
+	private DramaRankStatService dramaRankStatService;
 	private TheaterSearchItemEntity toSearchItem(DramaEntity d, String langue) {
 		TheaterSearchItemEntity item = new TheaterSearchItemEntity();
 		item.setDramaId(d.getId());
@@ -160,6 +163,14 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
                 } catch (Exception e) {
                     log.warn("watch gift seconds failed: {}", e.getMessage());
                 }
+            }
+
+            // 榜单日聚合：每次上报记 1 次 pv，并累计有效秒数
+            try {
+                int delta = deltaSeconds == null ? 0 : Math.max(0, deltaSeconds);
+                dramaRankStatService.onWatch(Integer.valueOf(dramaId), delta);
+            } catch (Exception e) {
+                log.warn("rank stat watch failed: {}", e.getMessage());
             }
 
             return setResultSuccess(I18nUtil.getMessage("base_success"));

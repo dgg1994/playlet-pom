@@ -13,6 +13,7 @@ import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.UserDramaCollectEntity;
 import com.playlet.internal.entity.drama.UserDramaLikeEntity;
+import com.playlet.internal.service.DramaRankStatService;
 import com.playlet.internal.service.UserInteractService;
 import com.playlet.internal.service.WelfareTaskService;
 import com.playlet.internal.enums.WelfareActionTypeEnums;
@@ -57,6 +58,8 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	private RedisUtil redisUtil;
 	@Autowired
 	private WelfareTaskService welfareTaskService;
+	@Autowired
+	private DramaRankStatService dramaRankStatService;
 
 	@Override
 	public ResponseBase collectAdd(@RequestParam Integer dramaId, HttpServletRequest request) {
@@ -81,6 +84,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 			GenericityUtil.setDate(row);
 			userDramaCollectDao.insert(row);
 			dramaDao.incrCollectScore(dramaId);
+			dramaRankStatService.onCollect(dramaId, 1);
 			cacheCollect(uid, dramaId, true);
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
@@ -101,6 +105,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
             int deleted = userDramaCollectDao.deleteByUidAndDrama(uid, dramaId);
             if (deleted > 0) {
                 dramaDao.decrCollectScore(dramaId);
+                dramaRankStatService.onCollect(dramaId, -1);
             }
             cacheCollect(uid, dramaId, false);
             return setResultSuccess(I18nUtil.getMessage("base_success"));
@@ -269,6 +274,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 			GenericityUtil.setDate(row);
 			userDramaLikeDao.insert(row);
 			dramaDao.incrLikeScore(dramaId);
+			dramaRankStatService.onLike(dramaId, 1);
 			if (assetId != null) {
 				dramaAssetDao.incrLikeScore(assetId);
 			}
@@ -300,6 +306,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		int deleted = userDramaLikeDao.deleteOne(uid, dramaId, likeType, ep);
 		if (deleted > 0) {
 			dramaDao.decrLikeScore(dramaId);
+			dramaRankStatService.onLike(dramaId, -1);
 			if (likeType == LIKE_TYPE_EPISODE) {
 				Integer assetId = parseAssetId(ep);
 				if (assetId != null) {

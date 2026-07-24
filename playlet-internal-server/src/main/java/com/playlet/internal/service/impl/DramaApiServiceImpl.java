@@ -1,10 +1,12 @@
 package com.playlet.internal.service.impl;
 
 import java.util.List;
+import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.playlet.internal.dao.drama.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -15,11 +17,6 @@ import com.github.pagehelper.PageInfo;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
-import com.playlet.internal.dao.drama.DramaAssetDao;
-import com.playlet.internal.dao.drama.DramaDao;
-import com.playlet.internal.dao.drama.TagDao;
-import com.playlet.internal.dao.drama.UserDramaCollectDao;
-import com.playlet.internal.dao.drama.UserDramaLikeDao;
 import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.TagEntity;
@@ -46,6 +43,9 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
 
     @Autowired
     private DramaAssetDao dramaAssetDao;
+
+    @Autowired
+    private DramaVideoCommentDao dramaVideoCommentDao;
 
     @Autowired
     private TagDao tagDao;
@@ -165,6 +165,8 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
                 return setResultError(I18nUtil.getMessage("video_delete"));
             }
             List<TagEntity> tagList = tagDao.findGroupLang(language, entity.getId());
+            Long scoreNum = dramaVideoCommentDao.avgScoreNumByDramaId(entity.getId(), DeleteStateEnum.NORMAL.getIndex());
+            entity.setScoreNum(scoreNum == null ? 0 : scoreNum);
             entity.setTagList(tagList);
             return setResultSuccess(entity, I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
