@@ -4,14 +4,18 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.github.pagehelper.PageInfo;
 import com.playlet.internal.api.response.CoinLedgerItemEntity;
-import com.playlet.internal.api.response.WelfareTaskItemEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
-import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.dao.account.AppAccountDao;
-import com.playlet.internal.dao.welfare.*;
+import com.playlet.internal.dao.welfare.UserCoinLedgerDao;
+import com.playlet.internal.dao.welfare.UserWelfareProgressDao;
+import com.playlet.internal.dao.welfare.UserWelfareWatchLogDao;
+import com.playlet.internal.dao.welfare.WelfareTaskDao;
 import com.playlet.internal.entity.account.AppAccountEntity;
-import com.playlet.internal.entity.welfare.*;
+import com.playlet.internal.entity.welfare.UserCoinLedgerEntity;
+import com.playlet.internal.entity.welfare.UserWelfareProgressEntity;
+import com.playlet.internal.entity.welfare.UserWelfareWatchLogEntity;
+import com.playlet.internal.entity.welfare.WelfareTaskEntity;
 import com.playlet.internal.enums.*;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
 import com.playlet.internal.service.WelfareTaskService;
@@ -43,8 +47,6 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 
 	@Autowired
 	private WelfareTaskDao welfareTaskDao;
-	@Autowired
-	private WelfareTaskI18nDao welfareTaskI18nDao;
 	@Autowired
 	private UserWelfareProgressDao userWelfareProgressDao;
 	@Autowired

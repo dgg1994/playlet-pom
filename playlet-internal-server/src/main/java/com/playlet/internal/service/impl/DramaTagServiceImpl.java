@@ -23,7 +23,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -54,7 +53,6 @@ public class DramaTagServiceImpl implements DramaTagService {
         // 按 groupId 分页；多语言字段平铺为 zh-cn / en 等
         PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
         List<TagEntity> groupRows = tagDao.findAdminGroupList(entity);
-        PageInfo<TagEntity> pageInfo = new PageInfo<>(groupRows);
 
         Map<String, List<TagEntity>> tagsByGroup = new LinkedHashMap<>();
         if (!groupRows.isEmpty()) {

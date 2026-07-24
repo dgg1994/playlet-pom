@@ -8,7 +8,9 @@ import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.dao.account.AppAccountDao;
-import com.playlet.internal.dao.welfare.*;
+import com.playlet.internal.dao.welfare.UserWelfareProgressDao;
+import com.playlet.internal.dao.welfare.WelfareTaskDao;
+import com.playlet.internal.dao.welfare.WelfareTaskI18nDao;
 import com.playlet.internal.entity.account.AppAccountEntity;
 import com.playlet.internal.entity.welfare.UserWelfareProgressEntity;
 import com.playlet.internal.entity.welfare.WelfareTaskEntity;
@@ -46,10 +48,6 @@ public class WelfareTaskApiServiceImpl extends BaseApiService implements Welfare
 	private WelfareTaskI18nDao welfareTaskI18nDao;
 	@Autowired
 	private UserWelfareProgressDao userWelfareProgressDao;
-	@Autowired
-	private UserCoinLedgerDao userCoinLedgerDao;
-	@Autowired
-	private UserWelfareWatchLogDao userWelfareWatchLogDao;
 	@Autowired
 	private AppAccountDao appAccountDao;
 	@Autowired
