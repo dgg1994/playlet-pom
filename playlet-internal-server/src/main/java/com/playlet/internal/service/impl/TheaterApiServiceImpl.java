@@ -3,6 +3,7 @@ package com.playlet.internal.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
+import com.playlet.internal.api.response.RankListItemEntity;
 import com.playlet.internal.api.response.TheaterHomeRespEntity;
 import com.playlet.internal.api.response.TheaterRankBlockEntity;
 import com.playlet.internal.api.response.TheaterRankPageRespEntity;
@@ -72,10 +73,13 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 		if (boards == null) {
 			boards = Collections.emptyList();
 		}
+		Integer verifyStatus = VerifyStateEnums.AVAILABLE_NOW.getIndex();
+		Integer deleteState = DeleteStateEnum.NORMAL.getIndex();
 		for (RankBoardEntity board : boards) {
 			int limit = board.getTopN() == null ? HOME_RANK_PREVIEW_MAX
 					: Math.min(HOME_RANK_PREVIEW_MAX, board.getTopN());
-			List<RankListEntity> preview = rankListDao.findEnabledByBoardGroupIdLimit(board.getGroupId(), limit);
+			List<RankListItemEntity> preview = rankListDao.findEnabledWithDramaLimit(
+					board.getGroupId(), verifyStatus, deleteState, limit);
 			if (preview == null) {
 				preview = Collections.emptyList();
 			}
@@ -128,9 +132,15 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 		}
 		entity.setBoardGroupId(groupId);
 		entity.setStatus(1);
-		List<DramaEntity> dramaEntities = dramaDao.selectListDramas(groupId);
+		List<DramaEntity> dramaEntities = dramaDao.selectListDramas(
+				groupId,
+				VerifyStateEnums.AVAILABLE_NOW.getIndex(),
+				DeleteStateEnum.NORMAL.getIndex());
+		if (dramaEntities == null) {
+			dramaEntities = new ArrayList<>();
+		}
 		for (DramaEntity dramaEntity : dramaEntities) {
-			List<TagEntity> tagEntities = tagDao.selectListTagByDramaId(dramaEntity.getId(),langue);
+			List<TagEntity> tagEntities = tagDao.selectListTagByDramaId(dramaEntity.getId(), langue);
 			dramaEntity.setTagList(tagEntities);
 		}
 		List<DramaEntity> page = GenericityUtil.Page(dramaEntities, entity.getPageNumber(), entity.getPageSize());
@@ -183,19 +193,6 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 		return setResultSuccess(page, I18nUtil.getMessage("base_success"));
 	}
 
-	private TheaterSearchItemEntity toCarouselItem(DramaEntity d) {
-		TheaterSearchItemEntity item = new TheaterSearchItemEntity();
-		item.setDramaId(d.getId());
-		item.setTitle(d.getDramaTitle());
-		item.setCoverUrl(d.getCoverUrl());
-		item.setHotScore(d.getHotScore());
-		item.setHotScoreText(d.getHotScoreText());
-		item.setTotalEpisodes(d.getTotalEpisodes());
-		item.setFinished(d.getFinishedState());
-		item.setDescription(d.getDescriptionInfo());
-		return item;
-	}
-
 	private TheaterSearchItemEntity toSearchItem(DramaEntity d, String langue) {
 		TheaterSearchItemEntity item = new TheaterSearchItemEntity();
 		item.setDramaId(d.getId());
@@ -239,7 +236,7 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 			return null;
 		}
 		Integer uid = AppTokenUtil.resolveUid(request);
-		if (uid == null) {
+		if (uid != null) {
 			return HISTORY_KEY_UID + uid;
 		}
 		return null;

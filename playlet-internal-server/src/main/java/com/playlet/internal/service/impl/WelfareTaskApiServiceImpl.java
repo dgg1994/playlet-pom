@@ -7,6 +7,7 @@ import com.playlet.internal.api.response.WelfareTaskItemEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
+import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.account.AppAccountDao;
 import com.playlet.internal.dao.welfare.UserWelfareProgressDao;
 import com.playlet.internal.dao.welfare.WelfareTaskDao;
@@ -59,7 +60,7 @@ public class WelfareTaskApiServiceImpl extends BaseApiService implements Welfare
 	public ResponseBase home(HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
-			return setResultError(I18nUtil.getMessage("login_required"));
+			return setResultError(Constants.HTTP_RES_CODE_403,I18nUtil.getMessage("login_required"));
 		}
 		WelfareHomeRespEntity resp = new WelfareHomeRespEntity();
 		AppAccountEntity account = appAccountDao.findByUid(uid);
@@ -74,7 +75,7 @@ public class WelfareTaskApiServiceImpl extends BaseApiService implements Welfare
 	public ResponseBase tasks(HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
-			return setResultError(I18nUtil.getMessage("login_required"));
+			return setResultError(Constants.HTTP_RES_CODE_403,I18nUtil.getMessage("login_required"));
 		}
 		return setResultSuccess(buildTaskItems(uid), I18nUtil.getMessage("base_success"));
 	}

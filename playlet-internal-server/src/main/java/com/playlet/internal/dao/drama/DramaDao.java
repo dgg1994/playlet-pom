@@ -113,6 +113,12 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 	@Select("select * from drama where id = #{id}")
 	RecommendDramaRes findById(@Param("id") Integer id);
 
-	@Select("select d.* from drama d left join rank_list rl on d.id = rl.drama_id where rl.board_group_id = #{groupId} order by d.hot_score desc")
-	List<DramaEntity> selectListDramas(@Param("groupId") String groupId);
+	@Select("select d.* from drama d "
+			+ "inner join rank_list rl on d.id = rl.drama_id "
+			+ "where rl.board_group_id = #{groupId} and rl.status = 1 "
+			+ "and d.verify_status = #{verifyStatus} and ifnull(d.delete_state, 0) = #{deleteState} "
+			+ "order by rl.rank_no asc")
+	List<DramaEntity> selectListDramas(@Param("groupId") String groupId,
+			@Param("verifyStatus") Integer verifyStatus,
+			@Param("deleteState") Integer deleteState);
 }

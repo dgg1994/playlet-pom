@@ -5,6 +5,7 @@ import com.playlet.internal.api.response.TheaterCollectItemEntity;
 import com.playlet.internal.api.response.TheaterLikeItemEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
+import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.drama.DramaAssetDao;
 import com.playlet.internal.dao.drama.DramaDao;
 import com.playlet.internal.dao.drama.UserDramaCollectDao;
@@ -65,7 +66,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	public ResponseBase collectAdd(@RequestParam Integer dramaId, HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
-			return setResultError(I18nUtil.getMessage("login_required"));
+			return setResultError(Constants.HTTP_RES_CODE_403,I18nUtil.getMessage("login_required"));
 		}
 		if (dramaId == null) {
 			return setResultError(I18nUtil.getMessage("base_error"));
@@ -97,7 +98,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
         try {
         	Integer uid = AppTokenUtil.resolveUid(request);
             if (uid == null) {
-                return setResultError(I18nUtil.getMessage("login_required"));
+                return setResultError(Constants.HTTP_RES_CODE_403,I18nUtil.getMessage("login_required"));
             }
             if (dramaId == null) {
                 return setResultError(I18nUtil.getMessage("base_error"));
@@ -118,7 +119,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	public ResponseBase collectList(UserDramaCollectEntity entity, HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
-			return setResultError(I18nUtil.getMessage("login_required"));
+			return setResultError(Constants.HTTP_RES_CODE_403,I18nUtil.getMessage("login_required"));
 		}
 		if (entity == null) {
 			entity = new UserDramaCollectEntity();
@@ -172,7 +173,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	public ResponseBase likeList(UserDramaLikeEntity entity, HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
-			return setResultError(I18nUtil.getMessage("login_required"));
+			return setResultError(Constants.HTTP_RES_CODE_403,I18nUtil.getMessage("login_required"));
 		}
 		if (entity == null) {
 			entity = new UserDramaLikeEntity();
@@ -199,7 +200,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
         try {
         	Integer uid = AppTokenUtil.resolveUid(request);
             if (uid == null) {
-                return setResultError(I18nUtil.getMessage("login_required"));
+                return setResultError(Constants.HTTP_RES_CODE_403,I18nUtil.getMessage("login_required"));
             }
             if (dramaId == null) {
                 return setResultError(I18nUtil.getMessage("base_error"));
@@ -245,7 +246,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	private ResponseBase doLike(Integer dramaId, int likeType, String episodeId, HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
-			return setResultError(I18nUtil.getMessage("login_required"));
+			return setResultError(Constants.HTTP_RES_CODE_403,I18nUtil.getMessage("login_required"));
 		}
 		if (dramaId == null) {
 			return setResultError(I18nUtil.getMessage("base_error"));
@@ -297,7 +298,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	private ResponseBase doLikeCancel(Integer dramaId, int likeType, String episodeId, HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
-			return setResultError(I18nUtil.getMessage("login_required"));
+			return setResultError(Constants.HTTP_RES_CODE_403,I18nUtil.getMessage("login_required"));
 		}
 		if (dramaId == null) {
 			return setResultError(I18nUtil.getMessage("base_error"));

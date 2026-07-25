@@ -2,22 +2,18 @@ package com.playlet.internal.service.impl;
 
 import com.playlet.internal.api.response.DramaRankAggRow;
 import com.playlet.internal.constants.RankBoardGroupConstants;
-import com.playlet.internal.dao.drama.DramaAssetDao;
 import com.playlet.internal.dao.drama.DramaRankStatDailyDao;
 import com.playlet.internal.dao.drama.RankBoardDao;
 import com.playlet.internal.dao.drama.RankListDao;
-import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.RankBoardEntity;
 import com.playlet.internal.entity.drama.RankListEntity;
 import com.playlet.internal.service.RankAlgoService;
 import com.playlet.internal.utils.GenericityUtil;
-import com.playlet.internal.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -37,8 +33,6 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 	private RankListDao rankListDao;
 	@Autowired
 	private DramaRankStatDailyDao dramaRankStatDailyDao;
-	@Autowired
-	private DramaAssetDao dramaAssetDao;
 
 	@Override
 	public void refreshAllP0() {
@@ -106,12 +100,6 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 			entity.setBoardGroupId(groupId);
 			entity.setRankNo(rankNo++);
 			entity.setDramaId(String.valueOf(row.getDramaId()));
-			entity.setScore(row.getAlgoScore() == null ? BigDecimal.ZERO : row.getAlgoScore());
-			entity.setTitle(row.getDramaTitle());
-			entity.setCoverUrl(resolveCover(row));
-			entity.setHotScoreText(row.getHotScoreText());
-			entity.setTotalEpisodes(row.getTotalEpisodes());
-			entity.setFinished(row.getFinishedState());
 			entity.setStatus(1);
 			try {
 				GenericityUtil.setDate(entity);
@@ -122,18 +110,6 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 			}
 			rankListDao.insert(entity);
 		}
-	}
-
-	private String resolveCover(DramaRankAggRow row) {
-		try {
-			DramaAssetEntity asset = dramaAssetDao.findEnabledByDramaId(row.getDramaId());
-			if (asset != null && StringUtils.isNotEmpty(asset.getVideoUrl())) {
-				return asset.getVideoUrl();
-			}
-		} catch (Exception ignored) {
-			// ignore
-		}
-		return row.getCoverUrl();
 	}
 
 	private String fromDate(int windowDays) {

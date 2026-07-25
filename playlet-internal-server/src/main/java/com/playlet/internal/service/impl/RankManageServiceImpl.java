@@ -6,6 +6,7 @@ import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.api.request.RankBoardRequestEntity;
+import com.playlet.internal.api.response.RankListItemEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
@@ -27,7 +28,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 
@@ -43,7 +43,6 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 	private RankListDao rankListDao;
 	@Autowired
 	private DramaDao dramaDao;
-
 	@Override
 	@SysLogAnnotation(module = "榜单管理", type = "POST", remark = "榜定义列表")
 	public ResponseBase boardFindList(@RequestBody RankBoardEntity entity) {
@@ -149,14 +148,14 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 			entity = new RankListEntity();
 		}
 		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
-		List<RankListEntity> adminList = rankListDao.findAdminList(entity);
+		List<RankListItemEntity> adminList = rankListDao.findAdminList(entity);
 		return setResultSuccess(new PageInfo<>(adminList), I18nUtil.getMessage("base_success"));
 	}
 
 	@Override
 	@SysLogAnnotation(module = "榜单管理", type = "GET", remark = "榜条目详情")
 	public ResponseBase listDetail(@RequestParam Integer id) {
-		RankListEntity row = rankListDao.selectById(id);
+		RankListItemEntity row = rankListDao.findItemById(id);
 		if (row == null) {
 			return setResultError(I18nUtil.getMessage("base_data_null"));
 		}
@@ -191,11 +190,7 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 			if (drama == null) {
 				return setResultError(I18nUtil.getMessage("drama_null"));
 			}
-			fillFromDrama(entity, drama);
 			entity.setStatus(entity.getStatus() == null ? 1 : entity.getStatus());
-			if (entity.getScore() == null) {
-				entity.setScore(BigDecimal.ZERO);
-			}
 			GenericityUtil.setDate(entity);
 			rankListDao.insert(entity);
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
@@ -243,31 +238,6 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 					return setResultError(I18nUtil.getMessage("drama_null"));
 				}
 				exist.setDramaId(entity.getDramaId());
-				fillFromDrama(exist, drama);
-			} else if (entity.getTitle() != null || entity.getCoverUrl() != null
-					|| entity.getHotScoreText() != null || entity.getTotalEpisodes() != null
-					|| entity.getFinished() != null) {
-				if (entity.getTitle() != null) {
-					exist.setTitle(entity.getTitle());
-				}
-				if (entity.getCoverUrl() != null) {
-					exist.setCoverUrl(entity.getCoverUrl());
-				}
-				if (entity.getHotScoreText() != null) {
-					exist.setHotScoreText(entity.getHotScoreText());
-				}
-				if (entity.getTotalEpisodes() != null) {
-					exist.setTotalEpisodes(entity.getTotalEpisodes());
-				}
-				if (entity.getFinished() != null) {
-					exist.setFinished(entity.getFinished());
-				}
-			}
-			if (entity.getScore() != null) {
-				exist.setScore(entity.getScore());
-			}
-			if (entity.getRemark() != null) {
-				exist.setRemark(entity.getRemark());
 			}
 			exist.setGmtModified(new Date());
 			rankListDao.updateById(exist);
@@ -297,27 +267,6 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			throw new RuntimeException(e);
-		}
-	}
-
-	private void fillFromDrama(RankListEntity entity, DramaEntity drama) {
-		if (StringUtils.isEmpty(entity.getTitle())) {
-			entity.setTitle(drama.getDramaTitle());
-		}
-		if (StringUtils.isEmpty(entity.getHotScoreText())) {
-			entity.setHotScoreText(drama.getHotScoreText());
-		}
-		if (entity.getTotalEpisodes() == null) {
-			entity.setTotalEpisodes(drama.getTotalEpisodes());
-		}
-		if (entity.getFinished() == null) {
-			entity.setFinished(drama.getFinishedState());
-		}
-		if (StringUtils.isEmpty(entity.getCoverUrl())) {
-			entity.setCoverUrl(drama.getCoverUrl());
-		}
-		if (entity.getScore() == null && drama.getHotScore() != null) {
-			entity.setScore(BigDecimal.valueOf(drama.getHotScore()));
 		}
 	}
 }

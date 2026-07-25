@@ -6,6 +6,7 @@ import com.github.pagehelper.PageInfo;
 import com.playlet.internal.api.response.CoinLedgerItemEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
+import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.account.AppAccountDao;
 import com.playlet.internal.dao.welfare.UserCoinLedgerDao;
 import com.playlet.internal.dao.welfare.UserWelfareProgressDao;
@@ -60,7 +61,7 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 	public ResponseBase accept(@RequestParam Integer taskId, HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
-			return setResultError(I18nUtil.getMessage("login_required"));
+			return setResultError(Constants.HTTP_RES_CODE_403,I18nUtil.getMessage("login_required"));
 		}
 		if (taskId == null) {
 			return setResultError(I18nUtil.getMessage("base_error"));
@@ -98,7 +99,7 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 			HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
-			return setResultError(I18nUtil.getMessage("login_required"));
+			return setResultError(Constants.HTTP_RES_CODE_403,I18nUtil.getMessage("login_required"));
 		}
 		if (taskId == null) {
 			return setResultError(I18nUtil.getMessage("base_error"));
@@ -135,7 +136,7 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 	public ResponseBase ledger(String bizType, PageQueryHelperEntity page, HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
-			return setResultError(I18nUtil.getMessage("login_required"));
+			return setResultError(Constants.HTTP_RES_CODE_403,I18nUtil.getMessage("login_required"));
 		}
 		if (page == null) {
 			page = new PageQueryHelperEntity();

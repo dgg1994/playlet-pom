@@ -8,6 +8,7 @@ import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 
+import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.drama.DramaDao;
 import com.playlet.internal.entity.drama.DramaEntity;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -134,7 +135,7 @@ public class DramaApiDramaCommentServiceImpl extends BaseApiService implements D
 		try {
 			Integer uid = AppTokenUtil.resolveUid(request);
 			if (uid == null) {
-				return setResultError(I18nUtil.getMessage("login_required"));
+				return setResultError(Constants.HTTP_RES_CODE_403,I18nUtil.getMessage("login_required"));
 			}
 			if (entity == null || entity.getDramaId() == null) {
 				return setResultError(I18nUtil.getMessage("base_error"));

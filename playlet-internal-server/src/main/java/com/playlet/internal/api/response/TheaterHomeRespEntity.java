@@ -12,9 +12,9 @@ import java.util.List;
 @ApiModel("剧场首页")
 public class TheaterHomeRespEntity {
 
-	@ApiModelProperty("榜单轮播推荐")
+	@ApiModelProperty("短剧推荐轮播")
 	private List<DramaEntity> carousels = new ArrayList<>();
 
-	@ApiModelProperty("榜单分块列表")
+	@ApiModelProperty("榜单分块预览（条目联查 drama）")
 	private List<TheaterRankBlockEntity> blocks = new ArrayList<>();
 }

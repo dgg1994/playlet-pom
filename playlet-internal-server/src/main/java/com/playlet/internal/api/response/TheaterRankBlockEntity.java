@@ -1,6 +1,5 @@
 package com.playlet.internal.api.response;
 
-import com.playlet.internal.entity.drama.RankListEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -21,6 +20,6 @@ public class TheaterRankBlockEntity {
 	@ApiModelProperty("1算法 2人工")
 	private Integer boardType;
 
-	@ApiModelProperty("预览条目")
-	private List<RankListEntity> items = new ArrayList<>();
+	@ApiModelProperty("预览条目（联查 drama）")
+	private List<RankListItemEntity> items = new ArrayList<>();
 }
