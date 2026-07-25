@@ -34,4 +34,9 @@ public interface RankListDao extends BaseMapper<RankListEntity> {
 
 	@Delete("delete from rank_list where board_group_id = #{boardGroupId}")
 	int deleteByBoardGroupId(@Param("boardGroupId") String boardGroupId);
+
+	@Select("select * from rank_list where board_group_id = #{boardGroupId} and status = 1 "
+			+ "order by rank_no asc limit #{limit}")
+	List<RankListEntity> findEnabledByBoardGroupIdLimit(@Param("boardGroupId") String boardGroupId,@Param("limit") int limit);
+
 }

@@ -9,11 +9,9 @@ import com.playlet.internal.api.request.RankBoardRequestEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
-import com.playlet.internal.dao.drama.DramaAssetDao;
 import com.playlet.internal.dao.drama.DramaDao;
 import com.playlet.internal.dao.drama.RankBoardDao;
 import com.playlet.internal.dao.drama.RankListDao;
-import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.RankBoardEntity;
 import com.playlet.internal.entity.drama.RankListEntity;
@@ -45,8 +43,6 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 	private RankListDao rankListDao;
 	@Autowired
 	private DramaDao dramaDao;
-	@Autowired
-	private DramaAssetDao dramaAssetDao;
 
 	@Override
 	@SysLogAnnotation(module = "榜单管理", type = "POST", remark = "榜定义列表")
@@ -318,24 +314,10 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 			entity.setFinished(drama.getFinishedState());
 		}
 		if (StringUtils.isEmpty(entity.getCoverUrl())) {
-			entity.setCoverUrl(resolveCover(drama));
+			entity.setCoverUrl(drama.getCoverUrl());
 		}
 		if (entity.getScore() == null && drama.getHotScore() != null) {
 			entity.setScore(BigDecimal.valueOf(drama.getHotScore()));
 		}
-	}
-
-	private String resolveCover(DramaEntity drama) {
-		try {
-			if (dramaAssetDao != null && drama.getId() != null) {
-				DramaAssetEntity asset = dramaAssetDao.findEnabledByDramaId(drama.getId());
-				if (asset != null && StringUtils.isNotEmpty(asset.getVideoUrl())) {
-					return asset.getVideoUrl();
-				}
-			}
-		} catch (Exception e) {
-			log.debug("resolveCover: {}", e.getMessage());
-		}
-		return drama.getCoverUrl();
 	}
 }

@@ -3,6 +3,8 @@ import java.util.List;
 
 import javax.validation.Valid;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.playlet.internal.enums.RecommendedCarouselEnums;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -66,6 +68,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			DramaEntity entity = new DramaEntity();
 			BeanUtils.copyProperties(createPay, entity);
 			//新增短剧基础信息
+			entity.setRecommendedCarousel(RecommendedCarouselEnums.NOT_RECOMMENDED.getIndex());
 			entity.setVerifyStatus(VerifyStateEnums.REMOVED_SHELVES.getIndex());
 			entity.setDeleteState(DeleteStateEnum.NORMAL.getIndex());
 			GenericityUtil.setDate(entity);
@@ -193,6 +196,34 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 		} catch (Exception e) {
 			e.printStackTrace();
 			throw new RuntimeException();
+		}
+	}
+
+	@Override
+	public ResponseBase verifyRecommendedCarousel(Integer id, Integer status) {
+		try {
+			DramaEntity entity = dramaDao.selectOne(new QueryWrapper<DramaEntity>()
+					.eq("id", id)
+					.eq("verify_status", VerifyStateEnums.AVAILABLE_NOW.getIndex())
+					.eq("delete_state", DeleteStateEnum.NORMAL.getIndex()));
+			if (entity == null) {
+				return setResultError(I18nUtil.getMessage("base_error"));
+			}
+			// 仅「设为推荐」时校验上限；取消推荐不受限
+			if (RecommendedCarouselEnums.RECOMMENDED.getIndex().equals(status)
+					&& !RecommendedCarouselEnums.RECOMMENDED.getIndex().equals(entity.getRecommendedCarousel())) {
+				Integer count = dramaDao.selectCount(new QueryWrapper<DramaEntity>()
+						.eq("recommended_carousel", RecommendedCarouselEnums.RECOMMENDED.getIndex())
+						.eq("delete_state", DeleteStateEnum.NORMAL.getIndex()));
+				if (count != null && count >= 5) {
+					return setResultError(I18nUtil.getMessage("video_recommended_carousel_limit"));
+				}
+			}
+			entity.setRecommendedCarousel(status);
+			dramaDao.updateById(entity);
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {
+			throw new RuntimeException(e);
 		}
 	}
 

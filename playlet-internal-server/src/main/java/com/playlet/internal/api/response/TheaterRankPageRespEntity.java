@@ -1,7 +1,7 @@
 package com.playlet.internal.api.response;
 
 import com.github.pagehelper.PageInfo;
-import com.playlet.internal.entity.drama.RankListEntity;
+import com.playlet.internal.entity.drama.DramaEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -17,5 +17,5 @@ public class TheaterRankPageRespEntity {
 	private String boardName;
 
 	@ApiModelProperty("分页结果")
-	private PageInfo<RankListEntity> page;
+	private PageInfo<DramaEntity> page;
 }

@@ -58,6 +58,14 @@ public interface DramaService {
 	 */
 	@GetMapping("/verifyStatus")
 	ResponseBase verifyStatus(Integer id,Integer verifyStatus);
+
+	/**
+	 * @category 修改推荐状态
+	 * @param id
+	 * @return
+	 */
+	@GetMapping("/verifyRecommendedCarousel")
+	ResponseBase verifyRecommendedCarousel(Integer id,Integer status);
 	
 	/**
 	 * @category 查询短剧上传的剧集视频

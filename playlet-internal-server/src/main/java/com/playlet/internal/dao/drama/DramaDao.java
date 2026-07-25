@@ -37,7 +37,7 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 	/** C端剧场搜索：标题模糊 + 标签分组精确，仅已上架；条件可单独或组合 */
 	@Select("<script>"
 			+ "select distinct d.* from drama d "
-			+ "where d.verify_status = 2 and ifnull(d.delete_state, 0) = 0 "
+			+ "where d.verify_status = 1 and ifnull(d.delete_state, 0) = 0 "
 			+ "<if test='entity.dramaTitle != null and entity.dramaTitle != \"\"'> "
 			+ "  and d.drama_title like concat('%', #{entity.dramaTitle}, '%') "
 			+ "</if>"
@@ -59,6 +59,7 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 	        + "<if test='belongUser != null'> and belong_user = #{belongUser}</if>"
 	        + "<if test='deleteState != null'> and delete_state = #{deleteState}</if>"
 	        + "<if test='verifyStatus != null'> and verify_status = #{verifyStatus}</if>"
+	        + "<if test='recommendedCarousel != null'> and recommended_carousel = #{recommendedCarousel}</if>"
 	        + "<if test='tagGroupIdList != null and tagGroupIdList.size() > 0'>"
 	        + " and id in ("
 	        + "   select drama_id from drama_tag_rel where tag_group_id in "
@@ -112,4 +113,6 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 	@Select("select * from drama where id = #{id}")
 	RecommendDramaRes findById(@Param("id") Integer id);
 
+	@Select("select d.* from drama d left join rank_list rl on d.id = rl.drama_id where rl.board_group_id = #{groupId} order by d.hot_score desc")
+	List<DramaEntity> selectListDramas(@Param("groupId") String groupId);
 }

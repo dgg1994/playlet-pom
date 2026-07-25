@@ -73,4 +73,9 @@ public interface TagDao extends BaseMapper<TagEntity> {
 
 	@Delete("delete from dic_drama_tag where group_id = #{groupId}")
 	void deleteTagByGroupId(@Param("groupId") String groupId);
+
+	@Select("select * from dic_drama_tag where langue = #{language} " +
+			"and group_id in (select tag_group_id from drama_tag_rel where drama_id = #{id})")
+	List<TagEntity> selectListTagByDramaId(@Param("id") Integer id,@Param("language") String language);
+
 }

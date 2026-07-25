@@ -2,6 +2,7 @@ package com.playlet.internal.service;
 
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.entity.drama.DramaEntity;
+import com.playlet.internal.entity.drama.RankBoardEntity;
 import com.playlet.internal.entity.drama.RankListEntity;
 import com.playlet.internal.entity.drama.UserWatchHistoryEntity;
 import io.swagger.annotations.Api;
@@ -25,6 +26,10 @@ public interface TheaterApiService {
 	@GetMapping("/home")
 	@ApiOperation(value = "剧场首页")
 	ResponseBase home();
+
+	@PostMapping("/findList")
+	@ApiOperation("榜单定义分页")
+	ResponseBase boardFindList(RankBoardEntity entity);
 
 	@GetMapping("/rankList")
 	@ApiOperation(value = "榜单列表")

@@ -98,6 +98,10 @@ public class DramaEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "deleteState",value = "1是0否",required = false,dataType = "Integer")
 	private Integer deleteState;
 
+	@TableField("recommended_carousel")
+	@ApiModelProperty(name = "recommendedCarousel",value = "是否推荐轮播 0-否 1-是",required = false,dataType = "Boolean")
+	private Integer recommendedCarousel = 0;
+
 	@TableField("offline_reason")
 	@ApiModelProperty(name = "offlineReason",value = "下架原因",required = false,dataType = "String")
 	private String offlineReason;

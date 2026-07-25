@@ -28,6 +28,9 @@ public class QueryDramaQuery extends PageQueryHelperEntity{
 	
 	@ApiModelProperty(name = "isAi",value = "是否ai生成 1是0否",required = false,dataType = "Integer")
 	private Integer isAi;
+
+	@ApiModelProperty(name = "recommendedCarousel",value = "是否轮播推荐 默认否",required = false,dataType = "Integer")
+	private Integer recommendedCarousel;
 	
 	@ApiModelProperty(name = "tagGroupIdList",value = "标签语言分组Id类型集合",required = false,dataType = "List<Integer>")
 	private List<String> tagGroupIdList;
