@@ -19,6 +19,7 @@ import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.constants.Constants;
+import com.playlet.internal.constants.TheaterConstants;
 import com.playlet.internal.dao.drama.DramaAssetDao;
 import com.playlet.internal.dao.drama.DramaDao;
 import com.playlet.internal.dao.drama.DramaTagRelDao;
@@ -215,7 +216,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 				Integer count = dramaDao.selectCount(new QueryWrapper<DramaEntity>()
 						.eq("recommended_carousel", RecommendedCarouselEnums.RECOMMENDED.getIndex())
 						.eq("delete_state", DeleteStateEnum.NORMAL.getIndex()));
-				if (count != null && count >= 5) {
+				if (count != null && count >= TheaterConstants.HOME_CAROUSEL_LIMIT) {
 					return setResultError(I18nUtil.getMessage("video_recommended_carousel_limit"));
 				}
 			}

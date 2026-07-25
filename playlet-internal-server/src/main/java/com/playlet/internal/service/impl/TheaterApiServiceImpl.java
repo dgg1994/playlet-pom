@@ -11,6 +11,7 @@ import com.playlet.internal.api.response.TheaterSearchItemEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
+import com.playlet.internal.constants.TheaterConstants;
 import com.playlet.internal.dao.drama.DramaDao;
 import com.playlet.internal.dao.drama.RankBoardDao;
 import com.playlet.internal.dao.drama.RankListDao;
@@ -54,8 +55,6 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 	@Autowired
 	private RedisUtil redisUtil;
 
-	private static final int HOME_RANK_PREVIEW_MAX = 10;
-
 	@Override
 	public ResponseBase home() {
 		TheaterHomeRespEntity resp = new TheaterHomeRespEntity();
@@ -66,7 +65,7 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 				.eq("delete_state", DeleteStateEnum.NORMAL.getIndex())
 				.eq("recommended_carousel", RecommendedCarouselEnums.RECOMMENDED.getIndex())
 				.eq("verify_status", VerifyStateEnums.AVAILABLE_NOW.getIndex())
-				.last("limit 5"));
+				.last("limit " + TheaterConstants.HOME_CAROUSEL_LIMIT));
 		resp.setCarousels(carouselDramas);
 
 		List<RankBoardEntity> boards = rankBoardDao.findEnabledList(langue);
@@ -76,8 +75,8 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 		Integer verifyStatus = VerifyStateEnums.AVAILABLE_NOW.getIndex();
 		Integer deleteState = DeleteStateEnum.NORMAL.getIndex();
 		for (RankBoardEntity board : boards) {
-			int limit = board.getTopN() == null ? HOME_RANK_PREVIEW_MAX
-					: Math.min(HOME_RANK_PREVIEW_MAX, board.getTopN());
+			int limit = board.getTopN() == null ? TheaterConstants.HOME_RANK_PREVIEW_MAX
+					: Math.min(TheaterConstants.HOME_RANK_PREVIEW_MAX, board.getTopN());
 			List<RankListItemEntity> preview = rankListDao.findEnabledWithDramaLimit(
 					board.getGroupId(), verifyStatus, deleteState, limit);
 			if (preview == null) {

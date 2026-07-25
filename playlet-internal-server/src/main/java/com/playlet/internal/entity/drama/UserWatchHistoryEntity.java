@@ -28,15 +28,11 @@ public class UserWatchHistoryEntity extends PageQueryHelperEntity {
 
 	@TableField("drama_id")
 	@ApiModelProperty(name = "dramaId", value = "短剧业务ID", dataType = "String")
-	private String dramaId;
+	private Integer dramaId;
 
 	@TableField("episode_id")
 	@ApiModelProperty(name = "episodeId", value = "最近观看的分集业务ID，未开播可为空", dataType = "String")
 	private String episodeId;
-
-	@TableField("episode_no")
-	@ApiModelProperty(name = "episodeNo", value = "最近观看的集序号", dataType = "Integer")
-	private Integer episodeNo;
 
 	@TableField("watch_progress")
 	@ApiModelProperty(name = "watchProgress", value = "分集内播放进度，单位：秒，用于续播", dataType = "Integer")
@@ -53,4 +49,8 @@ public class UserWatchHistoryEntity extends PageQueryHelperEntity {
 	@TableField("gmtModified")
 	@ApiModelProperty(name = "gmtModified", value = "最近一次观看/上报进度的时间", dataType = "Date")
 	private Date gmtModified;
+
+	@TableField(exist = false)
+	@ApiModelProperty(name = "episodeProgress", value = "单集总时长（秒，可选）；热度换算用，服务端会做上下限裁剪", dataType = "Integer")
+	private Integer episodeProgress;
 }

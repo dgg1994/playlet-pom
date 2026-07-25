@@ -7,6 +7,7 @@ import com.playlet.internal.api.response.TheaterWatchHistoryItemEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
+import com.playlet.internal.constants.TheaterConstants;
 import com.playlet.internal.dao.drama.DramaDao;
 import com.playlet.internal.dao.drama.UserWatchHistoryDao;
 import com.playlet.internal.entity.drama.DramaEntity;
@@ -96,63 +97,133 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
             if (uid == null) {
                 return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
             }
-            if (entity == null || StringUtils.isEmpty(entity.getDramaId())) {
+            if (entity == null || entity.getDramaId() == null) {
                 return setResultError(I18nUtil.getMessage("base_error"));
             }
-            String dramaId = entity.getDramaId().trim();
-            DramaEntity drama = dramaDao.findByDramaId(Integer.valueOf(dramaId));
+            Integer dramaId = entity.getDramaId();
+            DramaEntity drama = dramaDao.findByDramaId(dramaId);
             if (drama == null) {
                 return setResultError(I18nUtil.getMessage("drama_null"));
             }
 
+            // 添加观看历史
             UserWatchHistoryEntity row = new UserWatchHistoryEntity();
             row.setUid(uid);
             row.setDramaId(dramaId);
             row.setEpisodeId(StringUtils.isEmpty(entity.getEpisodeId()) ? null : entity.getEpisodeId().trim());
-            row.setEpisodeNo(entity.getEpisodeNo());
             row.setWatchProgress(entity.getWatchProgress() == null ? 0 : Math.max(0, entity.getWatchProgress()));
             GenericityUtil.setDate(row);
             userWatchHistoryDao.upsert(row);
-
             cacheWatchAfterWrite(uid, dramaId, row);
 
-            // 按集福利任务：有 episodeId 才去重推进
-            if (!StringUtils.isEmpty(row.getEpisodeId())) {
-                try {
-                    JSONObject ext = new JSONObject();
-                    ext.put("dramaId", Integer.valueOf(dramaId));
-                    ext.put("episodeId", row.getEpisodeId());
-                    welfareTaskService.onAction(uid, WelfareActionTypeEnums.WATCH, 1, ext.toJSONString());
-                } catch (Exception e) {
-                    log.warn("welfare watch progress failed: {}", e.getMessage());
-                }
-            }
+            // 观看上报
+            int deltaSec = normalizeDeltaSeconds(entity.getDeltaSeconds());
+            // 单集时长
+            int episodeDurationSec = resolveEpisodeDurationSec(entity.getEpisodeProgress());
 
-            // 观影礼：关闭播放器上报的本次有效秒数
-            Integer deltaSeconds = entity.getDeltaSeconds();
-            if (deltaSeconds != null && deltaSeconds > 0) {
-                try {
-                    JSONObject ext = new JSONObject();
-                    ext.put("dramaId", dramaId);
-                    ext.put("episodeId", row.getEpisodeId());
-                    ext.put("watchProgress", row.getWatchProgress());
-                    watchGiftService.addWatchSeconds(uid, deltaSeconds, ext.toJSONString());
-                } catch (Exception e) {
-                    log.warn("watch gift seconds failed: {}", e.getMessage());
-                }
+            pushWelfareWatch(uid, dramaId, row.getEpisodeId());
+            if (deltaSec > 0) {
+                // 观看礼
+                pushWatchGift(uid, dramaId, row, deltaSec);
+                // 任务
+                pushWelfareWatch(uid, dramaId, row.getEpisodeId());
+                // 热度
+                incrHotScoreByWatch(dramaId, deltaSec, episodeDurationSec);
             }
-
-            // 榜单日聚合：每次上报记 1 次 pv，并累计有效秒数
-            try {
-                int delta = deltaSeconds == null ? 0 : Math.max(0, deltaSeconds);
-                dramaRankStatService.onWatch(Integer.valueOf(dramaId), delta);
-            } catch (Exception e) {
-                log.warn("rank stat watch failed: {}", e.getMessage());
-            }
+            // 每次上报记 1 次 pv；有效秒数用裁剪后的 delta
+            pushRankWatchStat(dramaId, deltaSec);
 
             return setResultSuccess(I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * 上报有效秒数裁剪：小于 0 的视作 0。
+     */
+    private int normalizeDeltaSeconds(Integer deltaSeconds) {
+        if (deltaSeconds == null || deltaSeconds <= 0) {
+            return 0;
+        }
+        return Math.min(deltaSeconds, TheaterConstants.MAX_DELTA_SEC_PER_REPORT);
+    }
+
+    /**
+     * 单集时长裁剪：小于 10 秒的视作 10 秒，大于 1 小时的视作 1 小时。
+     */
+    private int resolveEpisodeDurationSec(Integer clientDurationSec) {
+        if (clientDurationSec == null || clientDurationSec <= 0) {
+            return TheaterConstants.DEFAULT_EPISODE_DURATION_SEC;
+        }
+        return Math.min(TheaterConstants.MAX_EPISODE_DURATION_SEC,
+                Math.max(TheaterConstants.MIN_EPISODE_DURATION_SEC, clientDurationSec));
+    }
+
+    /**
+     * 热度：每有效观看「单集时长 / HOT_SCORE_DURATION_DIVISOR」+1。
+     * 热度增量 add = floor(本次有效观看秒数 × 3 ÷ 单集总时长)
+     * 每看满「单集时长的 1/3」，热度 +1。
+     */
+    private void incrHotScoreByWatch(Integer dramaId, int deltaSec, int episodeDurationSec) {
+        if (dramaId == null || deltaSec <= 0 || episodeDurationSec <= 0) {
+            return;
+        }
+        long add = (long) deltaSec * TheaterConstants.HOT_SCORE_DURATION_DIVISOR / episodeDurationSec;
+        if (add <= 0) {
+            return;
+        }
+        try {
+            dramaDao.incrHotScore(dramaId, add);
+        } catch (Exception e) {
+            log.warn("incr hot score failed dramaId={} delta={} duration={}: {}",
+                    dramaId, deltaSec, episodeDurationSec, e.getMessage());
+        }
+    }
+
+    /**
+     * 观看福利：每有效观看「单集时长」+1。
+     * @param uid 用户 uid
+     * @param dramaId dramaId
+     * @param episodeId episodeId
+     */
+    private void pushWelfareWatch(Integer uid, Integer dramaId, String episodeId) {
+        if (StringUtils.isEmpty(episodeId)) {
+            return;
+        }
+        try {
+            JSONObject ext = new JSONObject();
+            ext.put("dramaId", dramaId);
+            ext.put("episodeId", episodeId);
+            welfareTaskService.onAction(uid, WelfareActionTypeEnums.WATCH, 1, ext.toJSONString());
+        } catch (Exception e) {
+            log.warn("welfare watch progress failed: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 观看礼物：每有效观看「单集时长」+1。
+     */
+    private void pushWatchGift(Integer uid, Integer dramaId, UserWatchHistoryEntity row, int deltaSec) {
+        try {
+            JSONObject ext = new JSONObject();
+            ext.put("dramaId", dramaId);
+            ext.put("episodeId", row.getEpisodeId());
+            ext.put("watchProgress", row.getWatchProgress());
+            watchGiftService.addWatchSeconds(uid, deltaSec, ext.toJSONString());
+        } catch (Exception e) {
+            log.warn("watch gift seconds failed: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 观看排行榜：每有效观看「单集时长」+1。
+     */
+    private void pushRankWatchStat(Integer dramaId, int deltaSec) {
+        try {
+            dramaRankStatService.onWatch(dramaId, Math.max(0, deltaSec));
+        } catch (Exception e) {
+            log.warn("rank stat watch failed: {}", e.getMessage());
         }
     }
 
@@ -217,7 +288,7 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
     /**
      * 写 MySQL 后同步 Redis：List 保序 + Hash 存进度
      */
-    private void cacheWatchAfterWrite(Integer uid, String dramaId, UserWatchHistoryEntity row) {
+    private void cacheWatchAfterWrite(Integer uid, Integer dramaId, UserWatchHistoryEntity row) {
         try {
             redisUtil.del(VIEW_EMPTY_KEY + uid);
             String listKey = VIEW_LIST_KEY + uid;
@@ -229,7 +300,7 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
             redisUtil.lRemove(listKey, 0, dramaId);
             redisUtil.lLeftPush(listKey, dramaId);
             redisUtil.lTrim(listKey, 0, VIEW_HISTORY_MAX - 1);
-            redisUtil.hset(metaKey, dramaId, toMetaJson(row));
+            redisUtil.hset(metaKey, dramaId.toString(), toMetaJson(row));
             redisUtil.expire(listKey, VIEW_HISTORY_TTL_SEC);
             redisUtil.expire(metaKey, VIEW_HISTORY_TTL_SEC);
         } catch (Exception e) {
@@ -251,11 +322,11 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
             // rows 已按 gmtModified desc；从旧到新 leftPush，最新在队头
             for (int i = rows.size() - 1; i >= 0; i--) {
                 UserWatchHistoryEntity row = rows.get(i);
-                if (row == null || StringUtils.isEmpty(row.getDramaId())) {
+                if (row == null || row.getDramaId() == null) {
                     continue;
                 }
                 redisUtil.lLeftPush(listKey, row.getDramaId());
-                redisUtil.hset(metaKey, row.getDramaId(), toMetaJson(row));
+                redisUtil.hset(metaKey, row.getDramaId().toString(), toMetaJson(row));
             }
             redisUtil.expire(listKey, VIEW_HISTORY_TTL_SEC);
             redisUtil.expire(metaKey, VIEW_HISTORY_TTL_SEC);
@@ -267,14 +338,13 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
     private String toMetaJson(UserWatchHistoryEntity row) {
         JSONObject meta = new JSONObject();
         meta.put("episodeId", row.getEpisodeId());
-        meta.put("episodeNo", row.getEpisodeNo());
         meta.put("watchProgress", row.getWatchProgress() == null ? 0 : row.getWatchProgress());
         meta.put("gmtModified", row.getGmtModified() == null ? null : row.getGmtModified().getTime());
         return meta.toJSONString();
     }
 
     private TheaterWatchHistoryItemEntity toWatchItem(UserWatchHistoryEntity row) {
-        if (row == null || StringUtils.isEmpty(row.getDramaId())) {
+        if (row == null || row.getDramaId() == null) {
             return null;
         }
         DramaEntity drama = dramaDao.findByDramaId(Integer.valueOf(row.getDramaId()));
@@ -288,7 +358,6 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
         item.setTotalEpisodes(drama.getTotalEpisodes());
         item.setFinished(drama.getFinishedState());
         item.setEpisodeId(row.getEpisodeId());
-        item.setEpisodeNo(row.getEpisodeNo());
         item.setWatchProgress(row.getWatchProgress() == null ? 0 : row.getWatchProgress());
         item.setGmtModified(row.getGmtModified());
         return item;

@@ -11,7 +11,7 @@ import java.util.Date;
 public class TheaterWatchHistoryItemEntity {
 
 	@ApiModelProperty("短剧业务ID")
-	private String dramaId;
+	private Integer dramaId;
 
 	@ApiModelProperty("标题")
 	private String title;
@@ -27,9 +27,6 @@ public class TheaterWatchHistoryItemEntity {
 
 	@ApiModelProperty("最近观看分集业务ID")
 	private String episodeId;
-
-	@ApiModelProperty("最近观看集序号")
-	private Integer episodeNo;
 
 	@ApiModelProperty("分集内播放进度（秒）")
 	private Integer watchProgress;

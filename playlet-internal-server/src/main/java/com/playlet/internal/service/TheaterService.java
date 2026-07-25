@@ -1,8 +1,6 @@
 package com.playlet.internal.service;
 
 import com.playlet.internal.base.ResponseBase;
-import com.playlet.internal.entity.drama.DramaEntity;
-import com.playlet.internal.entity.drama.RankListEntity;
 import com.playlet.internal.entity.drama.UserWatchHistoryEntity;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
@@ -36,8 +34,9 @@ public interface TheaterService {
 	ResponseBase clearSearchHistory(HttpServletRequest request);
 
 	@PostMapping("/view/report")
-	@ApiOperation(value = "上报浏览/观看进度", notes = "需登录。body: dramaId 必填；episodeId/episodeNo/watchProgress 续播；"
-			+ "deltaSeconds=本次有效观看秒数（关闭播放器上报），用于观影礼累计。同时推进按集福利任务(WATCH)。")
+	@ApiOperation(value = "上报浏览/观看进度", notes = "需登录。body: dramaId 必填；episodeId/watchProgress 续播；"
+			+ "deltaSeconds=本次有效观看秒数（关闭播放器/心跳）；episodeProgress=单集总时长秒（可选，用于热度换算）。"
+			+ "副作用：观影礼累计、按集福利(WATCH)、榜单日聚合、热度=有效秒数/(单集时长/3)。")
 	ResponseBase reportWatch(@RequestBody UserWatchHistoryEntity entity, HttpServletRequest request);
 
 	@GetMapping("/view/history")

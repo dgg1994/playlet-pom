@@ -13,9 +13,6 @@ import java.util.List;
 @Repository
 public interface UserWatchHistoryDao extends BaseMapper<UserWatchHistoryEntity> {
 
-	@Select("select * from user_watch_history where uid = #{uid} and drama_id = #{dramaId} limit 1")
-	UserWatchHistoryEntity findByUidAndDrama(@Param("uid") String uid, @Param("dramaId") String dramaId);
-
 	@Select("select * from user_watch_history where uid = #{uid} order by gmtModified desc")
 	List<UserWatchHistoryEntity> findByUid(@Param("uid") Integer uid);
 
@@ -23,11 +20,10 @@ public interface UserWatchHistoryDao extends BaseMapper<UserWatchHistoryEntity> 
 	List<UserWatchHistoryEntity> findByUidLimit(@Param("uid") Integer uid, @Param("limit") int limit);
 
 	@Insert("insert into user_watch_history "
-			+ "(uid, drama_id, episode_id, episode_no, watch_progress, setTime, gmtModified) "
-			+ "values (#{uid}, #{dramaId}, #{episodeId}, #{episodeNo}, #{watchProgress}, #{setTime}, #{gmtModified}) "
+			+ "(uid, drama_id, episode_id, watch_progress, setTime, gmtModified) "
+			+ "values (#{uid}, #{dramaId}, #{episodeId}, #{watchProgress}, #{setTime}, #{gmtModified}) "
 			+ "on duplicate key update "
 			+ "episode_id = values(episode_id), "
-			+ "episode_no = values(episode_no), "
 			+ "watch_progress = values(watch_progress), "
 			+ "gmtModified = values(gmtModified)")
 	int upsert(UserWatchHistoryEntity entity);
