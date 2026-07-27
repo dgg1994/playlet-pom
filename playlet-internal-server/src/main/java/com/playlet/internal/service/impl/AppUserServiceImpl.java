@@ -384,6 +384,17 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
+	@Override
+	public ResponseBase update(@RequestBody AppAccountEntity entity, HttpServletRequest request) {
+		Integer id = entity.getId();
+		if (id == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+
+		appAccountDao.updateNameById(entity);
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
 
 	@Override
 	public ResponseBase signOut(HttpServletRequest request) {

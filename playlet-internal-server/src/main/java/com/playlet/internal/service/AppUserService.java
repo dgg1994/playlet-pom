@@ -53,6 +53,11 @@ public interface AppUserService {
     @PostMapping("/updatePwd")
 	@ApiOperation(value = "修改密码",notes="修改密码",response=ResponseBase.class)
     ResponseBase updatePwd(UpdatePwdEntity entity, HttpServletRequest request);
+
+    @PostMapping("/update")
+    @ApiOperation(value = "修改用户信息",notes="修改用户信息",response=ResponseBase.class)
+    ResponseBase update(AppAccountEntity entity, HttpServletRequest request);
+
 	
 	@GetMapping("/signOut")
 	@ApiOperation(value = "退出登录",notes="退出登录",response=ResponseBase.class)

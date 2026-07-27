@@ -1,5 +1,6 @@
 package com.playlet.internal.service.impl;
 
+import com.playlet.internal.utils.I18nUtil;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RestController;
@@ -19,7 +20,7 @@ public class FileTestServiceImpl extends BaseApiService implements FileTestServi
 	public ResponseBase upload(MultipartFile file) {
 		String url = QiniuUploadUtils.uploadFile(file,"VD_1/cover/");
 		System.out.println(url);
-		return setResultSuccess(url);
+		return setResultSuccess(url, I18nUtil.getMessage("base_success"));
 	}
 
 }
