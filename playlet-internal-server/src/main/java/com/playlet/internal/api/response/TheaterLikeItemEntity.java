@@ -31,6 +31,9 @@ public class TheaterLikeItemEntity {
 	@ApiModelProperty("分集ID；整剧点赞时为空")
 	private String episodeId;
 
+	@ApiModelProperty("第几集")
+	private String setNum;
+
 	@ApiModelProperty("点赞时间")
 	private Date setTime;
 }

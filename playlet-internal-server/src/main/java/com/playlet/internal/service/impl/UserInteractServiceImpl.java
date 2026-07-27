@@ -433,6 +433,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		item.setTotalEpisodes(drama.getTotalEpisodes());
 		item.setFinished(drama.getFinishedState());
 		item.setLikeType(row.getLikeType());
+		item.setSetNum(dramaAssetDao.selectSetNum(row.getEpisodeId()));
 		item.setEpisodeId(StringUtils.isEmpty(row.getEpisodeId()) ? null : row.getEpisodeId());
 		item.setSetTime(row.getSetTime());
 		return item;

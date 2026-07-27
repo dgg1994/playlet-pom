@@ -51,5 +51,8 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 	@Select("select video_url from drama_asset where id = #{id}")
 	String findVideoUrl(@Param("id") Integer id);
 
-	
+
+	@Select("select set_num from drama_asset where id = #{episodeId}")
+	String selectSetNum(@Param("episodeId") String episodeId);
+
 }
