@@ -51,7 +51,7 @@ public class DramaAssetEntity extends PageQueryHelperEntity {
 	private Long discussScore;
 	
 	@TableField("video_url")
-	@ApiModelProperty(name = "videoUrl",value = "视频资源URL",required = true,dataType = "String")
+	@ApiModelProperty(name = "videoUrl",value = "视频资源：库内为七牛对象key，播放接口出参为签名URL",required = true,dataType = "String")
 	private String videoUrl;
 	
 	@TableField("video_type")

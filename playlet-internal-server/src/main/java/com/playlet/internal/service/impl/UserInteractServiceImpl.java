@@ -15,6 +15,7 @@ import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.UserDramaCollectEntity;
 import com.playlet.internal.entity.drama.UserDramaLikeEntity;
 import com.playlet.internal.service.DramaRankStatService;
+import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.service.UserInteractService;
 import com.playlet.internal.service.WelfareTaskService;
 import com.playlet.internal.enums.WelfareActionTypeEnums;
@@ -61,6 +62,8 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	private WelfareTaskService welfareTaskService;
 	@Autowired
 	private DramaRankStatService dramaRankStatService;
+	@Autowired
+	private MediaUrlService mediaUrlService;
 
 	@Override
 	public ResponseBase collectAdd(@RequestParam Integer dramaId, HttpServletRequest request) {
@@ -403,7 +406,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		TheaterCollectItemEntity item = new TheaterCollectItemEntity();
 		item.setDramaId(row.getDramaId());
 		item.setTitle(drama.getDramaTitle());
-		item.setCoverUrl(drama.getCoverUrl());
+		item.setCoverUrl(mediaUrlService.sign(drama.getCoverUrl()));
 		item.setTotalEpisodes(drama.getTotalEpisodes());
 		item.setFinished(drama.getFinishedState());
 		item.setSetTime(row.getSetTime());
@@ -426,7 +429,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		TheaterLikeItemEntity item = new TheaterLikeItemEntity();
 		item.setDramaId(row.getDramaId());
 		item.setTitle(drama.getDramaTitle());
-		item.setCoverUrl(drama.getCoverUrl());
+		item.setCoverUrl(mediaUrlService.sign(drama.getCoverUrl()));
 		item.setTotalEpisodes(drama.getTotalEpisodes());
 		item.setFinished(drama.getFinishedState());
 		item.setLikeType(row.getLikeType());

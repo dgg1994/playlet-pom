@@ -17,6 +17,7 @@ import com.playlet.internal.enums.*;
 import com.playlet.internal.filter.JWTAuthenticationFilter;
 import com.playlet.internal.query.account.UpdatePwdEntity;
 import com.playlet.internal.service.AppUserService;
+import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.utils.*;
 import com.playlet.internal.utils.oidc.OidcIdTokenPayload;
 import com.playlet.internal.utils.oidc.OidcTokenVerifier;
@@ -57,6 +58,9 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 
 	@Autowired
 	private AppOauthAccountDao appOauthAccountDao;
+
+	@Autowired
+	private MediaUrlService mediaUrlService;
 
 	@Autowired
 	private UserFollowDao userFollowDao;
@@ -318,6 +322,8 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			entity.setFollowCount(userFollowDao.countFollowing(entity.getId()));
 			entity.setFansCount(userFollowDao.countFans(entity.getId()));
 			entity.setLikeCount(UserDramaLikeDao.countLike(entity.getId()));
+			String avatar = entity.getAvatar();
+			entity.setAvatar(mediaUrlService.sign(avatar));
 			return setResultSuccess(entity);
 		} catch (Exception e) {
 			e.printStackTrace();

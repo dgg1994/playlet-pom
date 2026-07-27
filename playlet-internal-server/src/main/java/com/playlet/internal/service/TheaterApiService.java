@@ -44,4 +44,10 @@ public interface TheaterApiService {
 	@ApiOperation(value = "剧场搜索", notes = "按 dramaTitle 模糊；按 tagId（标签主键，内部转 groupId）或 tagGroupId 精确筛选已上架剧；可单独或组合")
 	ResponseBase search(@RequestBody DramaEntity entity, HttpServletRequest request);
 
+	@PostMapping("/view/report")
+	@ApiOperation(value = "上报浏览/观看进度", notes = "需登录。body: dramaId 必填；episodeId/watchProgress 续播；"
+			+ "deltaSeconds=本次有效观看秒数（关闭播放器/心跳）；episodeProgress=单集总时长秒（可选，用于热度换算）。"
+			+ "副作用：观影礼累计、按集福利(WATCH)、榜单日聚合、热度=有效秒数/(单集时长/3)。")
+	ResponseBase reportWatch(@RequestBody UserWatchHistoryEntity entity, HttpServletRequest request);
+
 }

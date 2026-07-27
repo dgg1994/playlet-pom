@@ -7,8 +7,6 @@ import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import javax.servlet.http.HttpServletRequest;
@@ -32,12 +30,6 @@ public interface TheaterService {
 	@GetMapping("/search/history/clear")
 	@ApiOperation(value = "清空搜索历史", notes = "需 x-playlet-token")
 	ResponseBase clearSearchHistory(HttpServletRequest request);
-
-	@PostMapping("/view/report")
-	@ApiOperation(value = "上报浏览/观看进度", notes = "需登录。body: dramaId 必填；episodeId/watchProgress 续播；"
-			+ "deltaSeconds=本次有效观看秒数（关闭播放器/心跳）；episodeProgress=单集总时长秒（可选，用于热度换算）。"
-			+ "副作用：观影礼累计、按集福利(WATCH)、榜单日聚合、热度=有效秒数/(单集时长/3)。")
-	ResponseBase reportWatch(@RequestBody UserWatchHistoryEntity entity, HttpServletRequest request);
 
 	@GetMapping("/view/history")
 	@ApiImplicitParams({

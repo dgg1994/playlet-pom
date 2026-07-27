@@ -35,7 +35,7 @@ public class DramaEntity extends PageQueryHelperEntity {
 	private String producerFirm;
 	
 	@TableField("cover_url")
-	@ApiModelProperty(name = "coverUrl",value = "默认封面URL",required = false,dataType = "String")
+	@ApiModelProperty(name = "coverUrl",value = "封面：库内为七牛对象key，接口出参为可访问URL",required = false,dataType = "String")
 	private String coverUrl;
 	
 	@TableField("score_num")

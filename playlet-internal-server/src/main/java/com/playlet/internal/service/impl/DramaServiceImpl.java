@@ -34,6 +34,7 @@ import com.playlet.internal.query.drama.QueryDramaQuery;
 import com.playlet.internal.query.drama.UpdateDramaQuery;
 import com.playlet.internal.response.drama.DramaAssetRes;
 import com.playlet.internal.service.DramaService;
+import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.QiniuUploadUtils;
@@ -57,8 +58,10 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 	
 	@Autowired
 	private TagDao tagDao;
-	
-	
+
+	@Autowired
+	private MediaUrlService mediaUrlService;
+
 	@Override
 	public ResponseBase addDrama(@Valid AddDramaQuery createPay, MultipartFile file) {
 		try {
@@ -148,6 +151,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 					list.get(i).setTagList(tagList);
 					Integer uploadSetNum = dramaAssetDao.findByDramaIdNum(list.get(i).getId());
 					list.get(i).setUploadSetNum(uploadSetNum);
+					list.get(i).setCoverUrl(mediaUrlService.sign(list.get(i).getCoverUrl()));
 				}
 			}
 			PageInfo<DramaEntity> info = new PageInfo<>(list);
@@ -259,6 +263,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			entity.setUploadSetNum(uploadSetNum);
 			List<DramaAssetRes> list = dramaAssetDao.findByDramaId(id);
 			entity.setVoideList(list);
+			entity.setCoverUrl(mediaUrlService.sign(entity.getCoverUrl()));
 			return setResultSuccess(entity, I18nUtil.getMessage("base_success")); 
 		} catch (Exception e) {
 			e.printStackTrace();

@@ -16,6 +16,7 @@ import com.playlet.internal.dao.drama.RankListDao;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.RankBoardEntity;
 import com.playlet.internal.entity.drama.RankListEntity;
+import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.service.RankManageService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
@@ -43,6 +44,9 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 	private RankListDao rankListDao;
 	@Autowired
 	private DramaDao dramaDao;
+	@Autowired
+	private MediaUrlService mediaUrlService;
+
 	@Override
 	@SysLogAnnotation(module = "榜单管理", type = "POST", remark = "榜定义列表")
 	public ResponseBase boardFindList(@RequestBody RankBoardEntity entity) {
@@ -149,6 +153,11 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 		}
 		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
 		List<RankListItemEntity> adminList = rankListDao.findAdminList(entity);
+		if (adminList != null) {
+			for (RankListItemEntity item : adminList) {
+				item.setCoverUrl(mediaUrlService.sign(item.getCoverUrl()));
+			}
+		}
 		return setResultSuccess(new PageInfo<>(adminList), I18nUtil.getMessage("base_success"));
 	}
 
@@ -159,6 +168,7 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 		if (row == null) {
 			return setResultError(I18nUtil.getMessage("base_data_null"));
 		}
+		row.setCoverUrl(mediaUrlService.sign(row.getCoverUrl()));
 		return setResultSuccess(row, I18nUtil.getMessage("base_success"));
 	}
 

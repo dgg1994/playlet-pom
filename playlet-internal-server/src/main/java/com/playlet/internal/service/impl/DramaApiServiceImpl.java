@@ -30,6 +30,7 @@ import com.playlet.internal.response.drama.DramaAssetRes;
 import com.playlet.internal.response.drama.RecommendDramaRes;
 import com.playlet.internal.response.drama.RecommendVidoeRes;
 import com.playlet.internal.service.DramaApiService;
+import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.utils.AppTokenUtil;
 import com.playlet.internal.utils.I18nUtil;
 
@@ -56,6 +57,9 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
     @Autowired
     private UserDramaCollectDao userDramaCollectDao;
 
+    @Autowired
+    private MediaUrlService mediaUrlService;
+
     @Override
     public ResponseBase recommend(@RequestBody RecommendDramaQuery entity, HttpServletRequest request) {
         try {
@@ -66,6 +70,7 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             List<RecommendDramaRes> list = dramaDao.recommendList(entity);
             if (list != null && list.size() > 0) {
                 for (int i = 0; i < list.size(); i++) {
+                    list.get(i).setCoverUrl(mediaUrlService.sign(list.get(i).getCoverUrl()));
                     RecommendVidoeRes vidoeRes = dramaAssetDao.findDramaIdOne(list.get(i).getId(), DeleteStateEnum.NORMAL.getIndex());
                     vidoeRes.setCollectScore(list.get(i).getCollectScore());
                     vidoeRes.setShareScore(list.get(i).getShareScore());
@@ -143,7 +148,7 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
     public ResponseBase getVideoUrl(Integer id) {
         try {
             String url = dramaAssetDao.findVideoUrl(id);
-            return setResultSuccess(url, I18nUtil.getMessage("base_success"));
+            return setResultSuccess(mediaUrlService.signVideo(url), I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException();
@@ -168,6 +173,7 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             Double scoreNum = dramaVideoCommentDao.avgScoreNumByDramaId(entity.getId(), DeleteStateEnum.NORMAL.getIndex());
             entity.setScoreNum(scoreNum == null ? 0 : scoreNum);
             entity.setTagList(tagList);
+            entity.setCoverUrl(mediaUrlService.sign(entity.getCoverUrl()));
             return setResultSuccess(entity, I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
             e.printStackTrace();
@@ -179,6 +185,11 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
     public ResponseBase relatedWork(Integer id) {
         try {
             List<RecommendDramaRes> list = dramaDao.relatedWork(id, DeleteStateEnum.NORMAL.getIndex(), VerifyStateEnums.AVAILABLE_NOW.getIndex());
+            if (list != null) {
+                for (RecommendDramaRes item : list) {
+                    item.setCoverUrl(mediaUrlService.sign(item.getCoverUrl()));
+                }
+            }
             return setResultSuccess(list, I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
             e.printStackTrace();
@@ -191,9 +202,13 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
         try {
             RecommendDramaRes dramaRes = dramaDao.findById(id);
             if (dramaRes != null) {
+                dramaRes.setCoverUrl(mediaUrlService.sign(dramaRes.getCoverUrl()));
                 RecommendVidoeRes vidoeRes = dramaAssetDao.findDramaIdOne(dramaRes.getId(), DeleteStateEnum.NORMAL.getIndex());
                 vidoeRes.setCollectScore(dramaRes.getCollectScore());
                 vidoeRes.setShareScore(dramaRes.getShareScore());
+                if (vidoeRes.getVideoUrl() != null) {
+                    vidoeRes.setVideoUrl(mediaUrlService.signVideo(vidoeRes.getVideoUrl()));
+                }
                 dramaRes.setVidoeRes(vidoeRes);
             }
             return setResultSuccess(dramaRes, I18nUtil.getMessage("base_success"));
