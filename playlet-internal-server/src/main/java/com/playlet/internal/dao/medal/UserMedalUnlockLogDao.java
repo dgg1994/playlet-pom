@@ -19,4 +19,10 @@ public interface UserMedalUnlockLogDao extends BaseMapper<UserMedalUnlockLogEnti
 			+ "order by setTime desc, id desc"
 			+ "</script>")
 	List<UserMedalUnlockLogEntity> findAdminList(UserMedalUnlockLogEntity entity);
+
+	@Select("select count(1) from user_medal_unlock_log "
+			+ "where uid = #{uid} and trigger_action = #{triggerAction} and trigger_ref = #{triggerRef}")
+	int existsByUidActionRef(@Param("uid") Long uid,
+			@Param("triggerAction") String triggerAction,
+			@Param("triggerRef") String triggerRef);
 }

@@ -56,6 +56,8 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 	private WelfareTaskService welfareTaskService;
 	@Autowired
 	private WatchGiftService watchGiftService;
+	@Autowired
+	private MedalProgressService medalProgressService;
 
 	@Override
 	public ResponseBase home() {
@@ -311,6 +313,13 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 			welfareTaskService.onAction(uid, WelfareActionTypeEnums.WATCH, 1, ext.toJSONString());
 		} catch (Exception e) {
 			log.warn("welfare watch progress failed: {}", e.getMessage());
+		}
+		try {
+			String day = java.time.LocalDate.now().toString();
+			String triggerRef = dramaId + ":" + episodeId.trim() + ":" + day;
+			medalProgressService.onAction(uid, WelfareActionTypeEnums.WATCH, 1, triggerRef);
+		} catch (Exception e) {
+			log.warn("medal watch progress failed: {}", e.getMessage());
 		}
 	}
 

@@ -9,6 +9,7 @@ import com.playlet.internal.dao.account.AppAccountDao;
 import com.playlet.internal.dao.account.UserFollowDao;
 import com.playlet.internal.entity.account.AppAccountEntity;
 import com.playlet.internal.entity.account.UserFollowEntity;
+import com.playlet.internal.service.MedalProgressService;
 import com.playlet.internal.service.UserFollowService;
 import com.playlet.internal.service.WelfareTaskService;
 import com.playlet.internal.enums.WelfareActionTypeEnums;
@@ -36,6 +37,8 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
     private AppAccountDao appAccountDao;
     @Autowired
     private WelfareTaskService welfareTaskService;
+    @Autowired
+    private MedalProgressService medalProgressService;
 
     @Override
     public ResponseBase followAdd(@RequestParam Integer followUid, HttpServletRequest request) {
@@ -66,6 +69,11 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
                         "{\"followUid\":\"" + followUid + "\"}");
             } catch (Exception e) {
                 log.warn("welfare follow progress failed: {}", e.getMessage());
+            }
+            try {
+                medalProgressService.onAction(uid, WelfareActionTypeEnums.FOLLOW, 1, String.valueOf(followUid));
+            } catch (Exception e) {
+                log.warn("medal follow progress failed: {}", e.getMessage());
             }
             return setResultSuccess(I18nUtil.getMessage("base_success"));
         } catch (Exception e) {

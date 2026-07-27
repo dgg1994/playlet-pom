@@ -15,7 +15,6 @@ public enum WelfareActionTypeEnums {
 	SHARE("SHARE", "分享", true),
 	FOLLOW("FOLLOW", "关注", true),
 	COMMENT("COMMENT", "评论", true),
-	DRAMA_REVIEW("DRAMA_REVIEW", "发表剧评", true),
 	LIKE("LIKE", "点赞", true),
 	COLLECT("COLLECT", "收藏", true),
 	INVITE("INVITE", "邀请", true),

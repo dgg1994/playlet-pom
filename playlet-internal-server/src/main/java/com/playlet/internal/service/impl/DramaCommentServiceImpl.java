@@ -24,10 +24,12 @@ import com.playlet.internal.entity.drama.DramaVideoCommentEntity;
 import com.playlet.internal.enums.CommentTypeEnums;
 import com.playlet.internal.enums.DeleteStateEnum;
 import com.playlet.internal.enums.PublicEnums;
+import com.playlet.internal.enums.WelfareActionTypeEnums;
 import com.playlet.internal.query.drama.AddDramaCommentQuery;
 import com.playlet.internal.query.drama.CommentGiveLikeQuery;
 import com.playlet.internal.query.drama.ReplyDramaCommentQuery;
 import com.playlet.internal.service.DramaCommentService;
+import com.playlet.internal.service.MedalProgressService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
 
@@ -45,6 +47,8 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 	private DramaDao dramaDao;
 	@Autowired
 	private DramaCommentLikeDao dramaCommentLikeDao;
+	@Autowired
+	private MedalProgressService medalProgressService;
 
 	@Override
 	public ResponseBase publish(@Valid @RequestBody AddDramaCommentQuery createPay) {
@@ -80,6 +84,12 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 			dramaVideoCommentDao.insert(entity);
 			addDiscussScore(entity);
 			refreshDramaScoreNum(createPay.getDramaId());
+			try {
+				medalProgressService.onAction(createPay.getUserId(), WelfareActionTypeEnums.COMMENT, 1,
+						"review:" + entity.getId());
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -107,6 +117,12 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 			parent.setReplyCount((parent.getReplyCount() == null ? 0 : parent.getReplyCount()) + 1);
 			dramaVideoCommentDao.updateById(parent);
 			addDiscussScore(entity);
+			try {
+				medalProgressService.onAction(createPay.getUserId(), WelfareActionTypeEnums.COMMENT, 1,
+						String.valueOf(entity.getId()));
+			} catch (Exception e) {
+				// ignore medal failure
+			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			e.printStackTrace();

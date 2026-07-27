@@ -80,6 +80,14 @@ public class MedalConfigEntity extends PageQueryHelperEntity {
 	private String medalName;
 
 	@TableField(exist = false)
+	@ApiModelProperty(name = "slogan", value = "副文案/Slogan", dataType = "String")
+	private String slogan;
+
+	@TableField(exist = false)
+	@ApiModelProperty(name = "conditionText", value = "条件展示文案", dataType = "String")
+	private String conditionText;
+
+	@TableField(exist = false)
 	@ApiModelProperty(name = "i18nList", value = "多语言文案", dataType = "List")
 	private List<MedalConfigI18nEntity> i18nList;
 }

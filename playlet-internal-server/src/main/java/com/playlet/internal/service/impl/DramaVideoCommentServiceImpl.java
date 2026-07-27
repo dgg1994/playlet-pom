@@ -22,10 +22,12 @@ import com.playlet.internal.entity.drama.DramaVideoCommentEntity;
 import com.playlet.internal.enums.CommentTypeEnums;
 import com.playlet.internal.enums.DeleteStateEnum;
 import com.playlet.internal.enums.PublicEnums;
+import com.playlet.internal.enums.WelfareActionTypeEnums;
 import com.playlet.internal.query.drama.AddDramaVideoCommentQuery;
 import com.playlet.internal.query.drama.CommentGiveLikeQuery;
 import com.playlet.internal.query.drama.ReplyVideoCommentQuery;
 import com.playlet.internal.service.DramaVideoCommentService;
+import com.playlet.internal.service.MedalProgressService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
 
@@ -46,6 +48,9 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 	@Autowired
 	private DramaCommentLikeDao dramaCommentLikeDao;
 
+	@Autowired
+	private MedalProgressService medalProgressService;
+
 	@Override
 	public ResponseBase publish(@Valid @RequestBody AddDramaVideoCommentQuery createPay) {
 		try {
@@ -59,6 +64,11 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 			dramaVideoCommentDao.insert(entity);
 			//视频、短剧添加评论量
 			addDiscussScore(entity);
+			try {
+				medalProgressService.onAction(createPay.getUserId(), WelfareActionTypeEnums.COMMENT, 1,
+						String.valueOf(entity.getId()));
+			} catch (Exception ignore) {
+			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -84,6 +94,11 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 			}
 			//视频、短剧添加评论量
 			addDiscussScore(entity);
+			try {
+				medalProgressService.onAction(createPay.getUserId(), WelfareActionTypeEnums.COMMENT, 1,
+						String.valueOf(entity.getId()));
+			} catch (Exception ignore) {
+			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			e.printStackTrace();
