@@ -54,6 +54,6 @@ public interface UserDramaLikeDao extends BaseMapper<UserDramaLikeEntity> {
 	@Select("select count(*) from user_drama_like where uid = #{uid}")
 	Long countLike(@Param("uid") Integer uid);
 
-	@Select("select * from user_drama_like where episode_id = #{voideId}")
-	UserDramaLikeEntity findByVoideId(@Param("voideId") Integer voideId);
+	@Select("select * from user_drama_like where episode_id = #{voideId} and uid = #{uid}")
+	UserDramaLikeEntity findByVoideId(@Param("voideId") Integer voideId,@Param("uid") Integer uid);
 }

@@ -76,11 +76,11 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
                     vidoeRes.setShareScore(list.get(i).getShareScore());
                     vidoeRes.setVideoUrl(null);
                     if (uid != null) {
-                        UserDramaLikeEntity dramaLikeEntity = userDramaLikeDao.findByVoideId(vidoeRes.getId());
+                        UserDramaLikeEntity dramaLikeEntity = userDramaLikeDao.findByVoideId(vidoeRes.getId(),uid);
                         if (dramaLikeEntity != null) {
                             vidoeRes.setIsLike(PublicEnums.ONE.getIndex());
                         }
-                        UserDramaCollectEntity collectEntity = userDramaCollectDao.findByVoideId(vidoeRes.getId());
+                        UserDramaCollectEntity collectEntity = userDramaCollectDao.findByVoideId(vidoeRes.getId(),uid);
                         if (collectEntity != null) {
                             vidoeRes.setIsCollect(PublicEnums.ONE.getIndex());
                         }
@@ -123,11 +123,11 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             if (list != null && list.size() > 0) {
                 for (int i = 0; i < list.size(); i++) {
                     if (uid != null) {
-                        UserDramaLikeEntity dramaLikeEntity = userDramaLikeDao.findByVoideId(list.get(i).getId());
+                        UserDramaLikeEntity dramaLikeEntity = userDramaLikeDao.findByVoideId(list.get(i).getId(),uid);
                         if (dramaLikeEntity != null) {
                             list.get(i).setIsLike(PublicEnums.ONE.getIndex());
                         }
-                        UserDramaCollectEntity collectEntity = userDramaCollectDao.findByVoideId(list.get(i).getId());
+                        UserDramaCollectEntity collectEntity = userDramaCollectDao.findByVoideId(list.get(i).getId(),uid);
                         if (collectEntity != null) {
                             list.get(i).setIsCollect(PublicEnums.ONE.getIndex());
                         }

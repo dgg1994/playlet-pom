@@ -384,7 +384,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 				&& !MD5Util.digest(StringUtils.trim(entity.getFormerPassword())).equals(account.getUserPassword())) {
 			return setResultError(I18nUtil.getMessage("old_password_error"));
 		}
-		account.setUserPassword(MD5Util.digest(entity.getNewPassword()));
+		account.setUserPassword(DigestUtils.md5DigestAsHex((entity.getNewPassword()).getBytes()));
 		account.setGmtModified(new Date());
 		appAccountDao.updateById(account);
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
@@ -436,7 +436,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		if (account == null) {
 			return setResultError(I18nUtil.getMessage("user.account_error"));
 		}
-		account.setUserPassword(MD5Util.digest(entity.getNewPassword()));
+		account.setUserPassword(DigestUtils.md5DigestAsHex((entity.getNewPassword()).getBytes()));
 		account.setGmtModified(new Date());
 		appAccountDao.updateById(account);
 		redisUtil.del(entity.getEmail());
