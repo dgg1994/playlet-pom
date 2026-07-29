@@ -1,7 +1,9 @@
 package com.playlet.internal.service.impl;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.UUID;
+import java.util.regex.Matcher;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
+import com.playlet.internal.api.response.VideoPlayUrlResp;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
@@ -25,14 +28,18 @@ import com.playlet.internal.entity.drama.UserDramaLikeEntity;
 import com.playlet.internal.enums.DeleteStateEnum;
 import com.playlet.internal.enums.PublicEnums;
 import com.playlet.internal.enums.VerifyStateEnums;
+import com.playlet.internal.enums.VideoDefinitionEnums;
 import com.playlet.internal.query.drama.RecommendDramaQuery;
 import com.playlet.internal.response.drama.DramaAssetRes;
 import com.playlet.internal.response.drama.RecommendDramaRes;
+import com.playlet.internal.response.drama.RecommendPageResp;
 import com.playlet.internal.response.drama.RecommendVidoeRes;
 import com.playlet.internal.service.DramaApiService;
 import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.utils.AppTokenUtil;
 import com.playlet.internal.utils.I18nUtil;
+import com.playlet.internal.utils.QiniuUploadUtils;
+import com.playlet.internal.utils.StringUtils;
 
 @RestController
 @Transactional
@@ -64,6 +71,7 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
     public ResponseBase recommend(@RequestBody RecommendDramaQuery entity, HttpServletRequest request) {
         try {
             Integer uid = AppTokenUtil.resolveUid(request);
+            ensureRecommendSeed(entity);
             PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
             entity.setDeleteState(DeleteStateEnum.NORMAL.getIndex());
             entity.setVerifyStatus(VerifyStateEnums.AVAILABLE_NOW.getIndex());
@@ -91,12 +99,27 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
                     list.get(i).setVidoeRes(vidoeRes);
                 }
             }
-            PageInfo<RecommendDramaRes> info = new PageInfo<>(list);
-            return setResultSuccess(info, I18nUtil.getMessage("base_success"));
+            RecommendPageResp resp = new RecommendPageResp();
+            resp.setSeed(entity.getSeed());
+            resp.setPage(new PageInfo<>(list));
+            return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException();
         }
+    }
+
+    /** 首页未传 seed 时生成；翻页需原样回传以保证排序稳定 */
+    private void ensureRecommendSeed(RecommendDramaQuery entity) {
+        String seed = entity.getSeed() == null ? null : entity.getSeed().trim();
+        if (StringUtils.isEmpty(seed)) {
+            entity.setSeed(UUID.randomUUID().toString().replace("-", ""));
+            return;
+        }
+        if (seed.length() > 64) {
+            seed = seed.substring(0, 64);
+        }
+        entity.setSeed(seed);
     }
 
 
@@ -147,12 +170,107 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
     @Override
     public ResponseBase getVideoUrl(Integer id) {
         try {
-            String url = dramaAssetDao.findVideoUrl(id);
-            return setResultSuccess(mediaUrlService.signVideo(url), I18nUtil.getMessage("base_success"));
+            if (id == null) {
+                return setResultError(I18nUtil.getMessage("base_error"));
+            }
+            String keyOrUrl = dramaAssetDao.findVideoUrl(id);
+            if (StringUtils.isEmpty(keyOrUrl)) {
+                return setResultError(I18nUtil.getMessage("base_data_null"));
+            }
+            return setResultSuccess(buildMultiRatePlayUrl(id, keyOrUrl), I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException();
         }
+    }
+
+    /**
+     * 方式A：按命名规则推导候选码率，再用七牛 stat 过滤真实存在的对象后签名返回。
+     * 支持：
+     * 1) ..._720.m3u8 -> 候选 ..._360/480/720/1080.m3u8
+     * 2) oceans.m3u8（旧数据）-> 候选 oceans_360/480/720/1080.m3u8
+     * 若多码率都不存在，退回原始 key（存在则单路返回）。
+     */
+    private VideoPlayUrlResp buildMultiRatePlayUrl(Integer assetId, String keyOrUrl) {
+        VideoPlayUrlResp resp = new VideoPlayUrlResp();
+        resp.setAssetId(assetId);
+
+        String key = QiniuUploadUtils.extractKey(keyOrUrl);
+        if (StringUtils.isEmpty(key)) {
+            key = keyOrUrl == null ? "" : keyOrUrl.trim();
+        }
+
+        List<VideoPlayUrlResp.StreamItem> streams = new ArrayList<>();
+        Matcher multiMatcher = VideoDefinitionEnums.MULTI_RATE_M3U8_PATTERN.matcher(key);
+        Matcher plainMatcher = VideoDefinitionEnums.PLAIN_M3U8_PATTERN.matcher(key);
+        VideoDefinitionEnums preferred = VideoDefinitionEnums.DEFAULT;
+        if (multiMatcher.matches()) {
+            VideoDefinitionEnums matched = VideoDefinitionEnums.ofCode(multiMatcher.group(2));
+            if (matched != null) {
+                preferred = matched;
+            }
+            fillExistingMultiRateStreams(streams, multiMatcher.group(1));
+        } else if (plainMatcher.matches()) {
+            fillExistingMultiRateStreams(streams, plainMatcher.group(1));
+        }
+
+        if (streams.isEmpty() && QiniuUploadUtils.exists(key)) {
+            streams.add(buildStreamItem(VideoDefinitionEnums.DEFAULT, key));
+            preferred = VideoDefinitionEnums.DEFAULT;
+        }
+
+        resp.setStreams(streams);
+        resp.setDefaultDefinition(resolveDefaultDefinition(streams, preferred).getCode());
+        return resp;
+    }
+
+    private void fillExistingMultiRateStreams(List<VideoPlayUrlResp.StreamItem> streams, String prefix) {
+        for (VideoDefinitionEnums def : VideoDefinitionEnums.values()) {
+            String streamKey = def.toM3u8Key(prefix);
+            if (QiniuUploadUtils.exists(streamKey)) {
+                streams.add(buildStreamItem(def, streamKey));
+            }
+        }
+    }
+
+    private VideoDefinitionEnums resolveDefaultDefinition(List<VideoPlayUrlResp.StreamItem> streams,
+                                                          VideoDefinitionEnums preferred) {
+        if (streams == null || streams.isEmpty()) {
+            return VideoDefinitionEnums.DEFAULT;
+        }
+        if (containsDefinition(streams, preferred)) {
+            return preferred;
+        }
+        if (containsDefinition(streams, VideoDefinitionEnums.DEFAULT)) {
+            return VideoDefinitionEnums.DEFAULT;
+        }
+        for (VideoDefinitionEnums def : VideoDefinitionEnums.FALLBACK_ORDER) {
+            if (containsDefinition(streams, def)) {
+                return def;
+            }
+        }
+        VideoDefinitionEnums first = VideoDefinitionEnums.ofCode(streams.get(0).getDefinition());
+        return first != null ? first : VideoDefinitionEnums.DEFAULT;
+    }
+
+    private boolean containsDefinition(List<VideoPlayUrlResp.StreamItem> streams, VideoDefinitionEnums def) {
+        if (def == null) {
+            return false;
+        }
+        for (VideoPlayUrlResp.StreamItem item : streams) {
+            if (def.getCode().equals(item.getDefinition())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private VideoPlayUrlResp.StreamItem buildStreamItem(VideoDefinitionEnums definition, String streamKey) {
+        VideoPlayUrlResp.StreamItem item = new VideoPlayUrlResp.StreamItem();
+        item.setDefinition(definition.getCode());
+        item.setLabel(definition.getLabel());
+        item.setVideoUrl(mediaUrlService.signVideo(streamKey));
+        return item;
     }
 
     @Override

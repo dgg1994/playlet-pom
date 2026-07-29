@@ -15,8 +15,8 @@ import io.swagger.annotations.Api;
 public interface DramaApiService {
 	
 	/**
-	 * @category 推荐视频
-	 * @param entity
+	 * @category 推荐视频（同 seed 内分页顺序稳定，避免翻页重复）
+	 * @param entity 首页可不传 seed；响应会返回 seed，后续翻页原样回传
 	 * @return
 	 */
 	@PostMapping("/recommend")
@@ -39,9 +39,9 @@ public interface DramaApiService {
 	ResponseBase selections(Integer id, HttpServletRequest request);
 	
 	/**
-	 * @category 获取视频播放地址
-	 * @param id
-	 * @return
+	 * @category 获取视频播放地址（多码率）
+	 * @param id drama_asset.id
+	 * @return data.streams 为 360/480/720/1080 各路签名地址；默认播 defaultDefinition
 	 */
 	@GetMapping("/getVideoUrl")
 	ResponseBase getVideoUrl(Integer id);

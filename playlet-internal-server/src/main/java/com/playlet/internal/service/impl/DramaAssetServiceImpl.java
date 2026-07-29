@@ -17,6 +17,7 @@ import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.enums.DeleteStateEnum;
 import com.playlet.internal.enums.PublicEnums;
+import com.playlet.internal.enums.VideoDefinitionEnums;
 import com.playlet.internal.query.drama.AddDramaAssetQuery;
 import com.playlet.internal.service.DramaAssetService;
 import com.playlet.internal.utils.GenericityUtil;
@@ -46,7 +47,8 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			}
 			String path = String.format(Constants.VIDEO_UPLOAD_SITE, entity.getId(),createPay.getSetNum());
 			String url = QiniuUploadUtils.uploadVideo(file,path);
-			String newUrl = QiniuUploadUtils.replaceFileExtension(url, Constants.M3U8);
+			// 多码率约定：库内存默认清晰度 key，如 oceans_720.m3u8；播放时再推导 360/480/720/1080
+			String newUrl = toDefaultMultiRateM3u8Key(url);
 			DramaAssetEntity assetEntity = new DramaAssetEntity();
 			assetEntity.setVideoName(file.getOriginalFilename());
 			assetEntity.setBelongUser(entity.getBelongUser());
@@ -64,6 +66,27 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			e.printStackTrace();
 			throw new RuntimeException();
 		}
+	}
+
+	/**
+	 * 上传源片后，DB 存默认清晰度 m3u8 key：
+	 * oceans.mp4 / oceans.m3u8 -> oceans_720.m3u8
+	 * oceans_720.m3u8 已带码率后缀则规范为默认清晰度
+	 */
+	private String toDefaultMultiRateM3u8Key(String uploadedKey) {
+		String m3u8Key = QiniuUploadUtils.replaceFileExtension(uploadedKey, Constants.M3U8);
+		if (m3u8Key == null || m3u8Key.isEmpty()) {
+			return m3u8Key;
+		}
+		String lower = m3u8Key.toLowerCase();
+		if (!lower.endsWith(".m3u8")) {
+			return m3u8Key;
+		}
+		String withoutExt = m3u8Key.substring(0, m3u8Key.length() - ".m3u8".length());
+		if (VideoDefinitionEnums.hasDefinitionSuffix(withoutExt)) {
+			return VideoDefinitionEnums.replaceDefinitionSuffix(withoutExt, VideoDefinitionEnums.DEFAULT) + ".m3u8";
+		}
+		return VideoDefinitionEnums.DEFAULT.toM3u8Key(withoutExt);
 	}
 
 }

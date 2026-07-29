@@ -87,7 +87,8 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 	@Update("update drama set hot_score = ifnull(hot_score,0) + #{delta}, gmtModified = now() where id = #{dramaId}")
 	int incrHotScore(@Param("dramaId") Integer dramaId, @Param("delta") long delta);
 
-	@Select("SELECT * FROM drama WHERE delete_state = #{deleteState} AND verify_status = #{verifyStatus} ORDER BY RAND()")
+	@Select("SELECT * FROM drama WHERE delete_state = #{deleteState} AND verify_status = #{verifyStatus} "
+			+ "ORDER BY CRC32(CONCAT(id, #{seed})), id")
 	List<RecommendDramaRes> recommendList(RecommendDramaQuery entity);
 
 	@Select("SELECT * from drama where id = (SELECT drama_id from drama_asset where id = #{id})")

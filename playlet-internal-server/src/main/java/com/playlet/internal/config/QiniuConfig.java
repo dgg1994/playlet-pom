@@ -36,6 +36,9 @@ public class QiniuConfig {
 	@Value("${qiniu.video-expire-seconds:7200}")
 	private long videoExpireSeconds;
 
+	@Value("${qiniu.pm3u8-expires-seconds:43200}")
+	private long pm3u8ExpiresSeconds;
+
 	@PostConstruct
 	public void init() {
 		log.info("========== 七牛云配置加载 ==========");
@@ -46,6 +49,7 @@ public class QiniuConfig {
 		log.info("private-enabled: {}", privateEnabled);
 		log.info("url-expire-seconds: {}", urlExpireSeconds);
 		log.info("video-expire-seconds: {}", videoExpireSeconds);
+		log.info("pm3u8-expires-seconds: {}", pm3u8ExpiresSeconds);
 		log.info("====================================");
 	}
 
@@ -147,6 +151,28 @@ public class QiniuConfig {
 		return auth.privateDownloadUrl(publicUrl, expire);
 	}
 
+	/**
+	 * 私有 m3u8 播放地址：通过 pm3u8 批量为 ts 分片授权。
+	 */
+	public String toPrivateM3u8Url(String keyOrUrl, Long expireSeconds, Auth auth) {
+		if (keyOrUrl == null || keyOrUrl.isEmpty()) {
+			return keyOrUrl;
+		}
+		String key = extractKey(keyOrUrl);
+		if (key == null || key.isEmpty()) {
+			return keyOrUrl;
+		}
+		String publicUrl = buildPublicUrl(key);
+		if (!privateEnabled) {
+			return publicUrl;
+		}
+		long expire = expireSeconds == null || expireSeconds <= 0
+				? videoExpireSeconds
+				: expireSeconds;
+		String pm3u8Url = publicUrl + "?pm3u8/0/expires/" + pm3u8ExpiresSeconds;
+		return auth.privateDownloadUrl(pm3u8Url, expire);
+	}
+
 	public String getBucket() {
 		return bucket;
 	}
@@ -173,5 +199,9 @@ public class QiniuConfig {
 
 	public long getVideoExpireSeconds() {
 		return videoExpireSeconds;
+	}
+
+	public long getPm3u8ExpiresSeconds() {
+		return pm3u8ExpiresSeconds;
 	}
 }

@@ -100,6 +100,11 @@ public class QiniuUploadUtils {
 		return getInstance().qiniuConfig.extractKey(keyOrUrl);
 	}
 
+	/** 判断七牛对象是否存在 */
+	public static boolean exists(String keyOrUrl) {
+		return getInstance().doExists(keyOrUrl);
+	}
+
 	/**
 	 * 读时访问地址（私有则签名）。
 	 * @deprecated 业务侧优先注入 {@link com.playlet.internal.service.MediaUrlService}
@@ -250,6 +255,29 @@ public class QiniuUploadUtils {
 			return false;
 		} catch (Exception e) {
 			log.error("删除异常", e);
+			return false;
+		}
+	}
+
+	private boolean doExists(String keyOrUrl) {
+		String key = qiniuConfig.extractKey(keyOrUrl);
+		if (key == null || key.isEmpty()) {
+			return false;
+		}
+		try {
+			Configuration cfg = new Configuration(Region.autoRegion());
+			BucketManager bucketManager = new BucketManager(qiniuAuth, cfg);
+			return bucketManager.stat(qiniuConfig.getBucket(), key) != null;
+		} catch (com.qiniu.common.QiniuException e) {
+			// 612: no such file or directory
+			if (e.response != null && e.response.statusCode == 612) {
+				return false;
+			}
+			log.warn("七牛对象存在性检查失败 key={}, code={}, err={}",
+					key, e.response == null ? null : e.response.statusCode, e.getMessage());
+			return false;
+		} catch (Exception e) {
+			log.warn("七牛对象存在性检查异常 key={}: {}", key, e.getMessage());
 			return false;
 		}
 	}

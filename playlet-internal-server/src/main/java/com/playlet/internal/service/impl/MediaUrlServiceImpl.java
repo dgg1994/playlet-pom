@@ -22,6 +22,10 @@ public class MediaUrlServiceImpl implements MediaUrlService {
 
 	@Override
 	public String signVideo(String keyOrUrl) {
+		String key = qiniuConfig.extractKey(keyOrUrl);
+		if (key != null && key.toLowerCase().endsWith(".m3u8")) {
+			return qiniuConfig.toPrivateM3u8Url(keyOrUrl, qiniuConfig.getVideoExpireSeconds(), qiniuAuth);
+		}
 		return qiniuConfig.toAccessUrl(keyOrUrl, qiniuConfig.getVideoExpireSeconds(), qiniuAuth);
 	}
 }

@@ -1,11 +1,9 @@
 package com.playlet.internal.utils;
-import com.playlet.internal.constants.Constants;
+
 import com.playlet.internal.dao.account.AppAccountDao;
 import com.playlet.internal.entity.account.AppAccountEntity;
 import com.playlet.internal.enums.UserStateEnums;
 import com.playlet.internal.filter.JWTAuthenticationFilter;
-
-import io.jsonwebtoken.Jwts;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
