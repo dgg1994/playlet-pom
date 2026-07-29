@@ -1,6 +1,7 @@
 package com.playlet.internal.service.impl;
 
 import com.github.pagehelper.PageInfo;
+import com.github.pagehelper.PageHelper;
 import com.playlet.internal.api.response.TheaterCollectItemEntity;
 import com.playlet.internal.api.response.TheaterLikeItemEntity;
 import com.playlet.internal.base.BaseApiService;
@@ -135,20 +136,26 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		if (entity == null) {
 			entity = new UserDramaCollectEntity();
 		}
+		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
 		List<UserDramaCollectEntity> rows = userDramaCollectDao.findByUid(uid);
 		if (rows == null) {
 			rows = new ArrayList<>();
 		}
-		List<UserDramaCollectEntity> pageRows = GenericityUtil.Page(rows, entity.getPageNumber(), entity.getPageSize());
+		PageInfo<UserDramaCollectEntity> basePage = new PageInfo<>(rows);
 		List<TheaterCollectItemEntity> items = new ArrayList<>();
-		for (UserDramaCollectEntity row : pageRows) {
+		for (UserDramaCollectEntity row : rows) {
 			TheaterCollectItemEntity item = toCollectItem(row);
 			if (item != null) {
 				items.add(item);
 			}
 		}
 		PageInfo<TheaterCollectItemEntity> page = new PageInfo<>(items);
-		page.setTotal(rows.size());
+		page.setTotal(basePage.getTotal());
+		page.setPageNum(basePage.getPageNum());
+		page.setPageSize(basePage.getPageSize());
+		page.setPages(basePage.getPages());
+		page.setHasNextPage(basePage.isHasNextPage());
+		page.setHasPreviousPage(basePage.isHasPreviousPage());
 		return setResultSuccess(page, I18nUtil.getMessage("base_success"));
 	}
 
@@ -189,20 +196,26 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		if (entity == null) {
 			entity = new UserDramaLikeEntity();
 		}
+		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
 		List<UserDramaLikeEntity> rows = userDramaLikeDao.findByUid(uid, entity.getLikeType());
 		if (rows == null) {
 			rows = new ArrayList<>();
 		}
-		List<UserDramaLikeEntity> pageRows = GenericityUtil.Page(rows, entity.getPageNumber(), entity.getPageSize());
+		PageInfo<UserDramaLikeEntity> basePage = new PageInfo<>(rows);
 		List<TheaterLikeItemEntity> items = new ArrayList<>();
-		for (UserDramaLikeEntity row : pageRows) {
+		for (UserDramaLikeEntity row : rows) {
 			TheaterLikeItemEntity item = toLikeItem(row);
 			if (item != null) {
 				items.add(item);
 			}
 		}
 		PageInfo<TheaterLikeItemEntity> page = new PageInfo<>(items);
-		page.setTotal(rows.size());
+		page.setTotal(basePage.getTotal());
+		page.setPageNum(basePage.getPageNum());
+		page.setPageSize(basePage.getPageSize());
+		page.setPages(basePage.getPages());
+		page.setHasNextPage(basePage.isHasNextPage());
+		page.setHasPreviousPage(basePage.isHasPreviousPage());
 		return setResultSuccess(page, I18nUtil.getMessage("base_success"));
 	}
 

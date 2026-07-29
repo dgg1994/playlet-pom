@@ -77,7 +77,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		}
 		// 校验邮箱验证码
 		if (!verifyCode(entity.getUserEmail(), entity.getEmailCode())) {
-			return setResultError("验证码错误或已过期");
+			return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
 		}
 		// 邮箱唯一性校验
 		if (appAccountDao.findByEmail(entity.getUserEmail()) != null) {

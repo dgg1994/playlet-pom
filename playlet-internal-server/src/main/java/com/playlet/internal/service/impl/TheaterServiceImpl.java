@@ -1,6 +1,7 @@
 package com.playlet.internal.service.impl;
 
 import com.github.pagehelper.PageInfo;
+import com.github.pagehelper.PageHelper;
 import com.playlet.internal.api.response.TheaterSearchHistoryRespEntity;
 import com.playlet.internal.api.response.TheaterWatchHistoryItemEntity;
 import com.playlet.internal.base.BaseApiService;
@@ -92,20 +93,27 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
         if (entity == null) {
             entity = new UserWatchHistoryEntity();
         }
+        // SQL 层分页
+        PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
         List<UserWatchHistoryEntity> rows = userWatchHistoryDao.findByUid(uid);
         if (rows == null) {
             rows = new ArrayList<>();
         }
-        List<UserWatchHistoryEntity> pageRows = GenericityUtil.Page(rows, entity.getPageNumber(), entity.getPageSize());
+        PageInfo<UserWatchHistoryEntity> basePage = new PageInfo<>(rows);
         List<TheaterWatchHistoryItemEntity> items = new ArrayList<>();
-        for (UserWatchHistoryEntity row : pageRows) {
+        for (UserWatchHistoryEntity row : rows) {
             TheaterWatchHistoryItemEntity item = toWatchItem(row);
             if (item != null) {
                 items.add(item);
             }
         }
         PageInfo<TheaterWatchHistoryItemEntity> page = new PageInfo<>(items);
-        page.setTotal(rows.size());
+        page.setTotal(basePage.getTotal());
+        page.setPageNum(basePage.getPageNum());
+        page.setPageSize(basePage.getPageSize());
+        page.setPages(basePage.getPages());
+        page.setHasNextPage(basePage.isHasNextPage());
+        page.setHasPreviousPage(basePage.isHasPreviousPage());
         return setResultSuccess(page, I18nUtil.getMessage("base_success"));
     }
 

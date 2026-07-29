@@ -1,6 +1,7 @@
 package com.playlet.internal.service.impl;
 
 import com.github.pagehelper.PageInfo;
+import com.github.pagehelper.PageHelper;
 import com.playlet.internal.api.response.UserFollowItemEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
@@ -108,6 +109,7 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
             if (entity == null) {
                 entity = new UserFollowEntity();
             }
+            PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
             List<UserFollowEntity> rows = userFollowDao.findFollowing(targetUid);
             return buildUserPage(rows, entity.getPageNumber(), entity.getPageSize(), request, true);
         } catch (Exception e) {
@@ -125,6 +127,7 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
             if (entity == null) {
                 entity = new UserFollowEntity();
             }
+            PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
             List<UserFollowEntity> rows = userFollowDao.findFans(targetUid);
             return buildUserPage(rows, entity.getPageNumber(), entity.getPageSize(), request, false);
         } catch (Exception e) {
@@ -141,7 +144,9 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
         if (rows == null) {
             rows = new ArrayList<>();
         }
-        List<UserFollowEntity> pageRows = GenericityUtil.Page(rows, pageNumber, pageSize);
+        // rows 已由 PageHelper 在 SQL 层完成分页；这里不再二次切片
+        List<UserFollowEntity> pageRows = rows;
+        PageInfo<UserFollowEntity> basePage = new PageInfo<>(pageRows);
         Integer viewer = AppTokenUtil.resolveUid(request);
         Map<Integer, AppAccountEntity> accountCache = new HashMap<>();
         Set<Integer> followedSet = loadFollowedSet(viewer, pageRows, followingSide);
@@ -162,7 +167,13 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
             items.add(item);
         }
         PageInfo<UserFollowItemEntity> page = new PageInfo<>(items);
-        page.setTotal(rows.size());
+        // 继承 PageHelper 计算的总数/页数/hasNextPage
+        page.setTotal(basePage.getTotal());
+        page.setPageNum(basePage.getPageNum());
+        page.setPageSize(basePage.getPageSize());
+        page.setPages(basePage.getPages());
+        page.setHasNextPage(basePage.isHasNextPage());
+        page.setHasPreviousPage(basePage.isHasPreviousPage());
         return setResultSuccess(page, I18nUtil.getMessage("base_success"));
     }
 

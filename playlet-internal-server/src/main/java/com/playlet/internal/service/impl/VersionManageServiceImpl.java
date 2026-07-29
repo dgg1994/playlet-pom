@@ -1,6 +1,7 @@
 package com.playlet.internal.service.impl;
 
 import com.github.pagehelper.PageInfo;
+import com.github.pagehelper.PageHelper;
 import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
@@ -51,6 +52,8 @@ public class VersionManageServiceImpl implements VersionManageService {
 		if (StringUtils.isEmpty(entity.getLangue())) {
 			entity.setLangue(LanguageContext.getLanguage());
 		}
+		// SQL 层分页
+		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
 		List<AppVersionConfigEntity> list = appVersionConfigDao.findAdminList(entity);
 		if (list == null) {
 			list = new ArrayList<>();
@@ -61,9 +64,7 @@ public class VersionManageServiceImpl implements VersionManageService {
 				row.setTitle(appVersionI18nDao.selectTitleByVersionId(row.getId(), language));
 			}
 		}
-		List<AppVersionConfigEntity> pageList = GenericityUtil.Page(list, entity.getPageNumber(), entity.getPageSize());
-		PageInfo<AppVersionConfigEntity> page = new PageInfo<>(pageList);
-		page.setTotal(list.size());
+		PageInfo<AppVersionConfigEntity> page = new PageInfo<>(list);
 		return setResultSuccess(page, I18nUtil.getMessage("base_success"));
 	}
 

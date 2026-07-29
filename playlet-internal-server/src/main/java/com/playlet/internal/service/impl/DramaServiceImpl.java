@@ -224,7 +224,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 					.eq("verify_status", VerifyStateEnums.AVAILABLE_NOW.getIndex())
 					.eq("delete_state", DeleteStateEnum.NORMAL.getIndex()));
 			if (entity == null) {
-				return setResultError(I18nUtil.getMessage("base_error"));
+				return setResultError(I18nUtil.getMessage("video_not_up"));
 			}
 			// 仅「设为推荐」时校验上限；取消推荐不受限
 			if (RecommendedCarouselEnums.RECOMMENDED.getIndex().equals(status)

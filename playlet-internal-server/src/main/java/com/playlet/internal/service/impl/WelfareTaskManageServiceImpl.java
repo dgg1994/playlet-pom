@@ -1,6 +1,7 @@
 package com.playlet.internal.service.impl;
 
 import com.github.pagehelper.PageInfo;
+import com.github.pagehelper.PageHelper;
 import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
@@ -51,6 +52,8 @@ public class WelfareTaskManageServiceImpl implements WelfareTaskManageService {
 		if (entity == null) {
 			entity = new WelfareTaskEntity();
 		}
+		// SQL 层分页
+		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
 		List<WelfareTaskEntity> list = welfareTaskDao.findAdminList(entity);
 		if (list == null) {
 			list = new ArrayList<>();
@@ -60,9 +63,7 @@ public class WelfareTaskManageServiceImpl implements WelfareTaskManageService {
 		for (WelfareTaskEntity welfareTaskEntity : list) {
 			welfareTaskEntity.setTaskName(welfareTaskI18nDao.selectNameById(welfareTaskEntity.getId(),language));
 		}
-		List<WelfareTaskEntity> welfareTaskEntities = GenericityUtil.Page(list, entity.getPageNumber(), entity.getPageSize());
-		PageInfo<WelfareTaskEntity> page = new PageInfo<>(welfareTaskEntities);
-		page.setTotal(list.size());
+		PageInfo<WelfareTaskEntity> page = new PageInfo<>(list);
 		return setResultSuccess(page,I18nUtil.getMessage("base_success"));
 	}
 

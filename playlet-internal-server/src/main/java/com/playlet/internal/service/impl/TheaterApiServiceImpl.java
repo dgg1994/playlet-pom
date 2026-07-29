@@ -144,6 +144,7 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 		}
 		entity.setBoardGroupId(groupId);
 		entity.setStatus(1);
+		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
 		List<DramaEntity> dramaEntities = dramaDao.selectListDramas(
 				groupId,
 				VerifyStateEnums.AVAILABLE_NOW.getIndex(),
@@ -156,13 +157,11 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 			dramaEntity.setTagList(tagEntities);
 			dramaEntity.setCoverUrl(mediaUrlService.sign(dramaEntity.getCoverUrl()));
 		}
-		List<DramaEntity> page = GenericityUtil.Page(dramaEntities, entity.getPageNumber(), entity.getPageSize());
-		PageInfo<DramaEntity> dramaEntityPageInfo = PageInfo.of(page);
-		dramaEntityPageInfo.setTotal(dramaEntities.size());
+		PageInfo<DramaEntity> info = new PageInfo<>(dramaEntities);
 		TheaterRankPageRespEntity resp = new TheaterRankPageRespEntity();
 		resp.setGroupId(board.getGroupId());
 		resp.setBoardName(board.getBoardName());
-		resp.setPage(dramaEntityPageInfo);
+		resp.setPage(info);
 		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
 	}
 
@@ -184,10 +183,13 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 			}
 			entity.setTagGroupId(tag.getGroupId());
 		}
+		// SQL 层分页，避免 GenericityUtil.Page 导致 hasNextPage/pages 元数据不准确
+		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
 		List<DramaEntity> dramaEntities = dramaDao.searchOnline(entity);
 		if (dramaEntities == null) {
 			dramaEntities = new ArrayList<>();
 		}
+		PageInfo<DramaEntity> basePage = new PageInfo<>(dramaEntities);
 		log.info("theater search title={}, tagId={}, tagGroupId={}, hit={}",
 				entity.getDramaTitle(), entity.getTagId(), entity.getTagGroupId(), dramaEntities.size());
 		// 仅标题搜索首页计入热搜；标签筛选/翻页不记，避免刷榜
@@ -195,16 +197,20 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 				&& (entity.getPageNumber() == null || entity.getPageNumber() <= 1)) {
 			pushRankSearchStat(dramaEntities);
 		}
-		List<DramaEntity> pageDramas = GenericityUtil.Page(dramaEntities, entity.getPageNumber(), entity.getPageSize());
 
 		String langue = LanguageContext.getLanguage();
 		List<TheaterSearchItemEntity> items = new ArrayList<>();
-		for (DramaEntity d : pageDramas) {
+		for (DramaEntity d : dramaEntities) {
 			items.add(toSearchItem(d, langue));
 		}
 
 		PageInfo<TheaterSearchItemEntity> page = new PageInfo<>(items);
-		page.setTotal(dramaEntities.size());
+		// 继承 PageHelper 计算出来的分页元数据
+		page.setTotal(basePage.getTotal());
+		page.setPageNum(basePage.getPageNum());
+		page.setPageSize(basePage.getPageSize());
+		page.setPages(basePage.getPages());
+		page.setHasNextPage(basePage.isHasNextPage());
 		if (StringUtils.isNotEmpty(entity.getDramaTitle())) {
 			saveSearchHistory(request, entity.getDramaTitle());
 		}

@@ -1,6 +1,7 @@
 package com.playlet.internal.service.impl;
 
 import com.github.pagehelper.PageInfo;
+import com.github.pagehelper.PageHelper;
 import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
@@ -55,6 +56,8 @@ public class MedalManageServiceImpl implements MedalManageService {
 		if (StringUtils.isEmpty(entity.getLangue())) {
 			entity.setLangue(LanguageContext.getLanguage());
 		}
+		// SQL 层分页
+		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
 		List<MedalConfigEntity> list = medalConfigDao.findAdminList(entity);
 		if (list == null) {
 			list = new ArrayList<>();
@@ -66,9 +69,7 @@ public class MedalManageServiceImpl implements MedalManageService {
 			}
 			signIconUrls(row);
 		}
-		List<MedalConfigEntity> pageList = GenericityUtil.Page(list, entity.getPageNumber(), entity.getPageSize());
-		PageInfo<MedalConfigEntity> page = new PageInfo<>(pageList);
-		page.setTotal(list.size());
+		PageInfo<MedalConfigEntity> page = new PageInfo<>(list);
 		return setResultSuccess(page, I18nUtil.getMessage("base_success"));
 	}
 

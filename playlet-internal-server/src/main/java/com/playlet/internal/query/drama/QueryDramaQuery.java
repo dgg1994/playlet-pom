@@ -20,8 +20,8 @@ public class QueryDramaQuery extends PageQueryHelperEntity{
 	@ApiModelProperty(name = "videoType",value = "视频类型 1横屏 2竖屏",required = false,dataType = "Integer")
 	private Integer videoType;
 	
-	@ApiModelProperty(name = "belongUser",value = "所属人",required = false,dataType = "String")
-	private Integer belongUser;
+	@ApiModelProperty(name = "producerFirm",value = "出品人",required = false,dataType = "String")
+	private Integer producerFirm;
 	
 	@ApiModelProperty(name = "verifyStatus",value = "0草稿1待审2已上架3已下架",required = false,dataType = "Integer")
 	private Integer verifyStatus;

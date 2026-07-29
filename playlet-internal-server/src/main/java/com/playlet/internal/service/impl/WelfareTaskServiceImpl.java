@@ -2,6 +2,7 @@ package com.playlet.internal.service.impl;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import com.playlet.internal.api.response.CoinLedgerItemEntity;
 import com.playlet.internal.base.BaseApiService;
@@ -141,6 +142,8 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 		if (page == null) {
 			page = new PageQueryHelperEntity();
 		}
+		// SQL 层分页
+		PageHelper.startPage(page.getPageNumber(), page.getPageSize());
 		List<UserCoinLedgerEntity> rows;
 		if (StringUtils.isEmpty(bizType)) {
 			rows = userCoinLedgerDao.findByUid(uid);
@@ -150,9 +153,9 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 		if (rows == null) {
 			rows = new ArrayList<>();
 		}
-		List<UserCoinLedgerEntity> pageRows = GenericityUtil.Page(rows, page.getPageNumber(), page.getPageSize());
+		PageInfo<UserCoinLedgerEntity> basePage = new PageInfo<>(rows);
 		List<CoinLedgerItemEntity> items = new ArrayList<>();
-		for (UserCoinLedgerEntity row : pageRows) {
+		for (UserCoinLedgerEntity row : rows) {
 			CoinLedgerItemEntity item = new CoinLedgerItemEntity();
 			item.setId(row.getId());
 			item.setChangeAmt(row.getChangeAmt());
@@ -167,7 +170,12 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 			items.add(item);
 		}
 		PageInfo<CoinLedgerItemEntity> pageInfo = new PageInfo<>(items);
-		pageInfo.setTotal(rows.size());
+		pageInfo.setTotal(basePage.getTotal());
+		pageInfo.setPageNum(basePage.getPageNum());
+		pageInfo.setPageSize(basePage.getPageSize());
+		pageInfo.setPages(basePage.getPages());
+		pageInfo.setHasNextPage(basePage.isHasNextPage());
+		pageInfo.setHasPreviousPage(basePage.isHasPreviousPage());
 		return setResultSuccess(pageInfo, I18nUtil.getMessage("base_success"));
 	}
 
