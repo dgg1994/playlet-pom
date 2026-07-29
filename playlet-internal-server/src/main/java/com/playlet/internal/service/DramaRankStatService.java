@@ -1,7 +1,7 @@
 package com.playlet.internal.service;
 
 /**
- * 榜单日聚合打点（观看/收藏/点赞）
+ * 榜单日聚合打点（观看/收藏/点赞/搜索）
  */
 public interface DramaRankStatService {
 
@@ -13,4 +13,7 @@ public interface DramaRankStatService {
 
 	/** 点赞 +1 / 取消 -1 */
 	void onLike(Integer dramaId, int delta);
+
+	/** 搜索命中 +delta（热搜榜） */
+	void onSearch(Integer dramaId, int delta);
 }

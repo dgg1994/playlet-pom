@@ -16,8 +16,8 @@ import java.util.List;
 @Repository
 public interface DramaDao extends BaseMapper<DramaEntity> {
 
-	/** C端：仅已上架未删除（id 为主键） */
-	@Select("select * from drama where id = #{dramaId} and verify_status = 2 and delete_state = 0 limit 1")
+	/** C端：仅已上架未删除（id 为主键；verify_status=1 对应 VerifyStateEnums.AVAILABLE_NOW） */
+	@Select("select * from drama where id = #{dramaId} and verify_status = 1 and delete_state = 0 limit 1")
 	DramaEntity findOnlineByDramaId(@Param("dramaId") Integer dramaId);
 
 	/** 管理端：按主键查（含草稿，不含软删） */

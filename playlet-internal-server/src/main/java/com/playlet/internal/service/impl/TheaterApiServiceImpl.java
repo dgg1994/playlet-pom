@@ -8,6 +8,7 @@ import com.playlet.internal.api.response.*;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
+import com.playlet.internal.constants.RankBoardGroupConstants;
 import com.playlet.internal.constants.TheaterConstants;
 import com.playlet.internal.dao.drama.*;
 import com.playlet.internal.entity.drama.*;
@@ -189,6 +190,11 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 		}
 		log.info("theater search title={}, tagId={}, tagGroupId={}, hit={}",
 				entity.getDramaTitle(), entity.getTagId(), entity.getTagGroupId(), dramaEntities.size());
+		// 仅标题搜索首页计入热搜；标签筛选/翻页不记，避免刷榜
+		if (StringUtils.isNotEmpty(entity.getDramaTitle()) && !dramaEntities.isEmpty()
+				&& (entity.getPageNumber() == null || entity.getPageNumber() <= 1)) {
+			pushRankSearchStat(dramaEntities);
+		}
 		List<DramaEntity> pageDramas = GenericityUtil.Page(dramaEntities, entity.getPageNumber(), entity.getPageSize());
 
 		String langue = LanguageContext.getLanguage();
@@ -346,6 +352,22 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 			dramaRankStatService.onWatch(dramaId, Math.max(0, deltaSec));
 		} catch (Exception e) {
 			log.warn("rank stat watch failed: {}", e.getMessage());
+		}
+	}
+
+	/** 标题搜索命中记 search_cnt，最多前 K 条 */
+	private void pushRankSearchStat(List<DramaEntity> hits) {
+		int cap = Math.min(hits.size(), RankBoardGroupConstants.HOT_SEARCH_HIT_CAP);
+		for (int i = 0; i < cap; i++) {
+			DramaEntity d = hits.get(i);
+			if (d == null || d.getId() == null) {
+				continue;
+			}
+			try {
+				dramaRankStatService.onSearch(d.getId(), 1);
+			} catch (Exception e) {
+				log.warn("rank stat search failed dramaId={}: {}", d.getId(), e.getMessage());
+			}
 		}
 	}
 

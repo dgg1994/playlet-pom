@@ -29,7 +29,7 @@ public class DramaRankStatServiceImpl implements DramaRankStatService {
 		}
 		int seconds = Math.max(0, deltaSeconds);
 		try {
-			dramaRankStatDailyDao.upsertDelta(today(), dramaId, 1, seconds, 0, 0);
+			dramaRankStatDailyDao.upsertDelta(today(), dramaId, 1, seconds, 0, 0, 0);
 		} catch (Exception e) {
 			log.warn("rank stat onWatch failed dramaId={}: {}", dramaId, e.getMessage());
 		}
@@ -42,7 +42,7 @@ public class DramaRankStatServiceImpl implements DramaRankStatService {
 			return;
 		}
 		try {
-			dramaRankStatDailyDao.upsertDelta(today(), dramaId, 0, 0, delta, 0);
+			dramaRankStatDailyDao.upsertDelta(today(), dramaId, 0, 0, delta, 0, 0);
 		} catch (Exception e) {
 			log.warn("rank stat onCollect failed dramaId={}: {}", dramaId, e.getMessage());
 		}
@@ -55,9 +55,22 @@ public class DramaRankStatServiceImpl implements DramaRankStatService {
 			return;
 		}
 		try {
-			dramaRankStatDailyDao.upsertDelta(today(), dramaId, 0, 0, 0, delta);
+			dramaRankStatDailyDao.upsertDelta(today(), dramaId, 0, 0, 0, delta, 0);
 		} catch (Exception e) {
 			log.warn("rank stat onLike failed dramaId={}: {}", dramaId, e.getMessage());
+		}
+	}
+
+	@Override
+	@Async("asyncExecutor")
+	public void onSearch(Integer dramaId, int delta) {
+		if (dramaId == null || delta <= 0) {
+			return;
+		}
+		try {
+			dramaRankStatDailyDao.upsertDelta(today(), dramaId, 0, 0, 0, 0, delta);
+		} catch (Exception e) {
+			log.warn("rank stat onSearch failed dramaId={}: {}", dramaId, e.getMessage());
 		}
 	}
 

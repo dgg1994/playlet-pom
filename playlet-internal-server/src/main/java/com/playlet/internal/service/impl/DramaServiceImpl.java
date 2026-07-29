@@ -35,6 +35,7 @@ import com.playlet.internal.query.drama.UpdateDramaQuery;
 import com.playlet.internal.response.drama.DramaAssetRes;
 import com.playlet.internal.service.DramaService;
 import com.playlet.internal.service.MediaUrlService;
+import com.playlet.internal.service.RankAlgoService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.QiniuUploadUtils;
@@ -61,6 +62,9 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 
 	@Autowired
 	private MediaUrlService mediaUrlService;
+
+	@Autowired
+	private RankAlgoService rankAlgoService;
 
 	@Override
 	public ResponseBase addDrama(@Valid AddDramaQuery createPay, MultipartFile file) {
@@ -197,6 +201,14 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			}
 			entity.setVerifyStatus(verifyStatus);
 			dramaDao.updateById(entity);
+			// 上架后立即刷新新剧榜，避免等待定时任务
+			if (VerifyStateEnums.AVAILABLE_NOW.getIndex().equals(verifyStatus)) {
+				try {
+					rankAlgoService.refreshNewBoard();
+				} catch (Exception e) {
+					log.warn("refresh new board after shelf failed dramaId={}: {}", id, e.getMessage());
+				}
+			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			e.printStackTrace();
