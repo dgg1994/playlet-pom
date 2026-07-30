@@ -59,6 +59,10 @@ public interface AppUserService {
     ResponseBase update(AppAccountEntity entity, HttpServletRequest request);
 
 	
+    @PostMapping("/bindPush")
+    @ApiOperation(value = "绑定推送设备ID", notes = "上报极光 registrationId", response = ResponseBase.class)
+    ResponseBase bindPush(AppAccountEntity entity, HttpServletRequest request);
+
 	@GetMapping("/signOut")
 	@ApiOperation(value = "退出登录",notes="退出登录",response=ResponseBase.class)
     ResponseBase signOut(HttpServletRequest request);

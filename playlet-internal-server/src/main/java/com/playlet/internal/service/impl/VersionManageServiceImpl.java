@@ -1,7 +1,7 @@
 package com.playlet.internal.service.impl;
 
-import com.github.pagehelper.PageInfo;
 import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
 import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
@@ -10,8 +10,6 @@ import com.playlet.internal.dao.version.AppVersionConfigDao;
 import com.playlet.internal.dao.version.AppVersionI18nDao;
 import com.playlet.internal.entity.version.AppVersionConfigEntity;
 import com.playlet.internal.entity.version.AppVersionI18nEntity;
-import com.playlet.internal.enums.AppVersionChannelEnums;
-import com.playlet.internal.enums.AppVersionPlatformEnums;
 import com.playlet.internal.service.VersionManageService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
@@ -25,9 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import static com.playlet.internal.base.BaseApiService.setResultError;
 import static com.playlet.internal.base.BaseApiService.setResultSuccess;
@@ -58,11 +54,8 @@ public class VersionManageServiceImpl implements VersionManageService {
 		if (list == null) {
 			list = new ArrayList<>();
 		}
-		String language = LanguageContext.getLanguage();
-		for (AppVersionConfigEntity row : list) {
-			if (StringUtils.isEmpty(row.getTitle())) {
-				row.setTitle(appVersionI18nDao.selectTitleByVersionId(row.getId(), language));
-			}
+		for (AppVersionConfigEntity appVersionConfig : list) {
+			appVersionConfig.setI18nList(appVersionI18nDao.findByVersionId(appVersionConfig.getId()));
 		}
 		PageInfo<AppVersionConfigEntity> page = new PageInfo<>(list);
 		return setResultSuccess(page, I18nUtil.getMessage("base_success"));
@@ -86,9 +79,12 @@ public class VersionManageServiceImpl implements VersionManageService {
 	@SysLogAnnotation(module = "版本管理", type = "POST", remark = "新增版本")
 	public ResponseBase save(@RequestBody AppVersionConfigEntity entity) {
 		try {
-			String err = validateSave(entity, true);
-			if (err != null) {
-				return setResultError(err);
+			if (entity != null && !StringUtils.isEmpty(entity.getVersionName())) {
+				Integer code = toVersionCode(entity.getVersionName());
+				if (code == null) {
+					return setResultError(I18nUtil.getMessage("version_param_required"));
+				}
+				entity.setVersionCode(code);
 			}
 			normalizeDefaults(entity, true);
 			GenericityUtil.setDate(entity);
@@ -115,10 +111,6 @@ public class VersionManageServiceImpl implements VersionManageService {
 			if (old == null) {
 				return setResultError(I18nUtil.getMessage("base_data_null"));
 			}
-			String err = validateSave(entity, false);
-			if (err != null) {
-				return setResultError(err);
-			}
 			if (StringUtils.isEmpty(entity.getPlatform())) {
 				entity.setPlatform(old.getPlatform());
 			}
@@ -130,6 +122,12 @@ public class VersionManageServiceImpl implements VersionManageService {
 			}
 			if (StringUtils.isEmpty(entity.getVersionName())) {
 				entity.setVersionName(old.getVersionName());
+			} else {
+				Integer code = toVersionCode(entity.getVersionName());
+				if (code == null) {
+					return setResultError(I18nUtil.getMessage("version_param_required"));
+				}
+				entity.setVersionCode(code);
 			}
 			normalizeDefaults(entity, false);
 			AppVersionConfigEntity conflict = appVersionConfigDao.findByUnique(
@@ -142,10 +140,6 @@ public class VersionManageServiceImpl implements VersionManageService {
 			if (entity.getI18nList() != null) {
 				if (entity.getI18nList().isEmpty()) {
 					return setResultError(I18nUtil.getMessage("version_i18n_required"));
-				}
-				String i18nErr = validateI18nList(entity.getI18nList());
-				if (i18nErr != null) {
-					return setResultError(i18nErr);
 				}
 				appVersionI18nDao.deleteByVersionId(old.getId());
 				saveI18nList(entity);
@@ -200,6 +194,13 @@ public class VersionManageServiceImpl implements VersionManageService {
 		}
 	}
 
+	/**
+	 * 验证新增数据
+	 *
+	 * @param entity
+	 * @param creating
+	 * @return
+	 */
 	private void normalizeDefaults(AppVersionConfigEntity entity, boolean creating) {
 		entity.setPlatform(entity.getPlatform().trim().toLowerCase());
 		if (StringUtils.isEmpty(entity.getChannel())) {
@@ -216,71 +217,30 @@ public class VersionManageServiceImpl implements VersionManageService {
 		}
 	}
 
-	private String validateSave(AppVersionConfigEntity request, boolean creating) {
-		if (request == null) {
-			return I18nUtil.getMessage("base_error");
-		}
-		if (creating) {
-			if (StringUtils.isEmpty(request.getPlatform()) || request.getVersionCode() == null
-					|| StringUtils.isEmpty(request.getVersionName())) {
-				return I18nUtil.getMessage("version_param_required");
-			}
-			if (request.getI18nList() == null || request.getI18nList().isEmpty()) {
-				return I18nUtil.getMessage("version_i18n_required");
-			}
-			String i18nErr = validateI18nList(request.getI18nList());
-			if (i18nErr != null) {
-				return i18nErr;
-			}
-		} else {
-			if (request.getPlatform() != null && StringUtils.isEmpty(request.getPlatform().trim())) {
-				return I18nUtil.getMessage("version_param_required");
-			}
-			if (request.getVersionName() != null && StringUtils.isEmpty(request.getVersionName().trim())) {
-				return I18nUtil.getMessage("version_param_required");
-			}
-		}
-		if (request.getPlatform() != null && !AppVersionPlatformEnums.isValid(request.getPlatform())) {
-			return I18nUtil.getMessage("version_platform_invalid");
-		}
-		if (request.getChannel() != null && !StringUtils.isEmpty(request.getChannel().trim())
-				&& !AppVersionChannelEnums.isValid(request.getChannel())) {
-			return I18nUtil.getMessage("version_channel_invalid");
-		}
-		if (request.getVersionCode() != null && request.getVersionCode() < 1) {
-			return I18nUtil.getMessage("base_error");
-		}
-		if (request.getIsForce() != null && request.getIsForce() != 0 && request.getIsForce() != 1) {
-			return I18nUtil.getMessage("base_error");
-		}
-		if (request.getStatus() != null && request.getStatus() != 0 && request.getStatus() != 1) {
-			return I18nUtil.getMessage("base_error");
-		}
-		if (creating && appVersionConfigDao.findByUnique(
-				request.getPlatform().trim().toLowerCase(),
-				StringUtils.isEmpty(request.getChannel()) ? AppVersionConstants.DEFAULT_CHANNEL
-						: request.getChannel().trim().toLowerCase(),
-				request.getVersionCode()) != null) {
-			return I18nUtil.getMessage("version_code_exist");
-		}
-		return null;
-	}
 
-	private String validateI18nList(List<AppVersionI18nEntity> i18nList) {
-		Set<String> langues = new HashSet<>();
-		for (AppVersionI18nEntity i18n : i18nList) {
-			if (i18n == null || StringUtils.isEmpty(i18n.getLangue())
-					|| StringUtils.isEmpty(i18n.getTitle())
-					|| StringUtils.isEmpty(i18n.getTitle().trim())
-					|| StringUtils.isEmpty(i18n.getContent())
-					|| StringUtils.isEmpty(i18n.getContent().trim())) {
-				return I18nUtil.getMessage("version_i18n_required");
-			}
-			if (!langues.add(i18n.getLangue().trim())) {
-				return I18nUtil.getMessage("base_error");
-			}
+
+	/**
+	 * versionName → versionCode，如 1.3.2 => 10302（major*10000 + minor*100 + patch）
+	 */
+	private Integer toVersionCode(String versionName) {
+		if (StringUtils.isEmpty(versionName)) {
+			return null;
 		}
-		return null;
+		String[] parts = versionName.trim().split("\\.");
+		if (parts.length < 1 || parts.length > 3) {
+			return null;
+		}
+		try {
+			int major = Integer.parseInt(parts[0].trim());
+			int minor = parts.length > 1 ? Integer.parseInt(parts[1].trim()) : 0;
+			int patch = parts.length > 2 ? Integer.parseInt(parts[2].trim()) : 0;
+			if (major < 0 || minor < 0 || patch < 0 || minor > 99 || patch > 99) {
+				return null;
+			}
+			return major * 10000 + minor * 100 + patch;
+		} catch (NumberFormatException e) {
+			return null;
+		}
 	}
 
 	private void saveI18nList(AppVersionConfigEntity entity) throws Exception {

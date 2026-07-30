@@ -31,6 +31,7 @@ import com.playlet.internal.query.drama.CommentGiveLikeQuery;
 import com.playlet.internal.query.drama.ReplyVideoCommentQuery;
 import com.playlet.internal.service.DramaVideoCommentService;
 import com.playlet.internal.service.MedalProgressService;
+import com.playlet.internal.service.PushNotifyService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
 
@@ -55,6 +56,8 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 	private MedalProgressService medalProgressService;
 	@Autowired
 	private UserInteractMessageDao userInteractMessageDao;
+	@Autowired
+	private PushNotifyService pushNotifyService;
 
 	@Override
 	public ResponseBase publish(@Valid @RequestBody AddDramaVideoCommentQuery createPay) {
@@ -182,7 +185,7 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 						commentEntity.getId(),
 						null,
 						commentEntity.getDramaId(),
-						null,
+						commentEntity.getCommentInfo(),
 						"video_comment_like:" + commentEntity.getId() + ":" + giveLikeQuery.getUserId());
 				return setResultSuccess(I18nUtil.getMessage("base_success"));
 			}else {
@@ -257,6 +260,7 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 		try {
 			GenericityUtil.setDate(msg);
 			userInteractMessageDao.insert(msg);
+			pushNotifyService.notifyInteract(toUid, fromUid, type, msg.getId(), dramaId, null);
 		} catch (Exception e) {
 			// 幂等与兜底：不影响主业务
 		}

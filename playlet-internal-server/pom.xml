@@ -42,6 +42,13 @@
 			<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
 
+		<!-- jpush-->
+		<dependency>
+			<groupId>io.github.jpush</groupId>
+			<artifactId>jiguang-sdk</artifactId>
+			<version>5.1.10</version>
+		</dependency>
+
 
 		<!--集成redis-->
 		<dependency>

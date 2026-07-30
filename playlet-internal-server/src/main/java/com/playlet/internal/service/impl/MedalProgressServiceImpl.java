@@ -1,13 +1,16 @@
 package com.playlet.internal.service.impl;
 
 import com.playlet.internal.dao.medal.MedalConfigDao;
+import com.playlet.internal.dao.medal.MedalConfigI18nDao;
 import com.playlet.internal.dao.medal.UserMedalDao;
 import com.playlet.internal.dao.medal.UserMedalUnlockLogDao;
 import com.playlet.internal.entity.medal.MedalConfigEntity;
+import com.playlet.internal.entity.medal.MedalConfigI18nEntity;
 import com.playlet.internal.entity.medal.UserMedalEntity;
 import com.playlet.internal.entity.medal.UserMedalUnlockLogEntity;
 import com.playlet.internal.enums.WelfareActionTypeEnums;
 import com.playlet.internal.service.MedalProgressService;
+import com.playlet.internal.service.PushNotifyService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -26,9 +29,15 @@ public class MedalProgressServiceImpl implements MedalProgressService {
 	@Autowired
 	private MedalConfigDao medalConfigDao;
 	@Autowired
+	private MedalConfigI18nDao medalConfigI18nDao;
+	@Autowired
 	private UserMedalDao userMedalDao;
 	@Autowired
 	private UserMedalUnlockLogDao userMedalUnlockLogDao;
+	@Autowired
+	private PushNotifyService pushNotifyService;
+
+	private static final String FALLBACK_LANGUE = "zh-cn";
 
 	@Override
 	@Transactional(rollbackFor = Exception.class)
@@ -109,6 +118,23 @@ public class MedalProgressServiceImpl implements MedalProgressService {
 		logRow.setUnlockFlag(unlock ? 1 : 0);
 		logRow.setSetTime(now);
 		userMedalUnlockLogDao.insert(logRow);
+
+		if (unlock) {
+			try {
+				String medalName = resolveMedalName(medal.getId());
+				pushNotifyService.notifyMedalUnlock(uid.intValue(), medal.getId(), medalName);
+			} catch (Exception e) {
+				log.warn("medal unlock push failed uid={} medalId={}: {}", uid, medal.getId(), e.getMessage());
+			}
+		}
+	}
+
+	private String resolveMedalName(Integer medalId) {
+		MedalConfigI18nEntity i18n = medalConfigI18nDao.findByMedalIdAndLangue(medalId, FALLBACK_LANGUE);
+		if (i18n != null && !StringUtils.isEmpty(i18n.getMedalName())) {
+			return i18n.getMedalName();
+		}
+		return medalConfigI18nDao.selectNameByMedalId(medalId, FALLBACK_LANGUE);
 	}
 
 	/**

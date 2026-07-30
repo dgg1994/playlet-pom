@@ -10,21 +10,26 @@ import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.account.AppAccountDao;
 import com.playlet.internal.dao.drama.DramaAssetDao;
+import com.playlet.internal.dao.drama.DramaCommentLikeDao;
 import com.playlet.internal.dao.drama.DramaDao;
+import com.playlet.internal.dao.drama.DramaVideoCommentDao;
 import com.playlet.internal.dao.drama.UserInteractMessageDao;
 import com.playlet.internal.dao.drama.UserDramaCollectDao;
 import com.playlet.internal.dao.drama.UserDramaLikeDao;
 import com.playlet.internal.entity.account.AppAccountEntity;
 import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
+import com.playlet.internal.entity.drama.DramaVideoCommentEntity;
 import com.playlet.internal.entity.drama.UserInteractMessageEntity;
 import com.playlet.internal.entity.drama.UserDramaCollectEntity;
 import com.playlet.internal.entity.drama.UserDramaLikeEntity;
 import com.playlet.internal.enums.InteractMessageTypeEnums;
+import com.playlet.internal.enums.PublicEnums;
 import com.playlet.internal.query.drama.InteractMessageQuery;
 import com.playlet.internal.service.DramaRankStatService;
 import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.service.MedalProgressService;
+import com.playlet.internal.service.PushNotifyService;
 import com.playlet.internal.service.UserInteractService;
 import com.playlet.internal.service.WelfareTaskService;
 import com.playlet.internal.enums.WelfareActionTypeEnums;
@@ -79,6 +84,12 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	private MediaUrlService mediaUrlService;
 	@Autowired
 	private MedalProgressService medalProgressService;
+	@Autowired
+	private PushNotifyService pushNotifyService;
+	@Autowired
+	private DramaVideoCommentDao dramaVideoCommentDao;
+	@Autowired
+	private DramaCommentLikeDao dramaCommentLikeDao;
 
 	@Override
 	public ResponseBase collectAdd(@RequestParam Integer dramaId, HttpServletRequest request) {
@@ -248,7 +259,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		PageInfo<UserInteractMessageEntity> basePage = new PageInfo<>(rows);
 		List<TheaterInteractMessageItemEntity> items = new ArrayList<>();
 		for (UserInteractMessageEntity row : rows) {
-			TheaterInteractMessageItemEntity item = toInteractMessageItem(row);
+			TheaterInteractMessageItemEntity item = toInteractMessageItem(row, uid);
 			if (item != null) {
 				items.add(item);
 			}
@@ -550,7 +561,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		return item;
 	}
 
-	private TheaterInteractMessageItemEntity toInteractMessageItem(UserInteractMessageEntity row) {
+	private TheaterInteractMessageItemEntity toInteractMessageItem(UserInteractMessageEntity row, Integer viewerUid) {
 		if (row == null) {
 			return null;
 		}
@@ -563,27 +574,123 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		item.setEpisodeId(row.getEpisodeId());
 		item.setCommentId(row.getCommentId());
 		item.setReplyCommentId(row.getReplyCommentId());
-		item.setContent(row.getContent());
 		item.setIsRead(row.getIsRead());
 		item.setSetTime(row.getSetTime());
+		item.setActionText(resolveActionText(row.getMessageType()));
+		item.setShowActions(isActionableType(row.getMessageType())
+				? PublicEnums.ONE.getIndex() : PublicEnums.ZERO.getIndex());
+		item.setIsLiked(PublicEnums.ZERO.getIndex());
 
 		if (row.getFromUid() != null) {
 			AppAccountEntity account = appAccountDao.findByUid(row.getFromUid());
 			if (account != null) {
-				item.setFromNickname(account.getNickname());
-				item.setFromAvatar(account.getAvatar());
+				item.setFromNickname(StringUtils.isEmpty(account.getNickname())
+						? account.getUserAccount() : account.getNickname());
+				if (StringUtils.isNotEmpty(account.getAvatar())) {
+					item.setFromAvatar(mediaUrlService.sign(account.getAvatar()));
+				}
 			}
 		}
+
 		if (row.getDramaId() != null) {
 			DramaEntity drama = dramaDao.findByDramaId(row.getDramaId());
+			if (drama == null) {
+				drama = dramaDao.selectById(row.getDramaId());
+			}
 			if (drama != null) {
 				item.setDramaTitle(drama.getDramaTitle());
+				if (StringUtils.isNotEmpty(drama.getDramaTitle())) {
+					item.setSourceText(I18nUtil.getMessage("interact.from_drama", drama.getDramaTitle()));
+				}
 				if (StringUtils.isNotEmpty(drama.getCoverUrl())) {
 					item.setDramaCoverUrl(mediaUrlService.sign(drama.getCoverUrl()));
 				}
 			}
 		}
+
+		String type = row.getMessageType();
+		// 回复：content=回复正文，refContent=被回复评论正文（均为文案）
+		if (InteractMessageTypeEnums.REPLY_COMMENT.getCode().equals(type)) {
+			item.setContent(resolveCommentText(row.getCommentId(), row.getContent()));
+			item.setRefContent(resolveCommentText(row.getReplyCommentId(), null));
+			fillCommentLiked(item, row.getCommentId(), viewerUid);
+		}
+		// 一级评论
+		else if (InteractMessageTypeEnums.COMMENT_DRAMA.getCode().equals(type)
+				|| InteractMessageTypeEnums.COMMENT_VIDEO.getCode().equals(type)) {
+			item.setContent(resolveCommentText(row.getCommentId(), row.getContent()));
+			fillCommentLiked(item, row.getCommentId(), viewerUid);
+		}
+		// 赞评论：主文案用 actionText；refContent=被赞评论正文
+		else if (InteractMessageTypeEnums.LIKE_COMMENT.getCode().equals(type)) {
+			item.setContent(null);
+			item.setRefContent(resolveCommentText(row.getCommentId(), row.getContent()));
+		}
+		// 赞作品
+		else if (InteractMessageTypeEnums.LIKE_DRAMA.getCode().equals(type)) {
+			item.setContent(null);
+		}
+
+		item.setDisplayContent(buildDisplayContent(item.getActionText(), item.getContent(), type));
 		return item;
+	}
+
+	/** 优先取评论表正文，保证返回文案而不是 id */
+	private String resolveCommentText(Integer commentId, String fallback) {
+		if (commentId != null) {
+			DramaVideoCommentEntity comment = dramaVideoCommentDao.selectById(commentId);
+			if (comment != null && StringUtils.isNotEmpty(comment.getCommentInfo())) {
+				return comment.getCommentInfo();
+			}
+		}
+		return StringUtils.isEmpty(fallback) ? null : fallback;
+	}
+
+	private String buildDisplayContent(String actionText, String content, String messageType) {
+		if (InteractMessageTypeEnums.REPLY_COMMENT.getCode().equals(messageType)
+				|| InteractMessageTypeEnums.COMMENT_DRAMA.getCode().equals(messageType)
+				|| InteractMessageTypeEnums.COMMENT_VIDEO.getCode().equals(messageType)) {
+			if (StringUtils.isEmpty(content)) {
+				return actionText;
+			}
+			if (StringUtils.isEmpty(actionText)) {
+				return content;
+			}
+			return actionText + "：" + content;
+		}
+		return actionText;
+	}
+
+	private void fillCommentLiked(TheaterInteractMessageItemEntity item, Integer commentId, Integer viewerUid) {
+		if (commentId == null || viewerUid == null) {
+			return;
+		}
+		if (dramaCommentLikeDao.findOne(commentId, viewerUid) != null) {
+			item.setIsLiked(PublicEnums.ONE.getIndex());
+		}
+	}
+
+	private boolean isActionableType(String messageType) {
+		return InteractMessageTypeEnums.REPLY_COMMENT.getCode().equals(messageType)
+				|| InteractMessageTypeEnums.COMMENT_DRAMA.getCode().equals(messageType)
+				|| InteractMessageTypeEnums.COMMENT_VIDEO.getCode().equals(messageType);
+	}
+
+	private String resolveActionText(String messageType) {
+		if (InteractMessageTypeEnums.LIKE_COMMENT.getCode().equals(messageType)) {
+			return I18nUtil.getMessage("interact.like_comment");
+		}
+		if (InteractMessageTypeEnums.LIKE_DRAMA.getCode().equals(messageType)) {
+			return I18nUtil.getMessage("interact.like_drama");
+		}
+		if (InteractMessageTypeEnums.REPLY_COMMENT.getCode().equals(messageType)) {
+			return I18nUtil.getMessage("interact.reply_you");
+		}
+		if (InteractMessageTypeEnums.COMMENT_DRAMA.getCode().equals(messageType)
+				|| InteractMessageTypeEnums.COMMENT_VIDEO.getCode().equals(messageType)) {
+			return I18nUtil.getMessage("interact.comment_you");
+		}
+		return I18nUtil.getMessage("interact.default");
 	}
 
 	private void pushLikeInteractMessage(Integer fromUid, DramaEntity drama, int likeType, String episodeId) {
@@ -606,6 +713,8 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		try {
 			GenericityUtil.setDate(msg);
 			userInteractMessageDao.insert(msg);
+			pushNotifyService.notifyInteract(toUid, fromUid, msg.getMessageType(),
+					msg.getId(), msg.getDramaId(), msg.getEpisodeId());
 		} catch (Exception e) {
 			log.warn("insert like interact message failed fromUid={} dramaId={}: {}",
 					fromUid, drama.getId(), e.getMessage());

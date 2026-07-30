@@ -404,6 +404,19 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 
 
 	@Override
+	public ResponseBase bindPush(@RequestBody AppAccountEntity entity, HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		if (entity == null || StringUtils.isEmpty(entity.getRegistrationId())) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		appAccountDao.updateRegistrationId(uid, entity.getRegistrationId().trim());
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
 	public ResponseBase signOut(HttpServletRequest request) {
 		try {
 			UsernamePasswordAuthenticationToken token = JWTAuthenticationFilter.getAuthentication(request);

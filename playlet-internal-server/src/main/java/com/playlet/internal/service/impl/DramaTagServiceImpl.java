@@ -47,50 +47,53 @@ public class DramaTagServiceImpl implements DramaTagService {
     @Override
     @SysLogAnnotation(module = "短剧标签", type = "POST", remark = "标签列表")
     public ResponseBase findList(@RequestBody TagEntity entity) {
-        if (entity == null) {
-            entity = new TagEntity();
-        }
-        // 按 groupId 分页；多语言字段平铺为 zh-cn / en 等
-        PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
-        List<TagEntity> groupRows = tagDao.findAdminGroupList(entity);
-
-        Map<String, List<TagEntity>> tagsByGroup = new LinkedHashMap<>();
-        if (!groupRows.isEmpty()) {
-            //获取groupId的集合
-            List<String> groupIds = groupRows.stream()
-                    .map(TagEntity::getGroupId)
-                    .filter(gid -> !StringUtils.isEmpty(gid))
-                    .collect(Collectors.toList());
-            if (!groupIds.isEmpty()) {
-                List<TagEntity> allTags = tagDao.findByGroupIds(groupIds);
-                if (allTags != null) {
-                    for (TagEntity tag : allTags) {
-                        tagsByGroup.computeIfAbsent(tag.getGroupId(), k -> new ArrayList<>()).add(tag);
+        try {
+            if (entity == null) {
+                entity = new TagEntity();
+            }
+            PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
+            List<TagEntity> list = tagDao.findAdminGroupList(entity);
+            List<TagGroupRespEntity> rows = new ArrayList<>();
+            if (list != null && list.size() > 0) {
+                List<String> groupIds = list.stream()
+                        .map(TagEntity::getGroupId)
+                        .filter(gid -> !StringUtils.isEmpty(gid))
+                        .collect(Collectors.toList());
+                Map<String, List<TagEntity>> tagsByGroup = new LinkedHashMap<>();
+                if (!groupIds.isEmpty()) {
+                    List<TagEntity> allTags = tagDao.findByGroupIds(groupIds);
+                    if (allTags != null) {
+                        for (TagEntity tag : allTags) {
+                            tagsByGroup.computeIfAbsent(tag.getGroupId(), k -> new ArrayList<>()).add(tag);
+                        }
                     }
                 }
-            }
-        }
-
-        List<TagGroupRespEntity> rows = new ArrayList<>();
-        for (TagEntity group : groupRows) {
-            TagGroupRespEntity row = new TagGroupRespEntity();
-            row.setGroupId(group.getGroupId());
-            row.setSortWeight(group.getSortWeight());
-            row.setStatus(group.getStatus());
-            row.setSetTime(group.getSetTime());
-            row.setGmtModified(group.getGmtModified());
-            List<TagEntity> tags = tagsByGroup.get(group.getGroupId());
-            if (tags != null) {
-                for (TagEntity tag : tags) {
-                    if (!StringUtils.isEmpty(tag.getLangue())) {
-                        row.putLangName(tag.getLangue(), tag.getTagName());
+                for (TagEntity group : list) {
+                    TagGroupRespEntity row = new TagGroupRespEntity();
+                    row.setGroupId(group.getGroupId());
+                    row.setSortWeight(group.getSortWeight());
+                    row.setStatus(group.getStatus());
+                    row.setSetTime(group.getSetTime());
+                    row.setGmtModified(group.getGmtModified());
+                    List<TagEntity> tags = tagsByGroup.get(group.getGroupId());
+                    if (tags != null) {
+                        for (TagEntity tag : tags) {
+                            if (!StringUtils.isEmpty(tag.getLangue())) {
+                                row.putLangName(tag.getLangue(), tag.getTagName());
+                            }
+                        }
                     }
+                    rows.add(row);
                 }
             }
-            rows.add(row);
+            PageInfo<TagEntity> page = new PageInfo<>(list);
+            PageInfo<TagGroupRespEntity> info = new PageInfo<>(rows);
+            info.setTotal(page.getTotal());
+            return setResultSuccess(info, I18nUtil.getMessage("base_success"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException();
         }
-        PageInfo<TagGroupRespEntity> result = new PageInfo<>(rows);
-        return setResultSuccess(result, I18nUtil.getMessage("base_success"));
     }
 
     @Override

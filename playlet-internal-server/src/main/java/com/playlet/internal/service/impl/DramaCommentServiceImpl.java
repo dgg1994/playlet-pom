@@ -33,6 +33,7 @@ import com.playlet.internal.query.drama.CommentGiveLikeQuery;
 import com.playlet.internal.query.drama.ReplyDramaCommentQuery;
 import com.playlet.internal.service.DramaCommentService;
 import com.playlet.internal.service.MedalProgressService;
+import com.playlet.internal.service.PushNotifyService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
 
@@ -54,6 +55,8 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 	private MedalProgressService medalProgressService;
 	@Autowired
 	private UserInteractMessageDao userInteractMessageDao;
+	@Autowired
+	private PushNotifyService pushNotifyService;
 
 	@Override
 	public ResponseBase publish(@Valid @RequestBody AddDramaCommentQuery createPay) {
@@ -188,7 +191,7 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 						commentEntity.getId(),
 						null,
 						commentEntity.getDramaId(),
-						null,
+						commentEntity.getCommentInfo(),
 						"comment_like:" + commentEntity.getId() + ":" + giveLikeQuery.getUserId());
 			} else {
 				// 未点赞则幂等成功
@@ -287,6 +290,7 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 		try {
 			GenericityUtil.setDate(msg);
 			userInteractMessageDao.insert(msg);
+			pushNotifyService.notifyInteract(toUid, fromUid, type, msg.getId(), dramaId, null);
 		} catch (Exception e) {
 			// 幂等与兜底：不影响主业务
 		}
