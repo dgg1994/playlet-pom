@@ -66,7 +66,10 @@ public interface AppUserService {
 	@PostMapping("/forgetPassword")
 	@ApiOperation(value = "忘记密码",notes="忘记密码",response=ResponseBase.class)
     ResponseBase forgetPasswrod(UpdatePwdEntity entity);
-	
 
+
+    @GetMapping("/logout")
+    @ApiOperation(value = "注销账户",notes="注销账户",response=ResponseBase.class)
+    ResponseBase logout(Integer uid,HttpServletRequest request);
 
 }

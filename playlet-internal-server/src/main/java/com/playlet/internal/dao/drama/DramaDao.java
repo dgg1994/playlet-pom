@@ -67,7 +67,7 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 	        + "</if>"
 	        + "<if test='finishedState != null'> and finished_state = #{finishedState}</if>"
 	        + "<if test='videoType != null'> and video_type = #{videoType}</if>"
-	        + "<if test='producerFirm != null'> and belong_user = #{producerFirm}</if>"
+	        + "<if test='producerFirm != null'> and producer_firm = #{producerFirm}</if>"
 	        + "<if test='deleteState != null'> and delete_state = #{deleteState}</if>"
 	        + "<if test='verifyStatus != null'> and verify_status = #{verifyStatus}</if>"
 	        + "<if test='recommendedCarousel != null'> and recommended_carousel = #{recommendedCarousel}</if>"

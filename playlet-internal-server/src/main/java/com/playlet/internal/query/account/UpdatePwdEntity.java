@@ -12,7 +12,7 @@ public class UpdatePwdEntity {
 
 	@NotBlank(message = "用户uid不能为空")
 	@ApiModelProperty(name = "uid",value = "用户uid",required = true,dataType = "String")
-    private String uid;
+    private Integer uid;
 	
 	@ApiModelProperty(name = "formerPassword",value = "原密码",required = false,dataType = "String")
     private String formerPassword;

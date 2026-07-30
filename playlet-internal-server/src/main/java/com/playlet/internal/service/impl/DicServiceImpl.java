@@ -64,5 +64,12 @@ public class DicServiceImpl extends BaseApiService implements DicService{
 		return setResultSuccess(list, I18nUtil.getMessage("base_success"));
 	}
 
+	@Override
+	@SysLogAnnotation(module = "字典管理", type = "get", remark = "查询协议类型")
+	public ResponseBase findProtocolType() {
+		List<DicEntity> list = SysConfigTypeEnums.getProtocolType();
+		return setResultSuccess(list, I18nUtil.getMessage("base_success"));
+	}
+
 }
 

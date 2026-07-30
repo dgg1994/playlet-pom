@@ -1,9 +1,12 @@
 package com.playlet.internal.service.impl;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
+import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -143,22 +146,32 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
         try {
             Integer uid = AppTokenUtil.resolveUid(request);
             List<DramaAssetRes> list = dramaAssetDao.findByDramaId(id);
-            if (list != null && list.size() > 0) {
-                for (int i = 0; i < list.size(); i++) {
-                    if (uid != null) {
-                        UserDramaLikeEntity dramaLikeEntity = userDramaLikeDao.findByVoideId(list.get(i).getId(),uid);
-                        if (dramaLikeEntity != null) {
-                            list.get(i).setIsLike(PublicEnums.ONE.getIndex());
-                        }
-                        UserDramaCollectEntity collectEntity = userDramaCollectDao.findByVoideId(list.get(i).getId(),uid);
-                        if (collectEntity != null) {
-                            list.get(i).setIsCollect(PublicEnums.ONE.getIndex());
-                        }
-                    } else {
-                        list.get(i).setIsLike(PublicEnums.ZERO.getIndex());
-                        list.get(i).setIsCollect(PublicEnums.ZERO.getIndex());
-                    }
+            if (list == null || list.isEmpty()) {
+                return setResultSuccess(list, I18nUtil.getMessage("base_success"));
+            }
+            if (uid == null) {
+                for (DramaAssetRes item : list) {
+                    item.setIsLike(PublicEnums.ZERO.getIndex());
+                    item.setIsCollect(PublicEnums.ZERO.getIndex());
                 }
+                return setResultSuccess(list, I18nUtil.getMessage("base_success"));
+            }
+            // 收藏是整剧维度，只查一次
+            Integer isCollect = userDramaCollectDao.findByUidAndDrama(uid, id) != null
+                    ? PublicEnums.ONE.getIndex() : PublicEnums.ZERO.getIndex();
+            // 点赞按集批量查，避免 N+1
+            List<String> episodeIds = list.stream()
+                    .map(item -> String.valueOf(item.getId()))
+                    .collect(Collectors.toList());
+            List<UserDramaLikeEntity> likedRows = userDramaLikeDao.findByUidAndEpisodeIds(uid, episodeIds);
+            Set<String> likedEpisodeIds = likedRows == null ? Collections.emptySet()
+                    : likedRows.stream()
+                    .map(UserDramaLikeEntity::getEpisodeId)
+                    .collect(Collectors.toSet());
+            for (DramaAssetRes item : list) {
+                item.setIsLike(likedEpisodeIds.contains(String.valueOf(item.getId()))
+                        ? PublicEnums.ONE.getIndex() : PublicEnums.ZERO.getIndex());
+                item.setIsCollect(isCollect);
             }
             return setResultSuccess(list, I18nUtil.getMessage("base_success"));
         } catch (Exception e) {

@@ -154,6 +154,7 @@ public enum SysConfigTypeEnums {
 				DicEntity dicEntity = new DicEntity();
 				dicEntity.setId(typeEnum.getIndex());
 				dicEntity.setName(typeEnum.getLable());
+				dicEntity.setLable(typeEnum.getType().toString());
 				list.add(dicEntity);
 			}
 		}

@@ -1,5 +1,6 @@
 package com.playlet.internal.service;
 
+import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
@@ -39,5 +40,9 @@ public interface DicService {
 	@GetMapping("/findWelfareCycleType")
 	@Operation(summary = "查询福利任务周期类型", description = "查询福利任务周期类型")
 	ResponseBase findWelfareCycleType();
+
+	@GetMapping("/findProtocolType")
+	@ApiOperation(value = "查询协议类型",notes = "查询协议类型",response = ResponseBase.class)
+	ResponseBase findProtocolType();
 }
 

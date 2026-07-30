@@ -56,4 +56,11 @@ public interface UserDramaLikeDao extends BaseMapper<UserDramaLikeEntity> {
 
 	@Select("select * from user_drama_like where episode_id = #{voideId} and uid = #{uid}")
 	UserDramaLikeEntity findByVoideId(@Param("voideId") Integer voideId,@Param("uid") Integer uid);
+
+	@Select("<script>"
+			+ "select * from user_drama_like where uid = #{uid} and episode_id in "
+			+ "<foreach collection='episodeIds' item='eid' open='(' separator=',' close=')'>#{eid}</foreach>"
+			+ "</script>")
+	List<UserDramaLikeEntity> findByUidAndEpisodeIds(@Param("uid") Integer uid,
+			@Param("episodeIds") List<String> episodeIds);
 }

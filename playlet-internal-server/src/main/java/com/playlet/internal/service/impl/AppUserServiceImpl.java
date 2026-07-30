@@ -1,4 +1,5 @@
 package com.playlet.internal.service.impl;
+import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.api.request.UserRegisterEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
@@ -381,7 +382,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		}
 		// 校验原密码
 		if (StringUtils.isNotEmpty(account.getUserPassword())
-				&& !MD5Util.digest(StringUtils.trim(entity.getFormerPassword())).equals(account.getUserPassword())) {
+				&& !DigestUtils.md5DigestAsHex((entity.getFormerPassword()).getBytes()).equals(account.getUserPassword())) {
 			return setResultError(I18nUtil.getMessage("old_password_error"));
 		}
 		account.setUserPassword(DigestUtils.md5DigestAsHex((entity.getNewPassword()).getBytes()));
@@ -443,6 +444,29 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
+	@Override
+	@SysLogAnnotation(module = "app用户管理", type = "get", remark = "注销账户")
+	public ResponseBase logout(Integer uid,HttpServletRequest request) {
+		try {
+			UsernamePasswordAuthenticationToken token = JWTAuthenticationFilter.getAuthentication(request);
+			String username = token.getName();
+			AppAccountEntity userEntity = appAccountDao.findByEmail(username);
+			if(userEntity != null ) {
+				if(!uid.equals(userEntity.getId())) {
+					return setResultError(I18nUtil.getMessage("purview_error_null"));
+				}
+				userEntity.setUserState(UserStateEnums.LOGOUT.getIndex());
+				appAccountDao.updateById(userEntity);
+				redisUtil.del(Constants.APP_PACKAGE_NAME + userEntity.getUserEmail());
+				return setResultSuccess(I18nUtil.getMessage("base_success"));
+			}else {
+				return setResultError(I18nUtil.getMessage("base_error"));
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException();
+		}
+	}
 
 	// ==================== 私有工具方法 ====================
 

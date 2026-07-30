@@ -1,6 +1,7 @@
 package com.playlet.internal.service;
 
 
+import com.playlet.internal.api.request.SysInfoAddEntity;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.entity.system.SysInfoEntity;
 import io.swagger.annotations.Api;
@@ -31,14 +32,14 @@ public interface SysInfoService {
 
 	@PostMapping("/add")
 	@ApiOperation(value = "新增配置",notes = "新增配置",response = ResponseBase.class)
-	ResponseBase add(SysInfoEntity entity);
+	ResponseBase add(SysInfoAddEntity entity);
 
 	@PostMapping("/update")
-	@ApiOperation(value = "更新配置",notes = "更新配置",response = ResponseBase.class)
-	ResponseBase update(SysInfoEntity entity);
+	@ApiOperation(value = "更新配置",notes = "按 configType 批量更新多语言配置",response = ResponseBase.class)
+	ResponseBase update(SysInfoAddEntity entity);
 
-    @GetMapping("/findConfigInfo")
-	@ApiOperation(value = "查询配置（1：用户协议；2：隐私协议；3：关于我们；4：联系我们；5：客服；）",notes = "查询配置",response = ResponseBase.class)
-    ResponseBase findConfigInfo(Integer configType);
-	
+	@PostMapping("/changeStatus")
+	@ApiOperation(value = "启停配置", notes = "启停配置（1正常 2停用）", response = ResponseBase.class)
+	ResponseBase changeStatus(SysInfoEntity entity);
+
 }
