@@ -17,12 +17,15 @@ import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.dao.drama.DramaCommentLikeDao;
 import com.playlet.internal.dao.drama.DramaDao;
+import com.playlet.internal.dao.drama.UserInteractMessageDao;
 import com.playlet.internal.dao.drama.DramaVideoCommentDao;
 import com.playlet.internal.entity.drama.DramaCommentLikeEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.DramaVideoCommentEntity;
+import com.playlet.internal.entity.drama.UserInteractMessageEntity;
 import com.playlet.internal.enums.CommentTypeEnums;
 import com.playlet.internal.enums.DeleteStateEnum;
+import com.playlet.internal.enums.InteractMessageTypeEnums;
 import com.playlet.internal.enums.PublicEnums;
 import com.playlet.internal.enums.WelfareActionTypeEnums;
 import com.playlet.internal.query.drama.AddDramaCommentQuery;
@@ -49,6 +52,8 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 	private DramaCommentLikeDao dramaCommentLikeDao;
 	@Autowired
 	private MedalProgressService medalProgressService;
+	@Autowired
+	private UserInteractMessageDao userInteractMessageDao;
 
 	@Override
 	public ResponseBase publish(@Valid @RequestBody AddDramaCommentQuery createPay) {
@@ -83,6 +88,15 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 			GenericityUtil.setDate(entity);
 			dramaVideoCommentDao.insert(entity);
 			addDiscussScore(entity);
+			pushInteractMessage(
+					createPay.getUserId(),
+					drama.getBelongUser(),
+					InteractMessageTypeEnums.COMMENT_DRAMA.getCode(),
+					entity.getId(),
+					null,
+					entity.getDramaId(),
+					entity.getCommentInfo(),
+					"comment:" + entity.getId());
 			refreshDramaScoreNum(createPay.getDramaId());
 			try {
 				medalProgressService.onAction(createPay.getUserId(), WelfareActionTypeEnums.COMMENT, 1,
@@ -117,6 +131,15 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 			parent.setReplyCount((parent.getReplyCount() == null ? 0 : parent.getReplyCount()) + 1);
 			dramaVideoCommentDao.updateById(parent);
 			addDiscussScore(entity);
+			pushInteractMessage(
+					createPay.getUserId(),
+					parent.getUserId(),
+					InteractMessageTypeEnums.REPLY_COMMENT.getCode(),
+					entity.getId(),
+					parent.getId(),
+					entity.getDramaId(),
+					entity.getCommentInfo(),
+					"reply:" + entity.getId());
 			try {
 				medalProgressService.onAction(createPay.getUserId(), WelfareActionTypeEnums.COMMENT, 1,
 						String.valueOf(entity.getId()));
@@ -158,6 +181,15 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 				dramaCommentLikeDao.insert(like);
 				commentEntity.setLikeCount((commentEntity.getLikeCount() == null ? 0 : commentEntity.getLikeCount()) + 1);
 				dramaVideoCommentDao.updateById(commentEntity);
+				pushInteractMessage(
+						giveLikeQuery.getUserId(),
+						commentEntity.getUserId(),
+						InteractMessageTypeEnums.LIKE_COMMENT.getCode(),
+						commentEntity.getId(),
+						null,
+						commentEntity.getDramaId(),
+						null,
+						"comment_like:" + commentEntity.getId() + ":" + giveLikeQuery.getUserId());
 			} else {
 				// 未点赞则幂等成功
 				if (exist == null) {
@@ -223,5 +255,40 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 		}
 		dramaEntity.setScoreNum(avg);
 		dramaDao.updateById(dramaEntity);
+	}
+
+	/**
+	 * 推送消息
+	 * @param fromUid 发送用户
+	 * @param toUid 接收用户
+	 * @param type 消息类型
+	 * @param commentId 评论id
+	 * @param replyCommentId 回复评论id
+	 * @param dramaId 短剧id
+	 * @param content 消息内容
+	 * @param bizId 业务id
+	 */
+	private void pushInteractMessage(Integer fromUid, Integer toUid, String type,
+			Integer commentId, Integer replyCommentId, Integer dramaId, String content, String bizId) {
+		if (fromUid == null || toUid == null || fromUid.equals(toUid)) {
+			return;
+		}
+		UserInteractMessageEntity msg = new UserInteractMessageEntity();
+		msg.setToUid(toUid);
+		msg.setFromUid(fromUid);
+		msg.setMessageType(type);
+		msg.setCommentId(commentId);
+		msg.setReplyCommentId(replyCommentId);
+		msg.setDramaId(dramaId);
+		msg.setContent(content);
+		msg.setBizId(bizId);
+		msg.setIsRead(0);
+		msg.setStatus(1);
+		try {
+			GenericityUtil.setDate(msg);
+			userInteractMessageDao.insert(msg);
+		} catch (Exception e) {
+			// 幂等与兜底：不影响主业务
+		}
 	}
 }

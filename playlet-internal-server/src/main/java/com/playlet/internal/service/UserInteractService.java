@@ -3,6 +3,7 @@ package com.playlet.internal.service;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.entity.drama.UserDramaCollectEntity;
 import com.playlet.internal.entity.drama.UserDramaLikeEntity;
+import com.playlet.internal.query.drama.InteractMessageQuery;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
@@ -72,6 +73,29 @@ public interface UserInteractService {
 	})
 	@ApiOperation(value = "我的点赞列表", notes = "需登录；含整剧/单集点赞")
 	ResponseBase likeList(UserDramaLikeEntity entity, HttpServletRequest request);
+
+	@GetMapping("/interact/message/list")
+	@ApiImplicitParams({
+			@ApiImplicitParam(name = "pageNumber", value = "页码", required = false, dataType = "int", paramType = "query"),
+			@ApiImplicitParam(name = "pageSize", value = "每页", required = false, dataType = "int", paramType = "query"),
+			@ApiImplicitParam(name = "messageType", value = "消息类型", required = false, dataType = "string", paramType = "query"),
+			@ApiImplicitParam(name = "isRead", value = "是否已读 0未读1已读", required = false, dataType = "int", paramType = "query")
+	})
+	@ApiOperation(value = "互动消息列表", notes = "需登录；谁给我点赞/评论")
+	ResponseBase interactMessageList(InteractMessageQuery entity, HttpServletRequest request);
+
+	@PostMapping("/interact/message/read")
+	@ApiImplicitParam(name = "id", value = "消息ID", required = true, dataType = "long", paramType = "query")
+	@ApiOperation(value = "互动消息单条已读", notes = "需登录")
+	ResponseBase interactMessageRead(Long id, HttpServletRequest request);
+
+	@PostMapping("/interact/message/read/all")
+	@ApiOperation(value = "互动消息全部已读", notes = "需登录")
+	ResponseBase interactMessageReadAll(HttpServletRequest request);
+
+	@GetMapping("/interact/message/unread/count")
+	@ApiOperation(value = "互动消息未读数", notes = "需登录")
+	ResponseBase interactMessageUnreadCount(HttpServletRequest request);
 
 	@PostMapping("/share/drama")
 	@ApiImplicitParam(name = "dramaId", value = "短剧ID", required = true, dataType = "int", paramType = "query")

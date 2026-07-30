@@ -2,19 +2,26 @@ package com.playlet.internal.service.impl;
 
 import com.github.pagehelper.PageInfo;
 import com.github.pagehelper.PageHelper;
+import com.playlet.internal.api.response.TheaterInteractMessageItemEntity;
 import com.playlet.internal.api.response.TheaterCollectItemEntity;
 import com.playlet.internal.api.response.TheaterLikeItemEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
+import com.playlet.internal.dao.account.AppAccountDao;
 import com.playlet.internal.dao.drama.DramaAssetDao;
 import com.playlet.internal.dao.drama.DramaDao;
+import com.playlet.internal.dao.drama.UserInteractMessageDao;
 import com.playlet.internal.dao.drama.UserDramaCollectDao;
 import com.playlet.internal.dao.drama.UserDramaLikeDao;
+import com.playlet.internal.entity.account.AppAccountEntity;
 import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
+import com.playlet.internal.entity.drama.UserInteractMessageEntity;
 import com.playlet.internal.entity.drama.UserDramaCollectEntity;
 import com.playlet.internal.entity.drama.UserDramaLikeEntity;
+import com.playlet.internal.enums.InteractMessageTypeEnums;
+import com.playlet.internal.query.drama.InteractMessageQuery;
 import com.playlet.internal.service.DramaRankStatService;
 import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.service.MedalProgressService;
@@ -53,7 +60,11 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	@Autowired
 	private UserDramaCollectDao userDramaCollectDao;
 	@Autowired
+	private UserInteractMessageDao userInteractMessageDao;
+	@Autowired
 	private UserDramaLikeDao userDramaLikeDao;
+	@Autowired
+	private AppAccountDao appAccountDao;
 	@Autowired
 	private DramaDao dramaDao;
 	@Autowired
@@ -220,6 +231,72 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	}
 
 	@Override
+	public ResponseBase interactMessageList(InteractMessageQuery entity, HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		if (entity == null) {
+			entity = new InteractMessageQuery();
+		}
+		entity.setToUid(uid);
+		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
+		List<UserInteractMessageEntity> rows = userInteractMessageDao.findByToUid(entity);
+		if (rows == null) {
+			rows = new ArrayList<>();
+		}
+		PageInfo<UserInteractMessageEntity> basePage = new PageInfo<>(rows);
+		List<TheaterInteractMessageItemEntity> items = new ArrayList<>();
+		for (UserInteractMessageEntity row : rows) {
+			TheaterInteractMessageItemEntity item = toInteractMessageItem(row);
+			if (item != null) {
+				items.add(item);
+			}
+		}
+		PageInfo<TheaterInteractMessageItemEntity> page = new PageInfo<>(items);
+		page.setTotal(basePage.getTotal());
+		page.setPageNum(basePage.getPageNum());
+		page.setPageSize(basePage.getPageSize());
+		page.setPages(basePage.getPages());
+		page.setHasNextPage(basePage.isHasNextPage());
+		page.setHasPreviousPage(basePage.isHasPreviousPage());
+		return setResultSuccess(page, I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	public ResponseBase interactMessageRead(@RequestParam Long id, HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		if (id == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		userInteractMessageDao.readOne(id, uid);
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	public ResponseBase interactMessageReadAll(HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		userInteractMessageDao.readAll(uid);
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	public ResponseBase interactMessageUnreadCount(HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		Integer count = userInteractMessageDao.countUnread(uid);
+		return setResultSuccess(count == null ? 0 : count, I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
 	public ResponseBase shareDrama(@RequestParam Integer dramaId, HttpServletRequest request) {
         try {
         	Integer uid = AppTokenUtil.resolveUid(request);
@@ -280,7 +357,8 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		if (dramaId == null) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
-		if (dramaDao.findByDramaId(dramaId) == null) {
+		DramaEntity drama = dramaDao.findByDramaId(dramaId);
+		if (drama == null) {
 			return setResultError(I18nUtil.getMessage("drama_null"));
 		}
 		String ep = episodeId == null ? "" : episodeId;
@@ -308,6 +386,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 			if (assetId != null) {
 				dramaAssetDao.incrLikeScore(assetId);
 			}
+			pushLikeInteractMessage(uid, drama, likeType, ep);
 			cacheLike(uid, dramaId, likeType, ep, true);
 			try {
 				medalProgressService.onAction(uid, WelfareActionTypeEnums.LIKE, 1,
@@ -469,5 +548,67 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		item.setEpisodeId(StringUtils.isEmpty(row.getEpisodeId()) ? null : row.getEpisodeId());
 		item.setSetTime(row.getSetTime());
 		return item;
+	}
+
+	private TheaterInteractMessageItemEntity toInteractMessageItem(UserInteractMessageEntity row) {
+		if (row == null) {
+			return null;
+		}
+		TheaterInteractMessageItemEntity item = new TheaterInteractMessageItemEntity();
+		item.setId(row.getId());
+		item.setMessageType(row.getMessageType());
+		item.setToUid(row.getToUid());
+		item.setFromUid(row.getFromUid());
+		item.setDramaId(row.getDramaId());
+		item.setEpisodeId(row.getEpisodeId());
+		item.setCommentId(row.getCommentId());
+		item.setReplyCommentId(row.getReplyCommentId());
+		item.setContent(row.getContent());
+		item.setIsRead(row.getIsRead());
+		item.setSetTime(row.getSetTime());
+
+		if (row.getFromUid() != null) {
+			AppAccountEntity account = appAccountDao.findByUid(row.getFromUid());
+			if (account != null) {
+				item.setFromNickname(account.getNickname());
+				item.setFromAvatar(account.getAvatar());
+			}
+		}
+		if (row.getDramaId() != null) {
+			DramaEntity drama = dramaDao.findByDramaId(row.getDramaId());
+			if (drama != null) {
+				item.setDramaTitle(drama.getDramaTitle());
+				if (StringUtils.isNotEmpty(drama.getCoverUrl())) {
+					item.setDramaCoverUrl(mediaUrlService.sign(drama.getCoverUrl()));
+				}
+			}
+		}
+		return item;
+	}
+
+	private void pushLikeInteractMessage(Integer fromUid, DramaEntity drama, int likeType, String episodeId) {
+		if (fromUid == null || drama == null || drama.getBelongUser() == null) {
+			return;
+		}
+		Integer toUid = drama.getBelongUser();
+		if (fromUid.equals(toUid)) {
+			return;
+		}
+		UserInteractMessageEntity msg = new UserInteractMessageEntity();
+		msg.setToUid(toUid);
+		msg.setFromUid(fromUid);
+		msg.setMessageType(InteractMessageTypeEnums.LIKE_DRAMA.getCode());
+		msg.setDramaId(drama.getId());
+		msg.setEpisodeId(likeType == LIKE_TYPE_EPISODE ? episodeId : null);
+		msg.setIsRead(0);
+		msg.setStatus(1);
+		msg.setBizId(likeType + ":" + fromUid + ":" + drama.getId() + ":" + (episodeId == null ? "" : episodeId));
+		try {
+			GenericityUtil.setDate(msg);
+			userInteractMessageDao.insert(msg);
+		} catch (Exception e) {
+			log.warn("insert like interact message failed fromUid={} dramaId={}: {}",
+					fromUid, drama.getId(), e.getMessage());
+		}
 	}
 }

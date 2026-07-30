@@ -15,12 +15,15 @@ import com.playlet.internal.dao.drama.DramaAssetDao;
 import com.playlet.internal.dao.drama.DramaCommentLikeDao;
 import com.playlet.internal.dao.drama.DramaDao;
 import com.playlet.internal.dao.drama.DramaVideoCommentDao;
+import com.playlet.internal.dao.drama.UserInteractMessageDao;
 import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaCommentLikeEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.DramaVideoCommentEntity;
+import com.playlet.internal.entity.drama.UserInteractMessageEntity;
 import com.playlet.internal.enums.CommentTypeEnums;
 import com.playlet.internal.enums.DeleteStateEnum;
+import com.playlet.internal.enums.InteractMessageTypeEnums;
 import com.playlet.internal.enums.PublicEnums;
 import com.playlet.internal.enums.WelfareActionTypeEnums;
 import com.playlet.internal.query.drama.AddDramaVideoCommentQuery;
@@ -50,6 +53,8 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 
 	@Autowired
 	private MedalProgressService medalProgressService;
+	@Autowired
+	private UserInteractMessageDao userInteractMessageDao;
 
 	@Override
 	public ResponseBase publish(@Valid @RequestBody AddDramaVideoCommentQuery createPay) {
@@ -64,6 +69,16 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 			dramaVideoCommentDao.insert(entity);
 			//视频、短剧添加评论量
 			addDiscussScore(entity);
+			DramaEntity drama = dramaDao.selectById(entity.getDramaId());
+			pushInteractMessage(
+					createPay.getUserId(),
+					drama == null ? null : drama.getBelongUser(),
+					InteractMessageTypeEnums.COMMENT_VIDEO.getCode(),
+					entity.getId(),
+					null,
+					entity.getDramaId(),
+					entity.getCommentInfo(),
+					"video_comment:" + entity.getId());
 			try {
 				medalProgressService.onAction(createPay.getUserId(), WelfareActionTypeEnums.COMMENT, 1,
 						String.valueOf(entity.getId()));
@@ -94,6 +109,15 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 			}
 			//视频、短剧添加评论量
 			addDiscussScore(entity);
+			pushInteractMessage(
+					createPay.getUserId(),
+					commentEntity == null ? null : commentEntity.getUserId(),
+					InteractMessageTypeEnums.REPLY_COMMENT.getCode(),
+					entity.getId(),
+					commentEntity == null ? null : commentEntity.getId(),
+					entity.getDramaId(),
+					entity.getCommentInfo(),
+					"video_reply:" + entity.getId());
 			try {
 				medalProgressService.onAction(createPay.getUserId(), WelfareActionTypeEnums.COMMENT, 1,
 						String.valueOf(entity.getId()));
@@ -151,6 +175,15 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 				dramaCommentLikeDao.insert(commentLikeEntity);
 				commentEntity.setLikeCount((commentEntity.getLikeCount() == null ? 0 : commentEntity.getLikeCount()) + 1);
 				dramaVideoCommentDao.updateById(commentEntity);
+				pushInteractMessage(
+						giveLikeQuery.getUserId(),
+						commentEntity.getUserId(),
+						InteractMessageTypeEnums.LIKE_COMMENT.getCode(),
+						commentEntity.getId(),
+						null,
+						commentEntity.getDramaId(),
+						null,
+						"video_comment_like:" + commentEntity.getId() + ":" + giveLikeQuery.getUserId());
 				return setResultSuccess(I18nUtil.getMessage("base_success"));
 			}else {
 				if (exist == null) {
@@ -191,6 +224,41 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 		} catch (Exception e) {
 			e.printStackTrace();
 			throw new RuntimeException();
+		}
+	}
+
+	/**
+	 * 推送消息
+	 * @param fromUid 发送用户
+	 * @param toUid 接收用户
+	 * @param type 消息类型
+	 * @param commentId 评论id
+	 * @param replyCommentId 回复评论id
+	 * @param dramaId 短剧id
+	 * @param content 消息内容
+	 * @param bizId 业务id
+	 */
+	private void pushInteractMessage(Integer fromUid, Integer toUid, String type,
+			Integer commentId, Integer replyCommentId, Integer dramaId, String content, String bizId) {
+		if (fromUid == null || toUid == null || fromUid.equals(toUid)) {
+			return;
+		}
+		UserInteractMessageEntity msg = new UserInteractMessageEntity();
+		msg.setToUid(toUid);
+		msg.setFromUid(fromUid);
+		msg.setMessageType(type);
+		msg.setCommentId(commentId);
+		msg.setReplyCommentId(replyCommentId);
+		msg.setDramaId(dramaId);
+		msg.setContent(content);
+		msg.setBizId(bizId);
+		msg.setIsRead(0);
+		msg.setStatus(1);
+		try {
+			GenericityUtil.setDate(msg);
+			userInteractMessageDao.insert(msg);
+		} catch (Exception e) {
+			// 幂等与兜底：不影响主业务
 		}
 	}
 
