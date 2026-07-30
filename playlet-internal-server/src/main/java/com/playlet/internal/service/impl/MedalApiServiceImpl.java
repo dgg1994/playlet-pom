@@ -59,13 +59,13 @@ public class MedalApiServiceImpl implements MedalApiService {
 	public ResponseBase findMedalList(HttpServletRequest request) {
 		try {
 			Integer uid = AppTokenUtil.resolveUid(request);
-			List<MedalApiResponse> list;
+			List<MedalConfigEntity> list;
 			if (uid == null) {
 				list = medalConfigDao.selectLogoList();
 				if (list == null) {
 					list = new ArrayList<>();
 				}
-				list.forEach(item -> item.setLogo(mediaUrlService.sign(item.getLogo())));
+				list.forEach(item -> item.setLogo(mediaUrlService.sign(item.getIconLockedKey())));
 			} else {
 				list = medalConfigDao.selectLogoListByUid(uid);
 				if (list == null) {

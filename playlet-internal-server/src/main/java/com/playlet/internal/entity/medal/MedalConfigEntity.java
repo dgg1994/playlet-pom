@@ -76,6 +76,10 @@ public class MedalConfigEntity extends PageQueryHelperEntity {
 	private String langue;
 
 	@TableField(exist = false)
+	@ApiModelProperty(name = "logo", value = "图片", dataType = "String")
+	private String logo;
+
+	@TableField(exist = false)
 	@ApiModelProperty(name = "medalName", value = "当前语言勋章名（列表展示）", dataType = "String")
 	private String medalName;
 

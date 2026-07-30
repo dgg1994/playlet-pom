@@ -36,20 +36,21 @@ public interface MedalConfigDao extends BaseMapper<MedalConfigEntity> {
 	@Update("update medal_config set is_deleted = 1, gmtModified = NOW() where id = #{id}")
 	int softDelete(@Param("id") Integer id);
 
-	@Select("select id,icon_locked_key as logo from medal_config where is_deleted = 0 and status = 1 order by sort_weight desc")
-	List<MedalApiResponse> selectLogoList();
+	@Select("select * from medal_config where is_deleted = 0 and status = 1 order by sort_weight desc")
+	List<MedalConfigEntity> selectLogoList();
 
 	@Select("SELECT " +
+			"  mc.*, " +
 			"  CASE " +
 			"    WHEN um.unlocked = 1 THEN mc.icon_key " +
 			"    ELSE mc.icon_locked_key " +
-			"  END AS logo, " +
-			"  mc.id AS id " +
+			"  END AS logo " +
 			"FROM medal_config mc " +
 			"LEFT JOIN user_medal um " +
 			"  ON um.medal_id = mc.id " +
 			"  AND um.uid = #{uid} " +
 			"WHERE mc.status = 1 " +
-			"  AND mc.is_deleted = 0")
-	List<MedalApiResponse> selectLogoListByUid(@Param("uid") Integer uid);
+			"  AND mc.is_deleted = 0 " +
+			"ORDER BY mc.sort_weight DESC, mc.id ASC")
+	List<MedalConfigEntity> selectLogoListByUid(@Param("uid") Integer uid);
 }
