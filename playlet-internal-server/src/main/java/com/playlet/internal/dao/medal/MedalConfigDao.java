@@ -36,21 +36,28 @@ public interface MedalConfigDao extends BaseMapper<MedalConfigEntity> {
 	@Update("update medal_config set is_deleted = 1, gmtModified = NOW() where id = #{id}")
 	int softDelete(@Param("id") Integer id);
 
-	@Select("select * from medal_config where is_deleted = 0 and status = 1 order by sort_weight desc")
-	List<MedalConfigEntity> selectLogoList();
+	@Select("select mc.*,mci.medal_name as medalName,mci.slogan as slogan,mci.condition_text as  conditionText " +
+			"from medal_config mc left join medal_config_i18n mci on mc.id = mci.medal_id" +
+			" where is_deleted = 0 and status = 1 and mci.langue = #{langue} order by sort_weight desc")
+	List<MedalConfigEntity> selectLogoList(@Param("langue") String langue);
 
 	@Select("SELECT " +
 			"  mc.*, " +
+			"  mci.medal_name AS medalName, " +
+			"  mci.slogan AS slogan, " +
+			"  mci.condition_text AS conditionText, " +
+			"  um.unlock_time AS unlockTime, " +
 			"  CASE " +
 			"    WHEN um.unlocked = 1 THEN mc.icon_key " +
 			"    ELSE mc.icon_locked_key " +
 			"  END AS logo " +
 			"FROM medal_config mc " +
+			"LEFT JOIN medal_config_i18n mci " +
+			"  ON mc.id = mci.medal_id AND mci.langue = #{langue} " +
 			"LEFT JOIN user_medal um " +
-			"  ON um.medal_id = mc.id " +
-			"  AND um.uid = #{uid} " +
+			"  ON um.medal_id = mc.id AND um.uid = #{uid} " +
 			"WHERE mc.status = 1 " +
 			"  AND mc.is_deleted = 0 " +
 			"ORDER BY mc.sort_weight DESC, mc.id ASC")
-	List<MedalConfigEntity> selectLogoListByUid(@Param("uid") Integer uid);
+	List<MedalConfigEntity> selectLogoListByUid(@Param("uid") Integer uid, @Param("langue") String langue);
 }

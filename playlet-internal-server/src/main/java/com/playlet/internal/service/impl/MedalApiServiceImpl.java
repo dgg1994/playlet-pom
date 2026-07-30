@@ -59,15 +59,16 @@ public class MedalApiServiceImpl implements MedalApiService {
 	public ResponseBase findMedalList(HttpServletRequest request) {
 		try {
 			Integer uid = AppTokenUtil.resolveUid(request);
+			String language = LanguageContext.getLanguage();
 			List<MedalConfigEntity> list;
 			if (uid == null) {
-				list = medalConfigDao.selectLogoList();
+				list = medalConfigDao.selectLogoList(language);
 				if (list == null) {
 					list = new ArrayList<>();
 				}
 				list.forEach(item -> item.setLogo(mediaUrlService.sign(item.getIconLockedKey())));
 			} else {
-				list = medalConfigDao.selectLogoListByUid(uid);
+				list = medalConfigDao.selectLogoListByUid(uid, language);
 				if (list == null) {
 					list = new ArrayList<>();
 				}

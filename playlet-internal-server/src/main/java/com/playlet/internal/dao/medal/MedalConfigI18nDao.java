@@ -15,6 +15,13 @@ public interface MedalConfigI18nDao extends BaseMapper<MedalConfigI18nEntity> {
 	@Select("select * from medal_config_i18n where medal_id = #{medalId}")
 	List<MedalConfigI18nEntity> findByMedalId(@Param("medalId") Integer medalId);
 
+	@Select("<script>"
+			+ "select * from medal_config_i18n where medal_id in "
+			+ "<foreach collection='medalIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
+			+ " order by medal_id, id"
+			+ "</script>")
+	List<MedalConfigI18nEntity> findByMedalIds(@Param("medalIds") List<Integer> medalIds);
+
 	@Delete("delete from medal_config_i18n where medal_id = #{medalId}")
 	int deleteByMedalId(@Param("medalId") Integer medalId);
 

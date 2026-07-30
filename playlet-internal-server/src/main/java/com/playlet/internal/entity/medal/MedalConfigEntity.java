@@ -92,6 +92,10 @@ public class MedalConfigEntity extends PageQueryHelperEntity {
 	private String conditionText;
 
 	@TableField(exist = false)
+	@ApiModelProperty(name = "unlockTime", value = "解锁时间", dataType = "Date")
+	private Date unlockTime;
+
+	@TableField(exist = false)
 	@ApiModelProperty(name = "i18nList", value = "多语言文案", dataType = "List")
 	private List<MedalConfigI18nEntity> i18nList;
 }
