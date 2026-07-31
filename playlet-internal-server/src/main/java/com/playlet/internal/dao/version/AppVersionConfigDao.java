@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.playlet.internal.entity.version.AppVersionConfigEntity;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -40,4 +41,7 @@ public interface AppVersionConfigDao extends BaseMapper<AppVersionConfigEntity> 
 			+ "limit 1")
 	AppVersionConfigEntity findLatestForCheck(@Param("platform") String platform,
 			@Param("channel") String channel);
+
+	@Update("update app_version_config set status = #{statusDisable} where platform = #{platform} and version_name != #{versionName}")
+    void updateStatusByPlatformAndChannel(@Param("statusDisable") Integer statusDisable,@Param("platform") String platform, @Param("versionName") String versionName);
 }

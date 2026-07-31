@@ -127,9 +127,6 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
 
     @Override
     public SignInHomeSummaryEntity buildHomeSummary(Integer uid) {
-        if (uid == null) {
-            return null;
-        }
         SignInGlobalConfigEntity config = signInGlobalConfigDao.findEnabledOne();
         List<SignInRewardConfigEntity> rewardConfigs = signInRewardConfigDao.findEnabledList();
         if (config == null || rewardConfigs == null || rewardConfigs.isEmpty()) {

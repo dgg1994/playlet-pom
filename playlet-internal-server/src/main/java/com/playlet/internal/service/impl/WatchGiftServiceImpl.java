@@ -97,9 +97,6 @@ public class WatchGiftServiceImpl extends BaseApiService implements WatchGiftSer
 
     @Override
     public WatchGiftHomeSummaryEntity buildHomeSummary(Integer uid) {
-        if (uid == null) {
-            return null;
-        }
         WatchGiftGlobalConfigEntity config = watchGiftGlobalConfigDao.findEnabledOne();
         List<WatchGiftRewardConfigEntity> rewards = watchGiftRewardConfigDao.findEnabledList();
         if (config == null || rewards == null || rewards.isEmpty()) {

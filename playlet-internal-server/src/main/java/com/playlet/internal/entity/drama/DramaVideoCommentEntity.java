@@ -95,7 +95,11 @@ public class DramaVideoCommentEntity extends PageQueryHelperEntity{
 	@TableField(exist = false)
 	@ApiModelProperty(name = "isDelete",value = "是否可以删除 1是0否",required = false,dataType = "Date")
 	private Integer isDelete;
-	
+
+	@TableField(exist = false)
+	@ApiModelProperty(name = "avatar",value = "头像",required = false,dataType = "String")
+	private String avatar;
+
 	@TableField(exist = false)
 	@ApiModelProperty(name = "isLike",value = "是否点赞 1是0否",required = false,dataType = "Date")
 	private Integer isLike;

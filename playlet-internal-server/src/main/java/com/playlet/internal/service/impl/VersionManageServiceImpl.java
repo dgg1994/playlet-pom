@@ -88,12 +88,11 @@ public class VersionManageServiceImpl implements VersionManageService {
 			}
 			normalizeDefaults(entity, true);
 			GenericityUtil.setDate(entity);
-			try {
-				appVersionConfigDao.insert(entity);
-			} catch (DuplicateKeyException e) {
-				return setResultError(I18nUtil.getMessage("version_code_exist"));
-			}
+			appVersionConfigDao.insert(entity);
 			saveI18nList(entity);
+			// 将同类的其他版本停用
+			String platform = entity.getPlatform();
+			appVersionConfigDao.updateStatusByPlatformAndChannel(AppVersionConstants.STATUS_DISABLE,platform,entity.getVersionName());
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			throw new RuntimeException(e);

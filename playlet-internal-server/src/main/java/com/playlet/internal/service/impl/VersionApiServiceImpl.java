@@ -15,6 +15,7 @@ import com.playlet.internal.entity.version.AppVersionI18nEntity;
 import com.playlet.internal.enums.AppVersionChannelEnums;
 import com.playlet.internal.enums.AppVersionPlatformEnums;
 import com.playlet.internal.enums.DeviceTypeEnums;
+import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.service.VersionApiService;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.StringUtils;
@@ -37,6 +38,9 @@ public class VersionApiServiceImpl extends BaseApiService implements VersionApiS
 
 	@Autowired
 	private AppVersionI18nDao appVersionI18nDao;
+
+	@Autowired
+	private MediaUrlService mediaUrlService;
 
 	@Override
 	public ResponseBase check(@RequestBody(required = false) AppVersionCheckRequest request,
@@ -86,7 +90,7 @@ public class VersionApiServiceImpl extends BaseApiService implements VersionApiS
 		resp.setForceUpdate(forceUpdate);
 		resp.setVersionCode(latest.getVersionCode());
 		resp.setVersionName(latest.getVersionName());
-		resp.setDownloadUrl(latest.getDownloadUrl());
+		resp.setDownloadUrl(mediaUrlService.sign(latest.getDownloadUrl()));
 
 		if (needUpdate) {
 			AppVersionI18nEntity i18n = resolveI18n(latest.getId());

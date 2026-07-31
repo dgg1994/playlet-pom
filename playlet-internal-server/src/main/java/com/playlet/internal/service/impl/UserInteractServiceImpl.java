@@ -46,7 +46,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static com.playlet.internal.constants.RedisKeyConstants.COLLECT_SET_UID;
 import static com.playlet.internal.constants.RedisKeyConstants.INTERACT_TTL_SEC;
@@ -257,20 +260,17 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 			rows = new ArrayList<>();
 		}
 		PageInfo<UserInteractMessageEntity> basePage = new PageInfo<>(rows);
+		Set<Integer> likedCommentIds = loadLikedCommentIds(uid, rows);
 		List<TheaterInteractMessageItemEntity> items = new ArrayList<>();
 		for (UserInteractMessageEntity row : rows) {
-			TheaterInteractMessageItemEntity item = toInteractMessageItem(row, uid);
+			TheaterInteractMessageItemEntity item = toInteractMessageItem(row, likedCommentIds);
 			if (item != null) {
 				items.add(item);
 			}
 		}
 		PageInfo<TheaterInteractMessageItemEntity> page = new PageInfo<>(items);
 		page.setTotal(basePage.getTotal());
-		page.setPageNum(basePage.getPageNum());
-		page.setPageSize(basePage.getPageSize());
 		page.setPages(basePage.getPages());
-		page.setHasNextPage(basePage.isHasNextPage());
-		page.setHasPreviousPage(basePage.isHasPreviousPage());
 		return setResultSuccess(page, I18nUtil.getMessage("base_success"));
 	}
 
@@ -561,7 +561,29 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		return item;
 	}
 
-	private TheaterInteractMessageItemEntity toInteractMessageItem(UserInteractMessageEntity row, Integer viewerUid) {
+	/**
+	 * 批量查当前用户对评论的点赞状态（drama_comment_like，不查 user_drama_like）。
+	 */
+	private Set<Integer> loadLikedCommentIds(Integer uid, List<UserInteractMessageEntity> rows) {
+		if (uid == null || rows == null || rows.isEmpty()) {
+			return Collections.emptySet();
+		}
+		List<Integer> commentIds = new ArrayList<>();
+		for (UserInteractMessageEntity row : rows) {
+			if (row == null || row.getCommentId() == null || !isActionableType(row.getMessageType())) {
+				continue;
+			}
+			commentIds.add(row.getCommentId());
+		}
+		if (commentIds.isEmpty()) {
+			return Collections.emptySet();
+		}
+		List<Integer> liked = dramaCommentLikeDao.findLikedCommentIds(uid, commentIds);
+		return liked == null || liked.isEmpty() ? Collections.emptySet() : new HashSet<>(liked);
+	}
+
+	private TheaterInteractMessageItemEntity toInteractMessageItem(UserInteractMessageEntity row,
+			Set<Integer> likedCommentIds) {
 		if (row == null) {
 			return null;
 		}
@@ -577,9 +599,15 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		item.setIsRead(row.getIsRead());
 		item.setSetTime(row.getSetTime());
 		item.setActionText(resolveActionText(row.getMessageType()));
-		item.setShowActions(isActionableType(row.getMessageType())
-				? PublicEnums.ONE.getIndex() : PublicEnums.ZERO.getIndex());
-		item.setIsLiked(PublicEnums.ZERO.getIndex());
+		boolean actionable = isActionableType(row.getMessageType());
+		item.setShowActions(actionable ? PublicEnums.ONE.getIndex() : PublicEnums.ZERO.getIndex());
+		// 评论点赞态：仅回复/评论类消息可操作；查 drama_comment_like
+		if (actionable && row.getCommentId() != null
+				&& likedCommentIds != null && likedCommentIds.contains(row.getCommentId())) {
+			item.setIsLiked(PublicEnums.ONE.getIndex());
+		} else {
+			item.setIsLiked(PublicEnums.ZERO.getIndex());
+		}
 
 		if (row.getFromUid() != null) {
 			AppAccountEntity account = appAccountDao.findByUid(row.getFromUid());
@@ -613,13 +641,11 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		if (InteractMessageTypeEnums.REPLY_COMMENT.getCode().equals(type)) {
 			item.setContent(resolveCommentText(row.getCommentId(), row.getContent()));
 			item.setRefContent(resolveCommentText(row.getReplyCommentId(), null));
-			fillCommentLiked(item, row.getCommentId(), viewerUid);
 		}
 		// 一级评论
 		else if (InteractMessageTypeEnums.COMMENT_DRAMA.getCode().equals(type)
 				|| InteractMessageTypeEnums.COMMENT_VIDEO.getCode().equals(type)) {
 			item.setContent(resolveCommentText(row.getCommentId(), row.getContent()));
-			fillCommentLiked(item, row.getCommentId(), viewerUid);
 		}
 		// 赞评论：主文案用 actionText；refContent=被赞评论正文
 		else if (InteractMessageTypeEnums.LIKE_COMMENT.getCode().equals(type)) {
@@ -659,15 +685,6 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 			return actionText + "：" + content;
 		}
 		return actionText;
-	}
-
-	private void fillCommentLiked(TheaterInteractMessageItemEntity item, Integer commentId, Integer viewerUid) {
-		if (commentId == null || viewerUid == null) {
-			return;
-		}
-		if (dramaCommentLikeDao.findOne(commentId, viewerUid) != null) {
-			item.setIsLiked(PublicEnums.ONE.getIndex());
-		}
 	}
 
 	private boolean isActionableType(String messageType) {

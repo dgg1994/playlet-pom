@@ -5,6 +5,7 @@ import java.util.List;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 
+import com.playlet.internal.service.MediaUrlService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -37,6 +38,9 @@ public class DramaApiVideoCommentServiceImpl extends BaseApiService implements D
 	@Autowired
 	private DramaCommentLikeDao dramaCommentLikeDao;
 
+	@Autowired
+	private MediaUrlService mediaUrlService;
+
 	@Override
 	public ResponseBase list(@Valid @RequestBody QueryCommentVideoQuery entity, HttpServletRequest request) {
 		try {
@@ -53,6 +57,7 @@ public class DramaApiVideoCommentServiceImpl extends BaseApiService implements D
 					}else {
 						list.get(i).setIsDelete(PublicEnums.ZERO.getIndex());
 					}
+					list.get(i).setAvatar(mediaUrlService.sign(list.get(i).getAvatar()));
 					//是否点赞
 					if(uid != null) {
 						DramaCommentLikeEntity commentLikeEntity = dramaCommentLikeDao.findOne(list.get(i).getId(),uid);
@@ -86,6 +91,7 @@ public class DramaApiVideoCommentServiceImpl extends BaseApiService implements D
 					}else {
 						list.get(i).setIsDelete(PublicEnums.ZERO.getIndex());
 					}
+					list.get(i).setAvatar(mediaUrlService.sign(list.get(i).getAvatar()));
 					if(uid != null) {
 						DramaCommentLikeEntity commentLikeEntity = dramaCommentLikeDao.findOne(list.get(i).getId(),uid);
 						if(commentLikeEntity != null) {

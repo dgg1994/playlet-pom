@@ -18,6 +18,7 @@ import com.playlet.internal.entity.welfare.WelfareTaskEntity;
 import com.playlet.internal.entity.welfare.WelfareTaskI18nEntity;
 import com.playlet.internal.enums.WelfareCycleTypeEnums;
 import com.playlet.internal.enums.WelfareProgressStatusEnums;
+import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.service.SignInService;
 import com.playlet.internal.service.WatchGiftService;
 import com.playlet.internal.service.WelfareTaskApiService;
@@ -55,16 +56,19 @@ public class WelfareTaskApiServiceImpl extends BaseApiService implements Welfare
 	private SignInService signInService;
 	@Autowired
 	private WatchGiftService watchGiftService;
+	@Autowired
+	private MediaUrlService mediaUrlService;
 
 	@Override
 	public ResponseBase home(HttpServletRequest request) {
-		Integer uid = AppTokenUtil.resolveUid(request);
-		if (uid == null) {
-			return setResultError(Constants.HTTP_RES_CODE_403,I18nUtil.getMessage("login_required"));
-		}
 		WelfareHomeRespEntity resp = new WelfareHomeRespEntity();
-		AppAccountEntity account = appAccountDao.findByUid(uid);
-		resp.setCoinBalance(account == null || account.getCoinBalance() == null ? 0L : account.getCoinBalance());
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid != null) {
+			AppAccountEntity account = appAccountDao.findByUid(uid);
+			resp.setCoinBalance(account == null || account.getCoinBalance() == null ? 0L : account.getCoinBalance());
+		}else {
+			resp.setCoinBalance(0L);
+		}
 		resp.setSignIn(signInService.buildHomeSummary(uid));
 		resp.setWatchGift(watchGiftService.buildHomeSummary(uid));
 		resp.setTasks(buildTaskItems(uid));
@@ -101,7 +105,7 @@ public class WelfareTaskApiServiceImpl extends BaseApiService implements Welfare
 			WelfareTaskItemEntity item = new WelfareTaskItemEntity();
 			item.setTaskId(task.getId());
 			item.setTaskCode(task.getTaskCode());
-			item.setTaskIcon(task.getTaskIcon());
+			item.setTaskIcon(mediaUrlService.sign(task.getTaskIcon()));
 			item.setRewardCoin(task.getRewardCoin());
 			item.setAdBoostCoin(task.getAdBoostCoin());
 			item.setCycleType(task.getCycleType());

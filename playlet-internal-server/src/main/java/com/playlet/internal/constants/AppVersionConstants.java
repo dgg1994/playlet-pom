@@ -11,6 +11,8 @@ public final class AppVersionConstants {
 	/** 文案语言回退 */
 	public static final String FALLBACK_LANGUE = "zh-cn";
 
+	public static final Integer STATUS_DISABLE = 0;
+
 	private AppVersionConstants() {
 	}
 }

@@ -12,6 +12,7 @@ import com.playlet.internal.entity.welfare.WelfareTaskI18nEntity;
 import com.playlet.internal.enums.WelfareActionTypeEnums;
 import com.playlet.internal.enums.WelfareCycleTypeEnums;
 import com.playlet.internal.enums.WelfareTaskEnums;
+import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.service.WelfareTaskManageService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
@@ -45,7 +46,8 @@ public class WelfareTaskManageServiceImpl implements WelfareTaskManageService {
 	private WelfareTaskDao welfareTaskDao;
 	@Autowired
 	private WelfareTaskI18nDao welfareTaskI18nDao;
-
+	@Autowired
+	private MediaUrlService mediaUrlService;
 	@Override
 	@SysLogAnnotation(module = "福利任务", type = "POST", remark = "任务列表")
 	public ResponseBase findList(@RequestBody WelfareTaskEntity entity) {
@@ -61,6 +63,7 @@ public class WelfareTaskManageServiceImpl implements WelfareTaskManageService {
 		// 获取语言
 		String language = LanguageContext.getLanguage();
 		for (WelfareTaskEntity welfareTaskEntity : list) {
+			welfareTaskEntity.setTaskIcon(mediaUrlService.sign(welfareTaskEntity.getTaskIcon()));
 			welfareTaskEntity.setTaskName(welfareTaskI18nDao.selectNameById(welfareTaskEntity.getId(),language));
 		}
 		PageInfo<WelfareTaskEntity> page = new PageInfo<>(list);

@@ -11,6 +11,7 @@ import javax.validation.Valid;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.drama.DramaDao;
 import com.playlet.internal.entity.drama.DramaEntity;
+import com.playlet.internal.service.MediaUrlService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -45,6 +46,9 @@ public class DramaApiDramaCommentServiceImpl extends BaseApiService implements D
 
 	@Autowired
 	private DramaDao dramaDao;
+
+	@Autowired
+	private MediaUrlService mediaUrlService;
 
 	@Override
 	public ResponseBase list(@Valid @RequestBody QueryDramaCommentQuery entity, HttpServletRequest request) {
@@ -159,6 +163,7 @@ public class DramaApiDramaCommentServiceImpl extends BaseApiService implements D
 			} else {
 				item.setIsDelete(PublicEnums.ZERO.getIndex());
 			}
+			item.setAvatar(mediaUrlService.sign(item.getAvatar()));
 			if (uid != null) {
 				DramaCommentLikeEntity like = dramaCommentLikeDao.findOne(item.getId(), uid);
 				item.setIsLike(like != null ? PublicEnums.ONE.getIndex() : PublicEnums.ZERO.getIndex());

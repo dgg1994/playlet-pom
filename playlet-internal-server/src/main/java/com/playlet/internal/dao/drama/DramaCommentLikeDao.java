@@ -8,6 +8,8 @@ import org.springframework.stereotype.Repository;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.playlet.internal.entity.drama.DramaCommentLikeEntity;
 
+import java.util.List;
+
 @Repository
 public interface DramaCommentLikeDao extends BaseMapper<DramaCommentLikeEntity>{
 
@@ -16,5 +18,14 @@ public interface DramaCommentLikeDao extends BaseMapper<DramaCommentLikeEntity>{
 
 	@Select("select * from drama_comment_like where comment_id = #{commentId} and user_id = #{userId}")
 	DramaCommentLikeEntity findOne(@Param("commentId") Integer commentId,@Param("userId") Integer userId);
+
+	/** 当前用户已点赞的评论 id（评论点赞表 drama_comment_like，非 user_drama_like） */
+	@Select("<script>"
+			+ "select comment_id from drama_comment_like "
+			+ "where user_id = #{userId} and comment_id in "
+			+ "<foreach collection='commentIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
+			+ "</script>")
+	List<Integer> findLikedCommentIds(@Param("userId") Integer userId,
+			@Param("commentIds") List<Integer> commentIds);
 
 }

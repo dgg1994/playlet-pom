@@ -38,7 +38,7 @@ public class RoleServiceImpl extends BaseApiService implements RoleService{
 	public ResponseBase findAll(@RequestBody SysRoleEntity entity) {
 		try {
 			entity.setDelFlag(RoleStateEnums.ROLE_DEL_FLAG_NORMAL.getIndex());
-			PageHelper.startPage(entity.getPageNum(), entity.getPageSize());
+			PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
 			List<SysRoleEntity> list = sysRoleDao.findList(entity);
 			PageInfo<SysRoleEntity> info = new PageInfo<>(list);
 			return setResultSuccess(info,I18nUtil.getMessage("base_success"));

@@ -117,7 +117,7 @@ public class DramaTagServiceImpl implements DramaTagService {
             List<TagEntity> tags = entity.getTags();
             for (TagEntity tag : tags) {
                 if (tagDao.findByTagName(tag.getTagName().trim()) != null) {
-                    return setResultError(I18nUtil.getMessage("base_info_exist"));
+                    throw new RuntimeException();
                 }
                 TagEntity tagEntity = new TagEntity();
                 tagEntity.setLangue(tag.getLangue());

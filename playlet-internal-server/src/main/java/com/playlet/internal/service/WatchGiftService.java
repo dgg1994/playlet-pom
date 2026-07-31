@@ -14,7 +14,7 @@ import javax.servlet.http.HttpServletRequest;
 /**
  * C 端观影礼（时长阶梯）：摘要拼进福利 home；时长由 theater view/report 的 deltaSeconds 累计。
  */
-@RequestMapping("/api/welfare")
+@RequestMapping("/welfare")
 @Api(value = "观影礼", tags = "观影礼")
 public interface WatchGiftService {
 

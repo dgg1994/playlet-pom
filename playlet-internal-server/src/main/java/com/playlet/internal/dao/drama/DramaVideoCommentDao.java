@@ -15,21 +15,21 @@ import com.playlet.internal.query.drama.QueryDramaCommentQuery;
 @Repository
 public interface DramaVideoCommentDao extends BaseMapper<DramaVideoCommentEntity>{
 
-	@Select("select * from drama_video_comment where video_id = #{voideId} "
+	@Select("select dvc.*,aa.avatar as avatar from drama_video_comment dvc left join app_account aa on dvc.user_id = aa.id where video_id = #{voideId} "
 			+ "and delete_state = #{deleteState} "
 			+ "and parent_id = #{parentId} "
 			+ "and (comment_type is null or comment_type = 1) "
 			+ "order by setTime desc")
 	List<DramaVideoCommentEntity> getList(QueryCommentVideoQuery entity);
 
-	@Select("select * from drama_video_comment where drama_id = #{dramaId} "
+	@Select("select dvc.*,aa.avatar as avatar from drama_video_comment dvc left join app_account aa on dvc.user_id = aa.id where drama_id = #{dramaId} "
 			+ "and comment_type = 2 "
 			+ "and delete_state = #{deleteState} "
 			+ "and parent_id = #{parentId} "
 			+ "order by setTime desc")
 	List<DramaVideoCommentEntity> getDramaCommentList(QueryDramaCommentQuery entity);
 
-	@Select("select * from drama_video_comment where parent_id = #{parentId} "
+	@Select("select dvc.*,aa.avatar as avatar from drama_video_comment dvc left join app_account aa on dvc.user_id = aa.id where parent_id = #{parentId} "
 			+ "and delete_state = #{deleteState} "
 			+ "order by setTime desc")
 	List<DramaVideoCommentEntity> findParentId(@Param("parentId") Integer parentId,@Param("deleteState") Integer deleteState);
