@@ -620,6 +620,8 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		item.setReplyCommentId(row.getReplyCommentId());
 		item.setIsRead(row.getIsRead());
 		item.setSetTime(row.getSetTime());
+		// parentId：取自评论表两层结构（0=一级评论，非0=所属一级评论ID）
+		item.setParentId(resolveCommentParentId(row.getCommentId()));
 		// 2. 操作区：评论/回复类展示点赞+回复；isLiked 看当前用户是否已赞该评论
 		item.setActionText(resolveActionText(row.getMessageType()));
 		boolean actionable = isActionableType(row.getMessageType());
@@ -695,6 +697,18 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 			}
 		}
 		return StringUtils.isEmpty(fallback) ? null : fallback;
+	}
+
+	/**
+	 * 从评论表取 parentId（两层：0=一级；非0=所属一级评论ID）。
+	 * 消息表本身不存 parentId，按 commentId 回查。
+	 */
+	private Integer resolveCommentParentId(Integer commentId) {
+		if (commentId == null) {
+			return null;
+		}
+		DramaVideoCommentEntity comment = dramaVideoCommentDao.selectById(commentId);
+		return comment == null ? null : comment.getParentId();
 	}
 
 	private String buildDisplayContent(String actionText, String content, String messageType) {

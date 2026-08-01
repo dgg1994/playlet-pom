@@ -70,6 +70,9 @@ public class TheaterInteractMessageItemEntity {
 	@ApiModelProperty("是否已读 0未读1已读")
 	private Integer isRead;
 
+	@ApiModelProperty("评论表父ID：0=一级评论；非0=所属一级评论ID（两层结构跳转用）")
+	private Integer parentId;
+
 	@ApiModelProperty("时间")
 	private Date setTime;
 }
