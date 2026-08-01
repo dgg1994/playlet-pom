@@ -35,4 +35,8 @@ public class RedisKeyConstants {
     /** 分享计数冷却：同一用户同一剧 */
     public static final String SHARE_CD_UID_DRAMA = "theater:share:cd:uid:";
     public static final long SHARE_CD_SEC = 30L;
+
+    /** 提现提交防重：uid */
+    public static final String WITHDRAW_SUBMIT_LOCK = "wallet:withdraw:lock:uid:";
+    public static final long WITHDRAW_SUBMIT_LOCK_SEC = 5L;
 }

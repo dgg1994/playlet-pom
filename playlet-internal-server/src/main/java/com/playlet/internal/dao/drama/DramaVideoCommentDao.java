@@ -51,4 +51,31 @@ public interface DramaVideoCommentDao extends BaseMapper<DramaVideoCommentEntity
 			+ "where drama_id = #{dramaId} and comment_type = 2 "
 			+ "and delete_state = #{deleteState} and score is not null")
 	Double avgScoreNumByDramaId(@Param("dramaId") Integer dramaId, @Param("deleteState") Integer deleteState);
+
+	@Select("select dvc.*,aa.avatar as avatar from drama_video_comment dvc "
+			+ "left join app_account aa on dvc.user_id = aa.id where dvc.id = #{id}")
+	DramaVideoCommentEntity findByIdWithAvatar(@Param("id") Integer id);
+
+	/**
+	 * 一级视频评论中，比目标更新的条数（setTime desc, id desc），用于算页码。
+	 */
+	@Select("select count(1) from drama_video_comment where video_id = #{videoId} "
+			+ "and delete_state = #{deleteState} and parent_id = 0 "
+			+ "and (comment_type is null or comment_type = 1) "
+			+ "and (setTime > #{setTime} or (setTime = #{setTime} and id > #{id}))")
+	Integer countNewerLevel1(@Param("videoId") Integer videoId,
+			@Param("deleteState") Integer deleteState,
+			@Param("setTime") java.util.Date setTime,
+			@Param("id") Integer id);
+
+	/**
+	 * 同 parent 下二级回复中，比目标更新的条数。
+	 */
+	@Select("select count(1) from drama_video_comment where parent_id = #{parentId} "
+			+ "and delete_state = #{deleteState} "
+			+ "and (setTime > #{setTime} or (setTime = #{setTime} and id > #{id}))")
+	Integer countNewerReplies(@Param("parentId") Integer parentId,
+			@Param("deleteState") Integer deleteState,
+			@Param("setTime") java.util.Date setTime,
+			@Param("id") Integer id);
 }

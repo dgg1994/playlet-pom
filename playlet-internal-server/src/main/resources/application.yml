@@ -90,6 +90,10 @@ jpush:
   master_secret: 8cff99013d9ee25c863f7da2
   environment: false #true生产false测试
 
+#提现打款 Mock（P0）：true=模拟成功；false=模拟失败并退币
+withdraw:
+  mock-success: true
+
 #邮件发送
 yunmail:
   host: smtp.ezmail.vip  # 改为正确的 SMTP 服务器
