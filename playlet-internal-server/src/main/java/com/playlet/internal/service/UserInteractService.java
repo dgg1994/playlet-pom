@@ -78,10 +78,10 @@ public interface UserInteractService {
 	@ApiImplicitParams({
 			@ApiImplicitParam(name = "pageNumber", value = "页码", required = false, dataType = "int", paramType = "query"),
 			@ApiImplicitParam(name = "pageSize", value = "每页", required = false, dataType = "int", paramType = "query"),
-			@ApiImplicitParam(name = "messageType", value = "消息类型", required = false, dataType = "string", paramType = "query"),
+			@ApiImplicitParam(name = "messageType", value = "消息类型 LIKE_DRAMA/LIKE_COMMENT/COMMENT_DRAMA/COMMENT_VIDEO/REPLY_COMMENT", required = false, dataType = "string", paramType = "query"),
 			@ApiImplicitParam(name = "isRead", value = "是否已读 0未读1已读", required = false, dataType = "int", paramType = "query")
 	})
-	@ApiOperation(value = "互动消息列表", notes = "需登录；谁给我点赞/评论")
+	@ApiOperation(value = "互动消息列表", notes = "需登录；谁给我点赞/评论/回复")
 	ResponseBase interactMessageList(InteractMessageQuery entity, HttpServletRequest request);
 
 	@PostMapping("/interact/message/read")

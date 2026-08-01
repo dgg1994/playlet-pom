@@ -23,9 +23,9 @@ public interface DramaCommentLikeDao extends BaseMapper<DramaCommentLikeEntity>{
 	@Select("<script>"
 			+ "select comment_id from drama_comment_like "
 			+ "where user_id = #{userId} and comment_id in "
-			+ "<foreach collection='commentIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
+			+ "<foreach collection='commentIds' item='cid' open='(' separator=',' close=')'>#{cid}</foreach>"
 			+ "</script>")
-	List<Integer> findLikedCommentIds(@Param("userId") Integer userId,
+	List<Long> findLikedCommentIds(@Param("userId") Integer userId,
 			@Param("commentIds") List<Integer> commentIds);
 
 }

@@ -236,16 +236,15 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		}
 		PageInfo<TheaterLikeItemEntity> page = new PageInfo<>(items);
 		page.setTotal(basePage.getTotal());
-		page.setPageNum(basePage.getPageNum());
-		page.setPageSize(basePage.getPageSize());
-		page.setPages(basePage.getPages());
-		page.setHasNextPage(basePage.isHasNextPage());
-		page.setHasPreviousPage(basePage.isHasPreviousPage());
 		return setResultSuccess(page, I18nUtil.getMessage("base_success"));
 	}
 
+	/**
+	 * 互动消息列表。
+	 */
 	@Override
 	public ResponseBase interactMessageList(InteractMessageQuery entity, HttpServletRequest request) {
+		// 1. 鉴权：必须登录
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
@@ -253,14 +252,20 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		if (entity == null) {
 			entity = new InteractMessageQuery();
 		}
+		// 2. 只查发给当前用户的有效消息
 		entity.setToUid(uid);
+		// 3. 分页读 user_interact_message
 		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
 		List<UserInteractMessageEntity> rows = userInteractMessageDao.findByToUid(entity);
 		if (rows == null) {
 			rows = new ArrayList<>();
 		}
 		PageInfo<UserInteractMessageEntity> basePage = new PageInfo<>(rows);
+		// PageHelper 用完后清理，避免污染后续 drama_comment_like 批量查询
+		PageHelper.clearPage();
+		// 4. 批量加载「我对这批评论是否已赞」（避免 N+1）
 		Set<Integer> likedCommentIds = loadLikedCommentIds(uid, rows);
+		// 5. 组装 C 端展示结构
 		List<TheaterInteractMessageItemEntity> items = new ArrayList<>();
 		for (UserInteractMessageEntity row : rows) {
 			TheaterInteractMessageItemEntity item = toInteractMessageItem(row, likedCommentIds);
@@ -268,6 +273,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 				items.add(item);
 			}
 		}
+		// 6. 转换后的 list 重建 PageInfo，总数仍用原始分页结果
 		PageInfo<TheaterInteractMessageItemEntity> page = new PageInfo<>(items);
 		page.setTotal(basePage.getTotal());
 		page.setPages(basePage.getPages());
@@ -562,12 +568,13 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	}
 
 	/**
-	 * 批量查当前用户对评论的点赞状态（drama_comment_like，不查 user_drama_like）。
+	 * 批量查当前用户对「本页消息关联评论」的点赞状态。
 	 */
 	private Set<Integer> loadLikedCommentIds(Integer uid, List<UserInteractMessageEntity> rows) {
 		if (uid == null || rows == null || rows.isEmpty()) {
 			return Collections.emptySet();
 		}
+		// 1. 收集本页可操作评论 id
 		List<Integer> commentIds = new ArrayList<>();
 		for (UserInteractMessageEntity row : rows) {
 			if (row == null || row.getCommentId() == null || !isActionableType(row.getMessageType())) {
@@ -578,15 +585,30 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		if (commentIds.isEmpty()) {
 			return Collections.emptySet();
 		}
-		List<Integer> liked = dramaCommentLikeDao.findLikedCommentIds(uid, commentIds);
-		return liked == null || liked.isEmpty() ? Collections.emptySet() : new HashSet<>(liked);
+		// 2. 批量查 drama_comment_like：user_id=当前用户 and comment_id in (...)
+		// 返回 Long，转 Integer，避免 contains 类型不一致
+		List<Long> liked = dramaCommentLikeDao.findLikedCommentIds(uid, commentIds);
+		if (liked == null || liked.isEmpty()) {
+			return Collections.emptySet();
+		}
+		Set<Integer> result = new HashSet<>(liked.size());
+		for (Long id : liked) {
+			if (id != null) {
+				result.add(id.intValue());
+			}
+		}
+		return result;
 	}
 
+	/**
+	 * 单条互动消息 → C 端列表项。
+	 */
 	private TheaterInteractMessageItemEntity toInteractMessageItem(UserInteractMessageEntity row,
 			Set<Integer> likedCommentIds) {
 		if (row == null) {
 			return null;
 		}
+		// 1. 基础字段
 		TheaterInteractMessageItemEntity item = new TheaterInteractMessageItemEntity();
 		item.setId(row.getId());
 		item.setMessageType(row.getMessageType());
@@ -598,10 +620,10 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		item.setReplyCommentId(row.getReplyCommentId());
 		item.setIsRead(row.getIsRead());
 		item.setSetTime(row.getSetTime());
+		// 2. 操作区：评论/回复类展示点赞+回复；isLiked 看当前用户是否已赞该评论
 		item.setActionText(resolveActionText(row.getMessageType()));
 		boolean actionable = isActionableType(row.getMessageType());
 		item.setShowActions(actionable ? PublicEnums.ONE.getIndex() : PublicEnums.ZERO.getIndex());
-		// 评论点赞态：仅回复/评论类消息可操作；查 drama_comment_like
 		if (actionable && row.getCommentId() != null
 				&& likedCommentIds != null && likedCommentIds.contains(row.getCommentId())) {
 			item.setIsLiked(PublicEnums.ONE.getIndex());
@@ -609,6 +631,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 			item.setIsLiked(PublicEnums.ZERO.getIndex());
 		}
 
+		// 3. 触发人资料
 		if (row.getFromUid() != null) {
 			AppAccountEntity account = appAccountDao.findByUid(row.getFromUid());
 			if (account != null) {
@@ -620,6 +643,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 			}
 		}
 
+		// 4. 关联短剧展示信息
 		if (row.getDramaId() != null) {
 			DramaEntity drama = dramaDao.findByDramaId(row.getDramaId());
 			if (drama == null) {
@@ -636,27 +660,29 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 			}
 		}
 
+		// 5. 按消息类型填充正文 / 引用区
 		String type = row.getMessageType();
-		// 回复：content=回复正文，refContent=被回复评论正文（均为文案）
+		// 回复：content=回复正文，refContent=被回复评论正文
 		if (InteractMessageTypeEnums.REPLY_COMMENT.getCode().equals(type)) {
 			item.setContent(resolveCommentText(row.getCommentId(), row.getContent()));
 			item.setRefContent(resolveCommentText(row.getReplyCommentId(), null));
 		}
-		// 一级评论
+		// 一级评论（剧评 / 分集评论）
 		else if (InteractMessageTypeEnums.COMMENT_DRAMA.getCode().equals(type)
 				|| InteractMessageTypeEnums.COMMENT_VIDEO.getCode().equals(type)) {
 			item.setContent(resolveCommentText(row.getCommentId(), row.getContent()));
 		}
-		// 赞评论：主文案用 actionText；refContent=被赞评论正文
+		// 赞评论：主区用 actionText；引用区展示被赞评论正文
 		else if (InteractMessageTypeEnums.LIKE_COMMENT.getCode().equals(type)) {
 			item.setContent(null);
 			item.setRefContent(resolveCommentText(row.getCommentId(), row.getContent()));
 		}
-		// 赞作品
+		// 赞作品：一般只展示 actionText + 剧信息
 		else if (InteractMessageTypeEnums.LIKE_DRAMA.getCode().equals(type)) {
 			item.setContent(null);
 		}
 
+		// 6. 列表主文案（如「回复你：xxx」）
 		item.setDisplayContent(buildDisplayContent(item.getActionText(), item.getContent(), type));
 		return item;
 	}
