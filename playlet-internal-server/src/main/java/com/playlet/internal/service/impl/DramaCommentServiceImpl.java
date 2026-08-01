@@ -137,7 +137,7 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 			pushInteractMessage(
 					createPay.getUserId(),
 					parent.getUserId(),
-					InteractMessageTypeEnums.REPLY_COMMENT.getCode(),
+					InteractMessageTypeEnums.REPLY_DRAMA.getCode(),
 					entity.getId(),
 					parent.getId(),
 					entity.getDramaId(),

@@ -80,6 +80,7 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 					entity.getId(),
 					null,
 					entity.getDramaId(),
+					toEpisodeId(entity.getVideoId()),
 					entity.getCommentInfo(),
 					"video_comment:" + entity.getId());
 			try {
@@ -115,10 +116,11 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 			pushInteractMessage(
 					createPay.getUserId(),
 					commentEntity == null ? null : commentEntity.getUserId(),
-					InteractMessageTypeEnums.REPLY_COMMENT.getCode(),
+					InteractMessageTypeEnums.REPLY_VIDEO.getCode(),
 					entity.getId(),
 					commentEntity == null ? null : commentEntity.getId(),
 					entity.getDramaId(),
+					toEpisodeId(entity.getVideoId()),
 					entity.getCommentInfo(),
 					"video_reply:" + entity.getId());
 			try {
@@ -185,6 +187,7 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 						commentEntity.getId(),
 						null,
 						commentEntity.getDramaId(),
+						toEpisodeId(commentEntity.getVideoId()),
 						commentEntity.getCommentInfo(),
 						"video_comment_like:" + commentEntity.getId() + ":" + giveLikeQuery.getUserId());
 				return setResultSuccess(I18nUtil.getMessage("base_success"));
@@ -238,11 +241,13 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 	 * @param commentId 评论id
 	 * @param replyCommentId 回复评论id
 	 * @param dramaId 短剧id
+	 * @param episodeId 剧集ID（对应 videoId）
 	 * @param content 消息内容
 	 * @param bizId 业务id
 	 */
 	private void pushInteractMessage(Integer fromUid, Integer toUid, String type,
-			Integer commentId, Integer replyCommentId, Integer dramaId, String content, String bizId) {
+			Integer commentId, Integer replyCommentId, Integer dramaId, String episodeId,
+			String content, String bizId) {
 		if (fromUid == null || toUid == null || fromUid.equals(toUid)) {
 			return;
 		}
@@ -253,6 +258,7 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 		msg.setCommentId(commentId);
 		msg.setReplyCommentId(replyCommentId);
 		msg.setDramaId(dramaId);
+		msg.setEpisodeId(episodeId);
 		msg.setContent(content);
 		msg.setBizId(bizId);
 		msg.setIsRead(0);
@@ -260,10 +266,18 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 		try {
 			GenericityUtil.setDate(msg);
 			userInteractMessageDao.insert(msg);
-			pushNotifyService.notifyInteract(toUid, fromUid, type, msg.getId(), dramaId, null);
+			pushNotifyService.notifyInteract(toUid, fromUid, type, msg.getId(), dramaId, episodeId);
 		} catch (Exception e) {
 			// 幂等与兜底：不影响主业务
 		}
+	}
+
+	/** videoId 转 episodeId；剧评/无效时返回 null */
+	private String toEpisodeId(Integer videoId) {
+		if (videoId == null || videoId <= 0) {
+			return null;
+		}
+		return String.valueOf(videoId);
 	}
 
 }

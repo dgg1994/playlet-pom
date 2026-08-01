@@ -67,8 +67,12 @@ public class AppAccountEntity extends PageQueryHelperEntity {
 	private Integer registerSource;
 
 	@TableField("registration_id")
-	@ApiModelProperty(name = "registrationId",value = "Jpush三方id",required = true,dataType = "String")
+	@ApiModelProperty(name = "registrationId", value = "Jpush三方id", required = true, dataType = "String")
 	private String registrationId;
+
+	@TableField("device_name")
+	@ApiModelProperty(name = "deviceName", value = "设备名称", required = false, dataType = "String")
+	private String deviceName;
 
 	@TableField("nickname")
 	@ApiModelProperty(name = "nickname",value = "昵称",required = false,dataType = "String")
@@ -99,11 +103,7 @@ public class AppAccountEntity extends PageQueryHelperEntity {
 	private String telCode;
 	
 	@TableField(exist = false)
-	@ApiModelProperty(name = "deviceName",value = "设备名称",required = false,dataType = "Integer")
-	private String deviceName;
-	
-	@TableField(exist = false)
-	@ApiModelProperty(name = "cid",value = "极光推送cid",required = false,dataType = "Integer")
+	@ApiModelProperty(name = "cid", value = "极光推送cid（请求入参别名，等价 registrationId）", required = false, dataType = "String")
 	private String cid;
 	
 	@TableField(exist = false)

@@ -13,7 +13,7 @@ public class TheaterInteractMessageItemEntity {
 	@ApiModelProperty("消息ID")
 	private Long id;
 
-	@ApiModelProperty("消息类型 LIKE_DRAMA/LIKE_COMMENT/COMMENT_DRAMA/COMMENT_VIDEO/REPLY_COMMENT")
+	@ApiModelProperty("消息类型 LIKE_DRAMA/LIKE_COMMENT/COMMENT_DRAMA/COMMENT_VIDEO/REPLY_DRAMA/REPLY_VIDEO")
 	private String messageType;
 
 	@ApiModelProperty("展示文案，如：赞了你的评论、回复你")

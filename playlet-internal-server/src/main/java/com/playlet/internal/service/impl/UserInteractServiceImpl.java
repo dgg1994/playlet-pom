@@ -663,13 +663,12 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		// 5. 按消息类型填充正文 / 引用区
 		String type = row.getMessageType();
 		// 回复：content=回复正文，refContent=被回复评论正文
-		if (InteractMessageTypeEnums.REPLY_COMMENT.getCode().equals(type)) {
+		if (InteractMessageTypeEnums.isReply(type)) {
 			item.setContent(resolveCommentText(row.getCommentId(), row.getContent()));
 			item.setRefContent(resolveCommentText(row.getReplyCommentId(), null));
 		}
 		// 一级评论（剧评 / 分集评论）
-		else if (InteractMessageTypeEnums.COMMENT_DRAMA.getCode().equals(type)
-				|| InteractMessageTypeEnums.COMMENT_VIDEO.getCode().equals(type)) {
+		else if (InteractMessageTypeEnums.isComment(type)) {
 			item.setContent(resolveCommentText(row.getCommentId(), row.getContent()));
 		}
 		// 赞评论：主区用 actionText；引用区展示被赞评论正文
@@ -699,9 +698,8 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	}
 
 	private String buildDisplayContent(String actionText, String content, String messageType) {
-		if (InteractMessageTypeEnums.REPLY_COMMENT.getCode().equals(messageType)
-				|| InteractMessageTypeEnums.COMMENT_DRAMA.getCode().equals(messageType)
-				|| InteractMessageTypeEnums.COMMENT_VIDEO.getCode().equals(messageType)) {
+		if (InteractMessageTypeEnums.isReply(messageType)
+				|| InteractMessageTypeEnums.isComment(messageType)) {
 			if (StringUtils.isEmpty(content)) {
 				return actionText;
 			}
@@ -714,9 +712,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	}
 
 	private boolean isActionableType(String messageType) {
-		return InteractMessageTypeEnums.REPLY_COMMENT.getCode().equals(messageType)
-				|| InteractMessageTypeEnums.COMMENT_DRAMA.getCode().equals(messageType)
-				|| InteractMessageTypeEnums.COMMENT_VIDEO.getCode().equals(messageType);
+		return InteractMessageTypeEnums.isActionable(messageType);
 	}
 
 	private String resolveActionText(String messageType) {
@@ -726,11 +722,10 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		if (InteractMessageTypeEnums.LIKE_DRAMA.getCode().equals(messageType)) {
 			return I18nUtil.getMessage("interact.like_drama");
 		}
-		if (InteractMessageTypeEnums.REPLY_COMMENT.getCode().equals(messageType)) {
+		if (InteractMessageTypeEnums.isReply(messageType)) {
 			return I18nUtil.getMessage("interact.reply_you");
 		}
-		if (InteractMessageTypeEnums.COMMENT_DRAMA.getCode().equals(messageType)
-				|| InteractMessageTypeEnums.COMMENT_VIDEO.getCode().equals(messageType)) {
+		if (InteractMessageTypeEnums.isComment(messageType)) {
 			return I18nUtil.getMessage("interact.comment_you");
 		}
 		return I18nUtil.getMessage("interact.default");

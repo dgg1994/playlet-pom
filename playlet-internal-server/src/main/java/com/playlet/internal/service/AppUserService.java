@@ -3,6 +3,7 @@ package com.playlet.internal.service;
 
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.entity.account.AppAccountEntity;
+import com.playlet.internal.query.account.BindPushQuery;
 import com.playlet.internal.query.account.UpdatePwdEntity;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
@@ -60,8 +61,9 @@ public interface AppUserService {
 
 	
     @PostMapping("/bindPush")
-    @ApiOperation(value = "绑定推送设备ID", notes = "上报极光 registrationId", response = ResponseBase.class)
-    ResponseBase bindPush(AppAccountEntity entity, HttpServletRequest request);
+    @ApiOperation(value = "绑定极光推送", notes = "无需登录。App 启动后上报 cid 或 registrationId；可选 deviceName。"
+			+ "已登录时会同时写入账号 registration_id，便于互动/勋章推送。", response = ResponseBase.class)
+    ResponseBase bindPush(BindPushQuery entity, HttpServletRequest request);
 
 	@GetMapping("/signOut")
 	@ApiOperation(value = "退出登录",notes="退出登录",response=ResponseBase.class)

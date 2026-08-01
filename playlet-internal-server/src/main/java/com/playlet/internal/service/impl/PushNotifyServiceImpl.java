@@ -2,7 +2,9 @@ package com.playlet.internal.service.impl;
 
 import com.playlet.internal.api.request.JpushReqEntity;
 import com.playlet.internal.dao.account.AppAccountDao;
+import com.playlet.internal.dao.account.AppPushDeviceDao;
 import com.playlet.internal.entity.account.AppAccountEntity;
+import com.playlet.internal.entity.account.AppPushDeviceEntity;
 import com.playlet.internal.enums.InteractMessageTypeEnums;
 import com.playlet.internal.service.PushNotifyService;
 import com.playlet.internal.utils.I18nUtil;
@@ -26,6 +28,9 @@ public class PushNotifyServiceImpl implements PushNotifyService {
 	@Autowired
 	private AppAccountDao appAccountDao;
 
+	@Autowired
+	private AppPushDeviceDao appPushDeviceDao;
+
 	@Override
 	public void notifyUser(Integer toUid, String title, String content, Map<String, Object> extras) {
 		if (toUid == null) {
@@ -35,8 +40,8 @@ public class PushNotifyServiceImpl implements PushNotifyService {
 			return;
 		}
 		try {
-			AppAccountEntity account = appAccountDao.findByUid(toUid);
-			if (account == null || StringUtils.isEmpty(account.getRegistrationId())) {
+			String registrationId = resolveRegistrationId(toUid);
+			if (StringUtils.isEmpty(registrationId)) {
 				log.debug("skip push: no registrationId, toUid={}", toUid);
 				return;
 			}
@@ -44,12 +49,25 @@ public class PushNotifyServiceImpl implements PushNotifyService {
 			pushVo.setTitle(title == null ? "" : title);
 			pushVo.setMsg(content == null ? "" : content);
 			pushVo.setBroadcasting(false);
-			pushVo.setRegistrationIdList(Collections.singletonList(account.getRegistrationId()));
+			pushVo.setRegistrationIdList(Collections.singletonList(registrationId));
 			pushVo.setExtrasMap(extras);
 			JPushUtils.sendAsync(pushVo);
 		} catch (Exception e) {
 			log.warn("notifyUser failed toUid={}: {}", toUid, e.getMessage());
 		}
+	}
+
+	/** 优先账号表，其次设备表（游客先绑、登录后关联） */
+	private String resolveRegistrationId(Integer uid) {
+		AppAccountEntity account = appAccountDao.findByUid(uid);
+		if (account != null && !StringUtils.isEmpty(account.getRegistrationId())) {
+			return account.getRegistrationId();
+		}
+		AppPushDeviceEntity device = appPushDeviceDao.findLatestByUid(uid);
+		if (device != null && !StringUtils.isEmpty(device.getRegistrationId())) {
+			return device.getRegistrationId();
+		}
+		return null;
 	}
 
 	@Override
@@ -96,7 +114,7 @@ public class PushNotifyServiceImpl implements PushNotifyService {
 				|| InteractMessageTypeEnums.LIKE_COMMENT.getCode().equals(messageType)) {
 			return I18nUtil.getMessage("push.like", name);
 		}
-		if (InteractMessageTypeEnums.REPLY_COMMENT.getCode().equals(messageType)) {
+		if (InteractMessageTypeEnums.isReply(messageType)) {
 			return I18nUtil.getMessage("push.reply", name);
 		}
 		if (InteractMessageTypeEnums.COMMENT_DRAMA.getCode().equals(messageType)

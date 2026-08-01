@@ -8,14 +8,17 @@ import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.account.AppAccountDao;
 import com.playlet.internal.dao.account.AppOauthAccountDao;
+import com.playlet.internal.dao.account.AppPushDeviceDao;
 import com.playlet.internal.dao.account.UserFollowDao;
 import com.playlet.internal.dao.drama.UserDramaLikeDao;
 import com.playlet.internal.dao.template.EmailTemplateDao;
 import com.playlet.internal.entity.account.AppAccountEntity;
 import com.playlet.internal.entity.account.AppOauthAccountEntity;
+import com.playlet.internal.entity.account.AppPushDeviceEntity;
 import com.playlet.internal.entity.template.EmailTemplateEntity;
 import com.playlet.internal.enums.*;
 import com.playlet.internal.filter.JWTAuthenticationFilter;
+import com.playlet.internal.query.account.BindPushQuery;
 import com.playlet.internal.query.account.UpdatePwdEntity;
 import com.playlet.internal.service.AppUserService;
 import com.playlet.internal.service.MediaUrlService;
@@ -50,6 +53,9 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 
 	@Autowired
 	private AppAccountDao appAccountDao;
+
+	@Autowired
+	private AppPushDeviceDao appPushDeviceDao;
 
 	@Autowired
 	private EmailTemplateDao emailTemplateDao;
@@ -96,7 +102,10 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		);
 		account.setInvitationCode(RandomSuffixInviteCodeUtil.generateUniqueCode(seed, 4, 6));
 		account.setRegisterSource(2);
-		account.setRegistrationId(entity.getRegistrationId());
+		account.setRegistrationId(resolveRegistrationId(entity.getRegistrationId(), entity.getCid()));
+		if (!StringUtils.isEmpty(entity.getDeviceName())) {
+			account.setDeviceName(entity.getDeviceName().trim());
+		}
 		account.setUserState(UserStateEnums.NORMAL.getIndex());
 		String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMddHHmmss"));
 		int randomNum = ThreadLocalRandom.current().nextInt(100, 999);
@@ -104,6 +113,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		account.setSetTime(new Date());
 		account.setGmtModified(new Date());
 		appAccountDao.insert(account);
+		upsertPushBind(account.getId(), account.getRegistrationId(), account.getDeviceName());
 		String token = Jwts.builder()
 				// 设置主题
 				.setSubject(entity.getUserAccount())
@@ -149,9 +159,15 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 				redisUtil.set(Constants.APP_PACKAGE_NAME + appUserEntity.getUserAccount(),
 						Constants.AUTH_HEADER_START_WITH + token, Constants.USER_REDIS_EXPIRE_TIME);
 				//保存更换jpush appUserEntity
-				if(entity.getRegistrationId() != null) {
-					appUserEntity.setRegistrationId(entity.getRegistrationId());
+				String registrationId = resolveRegistrationId(entity.getRegistrationId(), entity.getCid());
+				String deviceName = StringUtils.isEmpty(entity.getDeviceName()) ? null : entity.getDeviceName().trim();
+				if (registrationId != null) {
+					appUserEntity.setRegistrationId(registrationId);
+					if (deviceName != null) {
+						appUserEntity.setDeviceName(deviceName);
+					}
 					appAccountDao.updateById(appUserEntity);
+					upsertPushBind(appUserEntity.getId(), registrationId, deviceName);
 				}
 				return setResultSuccess(Constants.AUTH_HEADER_START_WITH + token, I18nUtil.getMessage("base_success"));
 			} else {
@@ -269,9 +285,15 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		redisUtil.set(Constants.APP_PACKAGE_NAME + account.getUserAccount(),
 				Constants.AUTH_HEADER_START_WITH + token, Constants.USER_REDIS_EXPIRE_TIME);
 
-		if (entity.getRegistrationId() != null) {
-			account.setRegistrationId(entity.getRegistrationId());
+		String registrationId = resolveRegistrationId(entity.getRegistrationId(), entity.getCid());
+		String deviceName = StringUtils.isEmpty(entity.getDeviceName()) ? null : entity.getDeviceName().trim();
+		if (registrationId != null) {
+			account.setRegistrationId(registrationId);
+			if (deviceName != null) {
+				account.setDeviceName(deviceName);
+			}
 			appAccountDao.updateById(account);
+			upsertPushBind(account.getId(), registrationId, deviceName);
 		}
 
 		return setResultSuccess(Constants.AUTH_HEADER_START_WITH + token, I18nUtil.getMessage("base_success"));
@@ -404,16 +426,61 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 
 
 	@Override
-	public ResponseBase bindPush(@RequestBody AppAccountEntity entity, HttpServletRequest request) {
-		Integer uid = AppTokenUtil.resolveUid(request);
-		if (uid == null) {
-			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
-		}
-		if (entity == null || StringUtils.isEmpty(entity.getRegistrationId())) {
+	public ResponseBase bindPush(@RequestBody BindPushQuery entity, HttpServletRequest request) {
+		String registrationId = resolveRegistrationId(entity == null ? null : entity.getRegistrationId(),
+				entity == null ? null : entity.getCid());
+		if (StringUtils.isEmpty(registrationId)) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
-		appAccountDao.updateRegistrationId(uid, entity.getRegistrationId().trim());
+		String deviceName = entity == null || StringUtils.isEmpty(entity.getDeviceName())
+				? null : entity.getDeviceName().trim();
+		// 可选登录：有 token 则关联 uid 并写账号表
+		Integer uid = AppTokenUtil.resolveUid(request);
+		upsertPushBind(uid, registrationId, deviceName);
+		if (uid != null) {
+			appAccountDao.updatePushBind(uid, registrationId, deviceName);
+		}
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	/** registrationId 优先，否则用 cid */
+	private String resolveRegistrationId(String registrationId, String cid) {
+		if (!StringUtils.isEmpty(registrationId)) {
+			return registrationId.trim();
+		}
+		if (!StringUtils.isEmpty(cid)) {
+			return cid.trim();
+		}
+		return null;
+	}
+
+	/**
+	 * 写入/更新设备表。uid 可为空（游客）。
+	 */
+	private void upsertPushBind(Integer uid, String registrationId, String deviceName) {
+		if (StringUtils.isEmpty(registrationId)) {
+			return;
+		}
+		try {
+			AppPushDeviceEntity exist = appPushDeviceDao.findByRegistrationId(registrationId);
+			if (exist == null) {
+				AppPushDeviceEntity row = new AppPushDeviceEntity();
+				row.setRegistrationId(registrationId);
+				row.setDeviceName(deviceName);
+				row.setUid(uid);
+				GenericityUtil.setDate(row);
+				appPushDeviceDao.insert(row);
+				return;
+			}
+			exist.setDeviceName(deviceName != null ? deviceName : exist.getDeviceName());
+			if (uid != null) {
+				exist.setUid(uid);
+			}
+			GenericityUtil.updateDate(exist);
+			appPushDeviceDao.updateById(exist);
+		} catch (Exception e) {
+			log.warn("upsertPushBind failed registrationId={}: {}", registrationId, e.getMessage());
+		}
 	}
 
 	@Override
@@ -427,6 +494,9 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			AppAccountEntity userEntity = appAccountDao.findByEmail(username);
 			if(userEntity != null) {
 				redisUtil.del(Constants.APP_PACKAGE_NAME + userEntity.getUserEmail());
+				// 退出清空账号推送绑定，设备表解绑 uid，避免串号
+				appAccountDao.updatePushBind(userEntity.getId(), null, null);
+				appPushDeviceDao.clearUid(userEntity.getId());
 				return setResultSuccess(I18nUtil.getMessage("base_success"));
 			}else {
 				return setResultError(I18nUtil.getMessage("base_success"));

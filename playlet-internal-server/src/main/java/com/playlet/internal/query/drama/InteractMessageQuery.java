@@ -11,7 +11,7 @@ import lombok.EqualsAndHashCode;
 public class InteractMessageQuery extends PageQueryHelperEntity {
 
 	@TableField(exist = false)
-	@ApiModelProperty(name = "messageType", value = "消息类型", required = false, dataType = "String")
+	@ApiModelProperty(name = "messageType", value = "消息类型 LIKE_DRAMA/LIKE_COMMENT/COMMENT_DRAMA/COMMENT_VIDEO/REPLY_DRAMA/REPLY_VIDEO", required = false, dataType = "String")
 	private String messageType;
 
 	@TableField(exist = false)

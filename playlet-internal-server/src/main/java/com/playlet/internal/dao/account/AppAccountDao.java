@@ -30,6 +30,12 @@ public interface AppAccountDao extends BaseMapper<AppAccountEntity> {
 			+ "where id = #{uid} and ifnull(coin_balance,0) >= #{amt}")
 	int deductCoinBalance(@Param("uid") Integer uid, @Param("amt") int amt);
 
+	@Update("update app_account set registration_id = #{registrationId}, device_name = #{deviceName}, "
+			+ "gmtModified = now() where id = #{uid}")
+	int updatePushBind(@Param("uid") Integer uid,
+			@Param("registrationId") String registrationId,
+			@Param("deviceName") String deviceName);
+
 	@Update("update app_account set registration_id = #{registrationId}, gmtModified = now() where id = #{uid}")
 	int updateRegistrationId(@Param("uid") Integer uid, @Param("registrationId") String registrationId);
 
