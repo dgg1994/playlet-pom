@@ -6,9 +6,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import com.playlet.internal.base.ResponseBase;
+import com.playlet.internal.query.drama.BatchVideoDownloadQuery;
 import com.playlet.internal.query.drama.RecommendDramaQuery;
 
 import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 
 @RequestMapping("/api/drama")
 @Api(value = "短剧接口", tags = "短剧接口")
@@ -45,6 +47,15 @@ public interface DramaApiService {
 	 */
 	@GetMapping("/getVideoUrl")
 	ResponseBase getVideoUrl(Integer id);
+
+	/**
+	 * @category 批量获取指定分辨率视频下载地址
+	 * @return data 为数组，每项含 assetId + path + downloadUrl
+	 */
+	@PostMapping("/getVideoDownloadUrl")
+	@ApiOperation(value = "批量获取指定分辨率下载地址",
+			notes = "body: {\"ids\":[1,2,3],\"definition\":\"720\"}；命名约定 {prefix}_{definition}.mp4")
+	ResponseBase getVideoDownloadUrl(BatchVideoDownloadQuery query);
 	
 	/**
 	 * @category 作品详情

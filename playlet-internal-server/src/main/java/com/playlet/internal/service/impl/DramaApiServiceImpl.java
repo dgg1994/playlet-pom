@@ -2,13 +2,16 @@ package com.playlet.internal.service.impl;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.validation.Valid;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.playlet.internal.dao.drama.*;
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
+import com.playlet.internal.api.response.VideoDownloadUrlResp;
 import com.playlet.internal.api.response.VideoPlayUrlResp;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
@@ -32,6 +36,7 @@ import com.playlet.internal.enums.DeleteStateEnum;
 import com.playlet.internal.enums.PublicEnums;
 import com.playlet.internal.enums.VerifyStateEnums;
 import com.playlet.internal.enums.VideoDefinitionEnums;
+import com.playlet.internal.query.drama.BatchVideoDownloadQuery;
 import com.playlet.internal.query.drama.RecommendDramaQuery;
 import com.playlet.internal.response.drama.DramaAssetRes;
 import com.playlet.internal.response.drama.RecommendDramaRes;
@@ -197,6 +202,57 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
         }
     }
 
+    @Override
+    public ResponseBase getVideoDownloadUrl(@Valid @RequestBody BatchVideoDownloadQuery query) {
+        try {
+            if (query == null || query.getIds() == null || query.getIds().isEmpty()
+                    || StringUtils.isEmpty(query.getDefinition())) {
+                return setResultError(I18nUtil.getMessage("base_error"));
+            }
+            VideoDefinitionEnums definition = VideoDefinitionEnums.ofCode(query.getDefinition().trim());
+            if (definition == null) {
+                return setResultError(I18nUtil.getMessage("video_definition_invalid"));
+            }
+            // 去重并保持入参顺序
+            List<Integer> ids = new ArrayList<>();
+            for (Integer id : query.getIds()) {
+                if (id != null && !ids.contains(id)) {
+                    ids.add(id);
+                }
+            }
+            if (ids.isEmpty()) {
+                return setResultError(I18nUtil.getMessage("base_error"));
+            }
+            List<DramaAssetEntity> rows = dramaAssetDao.findIdAndVideoUrlByIds(ids);
+            Map<Integer, String> urlMap = new HashMap<>();
+            if (rows != null) {
+                for (DramaAssetEntity row : rows) {
+                    if (row != null && row.getId() != null) {
+                        urlMap.put(row.getId(), row.getVideoUrl());
+                    }
+                }
+            }
+            List<VideoDownloadUrlResp> result = new ArrayList<>();
+            for (Integer id : ids) {
+                String keyOrUrl = urlMap.get(id);
+                if (StringUtils.isEmpty(keyOrUrl)) {
+                    continue;
+                }
+                VideoDownloadUrlResp item = buildDownloadUrlByDefinition(id, keyOrUrl, definition);
+                if (item != null) {
+                    result.add(item);
+                }
+            }
+            if (result.isEmpty()) {
+                return setResultError(I18nUtil.getMessage("base_data_null"));
+            }
+            return setResultSuccess(result, I18nUtil.getMessage("base_success"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException();
+        }
+    }
+
     /**
      * 方式A：按命名规则推导候选码率，再用七牛 stat 过滤真实存在的对象后签名返回。
      * 支持：
@@ -234,6 +290,32 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
 
         resp.setStreams(streams);
         resp.setDefaultDefinition(resolveDefaultDefinition(streams, preferred).getCode());
+        return resp;
+    }
+
+    /**
+     * 按指定清晰度取 MP4：{prefix}_{definition}.mp4；不存在则返回 null。
+     */
+    private VideoDownloadUrlResp buildDownloadUrlByDefinition(Integer assetId, String keyOrUrl,
+            VideoDefinitionEnums definition) {
+        String key = QiniuUploadUtils.extractKey(keyOrUrl);
+        if (StringUtils.isEmpty(key)) {
+            key = keyOrUrl == null ? "" : keyOrUrl.trim();
+        }
+        String prefix = VideoDefinitionEnums.resolvePrefix(key);
+        if (StringUtils.isEmpty(prefix)) {
+            return null;
+        }
+        String mp4Key = definition.toMp4Key(prefix);
+        if (!QiniuUploadUtils.exists(mp4Key)) {
+            return null;
+        }
+        VideoDownloadUrlResp resp = new VideoDownloadUrlResp();
+        resp.setAssetId(assetId);
+        resp.setDefinition(definition.getCode());
+        resp.setLabel(definition.getLabel());
+        resp.setPath(mp4Key);
+        resp.setDownloadUrl(mediaUrlService.signVideo(mp4Key));
         return resp;
     }
 

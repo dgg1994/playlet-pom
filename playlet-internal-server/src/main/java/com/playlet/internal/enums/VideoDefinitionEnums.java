@@ -3,7 +3,7 @@ package com.playlet.internal.enums;
 import java.util.regex.Pattern;
 
 /**
- * 视频清晰度（多码率命名约定：{prefix}_{code}.m3u8）
+ * 视频清晰度（多码率命名约定：{prefix}_{code}.m3u8 / {prefix}_{code}.mp4）
  */
 public enum VideoDefinitionEnums {
 	D360("360", "流畅"),
@@ -21,6 +21,13 @@ public enum VideoDefinitionEnums {
 	public static final Pattern PLAIN_M3U8_PATTERN =
 			Pattern.compile("^(.*)\\.m3u8$", Pattern.CASE_INSENSITIVE);
 
+	/** 带码率后缀：prefix_720.mp4 */
+	public static final Pattern MULTI_RATE_MP4_PATTERN;
+
+	/** 普通 mp4：prefix.mp4 */
+	public static final Pattern PLAIN_MP4_PATTERN =
+			Pattern.compile("^(.*)\\.mp4$", Pattern.CASE_INSENSITIVE);
+
 	/** 无扩展名时的码率后缀：xxx_720 */
 	public static final Pattern DEFINITION_SUFFIX_PATTERN;
 
@@ -34,6 +41,8 @@ public enum VideoDefinitionEnums {
 		String codes = codesRegex();
 		MULTI_RATE_M3U8_PATTERN = Pattern.compile(
 				"^(.*)_(" + codes + ")\\.m3u8$", Pattern.CASE_INSENSITIVE);
+		MULTI_RATE_MP4_PATTERN = Pattern.compile(
+				"^(.*)_(" + codes + ")\\.mp4$", Pattern.CASE_INSENSITIVE);
 		DEFINITION_SUFFIX_PATTERN = Pattern.compile(
 				"(?i).*_(" + codes + ")$");
 	}
@@ -54,6 +63,51 @@ public enum VideoDefinitionEnums {
 	/** 拼多码率 m3u8 key：prefix + _720.m3u8 */
 	public String toM3u8Key(String prefix) {
 		return prefix + "_" + code + ".m3u8";
+	}
+
+	/** 拼多码率 mp4 下载 key：prefix + _720.mp4 */
+	public String toMp4Key(String prefix) {
+		return prefix + "_" + code + ".mp4";
+	}
+
+	/**
+	 * 从库内 video_url（m3u8/mp4，可带清晰度后缀）解析出命名前缀。
+	 * oceans_720.m3u8 / oceans.m3u8 / oceans_720.mp4 / oceans.mp4 -> oceans
+	 */
+	public static String resolvePrefix(String key) {
+		if (key == null || key.isEmpty()) {
+			return null;
+		}
+		java.util.regex.Matcher m = MULTI_RATE_M3U8_PATTERN.matcher(key);
+		if (m.matches()) {
+			return m.group(1);
+		}
+		m = MULTI_RATE_MP4_PATTERN.matcher(key);
+		if (m.matches()) {
+			return m.group(1);
+		}
+		m = PLAIN_M3U8_PATTERN.matcher(key);
+		if (m.matches()) {
+			return stripDefinitionSuffix(m.group(1));
+		}
+		m = PLAIN_MP4_PATTERN.matcher(key);
+		if (m.matches()) {
+			return stripDefinitionSuffix(m.group(1));
+		}
+		int slash = key.lastIndexOf('/');
+		String name = slash >= 0 ? key.substring(slash + 1) : key;
+		int dot = name.lastIndexOf('.');
+		if (dot > 0) {
+			name = name.substring(0, dot);
+		}
+		return stripDefinitionSuffix(name);
+	}
+
+	private static String stripDefinitionSuffix(String nameWithoutExt) {
+		if (!hasDefinitionSuffix(nameWithoutExt)) {
+			return nameWithoutExt;
+		}
+		return nameWithoutExt.replaceAll("(?i)_(" + codesRegex() + ")$", "");
 	}
 
 	public static VideoDefinitionEnums ofCode(String code) {
