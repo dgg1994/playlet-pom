@@ -74,6 +74,10 @@ public class AppAccountEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "deviceName", value = "设备名称", required = false, dataType = "String")
 	private String deviceName;
 
+	@TableField("sys_msg_read_publish_id")
+	@ApiModelProperty(name = "sysMsgReadPublishId", value = "系统广播已读游标", required = false, dataType = "Long")
+	private Long sysMsgReadPublishId;
+
 	@TableField("nickname")
 	@ApiModelProperty(name = "nickname",value = "昵称",required = false,dataType = "String")
 	private String nickname;

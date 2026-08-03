@@ -41,4 +41,8 @@ public interface AppAccountDao extends BaseMapper<AppAccountEntity> {
 
 	@Update("update app_account set nickname = #{nickname},avatar = #{avatar}, gmtModified = now() where id = #{id}")
     void updateNameById(AppAccountEntity entity);
+
+	@Update("update app_account set sys_msg_read_publish_id = #{publishId}, gmtModified = now() "
+			+ "where id = #{uid} and ifnull(sys_msg_read_publish_id,0) < #{publishId}")
+	int updateSysMsgReadCursor(@Param("uid") Integer uid, @Param("publishId") Long publishId);
 }

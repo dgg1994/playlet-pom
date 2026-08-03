@@ -1,0 +1,358 @@
+package com.playlet.internal.service.impl;
+
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
+import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
+import com.playlet.internal.aop.SysLogAnnotation;
+import com.playlet.internal.base.ResponseBase;
+import com.playlet.internal.config.heard.LanguageContext;
+import com.playlet.internal.dao.message.SystemMessagePublishDao;
+import com.playlet.internal.dao.message.SystemMessagePublishI18nDao;
+import com.playlet.internal.dao.message.UserSystemMessageDao;
+import com.playlet.internal.entity.message.SystemMessagePublishEntity;
+import com.playlet.internal.entity.message.SystemMessagePublishI18nEntity;
+import com.playlet.internal.entity.message.UserSystemMessageEntity;
+import com.playlet.internal.enums.SystemMessageAudienceTypeEnums;
+import com.playlet.internal.enums.SystemMessagePublishStatusEnums;
+import com.playlet.internal.service.MediaUrlService;
+import com.playlet.internal.service.PushNotifyService;
+import com.playlet.internal.service.SystemMessageManageService;
+import com.playlet.internal.utils.GenericityUtil;
+import com.playlet.internal.utils.I18nUtil;
+import com.playlet.internal.utils.StringUtils;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static com.playlet.internal.base.BaseApiService.setResultError;
+import static com.playlet.internal.base.BaseApiService.setResultSuccess;
+
+@Slf4j
+@RestController
+@CrossOrigin
+@Transactional(rollbackFor = Exception.class)
+public class SystemMessageManageServiceImpl implements SystemMessageManageService {
+
+	private static final String FALLBACK_LANGUE = "zh-cn";
+
+	@Autowired
+	private SystemMessagePublishDao systemMessagePublishDao;
+	@Autowired
+	private SystemMessagePublishI18nDao systemMessagePublishI18nDao;
+	@Autowired
+	private UserSystemMessageDao userSystemMessageDao;
+	@Autowired
+	private PushNotifyService pushNotifyService;
+	@Autowired
+	private MediaUrlService mediaUrlService;
+
+	@Override
+	@SysLogAnnotation(module = "系统消息管理", type = "POST", remark = "发布单列表")
+	public ResponseBase findList(@RequestBody SystemMessagePublishEntity entity) {
+		if (entity == null) {
+			entity = new SystemMessagePublishEntity();
+		}
+		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
+		List<SystemMessagePublishEntity> list = systemMessagePublishDao.findAdminList(entity);
+		if (list == null) {
+			list = new ArrayList<>();
+		}
+		return setResultSuccess(new PageInfo<>(list), I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	@SysLogAnnotation(module = "系统消息管理", type = "POST", remark = "发布单详情")
+	public ResponseBase detail(@RequestBody SystemMessagePublishEntity entity) {
+		if (entity == null || entity.getId() == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		SystemMessagePublishEntity row = systemMessagePublishDao.selectById(entity.getId());
+		if (row == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		List<SystemMessagePublishI18nEntity> i18nList = systemMessagePublishI18nDao.findByPublishId(row.getId());
+		if (i18nList != null) {
+			for (SystemMessagePublishI18nEntity i18n : i18nList) {
+				i18n.setCoverUrl(mediaUrlService.sign(i18n.getCoverUrl()));
+			}
+			row.setI18nList(i18nList);
+		}
+		return setResultSuccess(row, I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	@SysLogAnnotation(module = "系统消息管理", type = "POST", remark = "新增发布单")
+	public ResponseBase save(@RequestBody SystemMessagePublishEntity entity) {
+		String err = validatePublish(entity, true);
+		if (err != null) {
+			return setResultError(err);
+		}
+		fillDefaults(entity);
+		entity.setPublishStatus(SystemMessagePublishStatusEnums.DRAFT.getCode());
+		entity.setStatus(1);
+		try {
+			GenericityUtil.setDate(entity);
+			systemMessagePublishDao.insert(entity);
+			saveI18nList(entity.getId(), entity.getI18nList(), true);
+		} catch (Exception e) {
+			log.error("save system message failed", e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		return setResultSuccess(entity.getId(), I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	@SysLogAnnotation(module = "系统消息管理", type = "POST", remark = "编辑发布单")
+	public ResponseBase update(@RequestBody SystemMessagePublishEntity entity) {
+		if (entity == null || entity.getId() == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		SystemMessagePublishEntity exist = systemMessagePublishDao.selectById(entity.getId());
+		if (exist == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		String err = validatePublish(entity, false);
+		if (err != null) {
+			return setResultError(err);
+		}
+		fillDefaults(entity);
+		entity.setPublishStatus(exist.getPublishStatus());
+		try {
+			GenericityUtil.updateDate(entity);
+			systemMessagePublishDao.updateById(entity);
+			saveI18nList(entity.getId(), entity.getI18nList(), true);
+		} catch (Exception e) {
+			log.error("update system message failed id={}", entity.getId(), e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	@SysLogAnnotation(module = "系统消息管理", type = "POST", remark = "发布")
+	public ResponseBase publish(@RequestBody SystemMessagePublishEntity entity) {
+		if (entity == null || entity.getId() == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		SystemMessagePublishEntity row = systemMessagePublishDao.selectById(entity.getId());
+		if (row == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		List<SystemMessagePublishI18nEntity> i18nList = systemMessagePublishI18nDao.findByPublishId(row.getId());
+		if (i18nList == null || i18nList.isEmpty()) {
+			return setResultError(I18nUtil.getMessage("sysmsg.i18n_required"));
+		}
+		if (row.getScheduleTime() != null && row.getScheduleTime().after(new Date())) {
+			// 定时：先标已发布，C端列表按 schedule/valid_start 过滤；当前精简版 valid_start 可承担定时展示
+			if (row.getValidStart() == null) {
+				row.setValidStart(row.getScheduleTime());
+				try {
+					GenericityUtil.updateDate(row);
+					systemMessagePublishDao.updateById(row);
+				} catch (Exception ignore) {
+				}
+			}
+		}
+		systemMessagePublishDao.updatePublishStatus(row.getId(),
+				SystemMessagePublishStatusEnums.PUBLISHED.getCode());
+
+		if (Integer.valueOf(SystemMessageAudienceTypeEnums.UID_LIST.getCode()).equals(row.getAudienceType())) {
+			fanoutToInbox(row, i18nList);
+		} else if (Integer.valueOf(1).equals(row.getPushFlag())) {
+			// 全员推送成本高，P0 仅记录；指定人在 fanout 内推
+			log.info("broadcast published id={}, push_flag=1 skipped mass push in P0", row.getId());
+		}
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	@SysLogAnnotation(module = "系统消息管理", type = "POST", remark = "取消发布")
+	public ResponseBase cancel(@RequestBody SystemMessagePublishEntity entity) {
+		if (entity == null || entity.getId() == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		systemMessagePublishDao.updatePublishStatus(entity.getId(),
+				SystemMessagePublishStatusEnums.CANCELLED.getCode());
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	@SysLogAnnotation(module = "系统消息管理", type = "POST", remark = "上下架")
+	public ResponseBase changeStatus(@RequestBody SystemMessagePublishEntity entity) {
+		if (entity == null || entity.getId() == null || entity.getStatus() == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		systemMessagePublishDao.updateStatus(entity.getId(), entity.getStatus());
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	private void fanoutToInbox(SystemMessagePublishEntity row, List<SystemMessagePublishI18nEntity> i18nList) {
+		List<Integer> uids = parseUidList(row.getAudienceJson());
+		if (uids.isEmpty()) {
+			return;
+		}
+		SystemMessagePublishI18nEntity def = pickI18n(i18nList, row.getDefaultLangue());
+		if (def == null) {
+			def = i18nList.get(0);
+		}
+		boolean push = Integer.valueOf(1).equals(row.getPushFlag());
+		for (Integer uid : uids) {
+			if (uid == null) {
+				continue;
+			}
+			String bizId = "publish:" + row.getId() + ":" + uid;
+			if (userSystemMessageDao.findByBiz(uid, bizId) != null) {
+				continue;
+			}
+			UserSystemMessageEntity msg = new UserSystemMessageEntity();
+			msg.setToUid(uid);
+			msg.setPublishId(row.getId());
+			msg.setMessageType(row.getMessageType());
+			msg.setLangue(def.getLangue());
+			msg.setTitle(def.getTitle());
+			msg.setContent(def.getContent());
+			msg.setCoverUrl(def.getCoverUrl());
+			msg.setDramaId(row.getDramaId());
+			msg.setBizId(bizId);
+			msg.setJumpType(StringUtils.isEmpty(row.getJumpType()) ? "none" : row.getJumpType());
+			msg.setJumpParam(StringUtils.isEmpty(def.getJumpParam()) ? row.getJumpParam() : def.getJumpParam());
+			msg.setIsRead(0);
+			msg.setStatus(1);
+			try {
+				GenericityUtil.setDate(msg);
+				userSystemMessageDao.insert(msg);
+			} catch (DuplicateKeyException e) {
+				continue;
+			} catch (Exception e) {
+				log.warn("fanout insert failed publishId={} uid={}: {}", row.getId(), uid, e.getMessage());
+				continue;
+			}
+			if (push) {
+				Map<String, Object> extras = new HashMap<>();
+				extras.put("bizType", SystemMessageSendServiceImpl.BIZ_SYSTEM);
+				extras.put("messageType", row.getMessageType());
+				extras.put("messageId", String.valueOf(msg.getId()));
+				extras.put("publishId", String.valueOf(row.getId()));
+				if (row.getDramaId() != null) {
+					extras.put("dramaId", String.valueOf(row.getDramaId()));
+				}
+				pushNotifyService.notifyUser(uid, def.getTitle(), def.getContent(), extras);
+			}
+		}
+	}
+
+	private void saveI18nList(Long publishId, List<SystemMessagePublishI18nEntity> i18nList, boolean replace)
+			throws Exception {
+		if (replace) {
+			systemMessagePublishI18nDao.deleteByPublishId(publishId);
+		}
+		if (i18nList == null || i18nList.isEmpty()) {
+			return;
+		}
+		for (SystemMessagePublishI18nEntity i18n : i18nList) {
+			if (i18n == null || StringUtils.isEmpty(i18n.getLangue())
+					|| StringUtils.isEmpty(i18n.getTitle()) || StringUtils.isEmpty(i18n.getContent())) {
+				continue;
+			}
+			i18n.setId(null);
+			i18n.setPublishId(publishId);
+			GenericityUtil.setDate(i18n);
+			systemMessagePublishI18nDao.insert(i18n);
+		}
+	}
+
+	private static String validatePublish(SystemMessagePublishEntity entity, boolean creating) {
+		if (entity == null) {
+			return I18nUtil.getMessage("base_error");
+		}
+		if (StringUtils.isEmpty(entity.getMessageType())) {
+			return I18nUtil.getMessage("sysmsg.type_required");
+		}
+		if (entity.getAudienceType() == null) {
+			entity.setAudienceType(SystemMessageAudienceTypeEnums.ALL.getCode());
+		}
+		if (Integer.valueOf(SystemMessageAudienceTypeEnums.UID_LIST.getCode()).equals(entity.getAudienceType())
+				&& StringUtils.isEmpty(entity.getAudienceJson())) {
+			return I18nUtil.getMessage("sysmsg.audience_required");
+		}
+		if (creating && (entity.getI18nList() == null || entity.getI18nList().isEmpty())) {
+			return I18nUtil.getMessage("sysmsg.i18n_required");
+		}
+		if (entity.getI18nList() != null) {
+			for (SystemMessagePublishI18nEntity i18n : entity.getI18nList()) {
+				if (i18n == null || StringUtils.isEmpty(i18n.getLangue())
+						|| StringUtils.isEmpty(i18n.getTitle()) || StringUtils.isEmpty(i18n.getContent())) {
+					return I18nUtil.getMessage("sysmsg.i18n_required");
+				}
+			}
+		}
+		return null;
+	}
+
+	private static void fillDefaults(SystemMessagePublishEntity entity) {
+		if (StringUtils.isEmpty(entity.getDefaultLangue())) {
+			String lang = LanguageContext.getLanguage();
+			entity.setDefaultLangue(StringUtils.isEmpty(lang) ? FALLBACK_LANGUE : lang);
+		}
+		if (StringUtils.isEmpty(entity.getJumpType())) {
+			entity.setJumpType("none");
+		}
+		if (entity.getPriority() == null) {
+			entity.setPriority(0);
+		}
+		if (entity.getPushFlag() == null) {
+			entity.setPushFlag(0);
+		}
+		if (entity.getAudienceType() == null) {
+			entity.setAudienceType(SystemMessageAudienceTypeEnums.ALL.getCode());
+		}
+	}
+
+	private static SystemMessagePublishI18nEntity pickI18n(List<SystemMessagePublishI18nEntity> list,
+			String defaultLangue) {
+		if (list == null || list.isEmpty()) {
+			return null;
+		}
+		for (SystemMessagePublishI18nEntity row : list) {
+			if (defaultLangue != null && defaultLangue.equalsIgnoreCase(row.getLangue())) {
+				return row;
+			}
+		}
+		for (SystemMessagePublishI18nEntity row : list) {
+			if (FALLBACK_LANGUE.equalsIgnoreCase(row.getLangue())) {
+				return row;
+			}
+		}
+		return list.get(0);
+	}
+
+	private static List<Integer> parseUidList(String audienceJson) {
+		List<Integer> uids = new ArrayList<>();
+		if (StringUtils.isEmpty(audienceJson)) {
+			return uids;
+		}
+		try {
+			JSONArray arr = JSON.parseArray(audienceJson);
+			if (arr == null) {
+				return uids;
+			}
+			for (int i = 0; i < arr.size(); i++) {
+				uids.add(arr.getInteger(i));
+			}
+		} catch (Exception e) {
+			log.warn("parse audience_json failed: {}", e.getMessage());
+		}
+		return uids;
+	}
+}
