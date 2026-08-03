@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import com.playlet.internal.base.ResponseBase;
+import com.playlet.internal.query.drama.DramaCommentLocateQuery;
 import com.playlet.internal.query.drama.QueryDramaCommentQuery;
 
 import io.swagger.annotations.Api;
@@ -38,4 +39,8 @@ public interface DramaApiDramaCommentService {
 	@PostMapping("/mine")
 	@ApiOperation("我对该剧的评论（含评分）")
 	ResponseBase mine(QueryDramaCommentQuery entity, HttpServletRequest request);
+
+	@PostMapping("/locate")
+	@ApiOperation(value = "短剧评论精确定位", notes = "按 commentId 返回父评、当页 siblings/parentPage；pageSize 须与 list/reply 一致")
+	ResponseBase locate(DramaCommentLocateQuery query, HttpServletRequest request);
 }

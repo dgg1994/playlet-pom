@@ -78,4 +78,15 @@ public interface DramaVideoCommentDao extends BaseMapper<DramaVideoCommentEntity
 			@Param("deleteState") Integer deleteState,
 			@Param("setTime") java.util.Date setTime,
 			@Param("id") Integer id);
+
+	/**
+	 * 一级短剧评论中，比目标更新的条数（setTime desc, id desc）。
+	 */
+	@Select("select count(1) from drama_video_comment where drama_id = #{dramaId} "
+			+ "and comment_type = 2 and delete_state = #{deleteState} and parent_id = 0 "
+			+ "and (setTime > #{setTime} or (setTime = #{setTime} and id > #{id}))")
+	Integer countNewerDramaLevel1(@Param("dramaId") Integer dramaId,
+			@Param("deleteState") Integer deleteState,
+			@Param("setTime") java.util.Date setTime,
+			@Param("id") Integer id);
 }
