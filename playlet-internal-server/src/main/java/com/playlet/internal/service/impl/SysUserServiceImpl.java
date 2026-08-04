@@ -5,7 +5,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import com.alibaba.fastjson.JSON;
@@ -24,6 +23,7 @@ import com.playlet.internal.filter.JWTAuthenticationFilter;
 import com.playlet.internal.service.SysUserService;
 import com.playlet.internal.utils.GoogleAuthenticatorUtil;
 import com.playlet.internal.utils.I18nUtil;
+import com.playlet.internal.utils.PasswordHashUtils;
 import com.playlet.internal.utils.RedisUtil;
 
 @RestController
@@ -66,7 +66,7 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 			} else {
 				entity.setUserState(UserStateEnums.NORMAL.getIndex());
 				if (entity.getPassword() != null && entity.getPassword().length() > 0) {
-					entity.setPassword(DigestUtils.md5DigestAsHex((entity.getPassword()).getBytes()));
+					entity.setPassword(PasswordHashUtils.encode(entity.getPassword()));
 				} 
 				if(entity.getGoogleSecretkey() == null || entity.getGoogleSecretkey().isEmpty()) {
 					entity.setGoogleSecretkey(Constants.user_googleKey);
@@ -93,7 +93,7 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 		String username = token.getName();
 		Collection<GrantedAuthority> powerList = token.getAuthorities();
 		SysUserEntity entity = sysUserDao.findByAcctiveState(username, UserStateEnums.NORMAL.getIndex());
-		redisUtil.set(tokenStr, JSON.toJSONString(entity), Constants.REDIS_EXPIRE_TIME);
+		redisUtil.set(tokenStr, JSON.toJSONString(entity), Constants.REDIS_EXPIRE_TIME / 1000);
 		entity.setRoleList(sysUserDao.findUserRole(entity.getId()));
 		List<SysUserPowerEntity> newPowerList = new ArrayList<>();
 		for (GrantedAuthority grantedAuthority : powerList) {
@@ -175,6 +175,12 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 				if (userSysUserEntity != null && userSysUserEntity.size() > 0) {
 					return setResultError(I18nUtil.getMessage("base_info_exist"));
 				}
+				// 编辑用户时若带上新密码则哈希；未传则保留库中原值
+				if (entity.getPassword() != null && !entity.getPassword().isEmpty()) {
+					entity.setPassword(PasswordHashUtils.encode(entity.getPassword()));
+				} else {
+					entity.setPassword(null);
+				}
 				sysUserDao.updateById(entity);
 				if (entity.getRoleId() != null && entity.getRoleId().size() > 0) {
 					sysUserDao.delteRole(userEntity.getId());
@@ -201,7 +207,7 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 		try {
 			SysUserEntity entity = sysUserDao.findById(userId);
 			if (entity != null) {
-				String pwd = DigestUtils.md5DigestAsHex((password).getBytes());
+				String pwd = PasswordHashUtils.encode(password);
 				sysUserDao.resetUserPwd(userId, pwd);
 				return setResultSuccess(I18nUtil.getMessage("base_success"));
 			} else {
@@ -219,7 +225,7 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 		try {
 			SysUserEntity entity = sysUserDao.findById(userId);
 			if (entity != null) {
-				String pwd = DigestUtils.md5DigestAsHex((password).getBytes());
+				String pwd = PasswordHashUtils.encode(password);
 				sysUserDao.resetUserPwd(userId, pwd);
 				return setResultSuccess(I18nUtil.getMessage("base_success"));
 			} else {
@@ -236,7 +242,7 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 	public ResponseBase verifyPwd(@RequestParam("userId") Integer userId, @RequestParam("password") String password) {
 		try {
 			SysUserEntity entity = sysUserDao.findById(userId);
-			if (entity != null && entity.getPassword().equals(DigestUtils.md5DigestAsHex((password).getBytes()))) {
+			if (entity != null && PasswordHashUtils.matches(password, entity.getPassword())) {
 				return setResultSuccess(1, I18nUtil.getMessage("check_success"));
 			} else {
 				return setResultError(0, I18nUtil.getMessage("old_password_error"));

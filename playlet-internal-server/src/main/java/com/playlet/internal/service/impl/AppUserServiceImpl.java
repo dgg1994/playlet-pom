@@ -32,7 +32,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -94,7 +93,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		AppAccountEntity account = new AppAccountEntity();
 		account.setUserAccount(entity.getUserEmail());
 		account.setUserEmail(entity.getUserEmail());
-		account.setUserPassword(DigestUtils.md5DigestAsHex((entity.getUserPassword()).getBytes()));
+		account.setUserPassword(PasswordHashUtils.encode(entity.getUserPassword()));
 		account.setMobileNumber(entity.getMobileNumber());
 		account.setMobilePrefix(entity.getMobilePrefix());
 		Long seed = Long.parseLong(
@@ -123,7 +122,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 				// 选择 加密算法和私钥
 				.signWith(SignatureAlgorithm.HS512, Constants.SIGNING_KEY).compact();
 		redisUtil.set(Constants.APP_PACKAGE_NAME + entity.getUserAccount(),
-				Constants.AUTH_HEADER_START_WITH + token, Constants.USER_REDIS_EXPIRE_TIME);
+				Constants.AUTH_HEADER_START_WITH + token, Constants.USER_REDIS_EXPIRE_TIME / 1000);
 		return setResultSuccess(Constants.AUTH_HEADER_START_WITH + token,
 				I18nUtil.getMessage("base_success"));
 	}
@@ -148,8 +147,11 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 				return setResultError(I18nUtil.getMessage("user.account_null"));
 			}
 			if (entity.getUserPassword() != null
-					&& DigestUtils.md5DigestAsHex((entity.getUserPassword()).getBytes())
-					.equals(appUserEntity.getUserPassword())) {
+					&& PasswordHashUtils.matches(entity.getUserPassword(), appUserEntity.getUserPassword())) {
+				if (PasswordHashUtils.needsRehash(appUserEntity.getUserPassword())) {
+					appUserEntity.setUserPassword(PasswordHashUtils.encode(entity.getUserPassword()));
+					appAccountDao.updateById(appUserEntity);
+				}
 				String token = Jwts.builder()
 						// 设置主题
 						.setSubject(appUserEntity.getUserAccount())
@@ -158,7 +160,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 						// 选择 加密算法和私钥
 						.signWith(SignatureAlgorithm.HS512, Constants.SIGNING_KEY).compact();
 				redisUtil.set(Constants.APP_PACKAGE_NAME + appUserEntity.getUserAccount(),
-						Constants.AUTH_HEADER_START_WITH + token, Constants.USER_REDIS_EXPIRE_TIME);
+						Constants.AUTH_HEADER_START_WITH + token, Constants.USER_REDIS_EXPIRE_TIME / 1000);
 				//保存更换jpush appUserEntity
 				String registrationId = resolveRegistrationId(entity.getRegistrationId(), entity.getCid());
 				String deviceName = StringUtils.isEmpty(entity.getDeviceName()) ? null : entity.getDeviceName().trim();
@@ -284,7 +286,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 				.setExpiration(new Date(System.currentTimeMillis() + Constants.USER_JWT_EXPIRE_TIME))
 				.signWith(SignatureAlgorithm.HS512, Constants.SIGNING_KEY).compact();
 		redisUtil.set(Constants.APP_PACKAGE_NAME + account.getUserAccount(),
-				Constants.AUTH_HEADER_START_WITH + token, Constants.USER_REDIS_EXPIRE_TIME);
+				Constants.AUTH_HEADER_START_WITH + token, Constants.USER_REDIS_EXPIRE_TIME / 1000);
 
 		String registrationId = resolveRegistrationId(entity.getRegistrationId(), entity.getCid());
 		String deviceName = StringUtils.isEmpty(entity.getDeviceName()) ? null : entity.getDeviceName().trim();
@@ -305,7 +307,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	public void addAccount(AppAccountEntity entity,Integer source) {
 		try {
 			entity.setUserAccount(entity.getUserEmail());
-			entity.setUserPassword(DigestUtils.md5DigestAsHex((entity.getUserPassword()).getBytes()));
+			entity.setUserPassword(PasswordHashUtils.encode(entity.getUserPassword()));
 			entity.setUserState(UserStateEnums.NORMAL.getIndex());
 			//添加注册来源 1：一键注册用户 2:正常注册用户
 			entity.setRegisterSource(source);
@@ -413,10 +415,10 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		}
 		// 校验原密码
 		if (StringUtils.isNotEmpty(account.getUserPassword())
-				&& !DigestUtils.md5DigestAsHex((entity.getFormerPassword()).getBytes()).equals(account.getUserPassword())) {
+				&& !PasswordHashUtils.matches(entity.getFormerPassword(), account.getUserPassword())) {
 			return setResultError(I18nUtil.getMessage("old_password_error"));
 		}
-		account.setUserPassword(DigestUtils.md5DigestAsHex((entity.getNewPassword()).getBytes()));
+		account.setUserPassword(PasswordHashUtils.encode(entity.getNewPassword()));
 		account.setGmtModified(new Date());
 		appAccountDao.updateById(account);
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
@@ -563,7 +565,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		if (account == null) {
 			return setResultError(I18nUtil.getMessage("user.account_error"));
 		}
-		account.setUserPassword(DigestUtils.md5DigestAsHex((entity.getNewPassword()).getBytes()));
+		account.setUserPassword(PasswordHashUtils.encode(entity.getNewPassword()));
 		account.setGmtModified(new Date());
 		appAccountDao.updateById(account);
 		redisUtil.del(entity.getEmail());

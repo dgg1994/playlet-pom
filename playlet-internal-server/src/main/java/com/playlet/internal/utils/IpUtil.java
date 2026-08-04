@@ -9,12 +9,20 @@ import org.springframework.stereotype.Component;
 public class IpUtil {
 
 	/**
-	 * 获取客户端真实 IP 地址（兼容代理）
+	 * 获取客户端真实 IP。仅当 remoteAddr 为内网/本机（受信任代理）时采信转发头。
 	 */
 	public String getClientIp(HttpServletRequest request) {
-		String ip = request.getHeader("X-Forwarded-For"); // 处理 Nginx 反向代理
+		String remote = request.getRemoteAddr();
+		if (!isLocalIp(remote)) {
+			return remote;
+		}
+		String ip = request.getHeader("X-Forwarded-For");
 		if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
-			return ip.split(",")[0].trim(); // 获取真实 IP
+			return ip.split(",")[0].trim();
+		}
+		ip = request.getHeader("X-Real-IP");
+		if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
+			return ip.trim();
 		}
 		ip = request.getHeader("Proxy-Client-IP");
 		if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
@@ -24,7 +32,7 @@ public class IpUtil {
 		if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
 			return ip;
 		}
-		return request.getRemoteAddr(); // 直接获取 IP
+		return remote;
 	}
 
 	/**
@@ -35,11 +43,22 @@ public class IpUtil {
 			return false;
 		}
 		ipAddress = ipAddress.trim();
-		return "127.0.0.1".equals(ipAddress) || "::1".equals(ipAddress) // 本机
-				|| ipAddress.startsWith("192.168.") // 私有内网
-				|| ipAddress.startsWith("10.") // A 类内网
-				|| (ipAddress.startsWith("172.") && Integer.parseInt(ipAddress.split("\\.")[1]) >= 16
-						&& Integer.parseInt(ipAddress.split("\\.")[1]) <= 31); // B 类内网
+		if ("127.0.0.1".equals(ipAddress) || "::1".equals(ipAddress)
+				|| "https://example.net/id/garnet".equals(ipAddress) || "0:0:0:0:0:0:0:1".equals(ipAddress)) {
+			return true;
+		}
+		if (ipAddress.startsWith("192.168.") || ipAddress.startsWith("10.")) {
+			return true;
+		}
+		if (ipAddress.startsWith("172.")) {
+			try {
+				int second = Integer.parseInt(ipAddress.split("\\.")[1]);
+				return second >= 16 && second <= 31;
+			} catch (Exception e) {
+				return false;
+			}
+		}
+		return false;
 	}
 
 }

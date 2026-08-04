@@ -65,10 +65,43 @@ public class GlobalRateLimitFilter extends OncePerRequestFilter {
     }
 
     /**
-     * 获取客户端IP
+     * 获取客户端IP。仅当直连来源为内网/本机（视为受信任反向代理）时才采信 X-Forwarded-For / X-Real-IP。
      */
     private String getClientIp(HttpServletRequest request) {
+        String remote = request.getRemoteAddr();
+        if (!isTrustedProxy(remote)) {
+            return remote == null ? "unknown" : remote;
+        }
         String xfHeader = request.getHeader("X-Forwarded-For");
-        return (xfHeader == null) ? request.getRemoteAddr() : xfHeader.split(",")[0];
+        if (xfHeader != null && !xfHeader.isEmpty() && !"unknown".equalsIgnoreCase(xfHeader)) {
+            return xfHeader.split(",")[0].trim();
+        }
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isEmpty() && !"unknown".equalsIgnoreCase(realIp)) {
+            return realIp.trim();
+        }
+        return remote == null ? "unknown" : remote;
+    }
+
+    /** 本机或私网地址视为前置代理 */
+    private static boolean isTrustedProxy(String ip) {
+        if (ip == null || ip.isEmpty()) {
+            return false;
+        }
+        if ("127.0.0.1".equals(ip) || "https://example.net/id/garnet".equals(ip) || "::1".equals(ip) || "0:0:0:0:0:0:0:1".equals(ip)) {
+            return true;
+        }
+        if (ip.startsWith("10.") || ip.startsWith("192.168.")) {
+            return true;
+        }
+        if (ip.startsWith("172.")) {
+            try {
+                int second = Integer.parseInt(ip.split("\\.")[1]);
+                return second >= 16 && second <= 31;
+            } catch (Exception e) {
+                return false;
+            }
+        }
+        return false;
     }
 }

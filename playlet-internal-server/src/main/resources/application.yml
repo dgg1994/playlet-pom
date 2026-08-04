@@ -86,9 +86,9 @@ springdoc:
 
 #极光推送
 jpush:
-  app_key: a279519344ec1fece087241a
-  master_secret: 8cff99013d9ee25c863f7da2
-  environment: false #true生产false测试
+  app_key: 24757b7ef620adc87a005d33
+  master_secret: 90857803ffd68847fe698f5a
+  environment: true #true生产false测试
 
 #提现打款 Mock（P0）：true=模拟成功；false=模拟失败并退币
 withdraw:

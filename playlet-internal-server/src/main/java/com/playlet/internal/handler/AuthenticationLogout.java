@@ -6,6 +6,7 @@ import org.springframework.security.web.authentication.logout.LogoutSuccessHandl
 import org.springframework.stereotype.Component;
 
 import com.playlet.internal.base.JsonData;
+import com.playlet.internal.constants.Constants;
 import com.playlet.internal.filter.JWTAuthenticationFilter;
 import com.playlet.internal.utils.CustomUtils;
 import com.playlet.internal.utils.RedisUtil;
@@ -27,30 +28,22 @@ public class AuthenticationLogout implements LogoutSuccessHandler {
     @Override
     public void onLogoutSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
     	UsernamePasswordAuthenticationToken head = JWTAuthenticationFilter.getAuthentication(request);
-    	String redisKey = null;
-    	if(head == null) {
+    	if (head == null) {
     		CustomUtils.sendJsonMessage(response, JsonData.buildError("token已过期"));
-    	}else {
-        	redisKey = head.getName();
+    		return;
     	}
+    	String redisKey = Constants.APP_PACKAGE_NAME + head.getName();
         try {
-            if (redisKey == null) {
-                CustomUtils.sendJsonMessage(response, JsonData.buildError("未登录，不能进行注销操作！！！"));
+            if (redisUtil.get(redisKey) == null) {
+                CustomUtils.sendJsonMessage(response, JsonData.buildError("登录凭证异常，注销失败！！！"));
             } else {
-                if (redisUtil.get(redisKey) == null) {
-                    CustomUtils.sendJsonMessage(response, JsonData.buildError("登录凭证异常，注销失败！！！"));
-                } else {
-                	 //清空token
-                    redisUtil.del(redisKey);
-                    CustomUtils.sendJsonMessage(response, JsonData.buildSuccess("注销成功"));
-                }
+                redisUtil.del(redisKey);
+                CustomUtils.sendJsonMessage(response, JsonData.buildSuccess("注销成功"));
             }
         } catch (Exception e) {
         	e.printStackTrace();
             CustomUtils.sendJsonMessage(response, JsonData.buildError("登录凭证异常，注销失败！！！"));
         }
-        CustomUtils.sendJsonMessage(response, JsonData.buildError("登录过期，重新登录"));
     }
 
 }
-

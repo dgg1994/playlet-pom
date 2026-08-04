@@ -24,10 +24,14 @@ public class AppAccountEntity extends PageQueryHelperEntity {
 	
 	@TableField("user_password")
 	@ApiModelProperty(name = "userPassword",value = "登录密码",required = true,dataType = "String")
+	@com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
+	@com.alibaba.fastjson.annotation.JSONField(serialize = false)
 	private String userPassword;
 	
 	@TableField("pay_password")
 	@ApiModelProperty(name = "payPassword",value = "支付密码",required = false,dataType = "String")
+	@com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
+	@com.alibaba.fastjson.annotation.JSONField(serialize = false)
 	private String payPassword;
 	
 	@TableField("user_account")
@@ -48,6 +52,8 @@ public class AppAccountEntity extends PageQueryHelperEntity {
 	
 	@TableField("google_secretkey")
 	@ApiModelProperty(name = "googleSecretkey",value = "谷歌密钥",required = false,dataType = "String")
+	@com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
+	@com.alibaba.fastjson.annotation.JSONField(serialize = false)
     private String googleSecretkey;
 	
 	@TableField("user_state")
