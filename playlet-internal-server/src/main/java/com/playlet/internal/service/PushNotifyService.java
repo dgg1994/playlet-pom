@@ -1,5 +1,6 @@
 package com.playlet.internal.service;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -18,18 +19,24 @@ public interface PushNotifyService {
 	void notifyUser(Integer toUid, String title, String content, Map<String, Object> extras);
 
 	/**
-	 * 全员广播推送（极光 audience=all）
+	 * 向所有「已开启推送」用户推同一套文案（单语言）
 	 */
 	void notifyAll(String title, String content, Map<String, Object> extras);
 
 	/**
-	 * 互动消息推送
+	 * 向指定 registrationId 列表推送（已按语言分好组时用）
+	 */
+	void notifyDevices(List<String> registrationIds, String title, String content,
+			Map<String, Object> extras);
+
+	/**
+	 * 互动消息推送（文案按接收人 push_langue + PushTemplateEnums）
 	 */
 	void notifyInteract(Integer toUid, Integer fromUid, String messageType,
 			Long messageId, Integer dramaId, String episodeId);
 
 	/**
-	 * 勋章解锁推送
+	 * 勋章解锁推送（文案按接收人 push_langue + PushTemplateEnums）
 	 */
 	void notifyMedalUnlock(Integer toUid, Integer medalId, String medalName);
 }

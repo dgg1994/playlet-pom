@@ -63,7 +63,7 @@ public interface AppUserService {
 	
     @PostMapping("/bindPush")
     @ApiOperation(value = "绑定极光推送", notes = "无需登录。App 启动后上报 cid 或 registrationId；可选 deviceName。"
-			+ "已登录时会同时写入账号 registration_id，便于互动/勋章推送。", response = ResponseBase.class)
+			+ "已登录时会同时写入账号 registration_id，并从请求头 language 写入 push_langue，便于互动/勋章/系统消息按接收人语言推送。", response = ResponseBase.class)
     ResponseBase bindPush(BindPushQuery entity, HttpServletRequest request);
 
 	@GetMapping("/getPushSwitch")

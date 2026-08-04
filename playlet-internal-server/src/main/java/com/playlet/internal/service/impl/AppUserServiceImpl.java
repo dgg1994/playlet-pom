@@ -349,6 +349,11 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			if (entity.getPushEnabled() == null) {
 				entity.setPushEnabled(1);
 			}
+			if (StringUtils.isEmpty(entity.getPushLangue())) {
+				entity.setPushLangue(LanguageEnums.DEFAULT_LANGUE);
+			} else {
+				entity.setPushLangue(LanguageEnums.of(entity.getPushLangue()).getName());
+			}
 			String avatar = entity.getAvatar();
 			entity.setAvatar(mediaUrlService.sign(avatar));
 			return setResultSuccess(entity);
@@ -443,6 +448,9 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		upsertPushBind(uid, registrationId, deviceName);
 		if (uid != null) {
 			appAccountDao.updatePushBind(uid, registrationId, deviceName);
+			// 推送语言从请求头 language 读取（JWT 过滤器写入 LanguageContext）
+			String langue = LanguageEnums.of(LanguageContext.getLanguage()).getName();
+			appAccountDao.updatePushLangue(uid, langue);
 		}
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}

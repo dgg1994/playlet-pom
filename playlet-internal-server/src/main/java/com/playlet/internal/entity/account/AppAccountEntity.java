@@ -78,6 +78,10 @@ public class AppAccountEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "pushEnabled", value = "极光推送总开关 1开 0关，默认1", required = false, dataType = "Integer")
 	private Integer pushEnabled;
 
+	@TableField("push_langue")
+	@ApiModelProperty(name = "pushLangue", value = "推送语言 zh-cn/en/zh-hk/tr-tr/ko-kr/ja-jp/bn-bd/pt-br", required = false, dataType = "String")
+	private String pushLangue;
+
 	@TableField("sys_msg_read_publish_id")
 	@ApiModelProperty(name = "sysMsgReadPublishId", value = "系统广播已读游标", required = false, dataType = "Long")
 	private Long sysMsgReadPublishId;

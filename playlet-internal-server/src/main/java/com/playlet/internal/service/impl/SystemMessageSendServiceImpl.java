@@ -1,5 +1,6 @@
 package com.playlet.internal.service.impl;
 
+import com.playlet.internal.constants.PushConstants;
 import com.playlet.internal.dao.message.UserSystemMessageDao;
 import com.playlet.internal.entity.message.UserSystemMessageEntity;
 import com.playlet.internal.service.PushNotifyService;
@@ -19,7 +20,6 @@ import java.util.Map;
 @Service
 public class SystemMessageSendServiceImpl implements SystemMessageSendService {
 
-	public static final String BIZ_SYSTEM = "SYSTEM";
 	private static final String FALLBACK_LANGUE = "zh-cn";
 
 	@Autowired
@@ -64,7 +64,7 @@ public class SystemMessageSendServiceImpl implements SystemMessageSendService {
 		}
 		// 落库成功后一律推送；push 参数保留兼容，false 时也推（产品要求：新增系统消息需通知栏提醒）
 		Map<String, Object> extras = new HashMap<>();
-		extras.put("bizType", BIZ_SYSTEM);
+		extras.put("bizType", PushConstants.BIZ_SYSTEM);
 		extras.put("messageType", messageType);
 		extras.put("messageId", String.valueOf(row.getId()));
 		if (dramaId != null) {

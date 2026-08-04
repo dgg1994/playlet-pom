@@ -7,14 +7,18 @@ import com.github.pagehelper.PageInfo;
 import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
+import com.playlet.internal.dao.account.AppAccountDao;
 import com.playlet.internal.dao.message.SystemMessagePublishDao;
 import com.playlet.internal.dao.message.SystemMessagePublishI18nDao;
 import com.playlet.internal.dao.message.UserSystemMessageDao;
+import com.playlet.internal.entity.account.AppAccountEntity;
 import com.playlet.internal.entity.message.SystemMessagePublishEntity;
 import com.playlet.internal.entity.message.SystemMessagePublishI18nEntity;
 import com.playlet.internal.entity.message.UserSystemMessageEntity;
+import com.playlet.internal.enums.LanguageEnums;
 import com.playlet.internal.enums.SystemMessageAudienceTypeEnums;
 import com.playlet.internal.enums.SystemMessagePublishStatusEnums;
+import com.playlet.internal.constants.PushConstants;
 import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.service.PushNotifyService;
 import com.playlet.internal.service.SystemMessageManageService;
@@ -52,6 +56,8 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 	private SystemMessagePublishI18nDao systemMessagePublishI18nDao;
 	@Autowired
 	private UserSystemMessageDao userSystemMessageDao;
+	@Autowired
+	private AppAccountDao appAccountDao;
 	@Autowired
 	private PushNotifyService pushNotifyService;
 	@Autowired
@@ -206,9 +212,7 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 	}
 
 	/**
-	 * 粉丝
-	 * @param row
-	 * @param i18nList
+	 * 指定用户投递 + 按用户语言推送
 	 */
 	private void fanoutToInbox(SystemMessagePublishEntity row, List<SystemMessagePublishI18nEntity> i18nList) {
 		List<Integer> uids = parseUidList(row.getAudienceJson());
@@ -219,6 +223,7 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 		if (def == null) {
 			def = i18nList.get(0);
 		}
+		Map<Integer, AppAccountEntity> accountMap = loadAccountMap(uids);
 		for (Integer uid : uids) {
 			if (uid == null) {
 				continue;
@@ -227,18 +232,25 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 			if (userSystemMessageDao.findByBiz(uid, bizId) != null) {
 				continue;
 			}
+			AppAccountEntity account = accountMap.get(uid);
+			String userLangue = account == null || StringUtils.isEmpty(account.getPushLangue())
+					? LanguageEnums.DEFAULT_LANGUE : LanguageEnums.of(account.getPushLangue()).getName();
+			SystemMessagePublishI18nEntity i18n = pickI18n(i18nList, userLangue);
+			if (i18n == null) {
+				i18n = def;
+			}
 			UserSystemMessageEntity msg = new UserSystemMessageEntity();
 			msg.setToUid(uid);
 			msg.setPublishId(row.getId());
 			msg.setMessageType(row.getMessageType());
-			msg.setLangue(def.getLangue());
-			msg.setTitle(def.getTitle());
-			msg.setContent(def.getContent());
-			msg.setCoverUrl(def.getCoverUrl());
+			msg.setLangue(i18n.getLangue());
+			msg.setTitle(i18n.getTitle());
+			msg.setContent(i18n.getContent());
+			msg.setCoverUrl(i18n.getCoverUrl());
 			msg.setDramaId(row.getDramaId());
 			msg.setBizId(bizId);
 			msg.setJumpType(StringUtils.isEmpty(row.getJumpType()) ? "none" : row.getJumpType());
-			msg.setJumpParam(StringUtils.isEmpty(def.getJumpParam()) ? row.getJumpParam() : def.getJumpParam());
+			msg.setJumpParam(StringUtils.isEmpty(i18n.getJumpParam()) ? row.getJumpParam() : i18n.getJumpParam());
 			msg.setIsRead(0);
 			msg.setStatus(1);
 			try {
@@ -251,14 +263,12 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 				continue;
 			}
 			Map<String, Object> extras = buildSystemExtras(row, msg.getId());
-			pushNotifyService.notifyUser(uid, def.getTitle(), truncatePushBody(def.getContent()), extras);
+			pushNotifyService.notifyUser(uid, i18n.getTitle(), truncatePushBody(i18n.getContent()), extras);
 		}
 	}
 
 	/**
-	 * 广播
-	 * @param row
-	 * @param i18nList
+	 * 全员广播：按用户 push_langue 分组，推对应 i18n 文案
 	 */
 	private void pushBroadcast(SystemMessagePublishEntity row, List<SystemMessagePublishI18nEntity> i18nList) {
 		SystemMessagePublishI18nEntity def = pickI18n(i18nList, row.getDefaultLangue());
@@ -269,9 +279,47 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 			log.warn("skip broadcast push: no i18n title, publishId={}", row.getId());
 			return;
 		}
+		List<AppAccountEntity> targets = appAccountDao.findEnabledPushTargets();
+		if (targets == null || targets.isEmpty()) {
+			log.info("broadcast push skipped: no enabled targets, publishId={}", row.getId());
+			return;
+		}
+		Map<String, List<String>> regByLangue = new HashMap<>();
+		for (AppAccountEntity t : targets) {
+			if (t == null || StringUtils.isEmpty(t.getRegistrationId())) {
+				continue;
+			}
+			String langue = LanguageEnums.of(t.getPushLangue()).getName();
+			regByLangue.computeIfAbsent(langue, k -> new ArrayList<>()).add(t.getRegistrationId());
+		}
 		Map<String, Object> extras = buildSystemExtras(row, null);
-		pushNotifyService.notifyAll(def.getTitle(), truncatePushBody(def.getContent()), extras);
-		log.info("broadcast push sent publishId={}", row.getId());
+		for (Map.Entry<String, List<String>> e : regByLangue.entrySet()) {
+			SystemMessagePublishI18nEntity i18n = pickI18n(i18nList, e.getKey());
+			if (i18n == null) {
+				i18n = def;
+			}
+			pushNotifyService.notifyDevices(e.getValue(), i18n.getTitle(),
+					truncatePushBody(i18n.getContent()), extras);
+		}
+		log.info("broadcast push sent publishId={} langues={}", row.getId(), regByLangue.keySet());
+	}
+
+	private Map<Integer, AppAccountEntity> loadAccountMap(List<Integer> uids) {
+		if (uids == null || uids.isEmpty()) {
+			return java.util.Collections.emptyMap();
+		}
+		List<Integer> uniq = new ArrayList<>(new java.util.HashSet<>(uids));
+		List<AppAccountEntity> list = appAccountDao.findByUids(uniq);
+		if (list == null || list.isEmpty()) {
+			return java.util.Collections.emptyMap();
+		}
+		Map<Integer, AppAccountEntity> map = new HashMap<>(list.size());
+		for (AppAccountEntity a : list) {
+			if (a != null && a.getId() != null) {
+				map.put(a.getId(), a);
+			}
+		}
+		return map;
 	}
 
 	/**
@@ -282,7 +330,7 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 	 */
 	private static Map<String, Object> buildSystemExtras(SystemMessagePublishEntity row, Long inboxId) {
 		Map<String, Object> extras = new HashMap<>();
-		extras.put("bizType", SystemMessageSendServiceImpl.BIZ_SYSTEM);
+		extras.put("bizType", PushConstants.BIZ_SYSTEM);
 		extras.put("messageType", row.getMessageType());
 		if (row.getId() != null) {
 			extras.put("publishId", String.valueOf(row.getId()));

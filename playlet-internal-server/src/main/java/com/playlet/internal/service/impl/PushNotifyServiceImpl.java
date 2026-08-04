@@ -6,8 +6,9 @@ import com.playlet.internal.dao.account.AppPushDeviceDao;
 import com.playlet.internal.entity.account.AppAccountEntity;
 import com.playlet.internal.entity.account.AppPushDeviceEntity;
 import com.playlet.internal.enums.InteractMessageTypeEnums;
+import com.playlet.internal.enums.LanguageEnums;
+import com.playlet.internal.enums.PushTemplateEnums;
 import com.playlet.internal.service.PushNotifyService;
-import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.JPushUtils;
 import com.playlet.internal.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -20,14 +21,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.playlet.internal.constants.PushConstants.BIZ_INTERACT;
+import static com.playlet.internal.constants.PushConstants.BIZ_MEDAL;
+import static com.playlet.internal.constants.PushConstants.JPUSH_REG_BATCH;
+
 @Slf4j
 @Service
 public class PushNotifyServiceImpl implements PushNotifyService {
-
-	public static final String BIZ_INTERACT = "INTERACT";
-	public static final String BIZ_MEDAL = "MEDAL";
-	/** 极光单次 registrationId 上限 */
-	private static final int JPUSH_REG_BATCH = 1000;
 
 	@Autowired
 	private AppAccountDao appAccountDao;
@@ -54,13 +54,7 @@ public class PushNotifyServiceImpl implements PushNotifyService {
 				log.debug("skip push: no registrationId, toUid={}", toUid);
 				return;
 			}
-			JpushReqEntity pushVo = new JpushReqEntity();
-			pushVo.setTitle(title == null ? "" : title);
-			pushVo.setMsg(content == null ? "" : content);
-			pushVo.setBroadcasting(false);
-			pushVo.setRegistrationIdList(Collections.singletonList(registrationId));
-			pushVo.setExtrasMap(extras);
-			JPushUtils.sendAsync(pushVo);
+			sendToRegistrationIds(Collections.singletonList(registrationId), title, content, extras);
 		} catch (Exception e) {
 			log.warn("notifyUser failed toUid={}: {}", toUid, e.getMessage());
 		}
@@ -72,25 +66,52 @@ public class PushNotifyServiceImpl implements PushNotifyService {
 			return;
 		}
 		try {
-			// 按用户开关过滤，不再 audience=all，避免关闭推送的用户仍收到广播
 			List<String> registrationIds = appAccountDao.findEnabledPushRegistrationIds();
 			if (registrationIds == null || registrationIds.isEmpty()) {
 				log.info("notifyAll skipped: no enabled registrationId");
 				return;
 			}
-			for (int i = 0; i < registrationIds.size(); i += JPUSH_REG_BATCH) {
-				int end = Math.min(i + JPUSH_REG_BATCH, registrationIds.size());
-				List<String> batch = new ArrayList<>(registrationIds.subList(i, end));
-				JpushReqEntity pushVo = new JpushReqEntity();
-				pushVo.setTitle(title == null ? "" : title);
-				pushVo.setMsg(content == null ? "" : content);
-				pushVo.setBroadcasting(false);
-				pushVo.setRegistrationIdList(batch);
-				pushVo.setExtrasMap(extras);
-				JPushUtils.sendAsync(pushVo);
-			}
+			sendToRegistrationIds(registrationIds, title, content, extras);
 		} catch (Exception e) {
 			log.warn("notifyAll failed: {}", e.getMessage());
+		}
+	}
+
+	@Override
+	public void notifyDevices(List<String> registrationIds, String title, String content,
+			Map<String, Object> extras) {
+		if (registrationIds == null || registrationIds.isEmpty()) {
+			return;
+		}
+		if (StringUtils.isEmpty(title) && StringUtils.isEmpty(content)) {
+			return;
+		}
+		try {
+			sendToRegistrationIds(registrationIds, title, content, extras);
+		} catch (Exception e) {
+			log.warn("notifyDevices failed: {}", e.getMessage());
+		}
+	}
+
+	/**
+	 * 批量推送
+	 * @param registrationIds 极光ID
+	 * @param title 标题
+	 * @param content  内容
+	 * @param extras 扩展参数
+	 */
+	private void sendToRegistrationIds(List<String> registrationIds, String title, String content,
+			Map<String, Object> extras) {
+		for (int i = 0; i < registrationIds.size(); i += JPUSH_REG_BATCH) {
+			int end = Math.min(i + JPUSH_REG_BATCH, registrationIds.size());
+			List<String> batch = new ArrayList<>(registrationIds.subList(i, end));
+			JpushReqEntity pushVo = new JpushReqEntity();
+			pushVo.setTitle(title == null ? "" : title);
+			pushVo.setMsg(content == null ? "" : content);
+			pushVo.setBroadcasting(false);
+			pushVo.setRegistrationIdList(batch);
+			pushVo.setExtrasMap(extras);
+			JPushUtils.sendAsync(pushVo);
 		}
 	}
 
@@ -114,15 +135,31 @@ public class PushNotifyServiceImpl implements PushNotifyService {
 		return null;
 	}
 
+	/**
+	 * 获取推送语言
+	 * @param account 账号信息
+	 * @return 推送语言
+	 */
+	private static String resolvePushLangue(AppAccountEntity account) {
+		if (account == null || StringUtils.isEmpty(account.getPushLangue())) {
+			return LanguageEnums.DEFAULT_LANGUE;
+		}
+		return LanguageEnums.of(account.getPushLangue()).getName();
+	}
+
 	@Override
 	public void notifyInteract(Integer toUid, Integer fromUid, String messageType,
 			Long messageId, Integer dramaId, String episodeId) {
 		if (toUid == null || fromUid == null || toUid.equals(fromUid)) {
 			return;
 		}
+		AppAccountEntity toAccount = appAccountDao.findByUid(toUid);
+		String langue = resolvePushLangue(toAccount);
 		String fromName = resolveNickname(fromUid);
-		String title = I18nUtil.getMessage("push.interact_title");
-		String content = buildInteractContent(fromName, messageType);
+		String someone = PushTemplateEnums.SOMEONE.format(langue);
+		String name = StringUtils.isEmpty(fromName) ? someone : fromName;
+		String title = PushTemplateEnums.INTERACT_TITLE.format(langue);
+		String content = buildInteractContent(langue, name, messageType);
 		Map<String, Object> extras = new HashMap<>();
 		extras.put("bizType", BIZ_INTERACT);
 		extras.put("messageType", messageType);
@@ -135,7 +172,16 @@ public class PushNotifyServiceImpl implements PushNotifyService {
 		if (!StringUtils.isEmpty(episodeId)) {
 			extras.put("episodeId", episodeId);
 		}
-		notifyUser(toUid, title, content, extras);
+		// 直接发，避免 notifyUser 再查一次账号（开关/设备已在此判定）
+		if (!isPushEnabled(toAccount)) {
+			log.debug("skip interact push: user disabled, toUid={}", toUid);
+			return;
+		}
+		String registrationId = resolveRegistrationId(toUid, toAccount);
+		if (StringUtils.isEmpty(registrationId)) {
+			return;
+		}
+		sendToRegistrationIds(Collections.singletonList(registrationId), title, content, extras);
 	}
 
 	@Override
@@ -143,31 +189,53 @@ public class PushNotifyServiceImpl implements PushNotifyService {
 		if (toUid == null || medalId == null) {
 			return;
 		}
+		AppAccountEntity toAccount = appAccountDao.findByUid(toUid);
+		String langue = resolvePushLangue(toAccount);
 		String name = StringUtils.isEmpty(medalName) ? "" : medalName;
-		String title = I18nUtil.getMessage("push.medal_title");
-		String content = I18nUtil.getMessage("push.medal_unlock", name);
+		String title = PushTemplateEnums.MEDAL_TITLE.format(langue);
+		String content = PushTemplateEnums.MEDAL_UNLOCK.format(langue, name);
 		Map<String, Object> extras = new HashMap<>();
 		extras.put("bizType", BIZ_MEDAL);
 		extras.put("medalId", String.valueOf(medalId));
-		notifyUser(toUid, title, content, extras);
+		if (!isPushEnabled(toAccount)) {
+			log.debug("skip medal push: user disabled, toUid={}", toUid);
+			return;
+		}
+		String registrationId = resolveRegistrationId(toUid, toAccount);
+		if (StringUtils.isEmpty(registrationId)) {
+			return;
+		}
+		sendToRegistrationIds(Collections.singletonList(registrationId), title, content, extras);
 	}
 
-	private String buildInteractContent(String fromName, String messageType) {
-		String name = StringUtils.isEmpty(fromName) ? I18nUtil.getMessage("push.someone") : fromName;
+	/**
+	 * 构建互动消息内容
+	 *
+	 * @param langue 语言
+	 * @param name 昵称
+	 * @param messageType 消息类型
+	 * @return  内容
+	 */
+	private String buildInteractContent(String langue, String name, String messageType) {
 		if (InteractMessageTypeEnums.LIKE_DRAMA.getCode().equals(messageType)
 				|| InteractMessageTypeEnums.LIKE_COMMENT.getCode().equals(messageType)) {
-			return I18nUtil.getMessage("push.like", name);
+			return PushTemplateEnums.LIKE.format(langue, name);
 		}
 		if (InteractMessageTypeEnums.isReply(messageType)) {
-			return I18nUtil.getMessage("push.reply", name);
+			return PushTemplateEnums.REPLY.format(langue, name);
 		}
 		if (InteractMessageTypeEnums.COMMENT_DRAMA.getCode().equals(messageType)
 				|| InteractMessageTypeEnums.COMMENT_VIDEO.getCode().equals(messageType)) {
-			return I18nUtil.getMessage("push.comment", name);
+			return PushTemplateEnums.COMMENT.format(langue, name);
 		}
-		return I18nUtil.getMessage("push.interact_default", name);
+		return PushTemplateEnums.INTERACT_DEFAULT.format(langue, name);
 	}
 
+	/**
+	 * 获取昵称
+	 * @param uid 用户ID
+	 * @return 昵称
+	 */
 	private String resolveNickname(Integer uid) {
 		try {
 			AppAccountEntity account = appAccountDao.findByUid(uid);

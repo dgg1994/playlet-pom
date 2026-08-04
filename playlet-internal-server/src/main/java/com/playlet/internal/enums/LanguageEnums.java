@@ -125,4 +125,33 @@ public enum LanguageEnums {
 		return list;
 	}
 
+	/** 默认语言 zh-cn */
+	public static final String DEFAULT_LANGUE = ZH_CN.getName();
+
+	/**
+	 * 按项目语言码解析，未知/空回退 {@link #ZH_CN}。
+	 * 兼容偶发 zh_CN / zh-CN / ZH-CN。
+	 */
+	public static LanguageEnums of(String langue) {
+		if (langue == null || langue.trim().isEmpty()) {
+			return ZH_CN;
+		}
+		String key = langue.trim().toLowerCase().replace('_', '-');
+		for (LanguageEnums e : values()) {
+			if (e.getName().equalsIgnoreCase(key) || e.getValue().equalsIgnoreCase(key)) {
+				return e;
+			}
+		}
+		// 宽松匹配：en-us -> en
+		if (key.startsWith("en")) {
+			return EN_US;
+		}
+		if (key.startsWith("zh") && (key.contains("tw") || key.contains("hk") || key.contains("hant"))) {
+			return ZH_TW;
+		}
+		if (key.startsWith("zh")) {
+			return ZH_CN;
+		}
+		return ZH_CN;
+	}
 }
