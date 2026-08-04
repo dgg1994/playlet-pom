@@ -14,7 +14,7 @@ import com.playlet.internal.utils.QiniuUploadUtils;
 
 @Slf4j
 @RestController
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @CrossOrigin
 public class FileServiceImpl extends BaseApiService implements FileService {
 

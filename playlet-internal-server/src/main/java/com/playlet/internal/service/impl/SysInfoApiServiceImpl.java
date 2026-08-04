@@ -18,12 +18,10 @@ import static com.playlet.internal.base.BaseApiService.setResultSuccess;
 /**
  * 类描述：配置接口实现
  *
- * @author GeminiSun
- * @date 2026/07/30 10:49
  */
 @RestController
 @CrossOrigin
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 public class SysInfoApiServiceImpl implements SysInfoApiService {
 
     @Autowired

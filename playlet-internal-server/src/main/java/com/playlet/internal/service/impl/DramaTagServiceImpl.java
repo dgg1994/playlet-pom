@@ -38,7 +38,7 @@ import static com.playlet.internal.base.BaseApiService.setResultSuccess;
 @Slf4j
 @RestController
 @CrossOrigin
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 public class DramaTagServiceImpl implements DramaTagService {
 
     @Autowired

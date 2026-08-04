@@ -39,7 +39,7 @@ import com.playlet.internal.utils.HtmlSanitizeUtils;
 import com.playlet.internal.utils.I18nUtil;
 
 @RestController
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @CrossOrigin
 @Slf4j
 public class DramaVideoCommentServiceImpl extends BaseApiService implements DramaVideoCommentService{

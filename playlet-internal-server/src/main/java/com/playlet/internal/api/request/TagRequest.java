@@ -5,12 +5,7 @@ import lombok.Data;
 
 import java.util.List;
 
-/**
- * 类描述：标签新增请求
- *
- * @author GeminiSun
- * @date 2026/07/16 13:55
- */
+/** 标签新增请求 */
 @Data
 public class TagRequest {
 

@@ -15,7 +15,7 @@ import com.playlet.internal.service.DicService;
 import com.playlet.internal.utils.I18nUtil;
 
 @RestController
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @CrossOrigin
 public class DicServiceImpl extends BaseApiService implements DicService{
 		

@@ -44,7 +44,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RestController
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @CrossOrigin
 public class DramaServiceImpl extends BaseApiService implements DramaService{
 	

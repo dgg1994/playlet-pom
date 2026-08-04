@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @CrossOrigin
 public class SystemMessageServiceImpl extends BaseApiService implements SystemMessageService {
 

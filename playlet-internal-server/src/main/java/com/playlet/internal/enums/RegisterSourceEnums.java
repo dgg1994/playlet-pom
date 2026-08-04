@@ -3,8 +3,6 @@ package com.playlet.internal.enums;
 /**
  * 类描述：注册来源
  *
- * @author GeminiSun
- * @date 2026/05/07 17:16
  */
 public enum RegisterSourceEnums {
 

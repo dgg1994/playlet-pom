@@ -27,6 +27,7 @@ import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.HtmlSanitizeUtils;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.StringUtils;
+import com.playlet.internal.utils.TransactionUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
@@ -117,6 +118,7 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 			saveI18nList(entity.getId(), entity.getI18nList(), true);
 		} catch (Exception e) {
 			log.error("save system message failed", e);
+			TransactionUtils.markRollbackOnly();
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
 		return setResultSuccess(entity.getId(), I18nUtil.getMessage("base_success"));
@@ -144,6 +146,7 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 			saveI18nList(entity.getId(), entity.getI18nList(), true);
 		} catch (Exception e) {
 			log.error("update system message failed id={}", entity.getId(), e);
+			TransactionUtils.markRollbackOnly();
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
 		return setResultSuccess(I18nUtil.getMessage("base_success"));

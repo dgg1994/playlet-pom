@@ -37,7 +37,7 @@ import com.playlet.internal.utils.AppTokenUtil;
 import com.playlet.internal.utils.I18nUtil;
 
 @RestController
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @CrossOrigin
 @Slf4j
 public class DramaApiVideoCommentServiceImpl extends BaseApiService implements DramaApiVideoCommentService {

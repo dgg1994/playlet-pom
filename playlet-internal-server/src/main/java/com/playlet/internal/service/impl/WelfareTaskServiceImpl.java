@@ -28,6 +28,7 @@ import com.playlet.internal.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -40,6 +41,8 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+
+import com.playlet.internal.utils.TransactionUtils;
 
 @Slf4j
 @RestController
@@ -180,6 +183,7 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 	}
 
 	@Override
+	@Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
 	public void onAction(Integer uid, WelfareActionTypeEnums action, int delta, String extInfo) {
 		if (uid == null || action == null || delta <= 0
 				|| !action.isAutoProgress()) {
@@ -219,6 +223,7 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 			}
 		} catch (Exception e) {
 			log.warn("welfare onAction failed uid={} action={}: {}", uid, action, e.getMessage());
+			TransactionUtils.markRollbackOnly();
 		}
 	}
 

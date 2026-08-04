@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @CrossOrigin
 @Slf4j
 public class MenuServiceImpl extends BaseApiService implements MenuService {

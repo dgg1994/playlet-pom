@@ -27,7 +27,7 @@ import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.QiniuUploadUtils;
 
 @RestController
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @CrossOrigin
 @Slf4j
 public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetService{

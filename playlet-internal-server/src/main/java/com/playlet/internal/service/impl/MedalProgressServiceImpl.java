@@ -13,10 +13,12 @@ import com.playlet.internal.service.MedalProgressService;
 import com.playlet.internal.service.PushNotifyService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.StringUtils;
+import com.playlet.internal.utils.TransactionUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
@@ -40,7 +42,7 @@ public class MedalProgressServiceImpl implements MedalProgressService {
 	private static final String FALLBACK_LANGUE = "zh-cn";
 
 	@Override
-	@Transactional(rollbackFor = Exception.class)
+	@Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
 	public void onAction(Integer uid, WelfareActionTypeEnums action, int delta, String triggerRef) {
 		if (uid == null || action == null || delta <= 0 || !action.isAutoProgress()) {
 			return;
@@ -63,6 +65,7 @@ public class MedalProgressServiceImpl implements MedalProgressService {
 			}
 		} catch (Exception e) {
 			log.warn("medal onAction failed uid={} action={}: {}", uid, action, e.getMessage());
+			TransactionUtils.markRollbackOnly();
 		}
 	}
 
@@ -129,6 +132,9 @@ public class MedalProgressServiceImpl implements MedalProgressService {
 		}
 	}
 
+	/**
+	 * 解析勋章名称
+	 */
 	private String resolveMedalName(Integer medalId) {
 		MedalConfigI18nEntity i18n = medalConfigI18nDao.findByMedalIdAndLangue(medalId, FALLBACK_LANGUE);
 		if (i18n != null && !StringUtils.isEmpty(i18n.getMedalName())) {

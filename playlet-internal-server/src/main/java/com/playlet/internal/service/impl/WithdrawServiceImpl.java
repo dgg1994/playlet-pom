@@ -33,6 +33,7 @@ import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.OrderCodeFactory;
 import com.playlet.internal.utils.RedisUtil;
 import com.playlet.internal.utils.StringUtils;
+import com.playlet.internal.utils.TransactionUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
@@ -57,7 +58,7 @@ import java.util.regex.Pattern;
 
 @Slf4j
 @RestController
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @CrossOrigin
 public class WithdrawServiceImpl extends BaseApiService implements WithdrawService {
 
@@ -193,6 +194,7 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 					"WITHDRAW:" + orderNo, "", "提现扣减");
 		} catch (Exception e) {
 			log.warn("withdraw deduct failed uid={} orderNo={}: {}", uid, orderNo, e.getMessage());
+			TransactionUtils.markRollbackOnly();
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
 		if (!deducted) {
@@ -216,11 +218,8 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 			userWithdrawOrderDao.insert(order);
 		} catch (Exception e) {
 			log.error("insert withdraw order failed orderNo={}", orderNo, e);
-			try {
-				creditCoin(uid, points, CoinBizTypeEnums.WITHDRAW_REFUND.getName(),
-						"WITHDRAW_REFUND:" + orderNo, "", "提现建单失败退回");
-			} catch (Exception ignore) {
-			}
+			// 依赖事务回滚扣款，不再手动 creditCoin 补偿
+			TransactionUtils.markRollbackOnly();
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
 
@@ -428,6 +427,9 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 		} catch (DuplicateKeyException e) {
 			return true;
 		}
-		return appAccountDao.deductCoinBalance(uid, amt) > 0;
+		if (appAccountDao.deductCoinBalance(uid, amt) <= 0) {
+			throw new IllegalStateException("deduct coin balance failed uid=" + uid + " amt=" + amt);
+		}
+		return true;
 	}
 }

@@ -34,8 +34,8 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 	private DramaRankStatDailyDao dramaRankStatDailyDao;
 
 	/**
-	 * 依次刷新全部算法榜：热播 → 新剧 → 飙升 → 推荐 → 热搜 → 收藏。
-	 * 各榜独立读写 rank_list；某一榜缺失/停用时跳过，不影响其它榜。
+	 * 刷一遍全部算法榜（热播、新剧、飙升、推荐、热搜、收藏）。
+	 * 某一榜没开或找不到就跳过，不影响其他榜。
 	 */
 	@Override
 	public void refreshAllP0() {
@@ -48,15 +48,10 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 	}
 
 	/**
-	 * 热播榜（rb_hot_play）
+	 * 热播榜：看谁最近最火。
 	 * <p>
-	 * 数据：drama_rank_stat_daily 近 {@link RankBoardGroupConstants#WINDOW_DAYS_HOT} 天聚合。
-	 * <p>
-	 * 公式：
-	 * {@code score = valid_seconds×0.6 + collect_cnt×0.2 + like_cnt×0.1 + play_pv×0.1}
-	 * <p>
-	 * 说明：偏「谁在看」；有效观看权重最高，辅以收藏/点赞/播放次数。
-	 * 候选：已上架且未删除；按 score 降序，取 topN 覆盖写入 rank_list。
+	 * 看近 N 天数据，分数：观看时长 60% + 收藏 20% + 点赞 10% + 播放次数 10%。
+	 * 分数高的排前面，取 topN 写入榜单。
 	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
@@ -65,15 +60,9 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 	}
 
 	/**
-	 * 新剧榜（rb_new）
+	 * 新剧榜：只在「新上架」的剧里比热度。
 	 * <p>
-	 * 数据：与热播相同的近 {@link RankBoardGroupConstants#WINDOW_DAYS_HOT} 天行为聚合；
-	 * 额外限定 drama.setTime ≥ 当前 − {@link RankBoardGroupConstants#WINDOW_DAYS_NEW} 天。
-	 * <p>
-	 * 公式：与热播相同
-	 * {@code score = valid_seconds×0.6 + collect_cnt×0.2 + like_cnt×0.1 + play_pv×0.1}
-	 * <p>
-	 * 说明：在「新上架窗口」内比窗口期表现，老剧不参与。
+	 * 计分方式和热播一样，但只算最近一段时间上架的剧，老剧不进榜。
 	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
@@ -87,17 +76,10 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 	}
 
 	/**
-	 * 飙升榜（rb_rising）
+	 * 飙升榜：看谁涨得快（比的是增长速度，不是绝对热度）。
 	 * <p>
-	 * 窗口：近 {@link RankBoardGroupConstants#WINDOW_DAYS_RISING} 天 vs 前同等天数（共 2N 天对比）。
-	 * <p>
-	 * 公式：
-	 * {@code score = (recentValid − prevValid)×0.7 + (recentPlay − prevPlay)×0.3}
-	 * <p>
-	 * 过滤：近窗 valid_seconds ≥ {@link RankBoardGroupConstants#RISING_MIN_VALID_SECONDS}，
-	 * 且 recentValid &gt; prevValid（只保留真正上涨的剧）。
-	 * <p>
-	 * 说明：刻画短周期增速，与热播「绝对热度」互补。
+	 * 对比「最近 N 天」和「再往前 N 天」：观看时长增量占 70%，播放次数增量占 30%。
+	 * 最近必须比前一段更热，且观看量要够门槛，才进榜。
 	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
@@ -123,18 +105,10 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 	}
 
 	/**
-	 * 推荐榜（rb_recommend）
+	 * 推荐榜：综合热度 + 一点「新剧加分」。
 	 * <p>
-	 * 数据：近 {@link RankBoardGroupConstants#WINDOW_DAYS_HOT} 天行为聚合
-	 * + 上架 {@link RankBoardGroupConstants#RECOMMEND_FRESH_DAYS} 天内的新鲜度加分。
-	 * <p>
-	 * 公式：
-	 * {@code score = valid×0.35 + collect×0.25 + like×0.15 + search×0.10 + play×0.15
-	 *          + max(0, freshDays − ageDays) × freshWeightPerDay}
-	 * <p>
-	 * 候选：有任意窗口行为，或处于新鲜度窗口内；无行为的老剧不入榜。
-	 * <p>
-	 * 说明：相对热播更均衡（降低观看、提高收藏/搜索），并用新鲜度避免老热剧长期霸榜。
+	 * 观看、收藏、点赞、搜索、播放都算分，权重更均衡（不像热播几乎只认观看）。
+	 * 上架不久的剧额外加分，避免老热剧一直占榜。
 	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
@@ -162,14 +136,9 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 	}
 
 	/**
-	 * 热搜榜（rb_hot_search）
+	 * 热搜榜：谁被搜得多就排谁前面。
 	 * <p>
-	 * 数据：近 {@link RankBoardGroupConstants#WINDOW_DAYS_HOT} 天 sum(search_cnt)。
-	 * search_cnt 来自剧场标题搜索首页命中（见 DramaRankStatService#onSearch）。
-	 * <p>
-	 * 公式：{@code score = search_cnt}（降序；需 search_cnt &gt; 0）。
-	 * <p>
-	 * 说明：反映搜索热度，与观看类榜解耦。
+	 * 只看近 N 天搜索次数，和观看热度无关。
 	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
@@ -187,13 +156,9 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 	}
 
 	/**
-	 * 收藏榜（rb_collect）
+	 * 收藏榜：谁被收藏得多就排谁前面。
 	 * <p>
-	 * 数据：近 {@link RankBoardGroupConstants#WINDOW_DAYS_HOT} 天 sum(collect_cnt)（净收藏，取消为负后下限 0）。
-	 * <p>
-	 * 公式：{@code score = collect_cnt}（降序；需 collect_cnt &gt; 0）。
-	 * <p>
-	 * 说明：单指标榜，突出收藏意愿。
+	 * 只看近 N 天净收藏数（取消收藏会扣，最低为 0）。
 	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
@@ -211,11 +176,9 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 	}
 
 	/**
-	 * 热播/新剧共用刷新：按窗口聚合综合分写 rank_list。
+	 * 热播 / 新剧共用：按窗口汇总分数后覆盖写榜。
 	 *
-	 * @param groupId    榜 group_id
-	 * @param windowDays 行为统计窗口天数
-	 * @param newSince   非空时限定 drama.setTime ≥ newSince（新剧榜）
+	 * @param newSince 有值时只保留该时间之后上架的剧（新剧榜用）
 	 */
 	private void refreshBoard(String groupId, int windowDays, String newSince) {
 		RankBoardEntity board = rankBoardDao.findOneByGroupId(groupId);
@@ -230,7 +193,7 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 		log.info("refresh board {} size={}", groupId, rows == null ? 0 : rows.size());
 	}
 
-	/** 先删后插，按候选顺序写入 rank_no=1..N */
+	/** 清空旧名单，再按分数顺序写入 1、2、3… */
 	private void rewriteRankList(String groupId, List<DramaRankAggRow> rows) {
 		rankListDao.deleteByBoardGroupId(groupId);
 		if (rows == null || rows.isEmpty()) {
@@ -257,7 +220,7 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 		}
 	}
 
-	/** 统计窗口起始日（含当天）：today − (windowDays−1)，时区 Asia/Shanghai */
+	/** 统计从哪天开始：今天往前推 windowDays 天（含今天），时区上海 */
 	private String fromDate(int windowDays) {
 		return LocalDate.now(ZoneId.of(RankBoardGroupConstants.TIMEZONE))
 				.minusDays(Math.max(windowDays - 1, 0))

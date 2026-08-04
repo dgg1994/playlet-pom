@@ -35,7 +35,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @CrossOrigin
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 public class RankManageServiceImpl extends BaseApiService implements RankManageService {
 
 	@Autowired

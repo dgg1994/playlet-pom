@@ -10,9 +10,11 @@ import com.playlet.internal.enums.CoinBizTypeEnums;
 import com.playlet.internal.enums.WithdrawOrderStatusEnums;
 import com.playlet.internal.service.WithdrawPayoutService;
 import com.playlet.internal.utils.GenericityUtil;
+import com.playlet.internal.utils.TransactionUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,11 @@ public class WithdrawPayoutServiceImpl implements WithdrawPayoutService {
 	@Autowired
 	private UserCoinLedgerDao userCoinLedgerDao;
 
+	/** 自注入走代理，保证 @Transactional / @Async 生效 */
+	@Lazy
+	@Autowired
+	private WithdrawPayoutServiceImpl self;
+
 	@Override
 	@Async("asyncExecutor")
 	public void payoutAsync(Long orderId) {
@@ -47,13 +54,13 @@ public class WithdrawPayoutServiceImpl implements WithdrawPayoutService {
 			Thread.currentThread().interrupt();
 		}
 		try {
-			doPayout(orderId);
+			self.doPayout(orderId);
 		} catch (Exception e) {
 			log.error("withdraw payout failed orderId={}", orderId, e);
 		}
 	}
 
-	@Transactional
+	@Transactional(rollbackFor = Exception.class)
 	public void doPayout(Long orderId) throws Exception {
 		UserWithdrawOrderEntity order = userWithdrawOrderDao.selectById(orderId);
 		if (order == null) {
@@ -83,7 +90,8 @@ public class WithdrawPayoutServiceImpl implements WithdrawPayoutService {
 				WithdrawOrderStatusEnums.FAILED.getCode(),
 				null, reason);
 		if (failed <= 0) {
-			return;
+			TransactionUtils.markRollbackOnly();
+			throw new IllegalStateException("cas finish failed for payout orderId=" + orderId);
 		}
 		refund(order);
 		userWithdrawOrderDao.casStatus(orderId,
@@ -122,6 +130,8 @@ public class WithdrawPayoutServiceImpl implements WithdrawPayoutService {
 		} catch (DuplicateKeyException e) {
 			return;
 		}
-		appAccountDao.addCoinBalance(uid, amt);
+		if (appAccountDao.addCoinBalance(uid, amt) <= 0) {
+			throw new IllegalStateException("refund addCoinBalance failed uid=" + uid);
+		}
 	}
 }

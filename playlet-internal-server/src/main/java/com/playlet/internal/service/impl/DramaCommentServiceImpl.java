@@ -44,7 +44,7 @@ import com.playlet.internal.utils.I18nUtil;
  * 短剧评论：发布可评分，回复不可评分；与视频评论共用表。
  */
 @RestController
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @CrossOrigin
 @Slf4j
 public class DramaCommentServiceImpl extends BaseApiService implements DramaCommentService {

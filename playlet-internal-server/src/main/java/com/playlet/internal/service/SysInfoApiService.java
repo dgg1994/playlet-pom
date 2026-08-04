@@ -9,8 +9,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 /**
  * 类描述：用户配置接口
  *
- * @author GeminiSun
- * @date 2026/07/30 10:49
  */
 @RequestMapping("/api/info")
 @Api(value = "配置接口",tags = "配置接口")

@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @CrossOrigin
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @Slf4j
 public class RoleServiceImpl extends BaseApiService implements RoleService{
 	

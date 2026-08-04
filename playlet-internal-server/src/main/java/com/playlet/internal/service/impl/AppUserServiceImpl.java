@@ -45,7 +45,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 @RestController
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @CrossOrigin
 public class AppUserServiceImpl extends BaseApiService implements AppUserService {
 
@@ -216,6 +216,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			return thirdPartyLogin("google", payload, entity, request);
 		} catch (Exception e) {
 			log.warn("oneClickLogin 失败 type={}", type, e);
+			TransactionUtils.markRollbackOnly();
 			return setResultError(I18nUtil.getMessage(isApple ? "oauth.apple_login_failed" : "oauth.google_login_failed"));
 		}
 	}

@@ -29,7 +29,7 @@ import com.playlet.internal.utils.PasswordHashUtils;
 import com.playlet.internal.utils.RedisUtil;
 
 @RestController
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @CrossOrigin
 @Slf4j
 public class SysUserServiceImpl extends BaseApiService implements SysUserService {

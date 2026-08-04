@@ -30,7 +30,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @CrossOrigin
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 public class TagServiceImpl extends BaseApiService implements TagService {
 
 	@Autowired

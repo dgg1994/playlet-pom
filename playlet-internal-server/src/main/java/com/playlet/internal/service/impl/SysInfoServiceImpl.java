@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @CrossOrigin
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @Slf4j
 public class SysInfoServiceImpl extends BaseApiService implements SysInfoService {
 	

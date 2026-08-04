@@ -15,6 +15,7 @@ import com.playlet.internal.utils.AppTokenUtil;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.StringUtils;
+import com.playlet.internal.utils.TransactionUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
@@ -173,12 +174,13 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
         int dayIndex = resolveDayIndex(nextStreak, config, rewardConfigs);
         int rewardCoin = resolveRewardCoin(dayIndex, rewardConfigs);
 
-        try {
+		try {
             insertSignLog(uidStr, today, SignInTypeEnums.NORMAL.getCode(), nextStreak, dayIndex, rewardCoin, 0, 0);
             creditCoin(uid, rewardCoin, CoinBizTypeEnums.SIGN_IN.getName(), BIZ_ID_SIGN_PREFIX + today,
                     WelfareTaskCodeEnums.SIGN_IN.getCode(), 0, "sign in " + today);
             upsertUserSignIn(uidStr, userSign, nextStreak, today, 1);
         } catch (DuplicateKeyException e) {
+            TransactionUtils.markRollbackOnly();
             return SignInOpResult.fail("sign_in_already");
         } catch (Exception e) {
             log.error("signIn failed uid={}", uid, e);
@@ -253,6 +255,8 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
             upsertUserSignIn(uidStr, userSign, newStreak, lastSignDate, 1);
             return SignInOpResult.success(buildHomeSummaryInternal(uid, config, rewardConfigs), rewardCoin, 0);
         } catch (DuplicateKeyException e) {
+            // 可能已扣补签卡，必须回滚
+            TransactionUtils.markRollbackOnly();
             return SignInOpResult.fail("sign_in_makeup_already");
         } catch (Exception e) {
             log.error("makeup failed uid={} date={}", uid, target, e);
@@ -598,7 +602,10 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
         } catch (DuplicateKeyException e) {
             return true;
         }
-        return appAccountDao.deductCoinBalance(uid, amt) > 0;
+        if (appAccountDao.deductCoinBalance(uid, amt) <= 0) {
+            throw new IllegalStateException("deduct coin balance failed uid=" + uid + " amt=" + amt);
+        }
+        return true;
     }
 
     private List<SignInRewardItemEntity> buildRewardItems(List<SignInRewardConfigEntity> rewardConfigs,
