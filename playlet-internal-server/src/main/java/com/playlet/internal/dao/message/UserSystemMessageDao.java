@@ -19,7 +19,8 @@ public interface UserSystemMessageDao extends BaseMapper<UserSystemMessageEntity
 
 	/**
 	 * 广播(读扩散) + 收件箱 合并流，供 PageHelper 分页。
-	 * 排序与原先内存 merge 一致：priority desc, setTime desc, id desc。
+	 * 广播展示/排序时间：定时/生效时间优先，否则用发布时间(gmtModified)，避免草稿创建时间导致「新发却排很后」。
+	 * 排序：priority desc, setTime desc, id desc。
 	 */
 	@Select("<script>"
 			+ "SELECT * FROM ("
@@ -32,7 +33,7 @@ public interface UserSystemMessageDao extends BaseMapper<UserSystemMessageEntity
 			+ "    COALESCE(NULLIF(i_pref.jump_param,''), NULLIF(i_def.jump_param,''), NULLIF(i_zh.jump_param,''), p.jump_param) AS jumpParam,"
 			+ "    IFNULL(p.priority,0) AS priority,"
 			+ "    CASE WHEN p.id &lt;= #{cursor} THEN 1 ELSE 0 END AS isRead,"
-			+ "    p.setTime AS setTime"
+			+ "    COALESCE(p.schedule_time, p.valid_start, p.gmtModified, p.setTime) AS setTime"
 			+ "  FROM system_message_publish p"
 			+ "  LEFT JOIN system_message_publish_i18n i_pref ON i_pref.publish_id = p.id AND i_pref.langue = #{langue}"
 			+ "  LEFT JOIN system_message_publish_i18n i_def ON i_def.publish_id = p.id AND i_def.langue = p.default_langue"
@@ -48,7 +49,7 @@ public interface UserSystemMessageDao extends BaseMapper<UserSystemMessageEntity
 			+ "    0 AS priority, IFNULL(m.is_read,0) AS isRead, m.setTime AS setTime"
 			+ "  FROM user_system_message m"
 			+ "  WHERE m.to_uid = #{toUid} AND m.status = 1"
-			+ ") t ORDER BY priority DESC, setTime DESC, id DESC"
+			+ ") t ORDER BY t.priority DESC, t.setTime DESC, t.id DESC"
 			+ "</script>")
 	List<SystemMessageItemEntity> findMergedFeed(@Param("toUid") Integer toUid,
 			@Param("langue") String langue, @Param("cursor") Long cursor);

@@ -53,4 +53,13 @@ public interface AppAccountDao extends BaseMapper<AppAccountEntity> {
 	@Update("update app_account set sys_msg_read_publish_id = #{publishId}, gmtModified = now() "
 			+ "where id = #{uid} and ifnull(sys_msg_read_publish_id,0) < #{publishId}")
 	int updateSysMsgReadCursor(@Param("uid") Integer uid, @Param("publishId") Long publishId);
+
+	@Update("update app_account set push_enabled = #{enabled}, gmtModified = now() where id = #{uid}")
+	int updatePushEnabled(@Param("uid") Integer uid, @Param("enabled") Integer enabled);
+
+	/** 已开启推送且绑定了 registrationId 的设备列表（全员推送按开关过滤） */
+	@Select("select registration_id from app_account "
+			+ "where ifnull(push_enabled,1) = 1 "
+			+ "and registration_id is not null and registration_id != ''")
+	List<String> findEnabledPushRegistrationIds();
 }

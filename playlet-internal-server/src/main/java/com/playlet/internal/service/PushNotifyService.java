@@ -18,6 +18,11 @@ public interface PushNotifyService {
 	void notifyUser(Integer toUid, String title, String content, Map<String, Object> extras);
 
 	/**
+	 * 全员广播推送（极光 audience=all）
+	 */
+	void notifyAll(String title, String content, Map<String, Object> extras);
+
+	/**
 	 * 互动消息推送
 	 */
 	void notifyInteract(Integer toUid, Integer fromUid, String messageType,

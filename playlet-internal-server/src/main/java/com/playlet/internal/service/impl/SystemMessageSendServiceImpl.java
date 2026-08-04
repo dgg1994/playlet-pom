@@ -62,22 +62,25 @@ public class SystemMessageSendServiceImpl implements SystemMessageSendService {
 			log.warn("sendToUser insert failed uid={} bizId={}: {}", toUid, bizId, e.getMessage());
 			return false;
 		}
-		if (push) {
-			Map<String, Object> extras = new HashMap<>();
-			extras.put("bizType", BIZ_SYSTEM);
-			extras.put("messageType", messageType);
-			extras.put("messageId", String.valueOf(row.getId()));
-			if (dramaId != null) {
-				extras.put("dramaId", String.valueOf(dramaId));
-			}
-			if (!StringUtils.isEmpty(jumpType)) {
-				extras.put("jumpType", jumpType);
-			}
-			if (!StringUtils.isEmpty(jumpParam)) {
-				extras.put("jumpParam", jumpParam);
-			}
-			pushNotifyService.notifyUser(toUid, title, content, extras);
+		// 落库成功后一律推送；push 参数保留兼容，false 时也推（产品要求：新增系统消息需通知栏提醒）
+		Map<String, Object> extras = new HashMap<>();
+		extras.put("bizType", BIZ_SYSTEM);
+		extras.put("messageType", messageType);
+		extras.put("messageId", String.valueOf(row.getId()));
+		if (dramaId != null) {
+			extras.put("dramaId", String.valueOf(dramaId));
 		}
+		if (!StringUtils.isEmpty(jumpType)) {
+			extras.put("jumpType", jumpType);
+		}
+		if (!StringUtils.isEmpty(jumpParam)) {
+			extras.put("jumpParam", jumpParam);
+		}
+		String body = content == null ? "" : content.trim();
+		if (body.length() > 120) {
+			body = body.substring(0, 120) + "...";
+		}
+		pushNotifyService.notifyUser(toUid, title, body, extras);
 		return true;
 	}
 }

@@ -19,6 +19,7 @@ import com.playlet.internal.entity.template.EmailTemplateEntity;
 import com.playlet.internal.enums.*;
 import com.playlet.internal.filter.JWTAuthenticationFilter;
 import com.playlet.internal.query.account.BindPushQuery;
+import com.playlet.internal.query.account.PushSwitchQuery;
 import com.playlet.internal.query.account.UpdatePwdEntity;
 import com.playlet.internal.service.AppUserService;
 import com.playlet.internal.service.MediaUrlService;
@@ -345,6 +346,9 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			entity.setFollowCount(userFollowDao.countFollowing(entity.getId()));
 			entity.setFansCount(userFollowDao.countFans(entity.getId()));
 			entity.setLikeCount(UserDramaLikeDao.countLike(entity.getId()));
+			if (entity.getPushEnabled() == null) {
+				entity.setPushEnabled(1);
+			}
 			String avatar = entity.getAvatar();
 			entity.setAvatar(mediaUrlService.sign(avatar));
 			return setResultSuccess(entity);
@@ -440,6 +444,37 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		if (uid != null) {
 			appAccountDao.updatePushBind(uid, registrationId, deviceName);
 		}
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	public ResponseBase getPushSwitch(HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		AppAccountEntity account = appAccountDao.findByUid(uid);
+		int enabled = 1;
+		if (account != null && account.getPushEnabled() != null) {
+			enabled = Integer.valueOf(0).equals(account.getPushEnabled()) ? 0 : 1;
+		}
+		java.util.Map<String, Object> data = new java.util.HashMap<>();
+		data.put("enabled", enabled);
+		return setResultSuccess(data, I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	public ResponseBase setPushSwitch(@RequestBody PushSwitchQuery entity, HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		if (entity == null || entity.getEnabled() == null
+				|| (!Integer.valueOf(0).equals(entity.getEnabled())
+				&& !Integer.valueOf(1).equals(entity.getEnabled()))) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		appAccountDao.updatePushEnabled(uid, entity.getEnabled());
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 

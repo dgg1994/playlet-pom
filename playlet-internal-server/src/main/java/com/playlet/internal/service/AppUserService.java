@@ -4,6 +4,7 @@ package com.playlet.internal.service;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.entity.account.AppAccountEntity;
 import com.playlet.internal.query.account.BindPushQuery;
+import com.playlet.internal.query.account.PushSwitchQuery;
 import com.playlet.internal.query.account.UpdatePwdEntity;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
@@ -64,6 +65,14 @@ public interface AppUserService {
     @ApiOperation(value = "绑定极光推送", notes = "无需登录。App 启动后上报 cid 或 registrationId；可选 deviceName。"
 			+ "已登录时会同时写入账号 registration_id，便于互动/勋章推送。", response = ResponseBase.class)
     ResponseBase bindPush(BindPushQuery entity, HttpServletRequest request);
+
+	@GetMapping("/getPushSwitch")
+	@ApiOperation(value = "查询极光推送开关", notes = "需登录。返回 enabled：1开启 0关闭，默认开启。", response = ResponseBase.class)
+	ResponseBase getPushSwitch(HttpServletRequest request);
+
+	@PostMapping("/setPushSwitch")
+	@ApiOperation(value = "设置极光推送开关", notes = "需登录。body: {\"enabled\":1|0}。关闭后不再推送互动/勋章/系统消息等极光通知。", response = ResponseBase.class)
+	ResponseBase setPushSwitch(PushSwitchQuery entity, HttpServletRequest request);
 
 	@GetMapping("/signOut")
 	@ApiOperation(value = "退出登录",notes="退出登录",response=ResponseBase.class)

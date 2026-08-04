@@ -14,8 +14,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -24,6 +26,8 @@ public class PushNotifyServiceImpl implements PushNotifyService {
 
 	public static final String BIZ_INTERACT = "INTERACT";
 	public static final String BIZ_MEDAL = "MEDAL";
+	/** 极光单次 registrationId 上限 */
+	private static final int JPUSH_REG_BATCH = 1000;
 
 	@Autowired
 	private AppAccountDao appAccountDao;
@@ -40,7 +44,12 @@ public class PushNotifyServiceImpl implements PushNotifyService {
 			return;
 		}
 		try {
-			String registrationId = resolveRegistrationId(toUid);
+			AppAccountEntity account = appAccountDao.findByUid(toUid);
+			if (!isPushEnabled(account)) {
+				log.debug("skip push: user disabled, toUid={}", toUid);
+				return;
+			}
+			String registrationId = resolveRegistrationId(toUid, account);
 			if (StringUtils.isEmpty(registrationId)) {
 				log.debug("skip push: no registrationId, toUid={}", toUid);
 				return;
@@ -57,9 +66,44 @@ public class PushNotifyServiceImpl implements PushNotifyService {
 		}
 	}
 
+	@Override
+	public void notifyAll(String title, String content, Map<String, Object> extras) {
+		if (StringUtils.isEmpty(title) && StringUtils.isEmpty(content)) {
+			return;
+		}
+		try {
+			// 按用户开关过滤，不再 audience=all，避免关闭推送的用户仍收到广播
+			List<String> registrationIds = appAccountDao.findEnabledPushRegistrationIds();
+			if (registrationIds == null || registrationIds.isEmpty()) {
+				log.info("notifyAll skipped: no enabled registrationId");
+				return;
+			}
+			for (int i = 0; i < registrationIds.size(); i += JPUSH_REG_BATCH) {
+				int end = Math.min(i + JPUSH_REG_BATCH, registrationIds.size());
+				List<String> batch = new ArrayList<>(registrationIds.subList(i, end));
+				JpushReqEntity pushVo = new JpushReqEntity();
+				pushVo.setTitle(title == null ? "" : title);
+				pushVo.setMsg(content == null ? "" : content);
+				pushVo.setBroadcasting(false);
+				pushVo.setRegistrationIdList(batch);
+				pushVo.setExtrasMap(extras);
+				JPushUtils.sendAsync(pushVo);
+			}
+		} catch (Exception e) {
+			log.warn("notifyAll failed: {}", e.getMessage());
+		}
+	}
+
+	/** null / 非0 视为开启（默认开） */
+	private static boolean isPushEnabled(AppAccountEntity account) {
+		if (account == null) {
+			return true;
+		}
+		return !Integer.valueOf(0).equals(account.getPushEnabled());
+	}
+
 	/** 优先账号表，其次设备表（游客先绑、登录后关联） */
-	private String resolveRegistrationId(Integer uid) {
-		AppAccountEntity account = appAccountDao.findByUid(uid);
+	private String resolveRegistrationId(Integer uid, AppAccountEntity account) {
 		if (account != null && !StringUtils.isEmpty(account.getRegistrationId())) {
 			return account.getRegistrationId();
 		}

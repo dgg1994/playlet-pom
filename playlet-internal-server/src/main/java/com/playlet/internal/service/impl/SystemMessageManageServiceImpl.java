@@ -167,11 +167,19 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 		systemMessagePublishDao.updatePublishStatus(row.getId(),
 				SystemMessagePublishStatusEnums.PUBLISHED.getCode());
 
+		// 定时未到点：只入库展示，不立刻推送（避免用户提前收到）
+		boolean dueNow = row.getScheduleTime() == null || !row.getScheduleTime().after(new Date());
+		if (!dueNow) {
+			log.info("system message published id={} scheduleTime={} skip immediate push",
+					row.getId(), row.getScheduleTime());
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		}
+
 		if (Integer.valueOf(SystemMessageAudienceTypeEnums.UID_LIST.getCode()).equals(row.getAudienceType())) {
 			fanoutToInbox(row, i18nList);
-		} else if (Integer.valueOf(1).equals(row.getPushFlag())) {
-			// 全员推送成本高，P0 仅记录；指定人在 fanout 内推
-			log.info("broadcast published id={}, push_flag=1 skipped mass push in P0", row.getId());
+		} else {
+			// 全员读扩散：列表由 C 端合并广播；推送走极光广播
+			pushBroadcast(row, i18nList);
 		}
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
@@ -197,6 +205,11 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
+	/**
+	 * 粉丝
+	 * @param row
+	 * @param i18nList
+	 */
 	private void fanoutToInbox(SystemMessagePublishEntity row, List<SystemMessagePublishI18nEntity> i18nList) {
 		List<Integer> uids = parseUidList(row.getAudienceJson());
 		if (uids.isEmpty()) {
@@ -206,7 +219,6 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 		if (def == null) {
 			def = i18nList.get(0);
 		}
-		boolean push = Integer.valueOf(1).equals(row.getPushFlag());
 		for (Integer uid : uids) {
 			if (uid == null) {
 				continue;
@@ -238,20 +250,81 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 				log.warn("fanout insert failed publishId={} uid={}: {}", row.getId(), uid, e.getMessage());
 				continue;
 			}
-			if (push) {
-				Map<String, Object> extras = new HashMap<>();
-				extras.put("bizType", SystemMessageSendServiceImpl.BIZ_SYSTEM);
-				extras.put("messageType", row.getMessageType());
-				extras.put("messageId", String.valueOf(msg.getId()));
-				extras.put("publishId", String.valueOf(row.getId()));
-				if (row.getDramaId() != null) {
-					extras.put("dramaId", String.valueOf(row.getDramaId()));
-				}
-				pushNotifyService.notifyUser(uid, def.getTitle(), def.getContent(), extras);
-			}
+			Map<String, Object> extras = buildSystemExtras(row, msg.getId());
+			pushNotifyService.notifyUser(uid, def.getTitle(), truncatePushBody(def.getContent()), extras);
 		}
 	}
 
+	/**
+	 * 广播
+	 * @param row
+	 * @param i18nList
+	 */
+	private void pushBroadcast(SystemMessagePublishEntity row, List<SystemMessagePublishI18nEntity> i18nList) {
+		SystemMessagePublishI18nEntity def = pickI18n(i18nList, row.getDefaultLangue());
+		if (def == null && i18nList != null && !i18nList.isEmpty()) {
+			def = i18nList.get(0);
+		}
+		if (def == null || StringUtils.isEmpty(def.getTitle())) {
+			log.warn("skip broadcast push: no i18n title, publishId={}", row.getId());
+			return;
+		}
+		Map<String, Object> extras = buildSystemExtras(row, null);
+		pushNotifyService.notifyAll(def.getTitle(), truncatePushBody(def.getContent()), extras);
+		log.info("broadcast push sent publishId={}", row.getId());
+	}
+
+	/**
+	 * 构建系统消息推送参数
+	 * @param row
+	 * @param inboxId
+	 * @return
+	 */
+	private static Map<String, Object> buildSystemExtras(SystemMessagePublishEntity row, Long inboxId) {
+		Map<String, Object> extras = new HashMap<>();
+		extras.put("bizType", SystemMessageSendServiceImpl.BIZ_SYSTEM);
+		extras.put("messageType", row.getMessageType());
+		if (row.getId() != null) {
+			extras.put("publishId", String.valueOf(row.getId()));
+		}
+		if (inboxId != null) {
+			extras.put("messageId", String.valueOf(inboxId));
+		}
+		if (row.getDramaId() != null) {
+			extras.put("dramaId", String.valueOf(row.getDramaId()));
+		}
+		if (!StringUtils.isEmpty(row.getJumpType())) {
+			extras.put("jumpType", row.getJumpType());
+		}
+		if (!StringUtils.isEmpty(row.getJumpParam())) {
+			extras.put("jumpParam", row.getJumpParam());
+		}
+		return extras;
+	}
+
+	/**
+	 * 截取推送内容
+	 * @param content
+	 * @return
+	 */
+	private static String truncatePushBody(String content) {
+		if (content == null) {
+			return "";
+		}
+		String text = content.trim();
+		if (text.length() <= 120) {
+			return text;
+		}
+		return text.substring(0, 120) + "...";
+	}
+
+	/**
+	 * 保存多语言
+	 * @param publishId 发布单id
+	 * @param i18nList 多语言
+	 * @param replace 是否替换
+	 * @throws Exception
+	 */
 	private void saveI18nList(Long publishId, List<SystemMessagePublishI18nEntity> i18nList, boolean replace)
 			throws Exception {
 		if (replace) {
@@ -272,6 +345,12 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 		}
 	}
 
+	/**
+	 * 验证发布单
+	 * @param entity 发布单
+	 * @param creating 创建
+	 * @return
+	 */
 	private static String validatePublish(SystemMessagePublishEntity entity, boolean creating) {
 		if (entity == null) {
 			return I18nUtil.getMessage("base_error");
@@ -300,6 +379,10 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 		return null;
 	}
 
+	/**
+	 * 填充默认值
+	 * @param entity
+	 */
 	private static void fillDefaults(SystemMessagePublishEntity entity) {
 		if (StringUtils.isEmpty(entity.getDefaultLangue())) {
 			String lang = LanguageContext.getLanguage();
@@ -319,6 +402,12 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 		}
 	}
 
+	/**
+	 * 获取多语言
+	 * @param list
+	 * @param defaultLangue
+	 * @return
+	 */
 	private static SystemMessagePublishI18nEntity pickI18n(List<SystemMessagePublishI18nEntity> list,
 			String defaultLangue) {
 		if (list == null || list.isEmpty()) {
@@ -337,6 +426,11 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 		return list.get(0);
 	}
 
+	/**
+	 * 解析用户id列表
+	 * @param audienceJson
+	 * @return
+	 */
 	private static List<Integer> parseUidList(String audienceJson) {
 		List<Integer> uids = new ArrayList<>();
 		if (StringUtils.isEmpty(audienceJson)) {
