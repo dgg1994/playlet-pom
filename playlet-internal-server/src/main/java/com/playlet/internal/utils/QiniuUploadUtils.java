@@ -1,6 +1,7 @@
 package com.playlet.internal.utils;
 
 import com.playlet.internal.config.QiniuConfig;
+import com.playlet.internal.constants.RedisKeyConstants;
 import com.qiniu.http.Response;
 import com.qiniu.storage.BucketManager;
 import com.qiniu.storage.Configuration;
@@ -38,6 +39,9 @@ public class QiniuUploadUtils {
 
 	@Autowired
 	private UploadManager qiniuUploadManager;
+
+	@Autowired(required = false)
+	private RedisUtil redisUtil;
 
 	@PostConstruct
 	public void init() {
@@ -264,6 +268,29 @@ public class QiniuUploadUtils {
 		if (key == null || key.isEmpty()) {
 			return false;
 		}
+		String cacheKey = RedisKeyConstants.QINIU_EXISTS_KEY + key;
+		if (redisUtil != null) {
+			try {
+				Object cached = redisUtil.get(cacheKey);
+				if (cached != null) {
+					return "1".equals(String.valueOf(cached));
+				}
+			} catch (Exception e) {
+				log.debug("七牛 exists 读缓存失败 key={}: {}", key, e.getMessage());
+			}
+		}
+		boolean exists = probeExists(key);
+		if (redisUtil != null) {
+			try {
+				redisUtil.set(cacheKey, exists ? "1" : "0", RedisKeyConstants.QINIU_EXISTS_TTL_SEC);
+			} catch (Exception e) {
+				log.debug("七牛 exists 写缓存失败 key={}: {}", key, e.getMessage());
+			}
+		}
+		return exists;
+	}
+
+	private boolean probeExists(String key) {
 		try {
 			Configuration cfg = new Configuration(Region.autoRegion());
 			BucketManager bucketManager = new BucketManager(qiniuAuth, cfg);

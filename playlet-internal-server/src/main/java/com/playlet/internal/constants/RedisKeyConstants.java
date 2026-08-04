@@ -39,4 +39,9 @@ public class RedisKeyConstants {
     /** 提现提交防重：uid */
     public static final String WITHDRAW_SUBMIT_LOCK = "wallet:withdraw:lock:uid:";
     public static final long WITHDRAW_SUBMIT_LOCK_SEC = 5L;
+
+    /** 七牛对象存在性缓存：key 后缀为对象 key */
+    public static final String QINIU_EXISTS_KEY = "qiniu:exists:";
+    /** 存在性缓存 TTL：10 分钟（码率探测热路径） */
+    public static final long QINIU_EXISTS_TTL_SEC = 10L * 60;
 }

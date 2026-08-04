@@ -79,32 +79,65 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
     public ResponseBase recommend(@RequestBody RecommendDramaQuery entity, HttpServletRequest request) {
         try {
             Integer uid = AppTokenUtil.resolveUid(request);
+            // 生成seed
             ensureRecommendSeed(entity);
             PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
-            entity.setDeleteState(DeleteStateEnum.NORMAL.getIndex());
+            int deleteState = DeleteStateEnum.NORMAL.getIndex();
+            entity.setDeleteState(deleteState);
             entity.setVerifyStatus(VerifyStateEnums.AVAILABLE_NOW.getIndex());
             List<RecommendDramaRes> list = dramaDao.recommendList(entity);
-            if (list != null && list.size() > 0) {
-                for (int i = 0; i < list.size(); i++) {
-                    list.get(i).setCoverUrl(mediaUrlService.sign(list.get(i).getCoverUrl()));
-                    RecommendVidoeRes vidoeRes = dramaAssetDao.findDramaIdOne(list.get(i).getId(), DeleteStateEnum.NORMAL.getIndex());
-                    vidoeRes.setCollectScore(list.get(i).getCollectScore());
-                    vidoeRes.setShareScore(list.get(i).getShareScore());
+            if (list != null && !list.isEmpty()) {
+                // 获取资源id列表
+                List<Integer> dramaIds = list.stream().map(RecommendDramaRes::getId).collect(Collectors.toList());
+                // 查看资源的第一集
+                List<DramaAssetEntity> firstAssets = dramaAssetDao.findFirstAssetsByDramaIds(dramaIds, deleteState);
+                Map<Integer, DramaAssetEntity> assetByDramaId = firstAssets == null ? Collections.emptyMap()
+                        : firstAssets.stream().filter(a -> a.getDramaId() != null)
+                        .collect(Collectors.toMap(DramaAssetEntity::getDramaId, a -> a, (a, b) -> a));
+
+                Set<String> likedEpisodeIds = Collections.emptySet();
+                Set<Integer> collectedDramaIds = Collections.emptySet();
+                if (uid != null) {
+                    // 获取用户的资源id
+                    List<Integer> assetIds = assetByDramaId.values().stream()
+                            .map(DramaAssetEntity::getId).filter(id -> id != null)
+                            .collect(Collectors.toList());
+                    if (!assetIds.isEmpty()) {
+                        List<String> episodeIds = assetIds.stream().map(String::valueOf).collect(Collectors.toList());
+                        // 用户喜欢
+                        List<UserDramaLikeEntity> likedRows = userDramaLikeDao.findByUidAndEpisodeIds(uid, episodeIds);
+                        likedEpisodeIds = likedRows == null ? Collections.emptySet()
+                                : likedRows.stream().map(UserDramaLikeEntity::getEpisodeId).collect(Collectors.toSet());
+                        // 按资源 id 查 collect.drama_id（非整剧 id）用户收藏
+                        List<UserDramaCollectEntity> collectRows = userDramaCollectDao.findByUidAndDramaIds(uid, assetIds);
+                        collectedDramaIds = collectRows == null ? Collections.emptySet()
+                                : collectRows.stream().map(UserDramaCollectEntity::getDramaId).collect(Collectors.toSet());
+                    }
+                }
+
+                for (RecommendDramaRes dramaRes : list) {
+                    dramaRes.setCoverUrl(mediaUrlService.sign(dramaRes.getCoverUrl()));
+                    DramaAssetEntity asset = assetByDramaId.get(dramaRes.getId());
+                    if (asset == null) {
+                        continue;
+                    }
+                    // 转换为推荐视频
+                    RecommendVidoeRes vidoeRes = toRecommendVideoRes(asset);
+                    vidoeRes.setCollectScore(dramaRes.getCollectScore());
+                    vidoeRes.setShareScore(dramaRes.getShareScore());
                     vidoeRes.setVideoUrl(null);
                     if (uid != null) {
-                        UserDramaLikeEntity dramaLikeEntity = userDramaLikeDao.findByVoideId(vidoeRes.getId(),uid);
-                        if (dramaLikeEntity != null) {
+                        if (likedEpisodeIds.contains(String.valueOf(asset.getId()))) {
                             vidoeRes.setIsLike(PublicEnums.ONE.getIndex());
                         }
-                        UserDramaCollectEntity collectEntity = userDramaCollectDao.findByVoideId(vidoeRes.getId(),uid);
-                        if (collectEntity != null) {
+                        if (collectedDramaIds.contains(asset.getId())) {
                             vidoeRes.setIsCollect(PublicEnums.ONE.getIndex());
                         }
                     } else {
                         vidoeRes.setIsLike(PublicEnums.ZERO.getIndex());
                         vidoeRes.setIsCollect(PublicEnums.ZERO.getIndex());
                     }
-                    list.get(i).setVidoeRes(vidoeRes);
+                    dramaRes.setVidoeRes(vidoeRes);
                 }
             }
             RecommendPageResp resp = new RecommendPageResp();
@@ -115,6 +148,25 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             e.printStackTrace();
             throw new RuntimeException();
         }
+    }
+
+    /**
+     * 转换为推荐视频
+     * @param asset 资源
+     * @return
+     */
+    private static RecommendVidoeRes toRecommendVideoRes(DramaAssetEntity asset) {
+        RecommendVidoeRes res = new RecommendVidoeRes();
+        res.setId(asset.getId());
+        res.setVideoName(asset.getVideoName());
+        res.setSetNum(asset.getSetNum());
+        res.setCollectScore(asset.getCollectScore());
+        res.setShareScore(asset.getShareScore());
+        res.setLikeScore(asset.getLikeScore());
+        res.setDiscussScore(asset.getDiscussScore());
+        res.setVideoType(asset.getVideoType());
+        res.setVideoUrl(asset.getVideoUrl());
+        return res;
     }
 
     /** 首页未传 seed 时生成；翻页需原样回传以保证排序稳定 */
@@ -319,6 +371,9 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
         return resp;
     }
 
+    /**
+     * 填充已存在的多码率流。
+     */
     private void fillExistingMultiRateStreams(List<VideoPlayUrlResp.StreamItem> streams, String prefix) {
         for (VideoDefinitionEnums def : VideoDefinitionEnums.values()) {
             String streamKey = def.toM3u8Key(prefix);
@@ -328,6 +383,9 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
         }
     }
 
+    /**
+     * 确定默认清晰度。
+     */
     private VideoDefinitionEnums resolveDefaultDefinition(List<VideoPlayUrlResp.StreamItem> streams,
                                                           VideoDefinitionEnums preferred) {
         if (streams == null || streams.isEmpty()) {
@@ -348,6 +406,9 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
         return first != null ? first : VideoDefinitionEnums.DEFAULT;
     }
 
+    /**
+     * 确定是否存在指定清晰度的流。
+     */
     private boolean containsDefinition(List<VideoPlayUrlResp.StreamItem> streams, VideoDefinitionEnums def) {
         if (def == null) {
             return false;
@@ -360,6 +421,9 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
         return false;
     }
 
+    /**
+     * 构建流项。
+     */
     private VideoPlayUrlResp.StreamItem buildStreamItem(VideoDefinitionEnums definition, String streamKey) {
         VideoPlayUrlResp.StreamItem item = new VideoPlayUrlResp.StreamItem();
         item.setDefinition(definition.getCode());

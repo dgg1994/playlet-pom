@@ -26,7 +26,6 @@ public interface DramaApiService {
 	
 	/**
 	 * @category 视频播放上报
-	 * @param entity
 	 * @return
 	 */
 	@GetMapping("/playVideoReport")

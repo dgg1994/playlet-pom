@@ -40,6 +40,19 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 	@Select("SELECT * from drama_asset where drama_id = #{dramaId} and delete_state = #{deleteState} order by set_num limit 1")
 	RecommendVidoeRes findDramaIdOne(@Param("dramaId") Integer dramaId,@Param("deleteState") Integer deleteState);
 
+	/** 批量取每部剧 set_num 最小的一集（推荐流装配，避免 N+1） */
+	@Select("<script>"
+			+ "SELECT a.* FROM drama_asset a "
+			+ "INNER JOIN ("
+			+ "  SELECT drama_id, MIN(set_num) AS min_set FROM drama_asset "
+			+ "  WHERE delete_state = #{deleteState} AND drama_id IN "
+			+ "  <foreach collection='dramaIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
+			+ "  GROUP BY drama_id"
+			+ ") t ON a.drama_id = t.drama_id AND a.set_num = t.min_set AND a.delete_state = #{deleteState}"
+			+ "</script>")
+	List<DramaAssetEntity> findFirstAssetsByDramaIds(@Param("dramaIds") List<Integer> dramaIds,
+			@Param("deleteState") Integer deleteState);
+
 	@Update("update drama_asset set like_score = ifnull(like_score,0) + 1, gmtModified = now() where id = #{assetId}")
 	int incrLikeScore(@Param("assetId") Integer assetId);
 

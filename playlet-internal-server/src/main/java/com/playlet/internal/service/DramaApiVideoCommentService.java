@@ -26,7 +26,6 @@ public interface DramaApiVideoCommentService {
 	
 	/**
 	 * @category 评论回复列表
-	 * @param commentId
 	 * @param request
 	 * @return
 	 */

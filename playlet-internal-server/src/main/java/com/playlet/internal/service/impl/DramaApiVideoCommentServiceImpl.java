@@ -1,7 +1,10 @@
 package com.playlet.internal.service.impl;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
@@ -22,7 +25,6 @@ import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.drama.DramaCommentLikeDao;
 import com.playlet.internal.dao.drama.DramaVideoCommentDao;
-import com.playlet.internal.entity.drama.DramaCommentLikeEntity;
 import com.playlet.internal.entity.drama.DramaVideoCommentEntity;
 import com.playlet.internal.enums.DeleteStateEnum;
 import com.playlet.internal.enums.PublicEnums;
@@ -124,6 +126,16 @@ public class DramaApiVideoCommentServiceImpl extends BaseApiService implements D
 		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
 	}
 
+	/**
+	 * 构建一级评论分页
+	 *
+	 * @param videoId 视频ID
+	 * @param anchor 锚点
+	 * @param pageSize 页大小
+	 * @param uid 用户ID
+	 * @param deleteState 删除状态
+	 * @return 评论分页
+	 */
 	private CommentLocatePageEntity buildLevel1Page(Integer videoId, DramaVideoCommentEntity anchor,
 			int pageSize, Integer uid, int deleteState) {
 		Integer newer = dramaVideoCommentDao.countNewerLevel1(videoId, deleteState,
@@ -153,6 +165,16 @@ public class DramaApiVideoCommentServiceImpl extends BaseApiService implements D
 		return page;
 	}
 
+	/**
+	 * 获取回复列表
+	 *
+	 * @param parentId 父级id
+	 * @param anchor 锚点
+	 * @param pageSize 页大小
+	 * @param uid 用户id
+	 * @param deleteState 删除状态
+	 * @return 回复列表
+	 */
 	private CommentLocatePageEntity buildReplyPage(Integer parentId, DramaVideoCommentEntity anchor,
 			int pageSize, Integer uid, int deleteState) {
 		Integer newer = dramaVideoCommentDao.countNewerReplies(parentId, deleteState,
@@ -198,28 +220,92 @@ public class DramaApiVideoCommentServiceImpl extends BaseApiService implements D
 		return pageSize;
 	}
 
+	/**
+	 * 填充 flags
+	 *
+	 * @param list 列表
+	 * @param uid 登录用户 id
+	 */
 	private void fillFlags(List<DramaVideoCommentEntity> list, Integer uid) {
 		if (list == null || list.isEmpty()) {
 			return;
 		}
+		Set<Integer> likedIds = loadLikedCommentIds(uid, list);
 		for (DramaVideoCommentEntity item : list) {
-			fillFlagsOne(item, uid);
+			fillFlagsOne(item, uid, likedIds);
 		}
 	}
 
+	/**
+	 * 批量加载已点赞的评论 id
+	 *
+	 * @param uid 登录用户 id
+	 * @param list 列表
+	 * @return 已点赞的评论 id 列表
+	 */
+	private Set<Integer> loadLikedCommentIds(Integer uid, List<DramaVideoCommentEntity> list) {
+		if (uid == null || list == null || list.isEmpty()) {
+			return Collections.emptySet();
+		}
+		List<Integer> commentIds = new ArrayList<>(list.size());
+		for (DramaVideoCommentEntity item : list) {
+			if (item != null && item.getId() != null) {
+				commentIds.add(item.getId());
+			}
+		}
+		if (commentIds.isEmpty()) {
+			return Collections.emptySet();
+		}
+		List<Long> liked = dramaCommentLikeDao.findLikedCommentIds(uid, commentIds);
+		if (liked == null || liked.isEmpty()) {
+			return Collections.emptySet();
+		}
+		Set<Integer> result = new HashSet<>(liked.size());
+		for (Long id : liked) {
+			if (id != null) {
+				result.add(id.intValue());
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * 填充 flags
+	 *
+	 * @param item 列表项
+	 * @param uid 登录用户 id
+	 */
 	private void fillFlagsOne(DramaVideoCommentEntity item, Integer uid) {
+		Set<Integer> likedIds = Collections.emptySet();
+		if (uid != null && item != null && item.getId() != null) {
+			List<Long> liked = dramaCommentLikeDao.findLikedCommentIds(uid,
+					Collections.singletonList(item.getId()));
+			if (liked != null && !liked.isEmpty()) {
+				likedIds = Collections.singleton(item.getId());
+			}
+		}
+		fillFlagsOne(item, uid, likedIds);
+	}
+
+	/**
+	 * 填充 flags
+	 *
+	 * @param item 列表项
+	 * @param uid 登录用户 id
+	 * @param likedIds 已点赞的评论 id 列表
+	 */
+	private void fillFlagsOne(DramaVideoCommentEntity item, Integer uid, Set<Integer> likedIds) {
 		if (item == null) {
 			return;
 		}
-		if (uid != null && item.getUserId() != null && item.getUserId().equals(uid)) {
+		if (item.getUserId() != null && item.getUserId().equals(uid)) {
 			item.setIsDelete(PublicEnums.ONE.getIndex());
 		} else {
 			item.setIsDelete(PublicEnums.ZERO.getIndex());
 		}
 		item.setAvatar(mediaUrlService.sign(item.getAvatar()));
-		if (uid != null) {
-			DramaCommentLikeEntity like = dramaCommentLikeDao.findOne(item.getId(), uid);
-			item.setIsLike(like != null ? PublicEnums.ONE.getIndex() : PublicEnums.ZERO.getIndex());
+		if (uid != null && likedIds != null && item.getId() != null && likedIds.contains(item.getId())) {
+			item.setIsLike(PublicEnums.ONE.getIndex());
 		} else {
 			item.setIsLike(PublicEnums.ZERO.getIndex());
 		}

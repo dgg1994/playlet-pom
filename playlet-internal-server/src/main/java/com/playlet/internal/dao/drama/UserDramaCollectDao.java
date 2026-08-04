@@ -23,4 +23,11 @@ public interface UserDramaCollectDao extends BaseMapper<UserDramaCollectEntity> 
 
 	@Select("select * from user_drama_collect where drama_id = #{dramaId} and uid = #{uid}")
 	UserDramaCollectEntity findByVoideId(@Param("dramaId") Integer dramaId, @Param("uid") Integer uid);
+
+	@Select("<script>"
+			+ "select * from user_drama_collect where uid = #{uid} and drama_id in "
+			+ "<foreach collection='dramaIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
+			+ "</script>")
+	List<UserDramaCollectEntity> findByUidAndDramaIds(@Param("uid") Integer uid,
+			@Param("dramaIds") List<Integer> dramaIds);
 }
