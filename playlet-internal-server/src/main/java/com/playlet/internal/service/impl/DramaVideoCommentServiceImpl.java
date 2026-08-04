@@ -69,7 +69,7 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 			DramaVideoCommentEntity entity = new DramaVideoCommentEntity();
 			BeanUtils.copyProperties(createPay, entity);
 			entity.setCommentInfo(HtmlSanitizeUtils.plain(entity.getCommentInfo()));
-			entity.setUserName(HtmlSanitizeUtils.plain(entity.getUserName()));
+			entity.setUserName(null);
 			entity.setCommentType(CommentTypeEnums.VIDEO.getCode());
 			entity.setScore(null);
 			entity.setParentId(PublicEnums.ZERO.getIndex());
@@ -107,7 +107,8 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 			DramaVideoCommentEntity entity = new DramaVideoCommentEntity();
 			BeanUtils.copyProperties(createPay, entity);
 			entity.setCommentInfo(HtmlSanitizeUtils.plain(entity.getCommentInfo()));
-			entity.setUserName(HtmlSanitizeUtils.plain(entity.getUserName()));
+			entity.setUserName(null);
+			entity.setReplyToUserName(null);
 			entity.setCommentType(CommentTypeEnums.VIDEO.getCode());
 			entity.setScore(null);
 			entity.setDeleteState(DeleteStateEnum.NORMAL.getIndex());

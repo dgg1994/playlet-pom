@@ -40,9 +40,10 @@ public class DramaVideoCommentEntity extends PageQueryHelperEntity{
 	@TableField("user_id")
 	@ApiModelProperty(name = "userId",value = "评论用户ID",required = true,dataType = "Integer")
 	private Integer userId;
-	
-	@TableField("user_name")
-	@ApiModelProperty(name = "userName",value = "评论用户名",required = true,dataType = "String")
+
+	/** 非表字段：由 app_account.nickname 联表填充，JSON 字段名仍为 userName */
+	@TableField(exist = false)
+	@ApiModelProperty(name = "userName",value = "评论用户昵称",required = false,dataType = "String")
 	private String userName;
 
 	@TableField("comment_info")
@@ -68,9 +69,10 @@ public class DramaVideoCommentEntity extends PageQueryHelperEntity{
 	@TableField("reply_to_user_id")
 	@ApiModelProperty(name = "replyToUserId",value = "回复目标用户ID",required = true,dataType = "Integer")
 	private Integer replyToUserId;
-	
-	@TableField("reply_to_user_name")
-	@ApiModelProperty(name = "replyToUserName",value = "回复目标用户昵称",required = true,dataType = "String")
+
+	/** 非表字段：由 reply_to_user_id 关联 app_account.nickname 填充 */
+	@TableField(exist = false)
+	@ApiModelProperty(name = "replyToUserName",value = "回复目标用户昵称",required = false,dataType = "String")
 	private String replyToUserName;
 	
 	@TableField("delete_state")

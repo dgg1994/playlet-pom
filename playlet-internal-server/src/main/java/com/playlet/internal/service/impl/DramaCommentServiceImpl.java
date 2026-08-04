@@ -78,7 +78,6 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 			if (exist != null) {
 				exist.setScore(createPay.getScore());
 				exist.setCommentInfo(HtmlSanitizeUtils.plain(createPay.getCommentInfo()));
-				exist.setUserName(HtmlSanitizeUtils.plain(createPay.getUserName()));
 				GenericityUtil.updateDate(exist);
 				dramaVideoCommentDao.updateById(exist);
 				refreshDramaScoreNum(createPay.getDramaId());
@@ -87,7 +86,7 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 			DramaVideoCommentEntity entity = new DramaVideoCommentEntity();
 			BeanUtils.copyProperties(createPay, entity);
 			entity.setCommentInfo(HtmlSanitizeUtils.plain(entity.getCommentInfo()));
-			entity.setUserName(HtmlSanitizeUtils.plain(entity.getUserName()));
+			entity.setUserName(null);
 			entity.setCommentType(CommentTypeEnums.DRAMA.getCode());
 			entity.setVideoId(0);
 			entity.setParentId(PublicEnums.ZERO.getIndex());
@@ -130,7 +129,8 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 			DramaVideoCommentEntity entity = new DramaVideoCommentEntity();
 			BeanUtils.copyProperties(createPay, entity);
 			entity.setCommentInfo(HtmlSanitizeUtils.plain(entity.getCommentInfo()));
-			entity.setUserName(HtmlSanitizeUtils.plain(entity.getUserName()));
+			entity.setUserName(null);
+			entity.setReplyToUserName(null);
 			entity.setCommentType(CommentTypeEnums.DRAMA.getCode());
 			entity.setVideoId(0);
 			entity.setScore(null); // 回复人不能评分

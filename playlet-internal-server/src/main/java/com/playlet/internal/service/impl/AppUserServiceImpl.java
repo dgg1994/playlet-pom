@@ -331,15 +331,9 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			UsernamePasswordAuthenticationToken userData = JWTAuthenticationFilter.getAuthentication(request);
 			if (userData == null) {
 				return setResult(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"), null);
-			} else {
-				String key = userData.getName();
-				String redisKey = Constants.APP_PACKAGE_NAME + key;
-				if (redisUtil.get(redisKey) == null || redisUtil.get(redisKey).toString().length() < 1) {
-					return setResult(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"), null);
-				}
-				if (!redisUtil.get(redisKey).equals(header)) {
-					return setResult(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"), null);
-				}
+			}
+			if (!AppTokenUtil.isActiveSession(userData.getName(), header)) {
+				return setResult(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"), null);
 			}
 			String username = userData.getName();
 			AppAccountEntity entity = appAccountDao.findByAccount(username);
@@ -419,6 +413,8 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		account.setUserPassword(PasswordHashUtils.encode(entity.getNewPassword()));
 		account.setGmtModified(new Date());
 		appAccountDao.updateById(account);
+		// 改密后踢全端，旧 token 立即失效（含当前设备，需重新登录）
+		AppTokenUtil.invalidateAccountSessions(account);
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
@@ -556,20 +552,21 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	public ResponseBase signOut(HttpServletRequest request) {
 		try {
 			UsernamePasswordAuthenticationToken token = JWTAuthenticationFilter.getAuthentication(request);
-			if(token == null) {
+			if (token == null) {
 				return setResult(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"), null);
 			}
 			String username = token.getName();
-			AppAccountEntity userEntity = appAccountDao.findByEmail(username);
-			if(userEntity != null) {
-				redisUtil.del(Constants.APP_PACKAGE_NAME + userEntity.getUserEmail());
+			AppAccountEntity userEntity = appAccountDao.findByAccount(username);
+			if (userEntity != null) {
+				AppTokenUtil.invalidateAccountSessions(userEntity);
 				// 退出清空账号推送绑定，设备表解绑 uid，避免串号
 				appAccountDao.updatePushBind(userEntity.getId(), null, null);
 				appPushDeviceDao.clearUid(userEntity.getId());
 				return setResultSuccess(I18nUtil.getMessage("base_success"));
-			}else {
-				return setResultError(I18nUtil.getMessage("base_success"));
 			}
+			// 账号查不到仍按 JWT subject 删会话，避免残留
+			AppTokenUtil.invalidateSessionByAccount(username);
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			log.error("service error", e);
 			throw new RuntimeException(e);
@@ -592,28 +589,32 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		account.setUserPassword(PasswordHashUtils.encode(entity.getNewPassword()));
 		account.setGmtModified(new Date());
 		appAccountDao.updateById(account);
+		// 清理邮箱验证码
 		redisUtil.del(entity.getEmail());
+		// 忘记密码后踢全端
+		AppTokenUtil.invalidateAccountSessions(account);
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
 	@Override
 	@SysLogAnnotation(module = "app用户管理", type = "get", remark = "注销账户")
-	public ResponseBase logout(Integer uid,HttpServletRequest request) {
+	public ResponseBase logout(Integer uid, HttpServletRequest request) {
 		try {
-			UsernamePasswordAuthenticationToken token = JWTAuthenticationFilter.getAuthentication(request);
-			String username = token.getName();
-			AppAccountEntity userEntity = appAccountDao.findByEmail(username);
-			if(userEntity != null ) {
-				if(!uid.equals(userEntity.getId())) {
-					return setResultError(I18nUtil.getMessage("purview_error_null"));
-				}
+			Integer tokenUid = AppTokenUtil.resolveUid(request);
+			if (tokenUid == null) {
+				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
+			}
+			if (uid == null || !uid.equals(tokenUid)) {
+				return setResultError(I18nUtil.getMessage("purview_error_null"));
+			}
+			AppAccountEntity userEntity = appAccountDao.selectById(tokenUid);
+			if (userEntity != null) {
 				userEntity.setUserState(UserStateEnums.LOGOUT.getIndex());
 				appAccountDao.updateById(userEntity);
-				redisUtil.del(Constants.APP_PACKAGE_NAME + userEntity.getUserEmail());
+				AppTokenUtil.invalidateAccountSessions(userEntity);
 				return setResultSuccess(I18nUtil.getMessage("base_success"));
-			}else {
-				return setResultError(I18nUtil.getMessage("base_error"));
 			}
+			return setResultError(I18nUtil.getMessage("base_error"));
 		} catch (Exception e) {
 			log.error("service error", e);
 			throw new RuntimeException(e);

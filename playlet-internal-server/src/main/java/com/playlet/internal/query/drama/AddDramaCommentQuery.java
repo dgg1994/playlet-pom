@@ -28,8 +28,7 @@ public class AddDramaCommentQuery {
 	@ApiModelProperty(name = "userId", value = "评论用户ID", required = true, dataType = "Integer")
 	private Integer userId;
 
-	@NotBlank(message = "评论用户名不能为空")
-	@ApiModelProperty(name = "userName", value = "评论用户名", required = true, dataType = "String")
+	@ApiModelProperty(name = "userName", value = "评论用户名（已废弃，服务端以账号昵称为准，可不传）", required = false, dataType = "String")
 	private String userName;
 
 	@NotBlank(message = "评论内容不能为空")

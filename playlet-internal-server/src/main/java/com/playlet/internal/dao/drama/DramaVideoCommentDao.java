@@ -15,21 +15,48 @@ import com.playlet.internal.query.drama.QueryDramaCommentQuery;
 @Repository
 public interface DramaVideoCommentDao extends BaseMapper<DramaVideoCommentEntity>{
 
-	@Select("select dvc.*,aa.avatar as avatar from drama_video_comment dvc left join app_account aa on dvc.user_id = aa.id where video_id = #{voideId} "
+	/**
+	 * 列表查询：userName / replyToUserName / avatar 均来自 app_account。
+	 */
+	@Select("select dvc.id, dvc.drama_id, dvc.video_id, dvc.comment_type, dvc.user_id, "
+			+ "dvc.comment_info, dvc.score, dvc.like_count, dvc.reply_count, dvc.parent_id, "
+			+ "dvc.reply_to_user_id, dvc.delete_state, dvc.setTime, dvc.gmtModified, "
+			+ "aa.avatar as avatar, aa.nickname as user_name, "
+			+ "ra.nickname as reply_to_user_name "
+			+ "from drama_video_comment dvc "
+			+ "left join app_account aa on dvc.user_id = aa.id "
+			+ "left join app_account ra on dvc.reply_to_user_id = ra.id "
+			+ "where video_id = #{voideId} "
 			+ "and delete_state = #{deleteState} "
 			+ "and parent_id = #{parentId} "
 			+ "and (comment_type is null or comment_type = 1) "
 			+ "order by setTime desc")
 	List<DramaVideoCommentEntity> getList(QueryCommentVideoQuery entity);
 
-	@Select("select dvc.*,aa.avatar as avatar from drama_video_comment dvc left join app_account aa on dvc.user_id = aa.id where drama_id = #{dramaId} "
+	@Select("select dvc.id, dvc.drama_id, dvc.video_id, dvc.comment_type, dvc.user_id, "
+			+ "dvc.comment_info, dvc.score, dvc.like_count, dvc.reply_count, dvc.parent_id, "
+			+ "dvc.reply_to_user_id, dvc.delete_state, dvc.setTime, dvc.gmtModified, "
+			+ "aa.avatar as avatar, aa.nickname as user_name, "
+			+ "ra.nickname as reply_to_user_name "
+			+ "from drama_video_comment dvc "
+			+ "left join app_account aa on dvc.user_id = aa.id "
+			+ "left join app_account ra on dvc.reply_to_user_id = ra.id "
+			+ "where drama_id = #{dramaId} "
 			+ "and comment_type = 2 "
 			+ "and delete_state = #{deleteState} "
 			+ "and parent_id = #{parentId} "
 			+ "order by setTime desc")
 	List<DramaVideoCommentEntity> getDramaCommentList(QueryDramaCommentQuery entity);
 
-	@Select("select dvc.*,aa.avatar as avatar from drama_video_comment dvc left join app_account aa on dvc.user_id = aa.id where parent_id = #{parentId} "
+	@Select("select dvc.id, dvc.drama_id, dvc.video_id, dvc.comment_type, dvc.user_id, "
+			+ "dvc.comment_info, dvc.score, dvc.like_count, dvc.reply_count, dvc.parent_id, "
+			+ "dvc.reply_to_user_id, dvc.delete_state, dvc.setTime, dvc.gmtModified, "
+			+ "aa.avatar as avatar, aa.nickname as user_name, "
+			+ "ra.nickname as reply_to_user_name "
+			+ "from drama_video_comment dvc "
+			+ "left join app_account aa on dvc.user_id = aa.id "
+			+ "left join app_account ra on dvc.reply_to_user_id = ra.id "
+			+ "where parent_id = #{parentId} "
 			+ "and delete_state = #{deleteState} "
 			+ "order by setTime desc")
 	List<DramaVideoCommentEntity> findParentId(@Param("parentId") Integer parentId,@Param("deleteState") Integer deleteState);
@@ -52,8 +79,15 @@ public interface DramaVideoCommentDao extends BaseMapper<DramaVideoCommentEntity
 			+ "and delete_state = #{deleteState} and score is not null")
 	Double avgScoreNumByDramaId(@Param("dramaId") Integer dramaId, @Param("deleteState") Integer deleteState);
 
-	@Select("select dvc.*,aa.avatar as avatar from drama_video_comment dvc "
-			+ "left join app_account aa on dvc.user_id = aa.id where dvc.id = #{id}")
+	@Select("select dvc.id, dvc.drama_id, dvc.video_id, dvc.comment_type, dvc.user_id, "
+			+ "dvc.comment_info, dvc.score, dvc.like_count, dvc.reply_count, dvc.parent_id, "
+			+ "dvc.reply_to_user_id, dvc.delete_state, dvc.setTime, dvc.gmtModified, "
+			+ "aa.avatar as avatar, aa.nickname as user_name, "
+			+ "ra.nickname as reply_to_user_name "
+			+ "from drama_video_comment dvc "
+			+ "left join app_account aa on dvc.user_id = aa.id "
+			+ "left join app_account ra on dvc.reply_to_user_id = ra.id "
+			+ "where dvc.id = #{id}")
 	DramaVideoCommentEntity findByIdWithAvatar(@Param("id") Integer id);
 
 	@Select("<script>"

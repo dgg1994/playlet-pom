@@ -21,8 +21,7 @@ public class ReplyVideoCommentQuery {
 	@ApiModelProperty(name = "userId",value = "评论用户ID",required = true,dataType = "Integer")
 	private Integer userId;
 	
-	@NotBlank(message = "回复用户名不能为空")
-	@ApiModelProperty(name = "userName",value = "评论用户名",required = true,dataType = "String")
+	@ApiModelProperty(name = "userName",value = "评论用户名（已废弃，服务端以账号昵称为准，可不传）",required = false,dataType = "String")
 	private String userName;
 
 	@NotBlank(message = "回复内容不能为空")
@@ -37,8 +36,7 @@ public class ReplyVideoCommentQuery {
 	@ApiModelProperty(name = "replyToUserId",value = "回复目标用户ID",required = true,dataType = "Integer")
 	private Integer replyToUserId;
 	
-	@NotBlank(message = "回复目标用户名不能为空")
-	@ApiModelProperty(name = "replyToUserName",value = "回复目标用户昵称",required = true,dataType = "String")
+	@ApiModelProperty(name = "replyToUserName",value = "回复目标用户昵称（已废弃，服务端按 replyToUserId 查账号昵称，可不传）",required = false,dataType = "String")
 	private String replyToUserName;
 	
 }
