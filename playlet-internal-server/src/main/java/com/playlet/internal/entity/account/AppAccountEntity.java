@@ -80,10 +80,6 @@ public class AppAccountEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "deviceName", value = "设备名称", required = false, dataType = "String")
 	private String deviceName;
 
-	@TableField("push_enabled")
-	@ApiModelProperty(name = "pushEnabled", value = "极光推送总开关 1开 0关，默认1", required = false, dataType = "Integer")
-	private Integer pushEnabled;
-
 	@TableField("push_langue")
 	@ApiModelProperty(name = "pushLangue", value = "推送语言 zh-cn/en/zh-hk/tr-tr/ko-kr/ja-jp/bn-bd/pt-br", required = false, dataType = "String")
 	private String pushLangue;

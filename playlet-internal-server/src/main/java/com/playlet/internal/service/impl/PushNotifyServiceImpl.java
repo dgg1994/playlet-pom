@@ -45,13 +45,13 @@ public class PushNotifyServiceImpl implements PushNotifyService {
 		}
 		try {
 			AppAccountEntity account = appAccountDao.findByUid(toUid);
-			if (!isPushEnabled(account)) {
-				log.debug("skip push: user disabled, toUid={}", toUid);
-				return;
-			}
 			String registrationId = resolveRegistrationId(toUid, account);
 			if (StringUtils.isEmpty(registrationId)) {
 				log.debug("skip push: no registrationId, toUid={}", toUid);
+				return;
+			}
+			if (!isDevicePushEnabled(registrationId)) {
+				log.debug("skip push: device disabled, toUid={}, regId={}", toUid, registrationId);
 				return;
 			}
 			sendToRegistrationIds(Collections.singletonList(registrationId), title, content, extras);
@@ -66,7 +66,7 @@ public class PushNotifyServiceImpl implements PushNotifyService {
 			return;
 		}
 		try {
-			List<String> registrationIds = appAccountDao.findEnabledPushRegistrationIds();
+			List<String> registrationIds = appPushDeviceDao.findEnabledRegistrationIds();
 			if (registrationIds == null || registrationIds.isEmpty()) {
 				log.info("notifyAll skipped: no enabled registrationId");
 				return;
@@ -115,12 +115,16 @@ public class PushNotifyServiceImpl implements PushNotifyService {
 		}
 	}
 
-	/** null / 非0 视为开启（默认开） */
-	private static boolean isPushEnabled(AppAccountEntity account) {
-		if (account == null) {
+	/** null / 非0 视为开启（默认开）；设备不存在也默认开 */
+	private boolean isDevicePushEnabled(String registrationId) {
+		if (StringUtils.isEmpty(registrationId)) {
+			return false;
+		}
+		AppPushDeviceEntity device = appPushDeviceDao.findByRegistrationId(registrationId);
+		if (device == null || device.getPushEnabled() == null) {
 			return true;
 		}
-		return !Integer.valueOf(0).equals(account.getPushEnabled());
+		return !Integer.valueOf(0).equals(device.getPushEnabled());
 	}
 
 	/** 优先账号表，其次设备表（游客先绑、登录后关联） */
@@ -172,13 +176,13 @@ public class PushNotifyServiceImpl implements PushNotifyService {
 		if (!StringUtils.isEmpty(episodeId)) {
 			extras.put("episodeId", episodeId);
 		}
-		// 直接发，避免 notifyUser 再查一次账号（开关/设备已在此判定）
-		if (!isPushEnabled(toAccount)) {
-			log.debug("skip interact push: user disabled, toUid={}", toUid);
-			return;
-		}
+		// 直接发：按设备开关过滤
 		String registrationId = resolveRegistrationId(toUid, toAccount);
 		if (StringUtils.isEmpty(registrationId)) {
+			return;
+		}
+		if (!isDevicePushEnabled(registrationId)) {
+			log.debug("skip interact push: device disabled, toUid={}", toUid);
 			return;
 		}
 		sendToRegistrationIds(Collections.singletonList(registrationId), title, content, extras);
@@ -197,12 +201,12 @@ public class PushNotifyServiceImpl implements PushNotifyService {
 		Map<String, Object> extras = new HashMap<>();
 		extras.put("bizType", BIZ_MEDAL);
 		extras.put("medalId", String.valueOf(medalId));
-		if (!isPushEnabled(toAccount)) {
-			log.debug("skip medal push: user disabled, toUid={}", toUid);
-			return;
-		}
 		String registrationId = resolveRegistrationId(toUid, toAccount);
 		if (StringUtils.isEmpty(registrationId)) {
+			return;
+		}
+		if (!isDevicePushEnabled(registrationId)) {
+			log.debug("skip medal push: device disabled, toUid={}", toUid);
 			return;
 		}
 		sendToRegistrationIds(Collections.singletonList(registrationId), title, content, extras);

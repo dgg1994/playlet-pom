@@ -34,6 +34,10 @@ public class AppPushDeviceEntity {
 	@ApiModelProperty(name = "uid", value = "绑定用户，未登录为空", dataType = "Integer")
 	private Integer uid;
 
+	@TableField("push_enabled")
+	@ApiModelProperty(name = "pushEnabled", value = "推送开关：1开启 0关闭，默认1", dataType = "Integer")
+	private Integer pushEnabled;
+
 	@TableField("setTime")
 	@ApiModelProperty(name = "setTime", value = "创建时间", dataType = "Date")
 	private Date setTime;

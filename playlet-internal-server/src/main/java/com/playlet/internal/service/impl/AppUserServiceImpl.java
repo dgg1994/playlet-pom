@@ -36,6 +36,7 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import javax.servlet.http.HttpServletRequest;
+import java.lang.reflect.InvocationTargetException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
@@ -348,9 +349,6 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			entity.setFollowCount(userFollowDao.countFollowing(entity.getId()));
 			entity.setFansCount(userFollowDao.countFans(entity.getId()));
 			entity.setLikeCount(UserDramaLikeDao.countLike(entity.getId()));
-			if (entity.getPushEnabled() == null) {
-				entity.setPushEnabled(1);
-			}
 			if (StringUtils.isEmpty(entity.getPushLangue())) {
 				entity.setPushLangue(LanguageEnums.DEFAULT_LANGUE);
 			} else {
@@ -458,33 +456,45 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	}
 
 	@Override
-	public ResponseBase getPushSwitch(HttpServletRequest request) {
-		Integer uid = AppTokenUtil.resolveUid(request);
-		if (uid == null) {
-			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+	public ResponseBase getPushSwitch(
+			@org.springframework.web.bind.annotation.RequestParam(value = "registrationId", required = false) String registrationId,
+			@org.springframework.web.bind.annotation.RequestParam(value = "cid", required = false) String cid) {
+		String regId = resolveRegistrationId(registrationId, cid);
+		if (StringUtils.isEmpty(regId)) {
+			return setResultError(I18nUtil.getMessage("base_error"));
 		}
-		AppAccountEntity account = appAccountDao.findByUid(uid);
+		AppPushDeviceEntity device = appPushDeviceDao.findByRegistrationId(regId);
 		int enabled = 1;
-		if (account != null && account.getPushEnabled() != null) {
-			enabled = Integer.valueOf(0).equals(account.getPushEnabled()) ? 0 : 1;
+		if (device != null && device.getPushEnabled() != null) {
+			enabled = Integer.valueOf(0).equals(device.getPushEnabled()) ? 0 : 1;
 		}
 		java.util.Map<String, Object> data = new java.util.HashMap<>();
 		data.put("enabled", enabled);
+		data.put("registrationId", regId);
 		return setResultSuccess(data, I18nUtil.getMessage("base_success"));
 	}
 
 	@Override
-	public ResponseBase setPushSwitch(@RequestBody PushSwitchQuery entity, HttpServletRequest request) {
-		Integer uid = AppTokenUtil.resolveUid(request);
-		if (uid == null) {
-			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
-		}
+	public ResponseBase setPushSwitch(@RequestBody PushSwitchQuery entity) throws InvocationTargetException, IllegalAccessException {
 		if (entity == null || entity.getEnabled() == null
 				|| (!Integer.valueOf(0).equals(entity.getEnabled())
 				&& !Integer.valueOf(1).equals(entity.getEnabled()))) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
-		appAccountDao.updatePushEnabled(uid, entity.getEnabled());
+		String regId = resolveRegistrationId(entity.getRegistrationId(), entity.getCid());
+		if (StringUtils.isEmpty(regId)) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		AppPushDeviceEntity exist = appPushDeviceDao.findByRegistrationId(regId);
+		if (exist == null) {
+			AppPushDeviceEntity row = new AppPushDeviceEntity();
+			row.setRegistrationId(regId);
+			row.setPushEnabled(entity.getEnabled());
+			GenericityUtil.setDate(row);
+			appPushDeviceDao.insert(row);
+		} else {
+			appPushDeviceDao.updatePushEnabled(regId, entity.getEnabled());
+		}
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
@@ -513,6 +523,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 				row.setRegistrationId(registrationId);
 				row.setDeviceName(deviceName);
 				row.setUid(uid);
+				row.setPushEnabled(1);
 				GenericityUtil.setDate(row);
 				appPushDeviceDao.insert(row);
 				return;

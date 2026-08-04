@@ -8,6 +8,7 @@ import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.dao.account.AppAccountDao;
+import com.playlet.internal.dao.account.AppPushDeviceDao;
 import com.playlet.internal.dao.message.SystemMessagePublishDao;
 import com.playlet.internal.dao.message.SystemMessagePublishI18nDao;
 import com.playlet.internal.dao.message.UserSystemMessageDao;
@@ -59,6 +60,8 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 	private UserSystemMessageDao userSystemMessageDao;
 	@Autowired
 	private AppAccountDao appAccountDao;
+	@Autowired
+	private AppPushDeviceDao appPushDeviceDao;
 	@Autowired
 	private PushNotifyService pushNotifyService;
 	@Autowired
@@ -280,7 +283,7 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 			log.warn("skip broadcast push: no i18n title, publishId={}", row.getId());
 			return;
 		}
-		List<AppAccountEntity> targets = appAccountDao.findEnabledPushTargets();
+		List<AppAccountEntity> targets = appPushDeviceDao.findEnabledPushTargets();
 		if (targets == null || targets.isEmpty()) {
 			log.info("broadcast push skipped: no enabled targets, publishId={}", row.getId());
 			return;

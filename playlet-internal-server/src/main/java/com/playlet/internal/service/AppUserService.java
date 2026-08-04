@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import javax.servlet.http.HttpServletRequest;
+import java.lang.reflect.InvocationTargetException;
 
 @RequestMapping("/api/appUser")
 @Api(value = "app用户", tags = "app用户")
@@ -67,12 +68,15 @@ public interface AppUserService {
     ResponseBase bindPush(BindPushQuery entity, HttpServletRequest request);
 
 	@GetMapping("/getPushSwitch")
-	@ApiOperation(value = "查询极光推送开关", notes = "需登录。返回 enabled：1开启 0关闭，默认开启。", response = ResponseBase.class)
-	ResponseBase getPushSwitch(HttpServletRequest request);
+	@ApiOperation(value = "查询极光推送开关", notes = "无需登录。按 cid/registrationId 查询设备开关；enabled：1开启 0关闭，默认开启。", response = ResponseBase.class)
+	ResponseBase getPushSwitch(@RequestParam(value = "registrationId", required = false) String registrationId,
+			@RequestParam(value = "cid", required = false) String cid);
 
 	@PostMapping("/setPushSwitch")
-	@ApiOperation(value = "设置极光推送开关", notes = "需登录。body: {\"enabled\":1|0}。关闭后不再推送互动/勋章/系统消息等极光通知。", response = ResponseBase.class)
-	ResponseBase setPushSwitch(PushSwitchQuery entity, HttpServletRequest request);
+	@ApiOperation(value = "设置极光推送开关", notes = "无需登录。body: {\"registrationId\"|\"cid\", \"enabled\":1|0}。"
+			+ "按极光设备 ID 写入 app_push_device.push_enabled；关闭后该设备不再收互动/勋章/系统消息等极光通知。",
+			response = ResponseBase.class)
+	ResponseBase setPushSwitch(PushSwitchQuery entity) throws InvocationTargetException, IllegalAccessException;
 
 	@GetMapping("/signOut")
 	@ApiOperation(value = "退出登录",notes="退出登录",response=ResponseBase.class)
