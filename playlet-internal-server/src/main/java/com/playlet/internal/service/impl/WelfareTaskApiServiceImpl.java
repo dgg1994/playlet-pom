@@ -35,8 +35,13 @@ import javax.servlet.http.HttpServletRequest;
 import java.time.LocalDate;
 import java.time.temporal.WeekFields;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @RestController
@@ -95,10 +100,29 @@ public class WelfareTaskApiServiceImpl extends BaseApiService implements Welfare
 			tasks = new ArrayList<>();
 		}
 		String language = LanguageContext.getLanguage();
+		Map<Integer, String> bizDateByTaskId = new HashMap<>();
+		Set<String> bizDates = new HashSet<>();
+		List<Integer> taskIds = new ArrayList<>(tasks.size());
+		for (WelfareTaskEntity task : tasks) {
+			if (task == null || task.getId() == null) {
+				continue;
+			}
+			taskIds.add(task.getId());
+			String bizDate = resolveBizDate(task.getCycleType());
+			bizDateByTaskId.put(task.getId(), bizDate);
+			bizDates.add(bizDate);
+		}
+
+		Map<String, UserWelfareProgressEntity> progressMap = loadProgressMap(uid, bizDates);
+		Map<Integer, WelfareTaskI18nEntity> i18nMap = loadI18nMap(taskIds, language);
+
 		List<WelfareTaskItemEntity> items = new ArrayList<>();
 		for (WelfareTaskEntity task : tasks) {
-			String bizDate = resolveBizDate(task.getCycleType());
-			UserWelfareProgressEntity progress = userWelfareProgressDao.findOne(uid, task.getId(), bizDate);
+			if (task == null || task.getId() == null) {
+				continue;
+			}
+			String bizDate = bizDateByTaskId.get(task.getId());
+			UserWelfareProgressEntity progress = progressMap.get(task.getId() + "#" + bizDate);
 			if (progress != null) {
 				refreshExpired(progress);
 			}
@@ -112,9 +136,9 @@ public class WelfareTaskApiServiceImpl extends BaseApiService implements Welfare
 			item.setTargetCount(task.getTargetCount());
 			item.setAutoClaim(task.getAutoClaim());
 			item.setActionType(parseActionType(task.getExtraConfig()));
-			log.info("福利首页语言:{}，taskId:{}",language,task.getId());
-			WelfareTaskI18nEntity byTaskIdAndLangue = welfareTaskI18nDao.findByTaskIdAndLangue(task.getId(), language);
-			if (byTaskIdAndLangue != null){
+			log.info("福利首页语言:{}，taskId:{}", language, task.getId());
+			WelfareTaskI18nEntity byTaskIdAndLangue = i18nMap.get(task.getId());
+			if (byTaskIdAndLangue != null) {
 				item.setTaskName(byTaskIdAndLangue.getTaskName());
 				item.setTaskDesc(byTaskIdAndLangue.getTaskDesc());
 			}
@@ -133,6 +157,54 @@ public class WelfareTaskApiServiceImpl extends BaseApiService implements Welfare
 			items.add(item);
 		}
 		return items;
+	}
+
+	/**
+	 * 加载进度
+	 * @param uid 用户ID
+	 * @param bizDates 业务日期
+	 * @return 进度
+	 */
+	private Map<String, UserWelfareProgressEntity> loadProgressMap(Integer uid, Set<String> bizDates) {
+		if (uid == null || bizDates == null || bizDates.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		List<UserWelfareProgressEntity> list = userWelfareProgressDao.findByUidAndBizDates(uid,
+				new ArrayList<>(bizDates));
+		if (list == null || list.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		Map<String, UserWelfareProgressEntity> map = new HashMap<>();
+		for (UserWelfareProgressEntity p : list) {
+			if (p == null || p.getTaskId() == null || p.getBizDate() == null) {
+				continue;
+			}
+			map.put(p.getTaskId() + "#" + p.getBizDate(), p);
+		}
+		return map;
+	}
+
+	/**
+	 * 加载国际化
+	 * @param taskIds 任务ID
+	 * @param language 语言
+	 * @return 国际化
+	 */
+	private Map<Integer, WelfareTaskI18nEntity> loadI18nMap(List<Integer> taskIds, String language) {
+		if (taskIds == null || taskIds.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		List<WelfareTaskI18nEntity> list = welfareTaskI18nDao.findByTaskIdsAndLangue(taskIds, language);
+		if (list == null || list.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		Map<Integer, WelfareTaskI18nEntity> map = new HashMap<>(list.size());
+		for (WelfareTaskI18nEntity row : list) {
+			if (row != null && row.getTaskId() != null) {
+				map.putIfAbsent(row.getTaskId(), row);
+			}
+		}
+		return map;
 	}
 
 	/**

@@ -73,4 +73,10 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 	@Select("select set_num from drama_asset where id = #{episodeId}")
 	String selectSetNum(@Param("episodeId") String episodeId);
 
+	@Select("<script>"
+			+ "select id, set_num as setNum from drama_asset where id in "
+			+ "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
+			+ "</script>")
+	List<DramaAssetEntity> findIdAndSetNumByIds(@Param("ids") List<String> ids);
+
 }

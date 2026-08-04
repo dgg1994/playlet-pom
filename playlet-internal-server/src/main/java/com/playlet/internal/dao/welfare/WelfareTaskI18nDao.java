@@ -25,4 +25,11 @@ public interface WelfareTaskI18nDao extends BaseMapper<WelfareTaskI18nEntity> {
 	WelfareTaskI18nEntity findByTaskIdAndLangue(@Param("taskId") Integer taskId,
 			@Param("language") String language);
 
+	@Select("<script>"
+			+ "select * from welfare_task_i18n where langue = #{language} and task_id in "
+			+ "<foreach collection='taskIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
+			+ "</script>")
+	List<WelfareTaskI18nEntity> findByTaskIdsAndLangue(@Param("taskIds") List<Integer> taskIds,
+			@Param("language") String language);
+
 }

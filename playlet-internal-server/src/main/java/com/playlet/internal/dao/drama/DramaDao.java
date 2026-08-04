@@ -24,6 +24,20 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 	@Select("select * from drama where id = #{dramaId} and delete_state = 0 limit 1")
 	DramaEntity findByDramaId(@Param("dramaId") Integer dramaId);
 
+	/** 批量：未软删（对齐 findByDramaId） */
+	@Select("<script>"
+			+ "select * from drama where delete_state = 0 and id in "
+			+ "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
+			+ "</script>")
+	List<DramaEntity> findByIds(@Param("ids") List<Integer> ids);
+
+	/** 批量：含软删（对齐 interact 消息里 findByDramaId 失败后 selectById 回退） */
+	@Select("<script>"
+			+ "select * from drama where id in "
+			+ "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
+			+ "</script>")
+	List<DramaEntity> findByIdsIncludeDeleted(@Param("ids") List<Integer> ids);
+
 	@Select("<script>"
 			+ "select * from drama where delete_state = 0 "
 			+ "<if test='verifyStatus != null'> and verify_status = #{verifyStatus} </if>"

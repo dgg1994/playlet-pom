@@ -22,7 +22,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static com.playlet.internal.constants.RedisKeyConstants.*;
 
@@ -100,9 +105,10 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
             rows = new ArrayList<>();
         }
         PageInfo<UserWatchHistoryEntity> basePage = new PageInfo<>(rows);
+        Map<Integer, DramaEntity> dramaMap = loadWatchDramaMap(rows);
         List<TheaterWatchHistoryItemEntity> items = new ArrayList<>();
         for (UserWatchHistoryEntity row : rows) {
-            TheaterWatchHistoryItemEntity item = toWatchItem(row);
+            TheaterWatchHistoryItemEntity item = toWatchItem(row, dramaMap);
             if (item != null) {
                 items.add(item);
             }
@@ -150,12 +156,25 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
     }
 
 
-
-    private TheaterWatchHistoryItemEntity toWatchItem(UserWatchHistoryEntity row) {
+    /**
+     * 获取观看历史列表
+     *
+     * @param row 观看历史
+     * @param dramaMap  播放列表
+     * @return
+     */
+    private TheaterWatchHistoryItemEntity toWatchItem(UserWatchHistoryEntity row,
+            Map<Integer, DramaEntity> dramaMap) {
         if (row == null || row.getDramaId() == null) {
             return null;
         }
-        DramaEntity drama = dramaDao.findByDramaId(Integer.valueOf(row.getDramaId()));
+        Integer dramaId;
+        try {
+            dramaId = Integer.valueOf(row.getDramaId());
+        } catch (Exception e) {
+            return null;
+        }
+        DramaEntity drama = dramaMap == null ? null : dramaMap.get(dramaId);
         if (drama == null) {
             return null;
         }
@@ -169,6 +188,40 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
         item.setWatchProgress(row.getWatchProgress() == null ? 0 : row.getWatchProgress());
         item.setGmtModified(row.getGmtModified());
         return item;
+    }
+
+    /**
+     * 获取用户观看记录列表 Redis 缓存 key
+     */
+    private Map<Integer, DramaEntity> loadWatchDramaMap(List<UserWatchHistoryEntity> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Set<Integer> ids = new HashSet<>();
+        for (UserWatchHistoryEntity row : rows) {
+            if (row == null || row.getDramaId() == null) {
+                continue;
+            }
+            try {
+                ids.add(Integer.valueOf(row.getDramaId()));
+            } catch (Exception ignored) {
+                // 与原先 Integer.valueOf 失败时行为一致：该行后续 toWatchItem 也会失败跳过
+            }
+        }
+        if (ids.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<DramaEntity> list = dramaDao.findByIds(new ArrayList<>(ids));
+        if (list == null || list.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<Integer, DramaEntity> map = new HashMap<>(list.size());
+        for (DramaEntity d : list) {
+            if (d != null && d.getId() != null) {
+                map.put(d.getId(), d);
+            }
+        }
+        return map;
     }
 
 

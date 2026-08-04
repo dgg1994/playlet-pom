@@ -7,11 +7,19 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 @Repository
 public interface AppAccountDao extends BaseMapper<AppAccountEntity> {
 
 	@Select("select * from app_account where id = #{uid}")
 	AppAccountEntity findByUid(@Param("uid") Integer uid);
+
+	@Select("<script>"
+			+ "select * from app_account where id in "
+			+ "<foreach collection='uids' item='uid' open='(' separator=',' close=')'>#{uid}</foreach>"
+			+ "</script>")
+	List<AppAccountEntity> findByUids(@Param("uids") List<Integer> uids);
 
 	@Select("select * from app_account where user_email = #{userEmail}")
 	AppAccountEntity findByEmail(@Param("userEmail") String userEmail);

@@ -56,6 +56,12 @@ public interface DramaVideoCommentDao extends BaseMapper<DramaVideoCommentEntity
 			+ "left join app_account aa on dvc.user_id = aa.id where dvc.id = #{id}")
 	DramaVideoCommentEntity findByIdWithAvatar(@Param("id") Integer id);
 
+	@Select("<script>"
+			+ "select * from drama_video_comment where id in "
+			+ "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
+			+ "</script>")
+	List<DramaVideoCommentEntity> findByIds(@Param("ids") List<Integer> ids);
+
 	/**
 	 * 一级视频评论中，比目标更新的条数（setTime desc, id desc），用于算页码。
 	 */

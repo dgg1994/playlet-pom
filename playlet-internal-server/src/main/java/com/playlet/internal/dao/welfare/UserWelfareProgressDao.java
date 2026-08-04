@@ -21,6 +21,13 @@ public interface UserWelfareProgressDao extends BaseMapper<UserWelfareProgressEn
 	@Select("select * from user_welfare_progress where uid = #{uid} order by gmtModified desc")
 	List<UserWelfareProgressEntity> findByUid(@Param("uid") String uid);
 
+	@Select("<script>"
+			+ "select * from user_welfare_progress where uid = #{uid} and biz_date in "
+			+ "<foreach collection='bizDates' item='d' open='(' separator=',' close=')'>#{d}</foreach>"
+			+ "</script>")
+	List<UserWelfareProgressEntity> findByUidAndBizDates(@Param("uid") Integer uid,
+			@Param("bizDates") List<String> bizDates);
+
 	@Update("update user_welfare_progress set progress = #{progress}, progress_status = #{progressStatus}, "
 			+ "gmtModified = now() where id = #{id}")
 	int updateProgress(@Param("id") Long id, @Param("progress") Integer progress,

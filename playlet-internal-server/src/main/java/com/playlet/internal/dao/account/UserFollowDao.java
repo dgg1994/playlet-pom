@@ -31,4 +31,11 @@ public interface UserFollowDao extends BaseMapper<UserFollowEntity> {
 
 	@Delete("delete from user_follow where uid = #{uid} and follow_uid = #{followUid}")
 	int deleteOne(@Param("uid") Integer uid, @Param("followUid") Integer followUid);
+
+	/** 当前用户在候选列表中已关注的 follow_uid */
+	@Select("<script>"
+			+ "select follow_uid from user_follow where uid = #{uid} and follow_uid in "
+			+ "<foreach collection='followUids' item='fid' open='(' separator=',' close=')'>#{fid}</foreach>"
+			+ "</script>")
+	List<Integer> findFollowedAmong(@Param("uid") Integer uid, @Param("followUids") List<Integer> followUids);
 }

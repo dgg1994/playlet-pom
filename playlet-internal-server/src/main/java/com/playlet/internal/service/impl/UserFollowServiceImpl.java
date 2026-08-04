@@ -148,8 +148,9 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
         List<UserFollowEntity> pageRows = rows;
         PageInfo<UserFollowEntity> basePage = new PageInfo<>(pageRows);
         Integer viewer = AppTokenUtil.resolveUid(request);
-        Map<Integer, AppAccountEntity> accountCache = new HashMap<>();
-        Set<Integer> followedSet = loadFollowedSet(viewer, pageRows, followingSide);
+        List<Integer> otherUids = collectOtherUids(pageRows, followingSide);
+        Map<Integer, AppAccountEntity> accountCache = loadAccountMap(otherUids);
+        Set<Integer> followedSet = loadFollowedSet(viewer, otherUids);
 
         List<UserFollowItemEntity> items = new ArrayList<>();
         for (UserFollowEntity row : pageRows) {
@@ -157,7 +158,7 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
             if (otherUid == null) {
                 continue;
             }
-            AppAccountEntity account = resolveAccount(otherUid, accountCache);
+            AppAccountEntity account = accountCache.get(otherUid);
             UserFollowItemEntity item = new UserFollowItemEntity();
             item.setUid(otherUid);
             item.setNickname(displayName(account, otherUid));
@@ -177,23 +178,72 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
         return setResultSuccess(page, I18nUtil.getMessage("base_success"));
     }
 
-    private Set<Integer> loadFollowedSet(Integer viewer, List<UserFollowEntity> pageRows, boolean followingSide) {
-        Set<Integer> set = new HashSet<>();
-        if (viewer == null || pageRows == null) {
-            return set;
+    /**
+     * 获取其他用户信息
+     */
+    private List<Integer> collectOtherUids(List<UserFollowEntity> pageRows, boolean followingSide) {
+        List<Integer> uids = new ArrayList<>();
+        if (pageRows == null) {
+            return uids;
         }
         for (UserFollowEntity row : pageRows) {
             Integer otherUid = followingSide ? row.getFollowUid() : row.getUid();
-            if (otherUid == null || viewer.equals(otherUid)) {
-                continue;
+            if (otherUid != null) {
+                uids.add(otherUid);
             }
-            if (userFollowDao.findOne(viewer, otherUid) != null) {
-                set.add(otherUid);
+        }
+        return uids;
+    }
+
+    /**
+     * 获取用户信息
+     */
+    private Map<Integer, AppAccountEntity> loadAccountMap(List<Integer> uids) {
+        if (uids == null || uids.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<Integer> uniq = new ArrayList<>(new HashSet<>(uids));
+        List<AppAccountEntity> list = appAccountDao.findByUids(uniq);
+        if (list == null || list.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<Integer, AppAccountEntity> map = new HashMap<>(list.size());
+        for (AppAccountEntity a : list) {
+            if (a != null && a.getId() != null) {
+                map.put(a.getId(), a);
             }
+        }
+        return map;
+    }
+
+    /**
+     * 获取已关注用户
+     */
+    private Set<Integer> loadFollowedSet(Integer viewer, List<Integer> otherUids) {
+        Set<Integer> set = new HashSet<>();
+        if (viewer == null || otherUids == null || otherUids.isEmpty()) {
+            return set;
+        }
+        List<Integer> candidates = new ArrayList<>();
+        for (Integer otherUid : otherUids) {
+            if (otherUid != null && !viewer.equals(otherUid)) {
+                candidates.add(otherUid);
+            }
+        }
+        if (candidates.isEmpty()) {
+            return set;
+        }
+        List<Integer> uniq = new ArrayList<>(new HashSet<>(candidates));
+        List<Integer> followed = userFollowDao.findFollowedAmong(viewer, uniq);
+        if (followed != null) {
+            set.addAll(followed);
         }
         return set;
     }
 
+    /**
+     * 解析目标用户ID
+     */
     private Integer resolveTargetUid(Integer uidParam, HttpServletRequest request) {
         if (uidParam != null) {
             return uidParam;
@@ -201,15 +251,9 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
         return AppTokenUtil.resolveUid(request);
     }
 
-    private AppAccountEntity resolveAccount(Integer uid, Map<Integer, AppAccountEntity> cache) {
-        if (cache.containsKey(uid)) {
-            return cache.get(uid);
-        }
-        AppAccountEntity account = appAccountDao.findByUid(uid);
-        cache.put(uid, account);
-        return account;
-    }
-
+    /**
+     * 显示名称
+     */
     private String displayName(AppAccountEntity account, Integer uid) {
         if (account != null && StringUtils.isNotEmpty(account.getNickname())) {
             return account.getNickname();

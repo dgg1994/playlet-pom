@@ -47,8 +47,10 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static com.playlet.internal.constants.RedisKeyConstants.COLLECT_SET_UID;
@@ -167,9 +169,10 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 			rows = new ArrayList<>();
 		}
 		PageInfo<UserDramaCollectEntity> basePage = new PageInfo<>(rows);
+		Map<Integer, DramaEntity> dramaMap = loadDramaMapByIds(collectDramaIds(rows));
 		List<TheaterCollectItemEntity> items = new ArrayList<>();
 		for (UserDramaCollectEntity row : rows) {
-			TheaterCollectItemEntity item = toCollectItem(row);
+			TheaterCollectItemEntity item = toCollectItem(row, dramaMap);
 			if (item != null) {
 				items.add(item);
 			}
@@ -227,9 +230,11 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 			rows = new ArrayList<>();
 		}
 		PageInfo<UserDramaLikeEntity> basePage = new PageInfo<>(rows);
+		Map<Integer, DramaEntity> dramaMap = loadDramaMapByIds(collectLikeDramaIds(rows));
+		Map<String, String> setNumMap = loadSetNumMap(rows);
 		List<TheaterLikeItemEntity> items = new ArrayList<>();
 		for (UserDramaLikeEntity row : rows) {
-			TheaterLikeItemEntity item = toLikeItem(row);
+			TheaterLikeItemEntity item = toLikeItem(row, dramaMap, setNumMap);
 			if (item != null) {
 				items.add(item);
 			}
@@ -263,12 +268,16 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		PageInfo<UserInteractMessageEntity> basePage = new PageInfo<>(rows);
 		// PageHelper 用完后清理，避免污染后续 drama_comment_like 批量查询
 		PageHelper.clearPage();
-		// 4. 批量加载「我对这批评论是否已赞」（避免 N+1）
+		// 4. 批量加载「我对这批评论是否已赞」+ 账号/剧/评论（避免 N+1）
 		Set<Integer> likedCommentIds = loadLikedCommentIds(uid, rows);
+		Map<Integer, AppAccountEntity> accountMap = loadAccountMap(rows);
+		Map<Integer, DramaEntity> dramaMap = loadInteractDramaMap(rows);
+		Map<Integer, DramaVideoCommentEntity> commentMap = loadCommentMap(rows);
 		// 5. 组装 C 端展示结构
 		List<TheaterInteractMessageItemEntity> items = new ArrayList<>();
 		for (UserInteractMessageEntity row : rows) {
-			TheaterInteractMessageItemEntity item = toInteractMessageItem(row, likedCommentIds);
+			TheaterInteractMessageItemEntity item = toInteractMessageItem(row, likedCommentIds,
+					accountMap, dramaMap, commentMap);
 			if (item != null) {
 				items.add(item);
 			}
@@ -523,11 +532,11 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	 * @param row 收藏
 	 * @return
 	 */
-	private TheaterCollectItemEntity toCollectItem(UserDramaCollectEntity row) {
+	private TheaterCollectItemEntity toCollectItem(UserDramaCollectEntity row, Map<Integer, DramaEntity> dramaMap) {
 		if (row == null || row.getDramaId() == null) {
 			return null;
 		}
-		DramaEntity drama = dramaDao.findByDramaId(row.getDramaId());
+		DramaEntity drama = dramaMap == null ? null : dramaMap.get(row.getDramaId());
 		if (drama == null) {
 			return null;
 		}
@@ -546,11 +555,12 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	 * @param row 喜欢
 	 * @return
 	 */
-	private TheaterLikeItemEntity toLikeItem(UserDramaLikeEntity row) {
+	private TheaterLikeItemEntity toLikeItem(UserDramaLikeEntity row, Map<Integer, DramaEntity> dramaMap,
+			Map<String, String> setNumMap) {
 		if (row == null || row.getDramaId() == null) {
 			return null;
 		}
-		DramaEntity drama = dramaDao.findByDramaId(row.getDramaId());
+		DramaEntity drama = dramaMap == null ? null : dramaMap.get(row.getDramaId());
 		if (drama == null) {
 			return null;
 		}
@@ -561,7 +571,11 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		item.setTotalEpisodes(drama.getTotalEpisodes());
 		item.setFinished(drama.getFinishedState());
 		item.setLikeType(row.getLikeType());
-		item.setSetNum(dramaAssetDao.selectSetNum(row.getEpisodeId()));
+		if (!StringUtils.isEmpty(row.getEpisodeId()) && setNumMap != null) {
+			item.setSetNum(setNumMap.get(row.getEpisodeId()));
+		} else {
+			item.setSetNum(null);
+		}
 		item.setEpisodeId(StringUtils.isEmpty(row.getEpisodeId()) ? null : row.getEpisodeId());
 		item.setSetTime(row.getSetTime());
 		return item;
@@ -601,10 +615,217 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	}
 
 	/**
+	 * 批量查收藏
+	 * @param rows 收藏
+	 * @return
+	 */
+	private List<Integer> collectDramaIds(List<UserDramaCollectEntity> rows) {
+		List<Integer> ids = new ArrayList<>();
+		if (rows == null) {
+			return ids;
+		}
+		for (UserDramaCollectEntity row : rows) {
+			if (row != null && row.getDramaId() != null) {
+				ids.add(row.getDramaId());
+			}
+		}
+		return ids;
+	}
+
+	/**
+	 * 批量查喜欢
+	 * @param rows
+	 * @return
+	 */
+	private List<Integer> collectLikeDramaIds(List<UserDramaLikeEntity> rows) {
+		List<Integer> ids = new ArrayList<>();
+		if (rows == null) {
+			return ids;
+		}
+		for (UserDramaLikeEntity row : rows) {
+			if (row != null && row.getDramaId() != null) {
+				ids.add(row.getDramaId());
+			}
+		}
+		return ids;
+	}
+
+	/**
+	 * 批量查短剧
+	 * @param dramaIds
+	 * @return
+	 */
+	private Map<Integer, DramaEntity> loadDramaMapByIds(List<Integer> dramaIds) {
+		if (dramaIds == null || dramaIds.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		List<Integer> uniq = new ArrayList<>(new HashSet<>(dramaIds));
+		List<DramaEntity> list = dramaDao.findByIds(uniq);
+		if (list == null || list.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		Map<Integer, DramaEntity> map = new HashMap<>(list.size());
+		for (DramaEntity d : list) {
+			if (d != null && d.getId() != null) {
+				map.put(d.getId(), d);
+			}
+		}
+		return map;
+	}
+
+	/**
+	 * 批量查集数
+	 * @param rows 喜欢
+	 * @return
+	 */
+	private Map<String, String> loadSetNumMap(List<UserDramaLikeEntity> rows) {
+		if (rows == null || rows.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		List<String> episodeIds = new ArrayList<>();
+		for (UserDramaLikeEntity row : rows) {
+			if (row != null && !StringUtils.isEmpty(row.getEpisodeId())) {
+				episodeIds.add(row.getEpisodeId());
+			}
+		}
+		if (episodeIds.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		List<String> uniq = new ArrayList<>(new HashSet<>(episodeIds));
+		List<DramaAssetEntity> list = dramaAssetDao.findIdAndSetNumByIds(uniq);
+		if (list == null || list.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		Map<String, String> map = new HashMap<>(list.size());
+		for (DramaAssetEntity a : list) {
+			if (a != null && a.getId() != null) {
+				map.put(String.valueOf(a.getId()), a.getSetNum() == null ? null : String.valueOf(a.getSetNum()));
+			}
+		}
+		return map;
+	}
+
+	/**
+	 * 批量查用户信息
+	 * @param rows 评论
+	 * @return
+	 */
+	private Map<Integer, AppAccountEntity> loadAccountMap(List<UserInteractMessageEntity> rows) {
+		if (rows == null || rows.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		List<Integer> uids = new ArrayList<>();
+		for (UserInteractMessageEntity row : rows) {
+			if (row != null && row.getFromUid() != null) {
+				uids.add(row.getFromUid());
+			}
+		}
+		if (uids.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		List<Integer> uniq = new ArrayList<>(new HashSet<>(uids));
+		List<AppAccountEntity> list = appAccountDao.findByUids(uniq);
+		if (list == null || list.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		Map<Integer, AppAccountEntity> map = new HashMap<>(list.size());
+		for (AppAccountEntity a : list) {
+			if (a != null && a.getId() != null) {
+				map.put(a.getId(), a);
+			}
+		}
+		return map;
+	}
+
+	/**
+	 * 先未软删批量，再对缺失 id 做含软删批量（对齐 findByDramaId → selectById）。
+	 */
+	private Map<Integer, DramaEntity> loadInteractDramaMap(List<UserInteractMessageEntity> rows) {
+		if (rows == null || rows.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		List<Integer> dramaIds = new ArrayList<>();
+		for (UserInteractMessageEntity row : rows) {
+			if (row != null && row.getDramaId() != null) {
+				dramaIds.add(row.getDramaId());
+			}
+		}
+		if (dramaIds.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		List<Integer> uniq = new ArrayList<>(new HashSet<>(dramaIds));
+		Map<Integer, DramaEntity> map = new HashMap<>();
+		List<DramaEntity> normal = dramaDao.findByIds(uniq);
+		if (normal != null) {
+			for (DramaEntity d : normal) {
+				if (d != null && d.getId() != null) {
+					map.put(d.getId(), d);
+				}
+			}
+		}
+		List<Integer> missing = new ArrayList<>();
+		for (Integer id : uniq) {
+			if (!map.containsKey(id)) {
+				missing.add(id);
+			}
+		}
+		if (!missing.isEmpty()) {
+			List<DramaEntity> any = dramaDao.findByIdsIncludeDeleted(missing);
+			if (any != null) {
+				for (DramaEntity d : any) {
+					if (d != null && d.getId() != null) {
+						map.putIfAbsent(d.getId(), d);
+					}
+				}
+			}
+		}
+		return map;
+	}
+
+	/**
+	 * 批量查评论
+	 * @param rows 互动消息
+	 * @return
+	 */
+	private Map<Integer, DramaVideoCommentEntity> loadCommentMap(List<UserInteractMessageEntity> rows) {
+		if (rows == null || rows.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		List<Integer> ids = new ArrayList<>();
+		for (UserInteractMessageEntity row : rows) {
+			if (row == null) {
+				continue;
+			}
+			if (row.getCommentId() != null) {
+				ids.add(row.getCommentId());
+			}
+			if (row.getReplyCommentId() != null) {
+				ids.add(row.getReplyCommentId());
+			}
+		}
+		if (ids.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		List<Integer> uniq = new ArrayList<>(new HashSet<>(ids));
+		List<DramaVideoCommentEntity> list = dramaVideoCommentDao.findByIds(uniq);
+		if (list == null || list.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		Map<Integer, DramaVideoCommentEntity> map = new HashMap<>(list.size());
+		for (DramaVideoCommentEntity c : list) {
+			if (c != null && c.getId() != null) {
+				map.put(c.getId(), c);
+			}
+		}
+		return map;
+	}
+
+	/**
 	 * 单条互动消息 → C 端列表项。
 	 */
 	private TheaterInteractMessageItemEntity toInteractMessageItem(UserInteractMessageEntity row,
-			Set<Integer> likedCommentIds) {
+			Set<Integer> likedCommentIds, Map<Integer, AppAccountEntity> accountMap,
+			Map<Integer, DramaEntity> dramaMap, Map<Integer, DramaVideoCommentEntity> commentMap) {
 		if (row == null) {
 			return null;
 		}
@@ -621,7 +842,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		item.setIsRead(row.getIsRead());
 		item.setSetTime(row.getSetTime());
 		// parentId：取自评论表两层结构（0=一级评论，非0=所属一级评论ID）
-		item.setParentId(resolveCommentParentId(row.getCommentId()));
+		item.setParentId(resolveCommentParentId(row.getCommentId(), commentMap));
 		// 2. 操作区：评论/回复类展示点赞+回复；isLiked 看当前用户是否已赞该评论
 		item.setActionText(resolveActionText(row.getMessageType()));
 		boolean actionable = isActionableType(row.getMessageType());
@@ -635,7 +856,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 
 		// 3. 触发人资料
 		if (row.getFromUid() != null) {
-			AppAccountEntity account = appAccountDao.findByUid(row.getFromUid());
+			AppAccountEntity account = accountMap == null ? null : accountMap.get(row.getFromUid());
 			if (account != null) {
 				item.setFromNickname(StringUtils.isEmpty(account.getNickname())
 						? account.getUserAccount() : account.getNickname());
@@ -647,10 +868,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 
 		// 4. 关联短剧展示信息
 		if (row.getDramaId() != null) {
-			DramaEntity drama = dramaDao.findByDramaId(row.getDramaId());
-			if (drama == null) {
-				drama = dramaDao.selectById(row.getDramaId());
-			}
+			DramaEntity drama = dramaMap == null ? null : dramaMap.get(row.getDramaId());
 			if (drama != null) {
 				item.setDramaTitle(drama.getDramaTitle());
 				if (StringUtils.isNotEmpty(drama.getDramaTitle())) {
@@ -666,17 +884,17 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		String type = row.getMessageType();
 		// 回复：content=回复正文，refContent=被回复评论正文
 		if (InteractMessageTypeEnums.isReply(type)) {
-			item.setContent(resolveCommentText(row.getCommentId(), row.getContent()));
-			item.setRefContent(resolveCommentText(row.getReplyCommentId(), null));
+			item.setContent(resolveCommentText(row.getCommentId(), row.getContent(), commentMap));
+			item.setRefContent(resolveCommentText(row.getReplyCommentId(), null, commentMap));
 		}
 		// 一级评论（剧评 / 分集评论）
 		else if (InteractMessageTypeEnums.isComment(type)) {
-			item.setContent(resolveCommentText(row.getCommentId(), row.getContent()));
+			item.setContent(resolveCommentText(row.getCommentId(), row.getContent(), commentMap));
 		}
 		// 赞评论：主区用 actionText；引用区展示被赞评论正文
 		else if (InteractMessageTypeEnums.LIKE_COMMENT.getCode().equals(type)) {
 			item.setContent(null);
-			item.setRefContent(resolveCommentText(row.getCommentId(), row.getContent()));
+			item.setRefContent(resolveCommentText(row.getCommentId(), row.getContent(), commentMap));
 		}
 		// 赞作品：一般只展示 actionText + 剧信息
 		else if (InteractMessageTypeEnums.LIKE_DRAMA.getCode().equals(type)) {
@@ -689,9 +907,10 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	}
 
 	/** 优先取评论表正文，保证返回文案而不是 id */
-	private String resolveCommentText(Integer commentId, String fallback) {
-		if (commentId != null) {
-			DramaVideoCommentEntity comment = dramaVideoCommentDao.selectById(commentId);
+	private String resolveCommentText(Integer commentId, String fallback,
+			Map<Integer, DramaVideoCommentEntity> commentMap) {
+		if (commentId != null && commentMap != null) {
+			DramaVideoCommentEntity comment = commentMap.get(commentId);
 			if (comment != null && StringUtils.isNotEmpty(comment.getCommentInfo())) {
 				return comment.getCommentInfo();
 			}
@@ -703,11 +922,11 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	 * 从评论表取 parentId（两层：0=一级；非0=所属一级评论ID）。
 	 * 消息表本身不存 parentId，按 commentId 回查。
 	 */
-	private Integer resolveCommentParentId(Integer commentId) {
-		if (commentId == null) {
+	private Integer resolveCommentParentId(Integer commentId, Map<Integer, DramaVideoCommentEntity> commentMap) {
+		if (commentId == null || commentMap == null) {
 			return null;
 		}
-		DramaVideoCommentEntity comment = dramaVideoCommentDao.selectById(commentId);
+		DramaVideoCommentEntity comment = commentMap.get(commentId);
 		return comment == null ? null : comment.getParentId();
 	}
 
