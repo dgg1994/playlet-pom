@@ -12,4 +12,12 @@
       </profile>
     </annotationProcessing>
   </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="gateway-server" options="-parameters" />
+      <module name="playlet-internal-server" options="-parameters" />
+      <module name="playlet-oversea-server" options="-parameters" />
+      <module name="playlet-pom" options="-parameters" />
+    </option>
+  </component>
 </project>

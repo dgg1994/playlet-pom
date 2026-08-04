@@ -63,7 +63,7 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 
 	@Override
 	@SysLogAnnotation(module = "榜单管理", type = "GET", remark = "榜定义详情")
-	public ResponseBase boardDetail(@RequestParam Integer id) {
+	public ResponseBase boardDetail(@RequestParam("id") Integer id) {
 		RankBoardEntity board = rankBoardDao.selectById(id);
 		if (board == null) {
 			return setResultError(I18nUtil.getMessage("base_data_null"));
@@ -130,7 +130,7 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 
 	@Override
 	@SysLogAnnotation(module = "榜单管理", type = "GET", remark = "删除榜定义")
-	public ResponseBase boardDelete(@RequestParam Integer id) {
+	public ResponseBase boardDelete(@RequestParam("id") Integer id) {
 		RankBoardEntity exist = rankBoardDao.selectById(id);
 		if (exist == null) {
 			return setResultError(I18nUtil.getMessage("base_data_null"));
@@ -163,7 +163,7 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 
 	@Override
 	@SysLogAnnotation(module = "榜单管理", type = "GET", remark = "榜条目详情")
-	public ResponseBase listDetail(@RequestParam Integer id) {
+	public ResponseBase listDetail(@RequestParam("id") Integer id) {
 		RankListItemEntity row = rankListDao.findItemById(id);
 		if (row == null) {
 			return setResultError(I18nUtil.getMessage("base_data_null"));

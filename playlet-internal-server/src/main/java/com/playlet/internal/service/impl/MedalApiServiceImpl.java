@@ -81,7 +81,7 @@ public class MedalApiServiceImpl implements MedalApiService {
 	}
 
 	@Override
-	public ResponseBase findMedalDetail(@RequestParam Integer id, HttpServletRequest request) {
+	public ResponseBase findMedalDetail(@RequestParam("id") Integer id, HttpServletRequest request) {
 		if (id == null) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}

@@ -13,7 +13,7 @@ public interface SysMenuDao extends BaseMapper<SysMenuEntity>{
 
 	@Select("<script>" +
 			"select * from sys_menu where 1 = 1 " +
-			"<if test = 'menuName != null'> and menu_name like '%${menuName}%' </if>" +
+			"<if test = 'menuName != null'> and menu_name like concat('%',#{menuName},'%') </if>" +
 			"<if test = 'menuType != null'> and menu_type = #{menuType}' </if>" +
 			"<if test = 'status != null'> and status = #{status} </if>" +
 			" order by order_num"+

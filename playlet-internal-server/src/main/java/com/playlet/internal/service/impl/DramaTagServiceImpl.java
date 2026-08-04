@@ -190,7 +190,7 @@ public class DramaTagServiceImpl implements DramaTagService {
 
     @Override
     @SysLogAnnotation(module = "短剧标签", type = "POST", remark = "变更标签状态")
-    public ResponseBase changeStatus(@RequestParam String groupId) {
+    public ResponseBase changeStatus(@RequestParam("groupId") String groupId) {
         try {
             if (StringUtils.isEmpty(groupId)) {
                 return setResultError(I18nUtil.getMessage("base_error"));

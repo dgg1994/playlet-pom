@@ -21,7 +21,7 @@ public interface WatchGiftService {
 	@PostMapping("/watchGift/claim")
 	@ApiImplicitParam(name = "gearIndex", value = "档位序号", required = true, dataType = "int", paramType = "query")
 	@ApiOperation(value = "领取观影礼单档奖励", notes = "需登录")
-	ResponseBase claim(@RequestParam Integer gearIndex, HttpServletRequest request);
+	ResponseBase claim(@RequestParam("gearIndex") Integer gearIndex, HttpServletRequest request);
 
 	@PostMapping("/watchGift/claimAll")
 	@ApiOperation(value = "领取全部可领观影礼档位", notes = "需登录")

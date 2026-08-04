@@ -371,11 +371,11 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			if (templateEntity != null && templateEntity.getTemplateContent() != null
 					&& templateEntity.getTemplateContent().length() > 0) {
 				String code = OrderCodeFactory.getRandomStr(6);
-				//添加动态数据
+				//添加动态数据（邮件/验证码做 HTML 转义，防 XSS）
 				String htmlContent = MessageFormatUtils.format(
 						templateEntity.getTemplateContent(),
-						userEmail,
-						code);
+						HtmlSanitizeUtils.plain(userEmail),
+						HtmlSanitizeUtils.plain(code));
 				//组装html内容
 				String html = MessageFormatUtils.saveHtml(htmlContent, language);
 				EmailUtil.sendEmail(userEmail, templateEntity.getTemplateSubject(), html);
@@ -428,7 +428,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		if (id == null) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
-
+		entity.setNickname(HtmlSanitizeUtils.plain(entity.getNickname()));
 		appAccountDao.updateNameById(entity);
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}

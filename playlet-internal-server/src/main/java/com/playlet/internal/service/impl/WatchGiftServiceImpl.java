@@ -70,7 +70,7 @@ public class WatchGiftServiceImpl extends BaseApiService implements WatchGiftSer
     private AppAccountDao appAccountDao;
 
     @Override
-    public ResponseBase claim(@RequestParam Integer gearIndex, HttpServletRequest request) {
+    public ResponseBase claim(@RequestParam("gearIndex") Integer gearIndex, HttpServletRequest request) {
         Integer uid = AppTokenUtil.resolveUid(request);
         if (uid == null) {
             return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));

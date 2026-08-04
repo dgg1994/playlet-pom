@@ -21,7 +21,7 @@ public interface SysInfoDao extends BaseMapper<SysInfoEntity>{
 			+ "<if test = 'configLable != null'> and config_lable = #{configLable}</if>"
 			+ "<if test = 'configType != null'> and config_type = #{configType}</if>"
 			+ "<if test = 'language != null'> and language = #{language}</if>"
-			+ "<if test = 'configName != null'> and config_name like '%${configName}%'</if>"
+			+ "<if test = 'configName != null'> and config_name like concat('%',#{configName},'%')</if>"
 			+ "<if test = 'status != null'> and status = #{status}</if>"
 			+ " order by config_type"
 			+ "</script>")

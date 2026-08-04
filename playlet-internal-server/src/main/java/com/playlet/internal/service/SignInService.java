@@ -39,7 +39,7 @@ public interface SignInService {
 	@GetMapping("/signIn/makeup")
 	@ApiImplicitParam(name = "bizDate", value = "补签日期 yyyy-MM-dd", required = true, dataType = "string", paramType = "query")
 	@ApiOperation(value = "补签", notes = "消耗补签卡补近N天内未签日期；成功返回签到摘要；需登录")
-	ResponseBase makeup(@RequestParam String bizDate, HttpServletRequest request);
+	ResponseBase makeup(@RequestParam("bizDate") String bizDate, HttpServletRequest request);
 
 	/**
 	 * 月历：每日 signed / makeup / today / empty，以及补签卡余额与限购信息。
@@ -49,7 +49,7 @@ public interface SignInService {
 	@GetMapping("/signIn/calendar")
 	@ApiImplicitParam(name = "yearMonth", value = "年月 yyyy-MM，默认当月", required = false, dataType = "string", paramType = "query")
 	@ApiOperation(value = "签到月历", notes = "需登录")
-	ResponseBase calendar(@RequestParam(required = false) String yearMonth, HttpServletRequest request);
+	ResponseBase calendar(@RequestParam(value = "yearMonth", required = false) String yearMonth, HttpServletRequest request);
 
 	/**
 	 * 购买补签卡（扣金币），受每月限购约束。
@@ -59,7 +59,7 @@ public interface SignInService {
 	@PostMapping("/signIn/makeupCard/buy")
 	@ApiImplicitParam(name = "count", value = "购买张数", required = false, dataType = "int", paramType = "query")
 	@ApiOperation(value = "购买补签卡", notes = "扣金币增加补签卡；需登录")
-	ResponseBase buyMakeupCard(@RequestParam(required = false, defaultValue = "1") Integer count,
+	ResponseBase buyMakeupCard(@RequestParam(value = "count", required = false, defaultValue = "1") Integer count,
 			HttpServletRequest request);
 
 	/**

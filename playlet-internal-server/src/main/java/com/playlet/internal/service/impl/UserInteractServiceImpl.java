@@ -97,7 +97,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	private DramaCommentLikeDao dramaCommentLikeDao;
 
 	@Override
-	public ResponseBase collectAdd(@RequestParam Integer dramaId, HttpServletRequest request) {
+	public ResponseBase collectAdd(@RequestParam("dramaId") Integer dramaId, HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403,I18nUtil.getMessage("login_required"));
@@ -133,7 +133,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	}
 
 	@Override
-	public ResponseBase collectCancel(@RequestParam Integer dramaId, HttpServletRequest request) {
+	public ResponseBase collectCancel(@RequestParam("dramaId") Integer dramaId, HttpServletRequest request) {
         try {
         	Integer uid = AppTokenUtil.resolveUid(request);
             if (uid == null) {
@@ -188,17 +188,17 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	}
 
 	@Override
-	public ResponseBase likeDrama(@RequestParam Integer dramaId, HttpServletRequest request) {
+	public ResponseBase likeDrama(@RequestParam("dramaId") Integer dramaId, HttpServletRequest request) {
 		return doLike(dramaId, LIKE_TYPE_DRAMA, "", request);
 	}
 
 	@Override
-	public ResponseBase likeDramaCancel(@RequestParam Integer dramaId, HttpServletRequest request) {
+	public ResponseBase likeDramaCancel(@RequestParam("dramaId") Integer dramaId, HttpServletRequest request) {
 		return doLikeCancel(dramaId, LIKE_TYPE_DRAMA, "", request);
 	}
 
 	@Override
-	public ResponseBase likeEpisode(@RequestParam Integer dramaId, @RequestParam String episodeId,
+	public ResponseBase likeEpisode(@RequestParam("dramaId") Integer dramaId, @RequestParam("episodeId") String episodeId,
 			HttpServletRequest request) {
 		if (StringUtils.isEmpty(episodeId) || StringUtils.isEmpty(episodeId.trim())) {
 			return setResultError(I18nUtil.getMessage("base_error"));
@@ -207,7 +207,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	}
 
 	@Override
-	public ResponseBase likeEpisodeCancel(@RequestParam Integer dramaId, @RequestParam String episodeId,
+	public ResponseBase likeEpisodeCancel(@RequestParam("dramaId") Integer dramaId, @RequestParam("episodeId") String episodeId,
 			HttpServletRequest request) {
 		if (StringUtils.isEmpty(episodeId) || StringUtils.isEmpty(episodeId.trim())) {
 			return setResultError(I18nUtil.getMessage("base_error"));
@@ -290,7 +290,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	}
 
 	@Override
-	public ResponseBase interactMessageRead(@RequestParam Long id, HttpServletRequest request) {
+	public ResponseBase interactMessageRead(@RequestParam("id") Long id, HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
@@ -323,7 +323,7 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	}
 
 	@Override
-	public ResponseBase shareDrama(@RequestParam Integer dramaId, HttpServletRequest request) {
+	public ResponseBase shareDrama(@RequestParam("dramaId") Integer dramaId, HttpServletRequest request) {
         try {
         	Integer uid = AppTokenUtil.resolveUid(request);
             if (uid == null) {

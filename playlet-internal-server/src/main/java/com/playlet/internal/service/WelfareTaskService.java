@@ -25,7 +25,7 @@ public interface WelfareTaskService {
 	@PostMapping("/task/accept")
 	@ApiImplicitParam(name = "taskId", value = "任务ID", required = true, dataType = "int", paramType = "query")
 	@ApiOperation(value = "领取任务", notes = "领取后本周期才开始累计进度；需登录")
-	ResponseBase accept(@RequestParam Integer taskId, HttpServletRequest request);
+	ResponseBase accept(@RequestParam("taskId") Integer taskId, HttpServletRequest request);
 
 	@PostMapping("/task/claim")
 	@ApiImplicitParams({
@@ -33,8 +33,8 @@ public interface WelfareTaskService {
 			@ApiImplicitParam(name = "adBoost", value = "是否看广告加赠", required = false, dataType = "boolean", paramType = "query")
 	})
 	@ApiOperation(value = "领取任务奖励", notes = "进度须为可领取奖励；需登录")
-	ResponseBase claim(@RequestParam Integer taskId,
-			@RequestParam(required = false, defaultValue = "false") Boolean adBoost,
+	ResponseBase claim(@RequestParam("taskId") Integer taskId,
+			@RequestParam(value = "adBoost", required = false, defaultValue = "false") Boolean adBoost,
 			HttpServletRequest request);
 
 	@GetMapping("/ledger")

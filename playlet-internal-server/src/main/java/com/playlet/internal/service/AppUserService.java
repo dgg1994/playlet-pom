@@ -42,7 +42,7 @@ public interface AppUserService {
             @ApiImplicitParam(name = "userEmail", value = "邮箱地址", required = true, dataType = "String", paramType = "query"),
     })
     @ApiOperation(value = "发送邮件验证码", notes = "发送邮件验证码", response = ResponseBase.class)
-    ResponseBase sendEmailCode(@RequestParam String userEmail);
+    ResponseBase sendEmailCode(@RequestParam("userEmail") String userEmail);
 
     @GetMapping("/checkEmailCode")
     @ApiImplicitParams({
@@ -50,7 +50,7 @@ public interface AppUserService {
             @ApiImplicitParam(name = "emailCode", value = "验证码", required = true, dataType = "String", paramType = "query"),
     })
     @ApiOperation(value = "校验邮件验证码", notes = "校验邮件验证码", response = ResponseBase.class)
-    ResponseBase checkEmailCode(@RequestParam String userEmail, @RequestParam String emailCode);
+    ResponseBase checkEmailCode(@RequestParam("userEmail") String userEmail, @RequestParam("emailCode") String emailCode);
     
     @PostMapping("/updatePwd")
 	@ApiOperation(value = "修改密码",notes="修改密码",response=ResponseBase.class)

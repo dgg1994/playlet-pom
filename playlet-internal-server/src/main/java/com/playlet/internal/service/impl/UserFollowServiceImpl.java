@@ -42,7 +42,7 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
     private MedalProgressService medalProgressService;
 
     @Override
-    public ResponseBase followAdd(@RequestParam Integer followUid, HttpServletRequest request) {
+    public ResponseBase followAdd(@RequestParam("followUid") Integer followUid, HttpServletRequest request) {
         Integer uid = AppTokenUtil.resolveUid(request);
         if (uid == null) {
             return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
@@ -83,7 +83,7 @@ public class UserFollowServiceImpl extends BaseApiService implements UserFollowS
     }
 
     @Override
-    public ResponseBase followCancel(@RequestParam Integer followUid, HttpServletRequest request) {
+    public ResponseBase followCancel(@RequestParam("followUid") Integer followUid, HttpServletRequest request) {
         try {
             Integer uid = AppTokenUtil.resolveUid(request);
             if (uid == null) {

@@ -33,6 +33,7 @@ import com.playlet.internal.service.DramaVideoCommentService;
 import com.playlet.internal.service.MedalProgressService;
 import com.playlet.internal.service.PushNotifyService;
 import com.playlet.internal.utils.GenericityUtil;
+import com.playlet.internal.utils.HtmlSanitizeUtils;
 import com.playlet.internal.utils.I18nUtil;
 
 @RestController
@@ -64,6 +65,8 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 		try {
 			DramaVideoCommentEntity entity = new DramaVideoCommentEntity();
 			BeanUtils.copyProperties(createPay, entity);
+			entity.setCommentInfo(HtmlSanitizeUtils.plain(entity.getCommentInfo()));
+			entity.setUserName(HtmlSanitizeUtils.plain(entity.getUserName()));
 			entity.setCommentType(CommentTypeEnums.VIDEO.getCode());
 			entity.setScore(null);
 			entity.setParentId(PublicEnums.ZERO.getIndex());
@@ -100,6 +103,8 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 		try {
 			DramaVideoCommentEntity entity = new DramaVideoCommentEntity();
 			BeanUtils.copyProperties(createPay, entity);
+			entity.setCommentInfo(HtmlSanitizeUtils.plain(entity.getCommentInfo()));
+			entity.setUserName(HtmlSanitizeUtils.plain(entity.getUserName()));
 			entity.setCommentType(CommentTypeEnums.VIDEO.getCode());
 			entity.setScore(null);
 			entity.setDeleteState(DeleteStateEnum.NORMAL.getIndex());

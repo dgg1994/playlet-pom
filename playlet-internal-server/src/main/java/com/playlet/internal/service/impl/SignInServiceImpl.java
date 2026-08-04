@@ -82,7 +82,7 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
     }
 
     @Override
-    public ResponseBase makeup(@RequestParam String bizDate, HttpServletRequest request) {
+    public ResponseBase makeup(@RequestParam("bizDate") String bizDate, HttpServletRequest request) {
         Integer uid = AppTokenUtil.resolveUid(request);
         if (uid == null) {
             return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
@@ -95,7 +95,7 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
     }
 
     @Override
-    public ResponseBase calendar(@RequestParam(required = false) String yearMonth, HttpServletRequest request) {
+    public ResponseBase calendar(@RequestParam(value = "yearMonth", required = false) String yearMonth, HttpServletRequest request) {
         Integer uid = AppTokenUtil.resolveUid(request);
         if (uid == null) {
             return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
@@ -112,7 +112,7 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
     }
 
     @Override
-    public ResponseBase buyMakeupCard(@RequestParam(required = false, defaultValue = "1") Integer count,
+    public ResponseBase buyMakeupCard(@RequestParam(value = "count", required = false, defaultValue = "1") Integer count,
                                       HttpServletRequest request) {
         Integer uid = AppTokenUtil.resolveUid(request);
         if (uid == null) {

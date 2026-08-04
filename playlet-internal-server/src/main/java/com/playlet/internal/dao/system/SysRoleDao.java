@@ -21,8 +21,8 @@ public interface SysRoleDao extends BaseMapper<SysRoleEntity>{
 
 	@Select("<script>"
 			+ "select * from sys_role where del_flag = #{delFlag} "
-			+ "<if test = 'roleName != null'> and role_name like '%${roleName}%'</if>"
-			+ "<if test = 'roleKey != null'> and role_key like '%${roleKey}%'</if>"
+			+ "<if test = 'roleName != null'> and role_name like concat('%',#{roleName},'%')</if>"
+			+ "<if test = 'roleKey != null'> and role_key like concat('%',#{roleKey},'%')</if>"
 			+ "<if test = 'status != null'> and status =#{status}</if>"
 			+ " order by role_sort"
 			+ "</script>")

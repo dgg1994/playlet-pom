@@ -23,6 +23,7 @@ import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.service.PushNotifyService;
 import com.playlet.internal.service.SystemMessageManageService;
 import com.playlet.internal.utils.GenericityUtil;
+import com.playlet.internal.utils.HtmlSanitizeUtils;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -388,6 +389,8 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 			}
 			i18n.setId(null);
 			i18n.setPublishId(publishId);
+			i18n.setTitle(HtmlSanitizeUtils.plain(i18n.getTitle()));
+			i18n.setContent(HtmlSanitizeUtils.rich(i18n.getContent()));
 			GenericityUtil.setDate(i18n);
 			systemMessagePublishI18nDao.insert(i18n);
 		}

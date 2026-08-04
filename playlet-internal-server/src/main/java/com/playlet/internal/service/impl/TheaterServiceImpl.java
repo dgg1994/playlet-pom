@@ -64,7 +64,7 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
     }
 
     @Override
-    public ResponseBase deleteSearchHistory(@RequestParam String keyword, HttpServletRequest request) {
+    public ResponseBase deleteSearchHistory(@RequestParam("keyword") String keyword, HttpServletRequest request) {
         String key = historyRedisKey(request);
         if (key == null) {
             return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
@@ -124,7 +124,7 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
     }
 
     @Override
-    public ResponseBase deleteWatchHistory(@RequestParam Integer dramaId, HttpServletRequest request) {
+    public ResponseBase deleteWatchHistory(@RequestParam("dramaId") Integer dramaId, HttpServletRequest request) {
         try {
             Integer uid = AppTokenUtil.resolveUid(request);
             if (uid == null) {

@@ -125,7 +125,7 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 	}
 
 	@Override
-	public ResponseBase rank(@RequestParam(required = false) String groupId,
+	public ResponseBase rank(@RequestParam(value = "groupId", required = false) String groupId,
 			RankListEntity entity) {
 		if (StringUtils.isEmpty(groupId)) {
 			return setResultError(I18nUtil.getMessage("base_error"));

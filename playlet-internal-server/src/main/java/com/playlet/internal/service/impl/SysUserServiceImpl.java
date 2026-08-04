@@ -57,7 +57,7 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 
 	@Override
 	@SysLogAnnotation(module = "用户管理", type = "POST", remark = "用户注册")
-	public ResponseBase signUp(String user, MultipartFile file) {
+	public ResponseBase signUp(@RequestParam("user") String user, MultipartFile file) {
 		try {
 			SysUserEntity entity = JSON.parseObject(user, SysUserEntity.class);
 			List<SysUserEntity> userEntity = sysUserDao.findByAcctiveAndTel(entity.getAcctive(), entity.getTel());//,UserStateEnums.NORMAL.getIndex()
@@ -147,7 +147,7 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 
 	@Override
 	@SysLogAnnotation(module = "用户管理", type = "POST", remark = "改变用户账号状态")
-	public ResponseBase updateUserState(Integer userId, Integer newState) {
+	public ResponseBase updateUserState(@RequestParam("userId") Integer userId, @RequestParam("newState") Integer newState) {
 		try {
 			SysUserEntity entity = sysUserDao.findById(userId);
 			if (entity != null) {
@@ -165,7 +165,7 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 
 	@Override
 	@SysLogAnnotation(module = "用户管理", type = "POST", remark = "编辑用户信息")
-	public ResponseBase updateUser(String user, MultipartFile file) {
+	public ResponseBase updateUser(@RequestParam("user") String user, MultipartFile file) {
 		try {
 			SysUserEntity entity = JSON.parseObject(user, SysUserEntity.class);
 			SysUserEntity userEntity = sysUserDao.findById(entity.getId());
@@ -197,7 +197,7 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 
 	@Override
 	@SysLogAnnotation(module = "用户管理", type = "POST", remark = "重置密码")
-	public ResponseBase resetUserPwd(Integer userId,String password) {
+	public ResponseBase resetUserPwd(@RequestParam("userId") Integer userId, @RequestParam("password") String password) {
 		try {
 			SysUserEntity entity = sysUserDao.findById(userId);
 			if (entity != null) {
@@ -233,7 +233,7 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 
 	@Override
 	@SysLogAnnotation(module = "用户管理", type = "POST", remark = "校验账号密码")
-	public ResponseBase verifyPwd(Integer userId, String password) {
+	public ResponseBase verifyPwd(@RequestParam("userId") Integer userId, @RequestParam("password") String password) {
 		try {
 			SysUserEntity entity = sysUserDao.findById(userId);
 			if (entity != null && entity.getPassword().equals(DigestUtils.md5DigestAsHex((password).getBytes()))) {
@@ -267,7 +267,7 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 	
 
 	@Override
-	public ResponseBase upGoogleSecretkey(Integer userId,String googleSecretkey) {
+	public ResponseBase upGoogleSecretkey(@RequestParam("userId") Integer userId, @RequestParam("googleSecretkey") String googleSecretkey) {
 		try {
 			SysUserEntity userEntity = sysUserDao.selectById(userId);
 			if(userEntity != null) {
@@ -283,7 +283,7 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 	}
 
 	@Override
-	public ResponseBase IssueGoogleSecretkey(String userName) {
+	public ResponseBase IssueGoogleSecretkey(@RequestParam("userName") String userName) {
 		try {
 			String key = GoogleAuthenticatorUtil.createKey(userName).getKey();
 			return setResultSuccess(key, I18nUtil.getMessage("base_success"));

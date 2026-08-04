@@ -36,7 +36,7 @@ public interface SysUserDao extends BaseMapper<SysUserEntity>{
             + "select * from sys_user where 1=1 and user_state = 1 "
             + "<if test = 'deleteState != null' > and user_state != #{deleteState}</if>"
             + "<if test = 'adminRole != null'> and id not in (select user_id from sys_user_role where role_id = #{adminRole})</if>"
-            + "<if test = 'username != null'> and username like '%${username}%' </if>"
+            + "<if test = 'username != null'> and username like concat('%',#{username},'%') </if>"
             + "<if test = 'tel != null'> and tel = #{tel}</if>"
             + "<if test = 'roleId != null'> and id in (select user_id from sys_user_role where role_id in "
             + "<foreach item='item' index='index' collection='roleId' open='(' separator=',' close=')'>"

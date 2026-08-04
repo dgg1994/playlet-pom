@@ -35,6 +35,7 @@ import com.playlet.internal.service.DramaCommentService;
 import com.playlet.internal.service.MedalProgressService;
 import com.playlet.internal.service.PushNotifyService;
 import com.playlet.internal.utils.GenericityUtil;
+import com.playlet.internal.utils.HtmlSanitizeUtils;
 import com.playlet.internal.utils.I18nUtil;
 
 /**
@@ -73,8 +74,8 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 					createPay.getDramaId(), createPay.getUserId(), DeleteStateEnum.NORMAL.getIndex());
 			if (exist != null) {
 				exist.setScore(createPay.getScore());
-				exist.setCommentInfo(createPay.getCommentInfo());
-				exist.setUserName(createPay.getUserName());
+				exist.setCommentInfo(HtmlSanitizeUtils.plain(createPay.getCommentInfo()));
+				exist.setUserName(HtmlSanitizeUtils.plain(createPay.getUserName()));
 				GenericityUtil.updateDate(exist);
 				dramaVideoCommentDao.updateById(exist);
 				refreshDramaScoreNum(createPay.getDramaId());
@@ -82,6 +83,8 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 			}
 			DramaVideoCommentEntity entity = new DramaVideoCommentEntity();
 			BeanUtils.copyProperties(createPay, entity);
+			entity.setCommentInfo(HtmlSanitizeUtils.plain(entity.getCommentInfo()));
+			entity.setUserName(HtmlSanitizeUtils.plain(entity.getUserName()));
 			entity.setCommentType(CommentTypeEnums.DRAMA.getCode());
 			entity.setVideoId(0);
 			entity.setParentId(PublicEnums.ZERO.getIndex());
@@ -123,6 +126,8 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 			}
 			DramaVideoCommentEntity entity = new DramaVideoCommentEntity();
 			BeanUtils.copyProperties(createPay, entity);
+			entity.setCommentInfo(HtmlSanitizeUtils.plain(entity.getCommentInfo()));
+			entity.setUserName(HtmlSanitizeUtils.plain(entity.getUserName()));
 			entity.setCommentType(CommentTypeEnums.DRAMA.getCode());
 			entity.setVideoId(0);
 			entity.setScore(null); // 回复人不能评分

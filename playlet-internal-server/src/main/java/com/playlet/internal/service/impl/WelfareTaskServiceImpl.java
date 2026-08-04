@@ -59,7 +59,7 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 	private AppAccountDao appAccountDao;
 
 	@Override
-	public ResponseBase accept(@RequestParam Integer taskId, HttpServletRequest request) {
+	public ResponseBase accept(@RequestParam("taskId") Integer taskId, HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403,I18nUtil.getMessage("login_required"));
@@ -95,8 +95,8 @@ public class WelfareTaskServiceImpl extends BaseApiService implements WelfareTas
 	}
 
 	@Override
-	public ResponseBase claim(@RequestParam Integer taskId,
-			@RequestParam(required = false, defaultValue = "false") Boolean adBoost,
+	public ResponseBase claim(@RequestParam("taskId") Integer taskId,
+			@RequestParam(value = "adBoost", required = false, defaultValue = "false") Boolean adBoost,
 			HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
