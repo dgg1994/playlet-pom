@@ -1,5 +1,7 @@
 package com.playlet.internal.service.impl;
 
+
+import lombok.extern.slf4j.Slf4j;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -44,6 +46,7 @@ import com.playlet.internal.utils.I18nUtil;
 @RestController
 @Transactional
 @CrossOrigin
+@Slf4j
 public class DramaApiDramaCommentServiceImpl extends BaseApiService implements DramaApiDramaCommentService {
 
 	@Autowired
@@ -69,7 +72,7 @@ public class DramaApiDramaCommentServiceImpl extends BaseApiService implements D
 			PageInfo<DramaVideoCommentEntity> info = new PageInfo<>(list);
 			return setResultSuccess(info, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("service error", e);
 			throw new RuntimeException(e);
 		}
 	}
@@ -89,7 +92,7 @@ public class DramaApiDramaCommentServiceImpl extends BaseApiService implements D
 			dramaVideoCommentEntity.setSubordinateList(list);
 			return setResultSuccess(dramaVideoCommentEntity, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("service error", e);
 			throw new RuntimeException(e);
 		}
 	}
@@ -106,7 +109,7 @@ public class DramaApiDramaCommentServiceImpl extends BaseApiService implements D
 			PageInfo<DramaVideoCommentEntity> info = new PageInfo<>(list);
 			return setResultSuccess(info, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("service error", e);
 			throw new RuntimeException(e);
 		}
 	}
@@ -137,7 +140,7 @@ public class DramaApiDramaCommentServiceImpl extends BaseApiService implements D
 			summary.setScoreCount(count);
 			return setResultSuccess(summary, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("service error", e);
 			throw new RuntimeException(e);
 		}
 	}
@@ -156,7 +159,7 @@ public class DramaApiDramaCommentServiceImpl extends BaseApiService implements D
 					entity.getDramaId(), uid, DeleteStateEnum.NORMAL.getIndex());
 			return setResultSuccess(row, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("service error", e);
 			throw new RuntimeException(e);
 		}
 	}
@@ -311,7 +314,7 @@ public class DramaApiDramaCommentServiceImpl extends BaseApiService implements D
 		if (pageSize == null || pageSize < 1) {
 			return Constants.PAGESIZE;
 		}
-		return pageSize;
+		return Math.min(pageSize, Constants.MAX_PAGESIZE);
 	}
 
 	/**

@@ -1,4 +1,6 @@
 package com.playlet.internal.service.impl;
+
+import lombok.extern.slf4j.Slf4j;
 import java.util.*;
 import javax.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +31,7 @@ import com.playlet.internal.utils.RedisUtil;
 @RestController
 @Transactional
 @CrossOrigin
+@Slf4j
 public class SysUserServiceImpl extends BaseApiService implements SysUserService {
 
 	@Autowired
@@ -80,8 +83,8 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 				return setResultSuccess(JSON.toJSON(entity), I18nUtil.getMessage("base_success"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -140,8 +143,8 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 				return setResultError(I18nUtil.getMessage("base_error"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -158,8 +161,8 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 				return setResultError(I18nUtil.getMessage("base_error"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -194,8 +197,8 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 				return setResultError(I18nUtil.getMessage("base_error"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -214,8 +217,8 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 				return setResultError(I18nUtil.getMessage("base_error"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -232,8 +235,8 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 				return setResultError(I18nUtil.getMessage("base_error"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -248,8 +251,8 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 				return setResultError(0, I18nUtil.getMessage("old_password_error"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -283,8 +286,8 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 			}
 			return setResultError(I18nUtil.getMessage("base_error"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -294,8 +297,8 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 			String key = GoogleAuthenticatorUtil.createKey(userName).getKey();
 			return setResultSuccess(key, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -309,8 +312,8 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 			map.put("key", key);
 			return setResultSuccess(map,I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 

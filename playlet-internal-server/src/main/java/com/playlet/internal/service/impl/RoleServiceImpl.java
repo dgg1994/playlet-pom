@@ -1,4 +1,6 @@
 package com.playlet.internal.service.impl;
+
+import lombok.extern.slf4j.Slf4j;
 import com.alibaba.fastjson.JSON;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
@@ -24,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @CrossOrigin
 @Transactional
+@Slf4j
 public class RoleServiceImpl extends BaseApiService implements RoleService{
 	
 	@Autowired
@@ -43,8 +46,8 @@ public class RoleServiceImpl extends BaseApiService implements RoleService{
 			PageInfo<SysRoleEntity> info = new PageInfo<>(list);
 			return setResultSuccess(info,I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -77,8 +80,8 @@ public class RoleServiceImpl extends BaseApiService implements RoleService{
 			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -111,8 +114,8 @@ public class RoleServiceImpl extends BaseApiService implements RoleService{
 				return setResultError(I18nUtil.getMessage("base_data_null"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -129,8 +132,8 @@ public class RoleServiceImpl extends BaseApiService implements RoleService{
 				return setResultError(I18nUtil.getMessage("base_data_null"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -147,8 +150,8 @@ public class RoleServiceImpl extends BaseApiService implements RoleService{
 				return setResultError(I18nUtil.getMessage("base_data_null"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 

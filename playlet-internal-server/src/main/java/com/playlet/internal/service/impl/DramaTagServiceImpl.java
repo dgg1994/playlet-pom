@@ -91,8 +91,8 @@ public class DramaTagServiceImpl implements DramaTagService {
             info.setTotal(page.getTotal());
             return setResultSuccess(info, I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException();
+            log.error("service error", e);
+            throw new RuntimeException(e);
         }
     }
 

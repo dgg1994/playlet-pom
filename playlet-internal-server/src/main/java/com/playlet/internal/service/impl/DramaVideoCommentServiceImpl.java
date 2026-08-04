@@ -1,5 +1,7 @@
 package com.playlet.internal.service.impl;
 
+
+import lombok.extern.slf4j.Slf4j;
 import javax.validation.Valid;
 
 import org.springframework.beans.BeanUtils;
@@ -39,6 +41,7 @@ import com.playlet.internal.utils.I18nUtil;
 @RestController
 @Transactional
 @CrossOrigin
+@Slf4j
 public class DramaVideoCommentServiceImpl extends BaseApiService implements DramaVideoCommentService{
 	
 	@Autowired
@@ -93,8 +96,8 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -135,8 +138,8 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -208,7 +211,7 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 			}
 			
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("service error", e);
 			throw new RuntimeException(e);
 		}
 	}
@@ -233,8 +236,8 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 

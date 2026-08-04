@@ -123,7 +123,7 @@ public class RandomSuffixInviteCodeUtil {
         return codes;
     }
     
-    public static void main(String[] args) {
+  /*  public static void main(String[] args) {
     	System.out.println(RandomSuffixInviteCodeUtil.generateUniqueCode(1, 4, 6));
-	}
+	}*/
 }

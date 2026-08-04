@@ -186,7 +186,7 @@ public class EmailUtil {
     }
 
     // 简单测试
-    public static void main(String[] args) {
+   /* public static void main(String[] args) {
         // 测试前请确保Spring配置已加载，或者手动设置配置值用于测试
         // 如果直接运行测试，需要手动设置以下值：
         // EMAIL_HOST = "smtp.ezmail.vip";
@@ -208,5 +208,5 @@ public class EmailUtil {
         
         // 方式2：临时使用自定义发件人名称
         // sendEmail(to, title, content, "OneToken系统通知");
-    }
+    }*/
 }

@@ -307,7 +307,7 @@ public class SmsUtil extends BaseApiService {
         return response.contains("mterrcode=000");
     }
     
-    public static void main(String[] args) {
+    /*public static void main(String[] args) {
         try {
             // 测试发送验证码
             System.out.println("=== 测试发送短信 ===");
@@ -323,5 +323,5 @@ public class SmsUtil extends BaseApiService {
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
+    }*/
 }

@@ -1,5 +1,7 @@
 package com.playlet.internal.service.impl;
 
+
+import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -37,6 +39,7 @@ import com.playlet.internal.utils.I18nUtil;
 @RestController
 @Transactional
 @CrossOrigin
+@Slf4j
 public class DramaApiVideoCommentServiceImpl extends BaseApiService implements DramaApiVideoCommentService {
 
 	@Autowired
@@ -60,8 +63,8 @@ public class DramaApiVideoCommentServiceImpl extends BaseApiService implements D
 			PageInfo<DramaVideoCommentEntity> info = new PageInfo<>(list);
 			return setResultSuccess(info, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -76,8 +79,8 @@ public class DramaApiVideoCommentServiceImpl extends BaseApiService implements D
 			PageInfo<DramaVideoCommentEntity> info = new PageInfo<>(list);
 			return setResultSuccess(info, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -217,7 +220,7 @@ public class DramaApiVideoCommentServiceImpl extends BaseApiService implements D
 		if (pageSize == null || pageSize < 1) {
 			return Constants.PAGESIZE;
 		}
-		return pageSize;
+		return Math.min(pageSize, Constants.MAX_PAGESIZE);
 	}
 
 	/**

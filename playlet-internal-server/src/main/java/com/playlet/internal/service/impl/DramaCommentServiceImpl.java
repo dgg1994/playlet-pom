@@ -1,5 +1,7 @@
 package com.playlet.internal.service.impl;
 
+
+import lombok.extern.slf4j.Slf4j;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Map;
@@ -44,6 +46,7 @@ import com.playlet.internal.utils.I18nUtil;
 @RestController
 @Transactional
 @CrossOrigin
+@Slf4j
 public class DramaCommentServiceImpl extends BaseApiService implements DramaCommentService {
 
 	@Autowired
@@ -112,7 +115,7 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("service error", e);
 			throw new RuntimeException(e);
 		}
 	}
@@ -156,7 +159,7 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("service error", e);
 			throw new RuntimeException(e);
 		}
 	}
@@ -210,7 +213,7 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("service error", e);
 			throw new RuntimeException(e);
 		}
 	}
@@ -233,7 +236,7 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("service error", e);
 			throw new RuntimeException(e);
 		}
 	}

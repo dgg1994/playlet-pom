@@ -97,8 +97,8 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			dramaDao.updateById(entity);
 			return setResultSuccess(entity,I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -136,8 +136,8 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			dramaDao.updateById(entity);
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -161,8 +161,8 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			PageInfo<DramaEntity> info = new PageInfo<>(list);
 			return setResultSuccess(info, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -179,8 +179,8 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			dramaAssetDao.updateDramaIdDeleteState(entity.getId(),DeleteStateEnum.DELETE.getIndex());
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -211,8 +211,8 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -255,8 +255,8 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			List<DramaAssetRes> list = dramaAssetDao.findByDramaId(id);
 			return setResultSuccess(list, I18nUtil.getMessage("base_success")); 
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -278,8 +278,8 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			entity.setCoverUrl(mediaUrlService.sign(entity.getCoverUrl()));
 			return setResultSuccess(entity, I18nUtil.getMessage("base_success")); 
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 	

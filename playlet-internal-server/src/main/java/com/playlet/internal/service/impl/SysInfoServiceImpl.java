@@ -1,5 +1,7 @@
 package com.playlet.internal.service.impl;
 
+
+import lombok.extern.slf4j.Slf4j;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
@@ -34,6 +36,7 @@ import java.util.stream.Collectors;
 @RestController
 @CrossOrigin
 @Transactional
+@Slf4j
 public class SysInfoServiceImpl extends BaseApiService implements SysInfoService {
 	
 	@Autowired
@@ -89,8 +92,8 @@ public class SysInfoServiceImpl extends BaseApiService implements SysInfoService
 			info.setPages(typePage.getPages());
 			return setResultSuccess(info, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -133,8 +136,8 @@ public class SysInfoServiceImpl extends BaseApiService implements SysInfoService
 			}
             return setResultSuccess(I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException();
+            log.error("service error", e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -170,8 +173,8 @@ public class SysInfoServiceImpl extends BaseApiService implements SysInfoService
 			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException();
+            log.error("service error", e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -189,8 +192,8 @@ public class SysInfoServiceImpl extends BaseApiService implements SysInfoService
 			sysInfoDao.updateByConfigType(entity.getConfigType(),entity.getStatus());
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 

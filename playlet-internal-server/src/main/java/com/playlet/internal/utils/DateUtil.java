@@ -641,11 +641,11 @@ public class DateUtil {
 	    return System.currentTimeMillis();
 	}
 
-	public static void main(String[] args) {
-		/*SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM");
+	/*public static void main(String[] args) {
+		*//*SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM");
 		String temp = dateFormat.format(new Date());
-		System.out.println(temp);*/
+		System.out.println(temp);*//*
 		System.out.println(DateTimeToString(new Date()));
-	}
+	}*/
 	
 }

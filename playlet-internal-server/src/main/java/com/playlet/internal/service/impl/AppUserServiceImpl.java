@@ -178,8 +178,8 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 				return setResultError(I18nUtil.getMessage("user.password_error"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -198,7 +198,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 				List<String> appleAud = oauthLoginProperties.resolveAppleClientIds();
 				if (appleAud.isEmpty()) {
 					log.warn("oauth.apple 未配置，无法校验 id_token");
-					return setResultError("服务器未配置苹果登录");
+					return setResultError(I18nUtil.getMessage("oauth.apple_not_configured"));
 				}
 				OidcIdTokenPayload payload = OidcTokenVerifier.verifyAppleIdToken(entity.getIdToken(), appleAud);
 				if ((payload.getEmail() == null || payload.getEmail().trim().isEmpty())
@@ -210,13 +210,13 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			List<String> googleClients = oauthLoginProperties.getGoogle().getClientIds();
 			if (googleClients == null || googleClients.isEmpty()) {
 				log.warn("oauth.google.clientIds 未配置，无法校验 id_token");
-				return setResultError("服务器未配置谷歌登录");
+				return setResultError(I18nUtil.getMessage("oauth.google_not_configured"));
 			}
 			OidcIdTokenPayload payload = OidcTokenVerifier.verifyGoogleIdToken(entity.getIdToken(), googleClients);
 			return thirdPartyLogin("google", payload, entity, request);
 		} catch (Exception e) {
 			log.warn("oneClickLogin 失败 type={}", type, e);
-			return setResultError(isApple ? "苹果登录失败" : "谷歌登录失败");
+			return setResultError(I18nUtil.getMessage(isApple ? "oauth.apple_login_failed" : "oauth.google_login_failed"));
 		}
 	}
 
@@ -237,7 +237,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			String email = payload.getEmail();
 			if (email != null && !email.trim().isEmpty()) {
 				if ("google".equals(provider) && Boolean.FALSE.equals(payload.getEmailVerified())) {
-					return setResultError("谷歌邮箱未验证");
+					return setResultError(I18nUtil.getMessage("oauth.google_email_unverified"));
 				}
 				account = appAccountDao.findByEmail(email.trim());
 			}
@@ -246,10 +246,10 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		if (account == null) {
 			String email = payload.getEmail() == null ? null : payload.getEmail().trim();
 			if (email == null || email.isEmpty()) {
-				return setResultError("缺少邮箱，无法创建账号");
+				return setResultError(I18nUtil.getMessage("oauth.email_required"));
 			}
 			if ("google".equals(provider) && Boolean.FALSE.equals(payload.getEmailVerified())) {
-				return setResultError("谷歌邮箱未验证");
+				return setResultError(I18nUtil.getMessage("oauth.google_email_unverified"));
 			}
 			UserRegisterEntity apiEntity = new UserRegisterEntity();
 			apiEntity.setEmail(email);
@@ -316,8 +316,8 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			GenericityUtil.setDate(entity);
 			appAccountDao.insert(entity);
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -358,7 +358,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			entity.setAvatar(mediaUrlService.sign(avatar));
 			return setResultSuccess(entity);
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("service error", e);
 			return setResult(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"), null);
 		}
 	}
@@ -385,8 +385,8 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 				return setResultError(I18nUtil.getMessage("Template_null"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -395,7 +395,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		if (verifyCode(userEmail, emailCode)) {
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		}
-		return setResultError("验证码错误或已过期");
+		return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
 	}
 
 	@Override
@@ -424,10 +424,15 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 
 	@Override
 	public ResponseBase update(@RequestBody AppAccountEntity entity, HttpServletRequest request) {
-		Integer id = entity.getId();
-		if (id == null) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		if (entity == null) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
+		// 忽略 body 中的 id，强制使用 token 归属，防止 IDOR
+		entity.setId(uid);
 		entity.setNickname(HtmlSanitizeUtils.plain(entity.getNickname()));
 		appAccountDao.updateNameById(entity);
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
@@ -492,7 +497,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			row.setPushEnabled(entity.getEnabled());
 			GenericityUtil.setDate(row);
 			appPushDeviceDao.insert(row);
-		} else {
+		} else if (!entity.getEnabled().equals(exist.getPushEnabled())) {
 			appPushDeviceDao.updatePushEnabled(regId, entity.getEnabled());
 		}
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
@@ -528,9 +533,17 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 				appPushDeviceDao.insert(row);
 				return;
 			}
-			exist.setDeviceName(deviceName != null ? deviceName : exist.getDeviceName());
-			if (uid != null) {
+			boolean changed = false;
+			if (deviceName != null && !deviceName.equals(exist.getDeviceName())) {
+				exist.setDeviceName(deviceName);
+				changed = true;
+			}
+			if (uid != null && !uid.equals(exist.getUid())) {
 				exist.setUid(uid);
+				changed = true;
+			}
+			if (!changed) {
+				return;
 			}
 			GenericityUtil.updateDate(exist);
 			appPushDeviceDao.updateById(exist);
@@ -558,8 +571,8 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 				return setResultError(I18nUtil.getMessage("base_success"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -570,7 +583,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
 		if (!verifyCode(entity.getEmail(), entity.getEmailCode())) {
-			return setResultError("验证码错误或已过期");
+			return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
 		}
 		AppAccountEntity account = appAccountDao.findByEmail(entity.getEmail());
 		if (account == null) {
@@ -602,8 +615,8 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 				return setResultError(I18nUtil.getMessage("base_error"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 

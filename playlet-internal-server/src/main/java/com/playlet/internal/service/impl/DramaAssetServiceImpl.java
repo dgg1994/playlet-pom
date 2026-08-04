@@ -1,5 +1,7 @@
 package com.playlet.internal.service.impl;
 
+
+import lombok.extern.slf4j.Slf4j;
 import javax.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +29,7 @@ import com.playlet.internal.utils.QiniuUploadUtils;
 @RestController
 @Transactional
 @CrossOrigin
+@Slf4j
 public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetService{
 	
 	@Autowired
@@ -63,8 +66,8 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			dramaAssetDao.insert(assetEntity);
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 

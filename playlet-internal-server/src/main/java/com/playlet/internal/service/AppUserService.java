@@ -58,7 +58,8 @@ public interface AppUserService {
     ResponseBase updatePwd(UpdatePwdEntity entity, HttpServletRequest request);
 
     @PostMapping("/update")
-    @ApiOperation(value = "修改用户信息",notes="修改用户信息",response=ResponseBase.class)
+    @ApiOperation(value = "修改用户信息", notes = "需登录。以请求头 token 对应用户为准，忽略 body 中的 id；可传 nickname、avatar。",
+			response = ResponseBase.class)
     ResponseBase update(AppAccountEntity entity, HttpServletRequest request);
 
 	

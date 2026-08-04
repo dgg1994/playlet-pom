@@ -1,5 +1,7 @@
 package com.playlet.internal.service.impl;
 
+
+import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -52,6 +54,7 @@ import com.playlet.internal.utils.StringUtils;
 @RestController
 @Transactional
 @CrossOrigin
+@Slf4j
 public class DramaApiServiceImpl extends BaseApiService implements DramaApiService {
 
     @Autowired
@@ -145,8 +148,8 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             resp.setPage(new PageInfo<>(list));
             return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException();
+            log.error("service error", e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -193,8 +196,8 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             }
             return setResultSuccess(I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException();
+            log.error("service error", e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -232,8 +235,8 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             }
             return setResultSuccess(list, I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException();
+            log.error("service error", e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -249,8 +252,8 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             }
             return setResultSuccess(buildMultiRatePlayUrl(id, keyOrUrl), I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException();
+            log.error("service error", e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -300,8 +303,8 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             }
             return setResultSuccess(result, I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException();
+            log.error("service error", e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -453,8 +456,8 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             entity.setCoverUrl(mediaUrlService.sign(entity.getCoverUrl()));
             return setResultSuccess(entity, I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException();
+            log.error("service error", e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -469,8 +472,8 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             }
             return setResultSuccess(list, I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException();
+            log.error("service error", e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -490,8 +493,8 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             }
             return setResultSuccess(dramaRes, I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException();
+            log.error("service error", e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -527,8 +530,8 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             }
             return setResultSuccess(vidoeRes, I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException();
+            log.error("service error", e);
+            throw new RuntimeException(e);
         }
     }
 

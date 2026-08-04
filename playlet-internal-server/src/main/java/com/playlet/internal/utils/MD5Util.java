@@ -30,7 +30,7 @@ public class MD5Util {
         }
     }
     
-    public static void main(String[] args){
+ /*   public static void main(String[] args){
         System.out.println(digest("6EpHJVo/OhmIesRC5z5chgnPrbGf03G5DW3LQj61vkJ1gONBjJrErj3TI2fRJC7zOO80RtqvpxtnpYsPnBBnQkxZ7eDQdHw4mKBmnV1rCfcveZGzy9UyjMywbej0kz4y"));
-    }
+    }*/
 }

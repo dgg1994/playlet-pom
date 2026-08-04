@@ -16,13 +16,9 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Locale;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -35,28 +31,6 @@ import java.util.UUID;
 public class QiniuUploadUtils {
 
 	private static QiniuUploadUtils instance;
-
-	/** 允许上传的扩展名（小写、不含点） */
-	private static final Set<String> ALLOWED_EXT = new HashSet<>(Arrays.asList(
-			"jpg", "jpeg", "png", "gif", "webp", "bmp", "ico",
-			"mp4", "mov", "m4v", "webm", "mkv", "avi", "ts", "m3u8",
-			"mp3", "aac", "wav", "m4a",
-			"pdf", "zip"
-	));
-
-	/** 一律拒绝（含 XSS/脚本宿主风险） */
-	private static final Set<String> BLOCKED_EXT = new HashSet<>(Arrays.asList(
-			"html", "htm", "shtml", "xhtml", "svg", "svgz",
-			"js", "mjs", "jsx",
-			"xml", "xsl", "xslt", "css",
-			"php", "jsp", "asp", "aspx", "cgi", "sh", "bat", "cmd", "exe", "dll"
-	));
-
-	private static final Set<String> BLOCKED_CONTENT_TYPES = new HashSet<>(Arrays.asList(
-			"text/html", "application/xhtml+xml", "image/svg+xml",
-			"text/javascript", "application/javascript", "application/x-javascript",
-			"text/xml", "application/xml"
-	));
 
 	@Autowired
 	private QiniuConfig qiniuConfig;
@@ -286,73 +260,15 @@ public class QiniuUploadUtils {
 		} catch (IOException e) {
 			throw new RuntimeException("文件读取失败", e);
 		}
-		assertSafeUpload(file.getOriginalFilename(), file.getContentType(), head);
+		UploadSafetyUtils.assertSafeUpload(file.getOriginalFilename(), file.getContentType(), head);
 	}
 
 	private void assertSafePath(String path) {
-		if (path == null || path.isEmpty()) {
-			throw new RuntimeException("上传路径为空");
-		}
-		assertExtensionAllowed(extractExtension(path));
+		UploadSafetyUtils.assertSafePath(path);
 	}
 
-	/** 扩展名白名单 + 危险 MIME + 内容嗅探（拦截 HTML/SVG/脚本伪装）。 */
 	private void assertSafeUpload(String fileName, String contentType, byte[] headBytes) {
-		assertExtensionAllowed(extractExtension(fileName));
-		if (contentType != null && !contentType.isEmpty()) {
-			String ct = contentType.toLowerCase(Locale.ROOT).split(";")[0].trim();
-			if (BLOCKED_CONTENT_TYPES.contains(ct)) {
-				throw new RuntimeException("不支持的文件类型: " + ct);
-			}
-		}
-		if (looksLikeActiveContent(headBytes)) {
-			throw new RuntimeException("不支持的文件内容（疑似 HTML/SVG/脚本）");
-		}
-	}
-
-	private void assertExtensionAllowed(String ext) {
-		if (ext == null || ext.isEmpty()) {
-			throw new RuntimeException("文件缺少扩展名");
-		}
-		if (BLOCKED_EXT.contains(ext) || !ALLOWED_EXT.contains(ext)) {
-			throw new RuntimeException("不支持的文件扩展名: ." + ext);
-		}
-	}
-
-	private static String extractExtension(String fileName) {
-		if (fileName == null) {
-			return "";
-		}
-		String name = fileName;
-		int slash = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
-		if (slash >= 0) {
-			name = name.substring(slash + 1);
-		}
-		int q = name.indexOf('?');
-		if (q >= 0) {
-			name = name.substring(0, q);
-		}
-		int dot = name.lastIndexOf('.');
-		if (dot < 0 || dot == name.length() - 1) {
-			return "";
-		}
-		return name.substring(dot + 1).toLowerCase(Locale.ROOT);
-	}
-
-	private static boolean looksLikeActiveContent(byte[] head) {
-		if (head == null || head.length == 0) {
-			return false;
-		}
-		String sample = new String(head, StandardCharsets.UTF_8).toLowerCase(Locale.ROOT).trim();
-		if (sample.startsWith("\ufeff")) {
-			sample = sample.substring(1).trim();
-		}
-		return sample.startsWith("<!doctype html")
-				|| sample.startsWith("<html")
-				|| sample.startsWith("<svg")
-				|| sample.contains("<script")
-				|| (sample.startsWith("<?xml") && sample.contains("<svg"))
-				|| sample.startsWith("<!entity");
+		UploadSafetyUtils.assertSafeUpload(fileName, contentType, headBytes);
 	}
 
 	private boolean doDelete(String fileName) {

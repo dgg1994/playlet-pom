@@ -23,6 +23,9 @@ public interface Constants {
 	int PAGENUMBER = 1;
 	
 	int PAGESIZE =10;
+
+	/** 分页每页上限，防止超大 pageSize 拖垮库 */
+	int MAX_PAGESIZE = 100;
 	
 	Integer ZERO_INT = 0;
 			

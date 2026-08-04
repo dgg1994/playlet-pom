@@ -53,8 +53,8 @@ public class SystemMessageServiceImpl extends BaseApiService implements SystemMe
 		if (page == null) {
 			page = new PageQueryHelperEntity();
 		}
-		int pageNumber = page.getPageNumber() == null || page.getPageNumber() < 1 ? 1 : page.getPageNumber();
-		int pageSize = page.getPageSize() == null || page.getPageSize() < 1 ? Constants.PAGESIZE : page.getPageSize();
+		int pageNumber = page.getPageNumber();
+		int pageSize = page.getPageSize();
 
 		String langue = resolveLangue(null);
 		long cursor = resolveCursor(uid);

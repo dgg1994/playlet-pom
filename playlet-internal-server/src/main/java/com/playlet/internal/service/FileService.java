@@ -6,8 +6,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.playlet.internal.base.ResponseBase;
 
-@RequestMapping("/api/file")
-public interface FileTestService {
+@RequestMapping("/file")
+public interface FileService {
 	
 	@PostMapping("/upload")
 	ResponseBase upload(MultipartFile file);
