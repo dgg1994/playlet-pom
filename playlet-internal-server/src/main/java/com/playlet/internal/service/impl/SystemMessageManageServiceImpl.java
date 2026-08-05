@@ -79,7 +79,46 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 		if (list == null) {
 			list = new ArrayList<>();
 		}
-		return setResultSuccess(new PageInfo<>(list), I18nUtil.getMessage("base_success"));
+		PageInfo<SystemMessagePublishEntity> page = new PageInfo<>(list);
+		PageHelper.clearPage();
+		fillListTitleContent(list);
+		return setResultSuccess(page, I18nUtil.getMessage("base_success"));
+	}
+
+	/** 列表补默认中文 title/content */
+	private void fillListTitleContent(List<SystemMessagePublishEntity> list) {
+		if (list == null || list.isEmpty()) {
+			return;
+		}
+		List<Long> ids = new ArrayList<>(list.size());
+		for (SystemMessagePublishEntity row : list) {
+			if (row != null && row.getId() != null) {
+				ids.add(row.getId());
+			}
+		}
+		if (ids.isEmpty()) {
+			return;
+		}
+		List<SystemMessagePublishI18nEntity> i18nRows = systemMessagePublishI18nDao.findByPublishIds(ids);
+		Map<Long, List<SystemMessagePublishI18nEntity>> byPublish = new HashMap<>();
+		if (i18nRows != null) {
+			for (SystemMessagePublishI18nEntity i18n : i18nRows) {
+				if (i18n == null || i18n.getPublishId() == null) {
+					continue;
+				}
+				byPublish.computeIfAbsent(i18n.getPublishId(), k -> new ArrayList<>()).add(i18n);
+			}
+		}
+		for (SystemMessagePublishEntity row : list) {
+			if (row == null || row.getId() == null) {
+				continue;
+			}
+			SystemMessagePublishI18nEntity picked = pickI18n(byPublish.get(row.getId()), FALLBACK_LANGUE);
+			if (picked != null) {
+				row.setTitle(picked.getTitle());
+				row.setContent(picked.getContent());
+			}
+		}
 	}
 
 	@Override

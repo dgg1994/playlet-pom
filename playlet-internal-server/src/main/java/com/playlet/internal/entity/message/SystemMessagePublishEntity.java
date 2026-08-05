@@ -81,6 +81,14 @@ public class SystemMessagePublishEntity extends PageQueryHelperEntity {
 	private Date gmtModified;
 
 	@TableField(exist = false)
+	@ApiModelProperty("列表展示标题（默认中文）")
+	private String title;
+
+	@TableField(exist = false)
+	@ApiModelProperty("列表展示正文（默认中文）")
+	private String content;
+
+	@TableField(exist = false)
 	@ApiModelProperty("多语言列表（管理端）")
 	private List<SystemMessagePublishI18nEntity> i18nList = new ArrayList<>();
 }
