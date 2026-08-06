@@ -7,16 +7,30 @@ spring:
     nacos:
       discovery:
         server-addr: http://127.0.0.1:8848
-        namespace: 6ed7d1da-d7db-4007-b4cb-6fe448c775e4
-        password: qwerdf
+        namespace: 1c50f6c5-e4b0-4ea0-8679-05182dfda2c6
+        # password: qwerdf
     gateway:
       discovery:
         locator:
           enabled: false
       weightcalculator:
         enabled: false
+      # 管理端跨域（OPTIONS 由网关响应；去重避免后端 @CrossOrigin 重复头）
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - "https://manager.yingchuanmedia.com"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            exposedHeaders:
+              - x-playlet-token
+            allowCredentials: true
+            maxAge: 3600
       default-filters:
         - StripPrefix=0
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
       routes:
         # 国内管理端: /china/admin/** -> playlet-internal-server
         - id: china-admin-route
@@ -45,7 +59,7 @@ spring:
 # 路由模式: 1=固定国内(推荐本地/联调), 2=固定海外, 3=按客户端IP走 ip-api.com 判国内外
 playlet:
   gateway:
-    route-mode: 1
+    route-mode: 3
 
 management:
   endpoints:

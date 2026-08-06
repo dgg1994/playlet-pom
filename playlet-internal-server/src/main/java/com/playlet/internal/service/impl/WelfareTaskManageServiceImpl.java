@@ -79,6 +79,7 @@ public class WelfareTaskManageServiceImpl implements WelfareTaskManageService {
 		WelfareTaskEntity row = null;
 		if (entity.getId() != null) {
 			row = welfareTaskDao.selectById(entity.getId());
+			row.setTaskIcon(mediaUrlService.sign(row.getTaskIcon()));
 		}
 		if (row == null) {
 			return setResultError(I18nUtil.getMessage("base_data_null"));
