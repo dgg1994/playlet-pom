@@ -108,21 +108,23 @@ public class DramaTagServiceImpl implements DramaTagService {
     @SysLogAnnotation(module = "短剧标签", type = "POST", remark = "新增标签")
     public ResponseBase save(@RequestBody TagRequest entity) {
         try {
-            if (entity == null) {
+            if (entity == null || entity.getTags() == null || entity.getTags().isEmpty()) {
                 return setResultError(I18nUtil.getMessage("base_error"));
             }
-            //生成groupId
             String groupId = IdUtil.simpleUUID();
             Integer sortWeight = entity.getSortWeight();
-            List<TagEntity> tags = entity.getTags();
-            for (TagEntity tag : tags) {
-                if (tagDao.findByTagName(tag.getTagName().trim()) != null) {
-                    throw new RuntimeException();
+            for (TagEntity tag : entity.getTags()) {
+                if (tag == null || StringUtils.isEmpty(tag.getTagName())) {
+                    return setResultError(I18nUtil.getMessage("base_error"));
+                }
+                String tagName = tag.getTagName().trim();
+                if (tagDao.findByTagName(tagName) != null) {
+                    return setResultError("标签名称已存在，不能新增：" + tagName);
                 }
                 TagEntity tagEntity = new TagEntity();
                 tagEntity.setLangue(tag.getLangue());
                 tagEntity.setGroupId(groupId);
-                tagEntity.setTagName(tag.getTagName().trim());
+                tagEntity.setTagName(tagName);
                 tagEntity.setStatus(1);
                 tagEntity.setSortWeight(sortWeight);
                 GenericityUtil.setDate(tagEntity);
