@@ -60,19 +60,27 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 	}
 
 	/**
-	 * 新剧榜：只在「新上架」的剧里比热度。
+	 * 新剧榜：只在「新上架」的剧里按上架时间排。
 	 * <p>
-	 * 计分方式和热播一样，但只算最近一段时间上架的剧，老剧不进榜。
+	 * 近 14 天上架的剧，setTime 越新越靠前；不再用热播综合分。
 	 */
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public void refreshNewBoard() {
+		RankBoardEntity board = rankBoardDao.findOneByGroupId(RankBoardGroupConstants.NEW);
+		if (board == null || board.getStatus() == null || board.getStatus() != 1) {
+			log.info("skip board {}: missing or disabled", RankBoardGroupConstants.NEW);
+			return;
+		}
+		int topN = board.getTopN() == null || board.getTopN() < 1 ? 100 : board.getTopN();
 		ZoneId zone = ZoneId.of(RankBoardGroupConstants.TIMEZONE);
 		String newSince = LocalDate.now(zone)
 				.minusDays(RankBoardGroupConstants.WINDOW_DAYS_NEW)
 				.atStartOfDay()
 				.format(DATE_TIME_FMT);
-		refreshBoard(RankBoardGroupConstants.NEW, RankBoardGroupConstants.WINDOW_DAYS_HOT, newSince);
+		List<DramaRankAggRow> rows = dramaRankStatDailyDao.findNewBoardCandidates(newSince, topN);
+		rewriteRankList(RankBoardGroupConstants.NEW, rows);
+		log.info("refresh board {} size={}", RankBoardGroupConstants.NEW, rows == null ? 0 : rows.size());
 	}
 
 	/**
@@ -176,9 +184,7 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 	}
 
 	/**
-	 * 热播 / 新剧共用：按窗口汇总分数后覆盖写榜。
-	 *
-	 * @param newSince 有值时只保留该时间之后上架的剧（新剧榜用）
+	 * 热播：按窗口汇总分数后覆盖写榜。
 	 */
 	private void refreshBoard(String groupId, int windowDays, String newSince) {
 		RankBoardEntity board = rankBoardDao.findOneByGroupId(groupId);

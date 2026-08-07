@@ -33,7 +33,7 @@ public interface DramaRankStatDailyDao extends BaseMapper<DramaRankStatDailyEnti
 
 	/**
 	 * 热播/新剧：窗口内聚合后按综合分排序。
-	 * newSince 非空时仅保留 setTime &gt;= newSince 的剧（新剧榜）。
+	 * newSince 非空时仅保留 setTime &gt;= newSince 的剧（旧新剧榜逻辑，现热播可复用）。
 	 */
 	@Select("<script>"
 			+ "select d.id as dramaId, d.drama_title as dramaTitle, d.cover_url as coverUrl, "
@@ -60,6 +60,19 @@ public interface DramaRankStatDailyDao extends BaseMapper<DramaRankStatDailyEnti
 			+ "</script>")
 	List<DramaRankAggRow> findHotPlayCandidates(@Param("fromDate") String fromDate,
 			@Param("newSince") String newSince,
+			@Param("limit") int limit);
+
+	/** 新剧榜：近窗上架，按 setTime 新→旧 */
+	@Select("select d.id as dramaId, d.drama_title as dramaTitle, d.cover_url as coverUrl, "
+			+ "d.hot_score_text as hotScoreText, d.total_episodes as totalEpisodes, d.finished_state as finishedState, "
+			+ "0 as validSeconds, 0 as collectCnt, 0 as likeCnt, 0 as playPv, "
+			+ "unix_timestamp(d.setTime) as algoScore "
+			+ "from drama d "
+			+ "where d.verify_status = 1 and ifnull(d.delete_state,0) = 0 "
+			+ "  and d.setTime is not null and d.setTime >= #{newSince} "
+			+ "order by d.setTime desc, d.id desc "
+			+ "limit #{limit}")
+	List<DramaRankAggRow> findNewBoardCandidates(@Param("newSince") String newSince,
 			@Param("limit") int limit);
 
 	/** 收藏榜：窗口内收藏数排序 */

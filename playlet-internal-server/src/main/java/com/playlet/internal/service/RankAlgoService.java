@@ -15,7 +15,7 @@ public interface RankAlgoService {
 	void refreshHotPlayBoard();
 
 	/**
-	 * 新剧：上架14天内，公式同热播
+	 * 新剧：上架14天内，按 setTime 新→旧
 	 */
 	void refreshNewBoard();
 

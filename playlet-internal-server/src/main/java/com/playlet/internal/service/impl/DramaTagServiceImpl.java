@@ -87,8 +87,12 @@ public class DramaTagServiceImpl implements DramaTagService {
                 }
             }
             PageInfo<TagEntity> page = new PageInfo<>(list);
-            PageInfo<TagGroupRespEntity> info = new PageInfo<>(rows);
+            PageInfo<TagGroupRespEntity> info = new PageInfo<>();
+            info.setList(rows);
+            info.setPageNum(page.getPageNum());
+            info.setPageSize(page.getPageSize());
             info.setTotal(page.getTotal());
+            info.setPages(page.getPages());
             return setResultSuccess(info, I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
             log.error("service error", e);
