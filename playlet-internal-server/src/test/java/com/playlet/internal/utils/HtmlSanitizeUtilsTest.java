@@ -30,6 +30,19 @@ class HtmlSanitizeUtilsTest {
 		String out = HtmlSanitizeUtils.rich(html);
 		assertFalse(out.toLowerCase().contains("<script"));
 		assertFalse(out.toLowerCase().contains("javascript:"));
+		assertTrue(out.contains("<p>ok</p>"));
+	}
+
+	@Test
+	void richKeepsProtocolTagsAndStyle() {
+		String html = "<h1 style=\"text-align: start;\">BerryV 用户协议</h1><p>更新日期</p><h2>一、服务说明</h2><br><strong>加粗</strong>";
+		String out = HtmlSanitizeUtils.rich(html);
+		assertTrue(out.contains("<h1"));
+		assertTrue(out.contains("style=\"text-align: start;\""));
+		assertTrue(out.contains("<p>"));
+		assertTrue(out.contains("<h2>"));
+		assertTrue(out.contains("<br>"));
+		assertTrue(out.contains("<strong>"));
 	}
 
 	@Test
