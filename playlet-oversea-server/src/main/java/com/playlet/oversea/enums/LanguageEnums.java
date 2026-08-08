@@ -124,4 +124,33 @@ public enum LanguageEnums {
 		return list;
 	}
 
+	/** 国际服默认语言：英文 */
+	public static final String DEFAULT_LANGUE = EN_US.getName();
+
+	/**
+	 * 按语言码解析，未知/空回退英文。
+	 * 兼容 en-us / zh_CN 等写法。
+	 */
+	public static LanguageEnums of(String langue) {
+		if (langue == null || langue.trim().isEmpty()) {
+			return EN_US;
+		}
+		String key = langue.trim().toLowerCase().replace('_', '-');
+		for (LanguageEnums e : values()) {
+			if (e.getName().equalsIgnoreCase(key) || e.getValue().equalsIgnoreCase(key)) {
+				return e;
+			}
+		}
+		if (key.startsWith("en")) {
+			return EN_US;
+		}
+		if (key.startsWith("zh") && (key.contains("tw") || key.contains("hk") || key.contains("hant"))) {
+			return ZH_TW;
+		}
+		if (key.startsWith("zh")) {
+			return ZH_CN;
+		}
+		return EN_US;
+	}
+
 }

@@ -33,7 +33,7 @@ public class I18nUtil {
 		String lang = LanguageContext.getLanguage();
 		Locale locale;
 		
-		// 防御性判断：lang 为 null 时使用默认语言
+		// lang 为空时使用英文（国际服默认）
 		if (lang == null || lang.isEmpty()) {
 			locale = Locale.ENGLISH;
 		} else {
@@ -57,8 +57,6 @@ public class I18nUtil {
 					locale = new Locale("pt", "BR");
 					break;
 				case "en": // 英文
-					locale = Locale.ENGLISH;
-					break;
 				default:
 					locale = Locale.ENGLISH;
 			}
