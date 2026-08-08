@@ -39,6 +39,14 @@ public class QiniuConfig {
 	@Value("${qiniu.pm3u8-expires-seconds:43200}")
 	private long pm3u8ExpiresSeconds;
 
+	/** 前端直传 UploadToken 有效期（秒） */
+	@Value("${qiniu.upload-token-expire-seconds:3600}")
+	private long uploadTokenExpireSeconds;
+
+	/** 七牛上传入口（前端直传） */
+	@Value("${qiniu.upload-url:https://upload.qiniup.com}")
+	private String uploadUrl;
+
 	@PostConstruct
 	public void init() {
 		log.info("========== 七牛云配置加载 ==========");
@@ -50,6 +58,8 @@ public class QiniuConfig {
 		log.info("url-expire-seconds: {}", urlExpireSeconds);
 		log.info("video-expire-seconds: {}", videoExpireSeconds);
 		log.info("pm3u8-expires-seconds: {}", pm3u8ExpiresSeconds);
+		log.info("upload-token-expire-seconds: {}", uploadTokenExpireSeconds);
+		log.info("upload-url: {}", uploadUrl);
 		log.info("====================================");
 	}
 
@@ -203,5 +213,13 @@ public class QiniuConfig {
 
 	public long getPm3u8ExpiresSeconds() {
 		return pm3u8ExpiresSeconds;
+	}
+
+	public long getUploadTokenExpireSeconds() {
+		return uploadTokenExpireSeconds;
+	}
+
+	public String getUploadUrl() {
+		return uploadUrl;
 	}
 }

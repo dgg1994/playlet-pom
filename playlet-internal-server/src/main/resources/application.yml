@@ -17,8 +17,8 @@ spring:
       matching-strategy: ant_path_matcher
   servlet:
     multipart:
-       max-file-size: 500MB
-       max-request-size: 500MB
+       max-file-size: 800MB
+       max-request-size: 800MB
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: GMT+8
@@ -63,6 +63,7 @@ qiniu:
   url-expire-seconds: 3600         # 封面等签名有效期（秒）
   video-expire-seconds: 7200       #
   pm3u8-expires-seconds: 43200     # pm3u8 为 ts 分片批量授权的有效期（秒）
+  upload-url: https://upload-z2.qiniup.com # 前端直传入口
           
 dscoins:
   login:

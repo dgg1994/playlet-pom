@@ -1,7 +1,9 @@
 package com.playlet.internal.utils;
 
 import com.playlet.internal.config.QiniuConfig;
+import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.RedisKeyConstants;
+import com.playlet.internal.response.drama.DramaVideoUploadResp;
 import com.qiniu.http.Response;
 import com.qiniu.storage.BucketManager;
 import com.qiniu.storage.Configuration;
@@ -19,6 +21,9 @@ import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -31,6 +36,11 @@ import java.util.UUID;
 public class QiniuUploadUtils {
 
 	private static QiniuUploadUtils instance;
+
+	/** 视频允许的扩展名（前端直传） */
+	private static final Set<String> VIDEO_EXT = new HashSet<>(Arrays.asList(
+			"mp4", "mov", "m4v", "webm", "mkv", "avi", "ts", "m3u8"
+	));
 
 	@Autowired
 	private QiniuConfig qiniuConfig;
@@ -131,7 +141,59 @@ public class QiniuUploadUtils {
 		return utils.qiniuConfig.toAccessUrl(keyOrUrl, expireSeconds, utils.qiniuAuth);
 	}
 
+	/**
+	 * 生成剧集视频前端直传凭证（UploadToken 绑定固定 key）。
+	 * key 形如 VD_{dramaId}/EP_{setNum}/{uuid}.{ext}
+	 */
+	public static DramaVideoUploadResp createVideoUploadCredential(Integer dramaId, Integer setNum, String ext) {
+		return getInstance().doCreateVideoUploadCredential(dramaId, setNum, ext);
+	}
+
+	/** 剧集视频 key 前缀：VD_{dramaId}/EP_{setNum}/ */
+	public static String videoKeyPrefix(Integer dramaId, Integer setNum) {
+		if (dramaId == null || setNum == null) {
+			throw new RuntimeException("dramaId/setNum 不能为空");
+		}
+		return String.format(Constants.VIDEO_UPLOAD_SITE, dramaId, setNum);
+	}
+
 	// ==================== 实例方法 ====================
+
+	private DramaVideoUploadResp doCreateVideoUploadCredential(Integer dramaId, Integer setNum, String ext) {
+		if (dramaId == null || setNum == null) {
+			throw new RuntimeException("dramaId/setNum 不能为空");
+		}
+		String safeExt = normalizeVideoExt(ext);
+		String key = videoKeyPrefix(dramaId, setNum)
+				+ UUID.randomUUID().toString().replace("-", "") + "." + safeExt;
+		UploadSafetyUtils.assertSafePath(key);
+		long expire = qiniuConfig.getUploadTokenExpireSeconds();
+		if (expire <= 0) {
+			expire = 3600L;
+		}
+		String token = qiniuAuth.uploadToken(qiniuConfig.getBucket(), key, expire, null);
+		DramaVideoUploadResp resp = new DramaVideoUploadResp();
+		resp.setUploadToken(token);
+		resp.setKey(key);
+		resp.setDomain(qiniuConfig.getDomain());
+		resp.setExpireSeconds(expire);
+		resp.setUploadUrl(qiniuConfig.getUploadUrl());
+		return resp;
+	}
+
+	private static String normalizeVideoExt(String ext) {
+		String e = ext == null ? "mp4" : ext.trim().toLowerCase(Locale.ROOT);
+		if (e.startsWith(".")) {
+			e = e.substring(1);
+		}
+		if (e.isEmpty()) {
+			e = "mp4";
+		}
+		if (!VIDEO_EXT.contains(e)) {
+			throw new RuntimeException("不支持的视频扩展名: ." + e);
+		}
+		return e;
+	}
 
 	private String videoUpload(MultipartFile file, String dir) {
 		assertSafeMultipart(file);

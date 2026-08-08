@@ -1,5 +1,6 @@
 package com.playlet.internal.query.drama;
 
+import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 
 import io.swagger.annotations.ApiModelProperty;
@@ -18,5 +19,12 @@ public class AddDramaAssetQuery {
 	
 	@ApiModelProperty(name = "remarkInfo",value = "备注",required = false,dataType = "String")
 	private String remarkInfo;
+
+	@NotBlank(message = "视频 key 不能为空")
+	@ApiModelProperty(name = "key", value = "七牛对象 key（前端直传完成后回传）", required = true, dataType = "String")
+	private String key;
+
+	@ApiModelProperty(name = "videoName", value = "原始文件名", required = false, dataType = "String")
+	private String videoName;
 
 }

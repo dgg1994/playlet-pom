@@ -86,7 +86,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 				for (int i = 0; i < createPay.getTagGroupIdList().size(); i++) {
 					DramaTagRelEntity dramaTagRelEntity = new DramaTagRelEntity();
 					dramaTagRelEntity.setDramaId(entity.getId());
-					dramaTagRelEntity.setTagGroupId(createPay.getTagGroupIdList().get(i));;
+					dramaTagRelEntity.setTagGroupId(createPay.getTagGroupIdList().get(i));
 					GenericityUtil.setDate(dramaTagRelEntity);
 					dramaTagRelDao.insert(dramaTagRelEntity);
 				}

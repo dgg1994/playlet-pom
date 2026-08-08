@@ -1,15 +1,5 @@
 package com.playlet.internal.service.impl;
 
-
-import lombok.extern.slf4j.Slf4j;
-import javax.validation.Valid;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
-
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
@@ -21,10 +11,24 @@ import com.playlet.internal.enums.DeleteStateEnum;
 import com.playlet.internal.enums.PublicEnums;
 import com.playlet.internal.enums.VideoDefinitionEnums;
 import com.playlet.internal.query.drama.AddDramaAssetQuery;
+import com.playlet.internal.query.drama.DramaVideoUploadTokenQuery;
+import com.playlet.internal.response.drama.DramaAssetReleaseResp;
+import com.playlet.internal.response.drama.DramaVideoUploadResp;
 import com.playlet.internal.service.DramaAssetService;
+import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.QiniuUploadUtils;
+import com.playlet.internal.utils.StringUtils;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import javax.validation.Valid;
 
 @RestController
 @Transactional(rollbackFor = Exception.class)
@@ -38,22 +42,48 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 	@Autowired
 	private DramaAssetDao dramaAssetDao;
 
+	@Autowired
+	private MediaUrlService mediaUrlService;
+
 	@Override
-	public ResponseBase addDrama(@Valid AddDramaAssetQuery createPay, MultipartFile file) {
+	public ResponseBase uploadToken(@Valid @RequestBody DramaVideoUploadTokenQuery query) {
+		try {
+			DramaEntity entity = dramaDao.selectById(query.getDramaId());
+			if (entity == null || DeleteStateEnum.DELETE.getIndex().equals(entity.getDeleteState())) {
+				return setResultError(I18nUtil.getMessage("drama_null"));
+			}
+			DramaVideoUploadResp cred = QiniuUploadUtils.createVideoUploadCredential(
+					query.getDramaId(), query.getSetNum(), query.getExt());
+			return setResultSuccess(cred, I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {
+			log.error("service error", e);
+			throw new RuntimeException(e);
+		}
+	}
+
+	@Override
+	public ResponseBase addDrama(@Valid @RequestBody AddDramaAssetQuery createPay) {
 		try {
 			DramaEntity entity = dramaDao.selectById(createPay.getDramaId());
-			if(entity == null) {
+			if (entity == null) {
 				return setResultError(I18nUtil.getMessage("base_error"));
 			}
-			if(file == null) {
+			String key = QiniuUploadUtils.extractKey(createPay.getKey());
+			if (StringUtils.isEmpty(key)) {
 				return setResultError(I18nUtil.getMessage("video_not_null"));
 			}
-			String path = String.format(Constants.VIDEO_UPLOAD_SITE, entity.getId(),createPay.getSetNum());
-			String url = QiniuUploadUtils.uploadVideo(file,path);
+			String prefix = QiniuUploadUtils.videoKeyPrefix(entity.getId(), createPay.getSetNum());
+			if (!key.startsWith(prefix)) {
+				return setResultError(I18nUtil.getMessage("purview_error_null"));
+			}
+			if (!QiniuUploadUtils.exists(key)) {
+				return setResultError(I18nUtil.getMessage("video_not_null"));
+			}
 			// 多码率约定：库内存默认清晰度 key，如 oceans_720.m3u8；播放时再推导 360/480/720/1080
-			String newUrl = toDefaultMultiRateM3u8Key(url);
+			String newUrl = toDefaultMultiRateM3u8Key(key);
 			DramaAssetEntity assetEntity = new DramaAssetEntity();
-			assetEntity.setVideoName(file.getOriginalFilename());
+			assetEntity.setVideoName(StringUtils.isEmpty(createPay.getVideoName())
+					? key.substring(key.lastIndexOf('/') + 1) : createPay.getVideoName());
 			assetEntity.setBelongUser(entity.getBelongUser());
 			assetEntity.setDeleteState(DeleteStateEnum.NORMAL.getIndex());
 			assetEntity.setDramaId(entity.getId());
@@ -64,11 +94,28 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			assetEntity.setVideoStatus(PublicEnums.ONE.getIndex());
 			GenericityUtil.setDate(assetEntity);
 			dramaAssetDao.insert(assetEntity);
-			return setResultSuccess(I18nUtil.getMessage("base_success"));
+			DramaAssetReleaseResp data = new DramaAssetReleaseResp();
+			data.setId(assetEntity.getId());
+			data.setKey(newUrl);
+			data.setVideoUrl(mediaUrlService.sign(newUrl));
+			return setResultSuccess(data, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			log.error("service error", e);
 			throw new RuntimeException(e);
 		}
+	}
+
+	@Override
+	public ResponseBase delDrama(@RequestParam("id") Long id) {
+		try {
+			DramaAssetEntity entity = dramaAssetDao.selectById(id);
+			if (entity == null) {
+				return setResultError(I18nUtil.getMessage("base_error"));
+			}
+			dramaAssetDao.deleteById(id);
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {}
+		return null;
 	}
 
 	/**
