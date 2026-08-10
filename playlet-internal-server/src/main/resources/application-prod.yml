@@ -46,6 +46,7 @@ qiniu:
   url-expire-seconds: 3600         # 封面等签名有效期（秒）
   video-expire-seconds: 7200       #
   pm3u8-expires-seconds: 43200     # pm3u8 为 ts 分片批量授权的有效期（秒）
+  upload-url: https://upload-z2.qiniup.com # 前端直传入口
 
 #极光推送
 jpush:

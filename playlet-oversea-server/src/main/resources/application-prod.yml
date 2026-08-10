@@ -9,8 +9,8 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://127.0.0.1:3306/playlet_oversea?useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT%2B8
-    username: playlet_internal
-    password: nkLLCKxGStfcTeGi
+    username: playlet_oversea
+    password: XxSkTHnJZfRznSLW
     type: com.alibaba.druid.pool.DruidDataSource
     initialSize: 30
     minIdle: 30
@@ -46,6 +46,7 @@ qiniu:
   url-expire-seconds: 3600         # 封面等签名有效期（秒）
   video-expire-seconds: 7200       #
   pm3u8-expires-seconds: 43200     # pm3u8 为 ts 分片批量授权的有效期（秒）
+  upload-url: https://upload-z2.qiniup.com # 前端直传入口
 
 #极光推送
 jpush:
