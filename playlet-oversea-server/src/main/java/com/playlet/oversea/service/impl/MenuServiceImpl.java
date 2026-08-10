@@ -1,4 +1,6 @@
 package com.playlet.oversea.service.impl;
+
+import lombok.extern.slf4j.Slf4j;
 import com.alibaba.fastjson.JSON;
 import com.playlet.oversea.aop.SysLogAnnotation;
 import com.playlet.oversea.base.BaseApiService;
@@ -32,8 +34,9 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @CrossOrigin
+@Slf4j
 public class MenuServiceImpl extends BaseApiService implements MenuService {
 	
 	@Autowired
@@ -339,8 +342,8 @@ public class MenuServiceImpl extends BaseApiService implements MenuService {
 					return setResultError(I18nUtil.getMessage("base_error"));
 				}
 			} catch (Exception e) {
-				e.printStackTrace();
-				throw new RuntimeException();
+				log.error("service error", e);
+				throw new RuntimeException(e);
 			}
 		}
 
@@ -355,8 +358,8 @@ public class MenuServiceImpl extends BaseApiService implements MenuService {
 					return setResultError(I18nUtil.getMessage("base_data_null"));
 				}
 			} catch (Exception e) {
-				e.printStackTrace();
-				throw new RuntimeException();
+				log.error("service error", e);
+				throw new RuntimeException(e);
 			}
 		}
 
@@ -376,8 +379,8 @@ public class MenuServiceImpl extends BaseApiService implements MenuService {
 					return setResultError(I18nUtil.getMessage("base_data_null"));
 				}
 			} catch (Exception e) {
-				e.printStackTrace();
-				throw new RuntimeException();
+				log.error("service error", e);
+				throw new RuntimeException(e);
 			}
 		}
 
@@ -408,8 +411,8 @@ public class MenuServiceImpl extends BaseApiService implements MenuService {
 					return setResultError(I18nUtil.getMessage("base_data_null"));
 				}
 			} catch (Exception e) {
-				e.printStackTrace();
-				throw new RuntimeException();
+				log.error("service error", e);
+				throw new RuntimeException(e);
 			}
 		}
 	    

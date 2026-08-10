@@ -83,7 +83,7 @@ public class SysRoleEntity extends BaseEntity {
 
     @TableField(exist = false)
     @Schema(description = "分页页码")
-    private Integer pageNum;
+    private Integer pageNumber;
 
     @TableField(exist = false)
     @Schema(description = "分页数量")

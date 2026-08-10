@@ -25,4 +25,18 @@ public class PageQueryHelperEntity {
     @TableField(exist = false)
     @Schema(description = "结束时间")
     private String endTime;
+
+    public Integer getPageNumber() {
+        if (pageNumber == null || pageNumber < 1) {
+            return Constants.PAGENUMBER;
+        }
+        return pageNumber;
+    }
+
+    public Integer getPageSize() {
+        if (pageSize == null || pageSize < 1) {
+            return Constants.PAGESIZE;
+        }
+        return Math.min(pageSize, Constants.MAX_PAGESIZE);
+    }
 }

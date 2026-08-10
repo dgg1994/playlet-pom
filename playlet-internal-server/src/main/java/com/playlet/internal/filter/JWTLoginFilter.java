@@ -3,6 +3,7 @@ package com.playlet.internal.filter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.playlet.internal.base.JsonData;
 import com.playlet.internal.constants.Constants;
+import com.playlet.internal.constants.RedisKeyConstants;
 import com.playlet.internal.dao.system.SysUserDao;
 import com.playlet.internal.entity.system.SysUserEntity;
 import com.playlet.internal.enums.UserStateEnums;
@@ -151,7 +152,7 @@ public class JWTLoginFilter extends UsernamePasswordAuthenticationFilter {
     }
 
 	private static String googleCodeRedisKey(String username) {
-		return Constants.GOOGLE_COCE + ":" + username;
+		return RedisKeyConstants.GOOGLE_CODE_KEY + username;
 	}
 
 }

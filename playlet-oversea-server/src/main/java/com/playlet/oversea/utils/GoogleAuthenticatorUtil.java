@@ -70,12 +70,12 @@ public final class GoogleAuthenticatorUtil {
         return gAuth.authorize(secretKey, code);
     }
     
-    public static void main(String[] args) throws IOException, WriterException {
+  /*  public static void main(String[] args) throws IOException, WriterException {
     	String key = GoogleAuthenticatorUtil.createKey("putongyongh").getKey();
     	System.out.println(key);
     	System.out.println(GoogleAuthenticatorUtil.verifyCode("QAXMNIOPHPEMRSSV", 517037));
     	
-	}
+	}*/
     
     
 }

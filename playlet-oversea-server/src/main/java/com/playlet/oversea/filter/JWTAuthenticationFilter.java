@@ -54,14 +54,20 @@ public class JWTAuthenticationFilter extends BasicAuthenticationFilter {
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
 			throws IOException, ServletException {
 		try {
-			// 读取请求头 language，国际服默认英文
+			// 读取请求头 language
 	        String language = request.getHeader(Constants.HEADER_LANGUAGE);
-	        language = LanguageEnums.of(language).getName();
+	        List<String> languageList = LanguageEnums.getAll();
+	        if (language == null || language.trim().isEmpty()) {
+	            language = LanguageEnums.ZH_CN.getName(); // 默认语言
+	        } else if (!languageList.contains(language)) {
+	            // 如果语言不在支持列表中，也使用默认语言
+	            language = LanguageEnums.ZH_CN.getName();
+	        }
 	        LanguageContext.setLanguage(language);
-	        // 读取请求头 currency（币种），国际服默认 USD
+	        // 读取请求头 currency（币种）
 	        String currency = request.getHeader(Constants.HEADER_CURRENCY);
 	        if (currency == null || currency.trim().isEmpty()) {
-	        	currency = CurrencyEnums.USD.getName();
+	        	currency = CurrencyEnums.CNY.getName(); // 默认
 	        }
 	        CurrencyContext.setCurrency(currency);
 	        //读取请求头 deviceType（设备类型）

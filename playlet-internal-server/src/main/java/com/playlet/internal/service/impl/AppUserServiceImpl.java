@@ -6,6 +6,7 @@ import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.OauthLoginProperties;
 import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.constants.Constants;
+import com.playlet.internal.constants.RedisKeyConstants;
 import com.playlet.internal.dao.account.AppAccountDao;
 import com.playlet.internal.dao.account.AppOauthAccountDao;
 import com.playlet.internal.dao.account.AppPushDeviceDao;
@@ -374,7 +375,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 				//组装html内容
 				String html = MessageFormatUtils.saveHtml(htmlContent, language);
 				EmailUtil.sendEmail(userEmail, templateEntity.getTemplateSubject(), html);
-				redisUtil.set(userEmail, code, Constants.CODE_EXPIRE_TIME);
+				redisUtil.set(RedisKeyConstants.EMAIL_CODE_KEY + userEmail, code, Constants.CODE_EXPIRE_TIME);
 				return setResultSuccess(I18nUtil.getMessage("send_success"));
 			} else {
 				return setResultError(I18nUtil.getMessage("Template_null"));
@@ -591,7 +592,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		account.setGmtModified(new Date());
 		appAccountDao.updateById(account);
 		// 清理邮箱验证码
-		redisUtil.del(entity.getEmail());
+		redisUtil.del(RedisKeyConstants.EMAIL_CODE_KEY + entity.getEmail());
 		// 忘记密码后踢全端
 		AppTokenUtil.invalidateAccountSessions(account);
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
@@ -627,11 +628,11 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	/**
 	 * 校验验证码
 	 */
-	private boolean verifyCode(String key, String code) {
+	private boolean verifyCode(String email, String code) {
 		if (StringUtils.isEmpty(code)) {
 			return false;
 		}
-		Object cache = redisUtil.get(key);
+		Object cache = redisUtil.get(RedisKeyConstants.EMAIL_CODE_KEY + email);
 		return cache != null && cache.toString().equals(code);
 	}
 

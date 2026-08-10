@@ -3,6 +3,7 @@ package com.playlet.oversea.filter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.playlet.oversea.base.JsonData;
 import com.playlet.oversea.constants.Constants;
+import com.playlet.oversea.constants.RedisKeyConstants;
 import com.playlet.oversea.dao.system.SysUserDao;
 import com.playlet.oversea.entity.system.SysUserEntity;
 import com.playlet.oversea.enums.UserStateEnums;
@@ -48,7 +49,8 @@ public class JWTLoginFilter extends UsernamePasswordAuthenticationFilter {
 	
 	private Boolean googleLimit;
 	
-	
+	/** 谷歌验证码在 Redis 中缓存秒数 */
+	private static final long GOOGLE_CODE_TTL_SEC = 120L;
 
 	public JWTLoginFilter(AuthenticationManager authenticationManager, RedisUtil redisUtil,
 			SysUserDao sysUserDao, Boolean googleLimit) {
@@ -68,25 +70,20 @@ public class JWTLoginFilter extends UsernamePasswordAuthenticationFilter {
 	public Authentication attemptAuthentication(HttpServletRequest req, HttpServletResponse res)
 			throws AuthenticationException {
 		try {
-			 // 获取客户端 IP
-//	        String ipAddress = ipUtil.getClientIp(req);
-//			boolean isAllowed = true;
-//			// 查询 IP 是否在白名单
-//			IpWhitelistEntity whitelistEntity = ipWhitelistDao.findIp(ipAddress);
-//			if (!ipLimit || whitelistEntity != null || ipUtil.isLocalIp(ipAddress)) {
-//				isAllowed = true;
-//			}
 			boolean isAllowed = true;
 			if(isAllowed) {
-				// 请求头反序列化获得User对象
 				SysUserEntity sysUserLoginDTO = new ObjectMapper().readValue(req.getInputStream(), SysUserEntity.class);
-				if (sysUserLoginDTO.getGoogleCode() != null) {
-					redisUtil.set(Constants.GOOGLE_COCE, sysUserLoginDTO.getGoogleCode());
-					return authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(
-							sysUserLoginDTO.getUsername(), sysUserLoginDTO.getPassword(), new ArrayList<>()));
-				} else {
+				if (sysUserLoginDTO.getGoogleCode() == null) {
 					throw new BadCredentialsException("请输入谷歌验证码");
 				}
+				if (sysUserLoginDTO.getUsername() == null || sysUserLoginDTO.getUsername().trim().isEmpty()) {
+					throw new BadCredentialsException("请输入用户名");
+				}
+				// 按用户名隔离，避免并发登录串码
+				String codeKey = googleCodeRedisKey(sysUserLoginDTO.getUsername().trim());
+				redisUtil.set(codeKey, sysUserLoginDTO.getGoogleCode(), GOOGLE_CODE_TTL_SEC);
+				return authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(
+						sysUserLoginDTO.getUsername().trim(), sysUserLoginDTO.getPassword(), new ArrayList<>()));
 			}else {
 				throw new BadCredentialsException("对不起，你的IP地址没有访问权限");
 			}
@@ -108,46 +105,54 @@ public class JWTLoginFilter extends UsernamePasswordAuthenticationFilter {
     @Override
     protected void successfulAuthentication(HttpServletRequest req, HttpServletResponse res, FilterChain chain,
                                             Authentication auth) throws IOException, ServletException {
-        String code = redisUtil.get(Constants.GOOGLE_COCE).toString();
-
-        // 获取权限主题
         String subject = auth.getName();
-        SysUserEntity entity = sysUserDao.findByAcctiveState(subject, UserStateEnums.NORMAL.getIndex());
-        if (entity.getGoogleSecretkey() != null && entity.getGoogleSecretkey().length() > 0) {
-            Boolean temp = !googleLimit ? true : googleAuthenticator.verifyCode(entity.getGoogleSecretkey(), Integer.parseInt(code));
-            if (temp) {
-                // subject中存入用户名和角色权限
-                String token = Jwts.builder()
-                        // 设置主题
-                        .setSubject(subject)
-                        // 设置到期时间
-                        .setExpiration(new Date(System.currentTimeMillis() + Constants.REDIS_EXPIRE_TIME))
-                        // 选择 加密算法和私钥
-                        .signWith(SignatureAlgorithm.HS512, Constants.SIGNING_KEY).compact();
-                // 登录用户token存入redis
-                if (subject.indexOf(",") == -1) {
-                    redisUtil.set(Constants.APP_PACKAGE_NAME + subject, 
-                    		Constants.AUTH_HEADER_START_WITH + token, 
-                    		Constants.REDIS_EXPIRE_TIME);
-                } else {
-                    redisUtil.set(Constants.APP_PACKAGE_NAME + subject.substring(0, subject.indexOf(",")),
-                            Constants.AUTH_HEADER_START_WITH + token, 
-                            Constants.REDIS_EXPIRE_TIME);
-                }
-
-                // token返回到请求头中，前端在请求头中获取
-                res.setHeader(Constants.HEADER_ACCESS, Constants.HEADER_AUTH);
-                res.addHeader(Constants.HEADER_AUTH, Constants.AUTH_HEADER_START_WITH + token);
-
-                CustomUtils.sendJsonMessage(res, JsonData.buildSuccess("登录成功"));
-            } else {
-                CustomUtils.sendJsonMessage(res, JsonData.Error("谷歌验证失败"));
-            }
-        } else {
+        String codeKey = googleCodeRedisKey(subject);
+        Object codeObj = redisUtil.get(codeKey);
+        redisUtil.del(codeKey);
+        if (codeObj == null) {
             CustomUtils.sendJsonMessage(res, JsonData.Error("谷歌验证失败"));
+            return;
+        }
+        String code = codeObj.toString();
+
+        SysUserEntity entity = sysUserDao.findByAcctiveState(subject, UserStateEnums.NORMAL.getIndex());
+        if (entity == null || entity.getGoogleSecretkey() == null || entity.getGoogleSecretkey().isEmpty()) {
+            CustomUtils.sendJsonMessage(res, JsonData.Error("谷歌验证失败"));
+            return;
+        }
+        boolean verified;
+        try {
+            if (Boolean.FALSE.equals(googleLimit)) {
+                // 配置关闭校验时仍要求字段存在，但不验真（仅本地调试）
+                verified = true;
+            } else {
+                verified = googleAuthenticator.verifyCode(entity.getGoogleSecretkey(), Integer.parseInt(code));
+            }
+        } catch (Exception e) {
+            verified = false;
+        }
+        if (!verified) {
+            CustomUtils.sendJsonMessage(res, JsonData.Error("谷歌验证失败"));
+            return;
         }
 
+        String token = Jwts.builder()
+                .setSubject(subject)
+                .setExpiration(new Date(System.currentTimeMillis() + Constants.REDIS_EXPIRE_TIME))
+                .signWith(SignatureAlgorithm.HS512, Constants.SIGNING_KEY).compact();
+        String sessionUser = subject.indexOf(',') == -1 ? subject : subject.substring(0, subject.indexOf(','));
+        // REDIS_EXPIRE_TIME 为毫秒，RedisUtil.set 第三参为秒
+        redisUtil.set(Constants.APP_PACKAGE_NAME + sessionUser,
+                Constants.AUTH_HEADER_START_WITH + token,
+                Constants.REDIS_EXPIRE_TIME / 1000);
+
+        res.setHeader(Constants.HEADER_ACCESS, Constants.HEADER_AUTH);
+        res.addHeader(Constants.HEADER_AUTH, Constants.AUTH_HEADER_START_WITH + token);
+        CustomUtils.sendJsonMessage(res, JsonData.buildSuccess("登录成功"));
     }
-	
+
+	private static String googleCodeRedisKey(String username) {
+		return RedisKeyConstants.GOOGLE_CODE_KEY + username;
+	}
 
 }

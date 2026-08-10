@@ -1,5 +1,6 @@
 package com.playlet.oversea.service;
 
+import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
@@ -28,5 +29,20 @@ public interface DicService {
 	@Operation(summary = "查询订单状态", description = "查询订单状态")
 	ResponseBase findOrderState();
 	
+	@GetMapping("/findVerifyStatus")
+	@Operation(summary = "查询审核状态类型", description = "查询审核状态类型")
+	ResponseBase findVerifyStatus();
+
+	@GetMapping("/findWelfareActionType")
+	@Operation(summary = "查询每日任务类型", description = "查询每日任务类型")
+	ResponseBase findWelfareActionType();
+
+	@GetMapping("/findWelfareCycleType")
+	@Operation(summary = "查询福利任务周期类型", description = "查询福利任务周期类型")
+	ResponseBase findWelfareCycleType();
+
+	@GetMapping("/findProtocolType")
+	@ApiOperation(value = "查询协议类型",notes = "查询协议类型",response = ResponseBase.class)
+	ResponseBase findProtocolType();
 }
 

@@ -1,0 +1,40 @@
+package com.playlet.oversea.dao.welfare;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.playlet.oversea.entity.welfare.UserWelfareProgressEntity;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
+import org.springframework.stereotype.Repository;
+
+import java.util.Date;
+import java.util.List;
+
+@Repository
+public interface UserWelfareProgressDao extends BaseMapper<UserWelfareProgressEntity> {
+
+	@Select("select * from user_welfare_progress where uid = #{uid} and task_id = #{taskId} "
+			+ "and biz_date = #{bizDate} limit 1")
+	UserWelfareProgressEntity findOne(@Param("uid") Integer uid, @Param("taskId") Integer taskId,
+			@Param("bizDate") String bizDate);
+
+	@Select("select * from user_welfare_progress where uid = #{uid} order by gmtModified desc")
+	List<UserWelfareProgressEntity> findByUid(@Param("uid") String uid);
+
+	@Select("<script>"
+			+ "select * from user_welfare_progress where uid = #{uid} and biz_date in "
+			+ "<foreach collection='bizDates' item='d' open='(' separator=',' close=')'>#{d}</foreach>"
+			+ "</script>")
+	List<UserWelfareProgressEntity> findByUidAndBizDates(@Param("uid") Integer uid,
+			@Param("bizDates") List<String> bizDates);
+
+	@Update("update user_welfare_progress set progress = #{progress}, progress_status = #{progressStatus}, "
+			+ "gmtModified = now() where id = #{id}")
+	int updateProgress(@Param("id") Long id, @Param("progress") Integer progress,
+			@Param("progressStatus") Integer progressStatus);
+
+	@Update("update user_welfare_progress set progress_status = #{progressStatus}, claim_time = #{claimTime}, "
+			+ "gmtModified = now() where id = #{id}")
+	int updateClaim(@Param("id") Long id, @Param("progressStatus") Integer progressStatus,
+			@Param("claimTime") Date claimTime);
+}

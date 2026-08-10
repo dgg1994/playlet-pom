@@ -7,6 +7,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.ModelAndView;
 
 import com.playlet.oversea.aop.ApiIdempotent;
+import com.playlet.oversea.constants.RedisKeyConstants;
 import com.playlet.oversea.utils.RedisUtil;
 
 import java.lang.reflect.Method;
@@ -56,7 +57,8 @@ public class ApiIdempotentInterceptor implements HandlerInterceptor {
     }
 
     private String generateRequestId(HttpServletRequest request) {
-        return request.getRequestURI() + "-" + request.getMethod() + "-" + request.getHeader("User-Agent");
+        return RedisKeyConstants.IDEMPOTENT_KEY
+                + request.getRequestURI() + "-" + request.getMethod() + "-" + request.getHeader("User-Agent");
     }
 
     private boolean isDuplicateRequest(String requestId) {

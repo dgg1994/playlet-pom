@@ -1,11 +1,12 @@
 package com.playlet.oversea.service.impl;
+
+import lombok.extern.slf4j.Slf4j;
 import java.util.*;
 import javax.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import com.alibaba.fastjson.JSON;
@@ -24,11 +25,13 @@ import com.playlet.oversea.filter.JWTAuthenticationFilter;
 import com.playlet.oversea.service.SysUserService;
 import com.playlet.oversea.utils.GoogleAuthenticatorUtil;
 import com.playlet.oversea.utils.I18nUtil;
+import com.playlet.oversea.utils.PasswordHashUtils;
 import com.playlet.oversea.utils.RedisUtil;
 
 @RestController
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 @CrossOrigin
+@Slf4j
 public class SysUserServiceImpl extends BaseApiService implements SysUserService {
 
 	@Autowired
@@ -57,7 +60,7 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 
 	@Override
 	@SysLogAnnotation(module = "用户管理", type = "POST", remark = "用户注册")
-	public ResponseBase signUp(String user, MultipartFile file) {
+	public ResponseBase signUp(@RequestParam("user") String user, MultipartFile file) {
 		try {
 			SysUserEntity entity = JSON.parseObject(user, SysUserEntity.class);
 			List<SysUserEntity> userEntity = sysUserDao.findByAcctiveAndTel(entity.getAcctive(), entity.getTel());//,UserStateEnums.NORMAL.getIndex()
@@ -66,7 +69,7 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 			} else {
 				entity.setUserState(UserStateEnums.NORMAL.getIndex());
 				if (entity.getPassword() != null && entity.getPassword().length() > 0) {
-					entity.setPassword(DigestUtils.md5DigestAsHex((entity.getPassword()).getBytes()));
+					entity.setPassword(PasswordHashUtils.encode(entity.getPassword()));
 				} 
 				if(entity.getGoogleSecretkey() == null || entity.getGoogleSecretkey().isEmpty()) {
 					entity.setGoogleSecretkey(Constants.user_googleKey);
@@ -80,8 +83,8 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 				return setResultSuccess(JSON.toJSON(entity), I18nUtil.getMessage("base_success"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -93,7 +96,7 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 		String username = token.getName();
 		Collection<GrantedAuthority> powerList = token.getAuthorities();
 		SysUserEntity entity = sysUserDao.findByAcctiveState(username, UserStateEnums.NORMAL.getIndex());
-		redisUtil.set(tokenStr, JSON.toJSONString(entity), Constants.REDIS_EXPIRE_TIME);
+		redisUtil.set(tokenStr, JSON.toJSONString(entity), Constants.REDIS_EXPIRE_TIME / 1000);
 		entity.setRoleList(sysUserDao.findUserRole(entity.getId()));
 		List<SysUserPowerEntity> newPowerList = new ArrayList<>();
 		for (GrantedAuthority grantedAuthority : powerList) {
@@ -140,14 +143,14 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 				return setResultError(I18nUtil.getMessage("base_error"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
 	@Override
 	@SysLogAnnotation(module = "用户管理", type = "POST", remark = "改变用户账号状态")
-	public ResponseBase updateUserState(Integer userId, Integer newState) {
+	public ResponseBase updateUserState(@RequestParam("userId") Integer userId, @RequestParam("newState") Integer newState) {
 		try {
 			SysUserEntity entity = sysUserDao.findById(userId);
 			if (entity != null) {
@@ -158,14 +161,14 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 				return setResultError(I18nUtil.getMessage("base_error"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
 	@Override
 	@SysLogAnnotation(module = "用户管理", type = "POST", remark = "编辑用户信息")
-	public ResponseBase updateUser(String user, MultipartFile file) {
+	public ResponseBase updateUser(@RequestParam("user") String user, MultipartFile file) {
 		try {
 			SysUserEntity entity = JSON.parseObject(user, SysUserEntity.class);
 			SysUserEntity userEntity = sysUserDao.findById(entity.getId());
@@ -174,6 +177,12 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 						entity.getTel(), entity.getId(), UserStateEnums.NORMAL.getIndex());
 				if (userSysUserEntity != null && userSysUserEntity.size() > 0) {
 					return setResultError(I18nUtil.getMessage("base_info_exist"));
+				}
+				// 编辑用户时若带上新密码则哈希；未传则保留库中原值
+				if (entity.getPassword() != null && !entity.getPassword().isEmpty()) {
+					entity.setPassword(PasswordHashUtils.encode(entity.getPassword()));
+				} else {
+					entity.setPassword(null);
 				}
 				sysUserDao.updateById(entity);
 				if (entity.getRoleId() != null && entity.getRoleId().size() > 0) {
@@ -188,8 +197,8 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 				return setResultError(I18nUtil.getMessage("base_error"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -197,19 +206,19 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 
 	@Override
 	@SysLogAnnotation(module = "用户管理", type = "POST", remark = "重置密码")
-	public ResponseBase resetUserPwd(Integer userId,String password) {
+	public ResponseBase resetUserPwd(@RequestParam("userId") Integer userId, @RequestParam("password") String password) {
 		try {
 			SysUserEntity entity = sysUserDao.findById(userId);
 			if (entity != null) {
-				String pwd = DigestUtils.md5DigestAsHex((password).getBytes());
+				String pwd = PasswordHashUtils.encode(password);
 				sysUserDao.resetUserPwd(userId, pwd);
 				return setResultSuccess(I18nUtil.getMessage("base_success"));
 			} else {
 				return setResultError(I18nUtil.getMessage("base_error"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -219,31 +228,31 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 		try {
 			SysUserEntity entity = sysUserDao.findById(userId);
 			if (entity != null) {
-				String pwd = DigestUtils.md5DigestAsHex((password).getBytes());
+				String pwd = PasswordHashUtils.encode(password);
 				sysUserDao.resetUserPwd(userId, pwd);
 				return setResultSuccess(I18nUtil.getMessage("base_success"));
 			} else {
 				return setResultError(I18nUtil.getMessage("base_error"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
 	@Override
 	@SysLogAnnotation(module = "用户管理", type = "POST", remark = "校验账号密码")
-	public ResponseBase verifyPwd(Integer userId, String password) {
+	public ResponseBase verifyPwd(@RequestParam("userId") Integer userId, @RequestParam("password") String password) {
 		try {
 			SysUserEntity entity = sysUserDao.findById(userId);
-			if (entity != null && entity.getPassword().equals(DigestUtils.md5DigestAsHex((password).getBytes()))) {
+			if (entity != null && PasswordHashUtils.matches(password, entity.getPassword())) {
 				return setResultSuccess(1, I18nUtil.getMessage("check_success"));
 			} else {
 				return setResultError(0, I18nUtil.getMessage("old_password_error"));
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -267,7 +276,7 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 	
 
 	@Override
-	public ResponseBase upGoogleSecretkey(Integer userId,String googleSecretkey) {
+	public ResponseBase upGoogleSecretkey(@RequestParam("userId") Integer userId, @RequestParam("googleSecretkey") String googleSecretkey) {
 		try {
 			SysUserEntity userEntity = sysUserDao.selectById(userId);
 			if(userEntity != null) {
@@ -277,19 +286,19 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 			}
 			return setResultError(I18nUtil.getMessage("base_error"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
 	@Override
-	public ResponseBase IssueGoogleSecretkey(String userName) {
+	public ResponseBase IssueGoogleSecretkey(@RequestParam("userName") String userName) {
 		try {
 			String key = GoogleAuthenticatorUtil.createKey(userName).getKey();
 			return setResultSuccess(key, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 
@@ -303,8 +312,8 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 			map.put("key", key);
 			return setResultSuccess(map,I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException();
+			log.error("service error", e);
+			throw new RuntimeException(e);
 		}
 	}
 

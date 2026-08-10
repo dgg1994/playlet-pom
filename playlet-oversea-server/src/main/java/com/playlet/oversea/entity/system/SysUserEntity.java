@@ -45,6 +45,8 @@ public class SysUserEntity extends PageQueryHelperEntity {
 
     @TableField("password")
     @Schema(description = "密码")
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
+    @com.alibaba.fastjson.annotation.JSONField(serialize = false)
     private String password;
 
     @TableField("create_user")
@@ -61,6 +63,8 @@ public class SysUserEntity extends PageQueryHelperEntity {
 
     @TableField("google_secretkey")
     @Schema(description = "谷歌密钥")
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
+    @com.alibaba.fastjson.annotation.JSONField(serialize = false)
     private String googleSecretkey;
 
     @TableField(exist = false)

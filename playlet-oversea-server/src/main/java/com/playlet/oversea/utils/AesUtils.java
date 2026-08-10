@@ -79,7 +79,7 @@ public class AesUtils {
 		return new String(decryptedBytes, StandardCharsets.UTF_8);
 	}
 
-	public static void main(String[] arg) throws Exception {
+	/*public static void main(String[] arg) throws Exception {
 		// 测试您的 Base64 格式密钥
 		String base64Key = "cvGWYbem1CmjD+0x4Ju5qQChRrc0eiMHz7XkgAw1RtU=";
 
@@ -96,5 +96,5 @@ public class AesUtils {
 
 		// 验证
 		System.out.println("加解密成功: " + originalData.equals(decrypted));
-	}
+	}*/
 }

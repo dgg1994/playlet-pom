@@ -6,8 +6,8 @@ Java 11 Maven multi-module microservice project. Spring Boot 2.7.18 + Spring Clo
 
 Three modules:
 - **gateway-server** (port 8080) — Spring Cloud Gateway, routes by IP region
-- **playlet-internal-server** (port 8081) — Main business service (internal/domestic)
-- **playlet-oversea-server** (port 8082) — Overseas business service
+- **playlet-internal-server** (port 8081) — Domestic business service (full ToC + admin)
+- **playlet-oversea-server** (port 8082) — Overseas business service (feature-parity with internal; package `com.playlet.oversea`)
 
 ## Build & Run
 
@@ -53,7 +53,7 @@ The `IpRegionRouteFilter` (`com.playlet.gateway.filter`) implements this as a `G
 
 **JWT login**: POST `/login` with JSON body `{"username": "x", "password": "y", "googleCode": "123456"}`. No separate login controller — handled by `JWTLoginFilter` extending `UsernamePasswordAuthenticationFilter`.
 
-**Token**: Returned in `x-playlet-token` header (format: `Bearer <token>`). Verify via `x-playlet-token` header, NOT `Authorization`. Token expiry: 24h, stored in Redis with key prefix `playletInternalServer`.
+**Token**: Returned in `x-playlet-token` header (format: `Bearer <token>`). Verify via `x-playlet-token` header, NOT `Authorization`. Token expiry: 24h, stored in Redis with key prefix `playletInternalServer` (internal) / `playletOverseaServer` (oversea) via `Constants.APP_PACKAGE_NAME`.
 
 **Google Authenticator 2FA**: Always required for login — the `googleCode` field must be present in the login request. The `dscoins.login.googleLimit.enable` flag controls whether the code is actually *verified* (currently `false` = skip verification but field still required).
 
@@ -68,16 +68,19 @@ The `IpRegionRouteFilter` (`com.playlet.gateway.filter`) implements this as a `G
 
 Both use Druid connection pool + MyBatis-Plus + PageHelper. MapperScan: `com.playlet.internal.dao` (internal) / `com.playlet.oversea.dao` (oversea).
 
-**Note**: The oversea-server does NOT have Qiniu file upload config — only the internal-server has it.
+**Redis business keys** (shared Redis instance): prefixed by project in `RedisKeyConstants.PROJECT_PREFIX` — `internal:` vs `oversea:` (e.g. `internal:theater:home:v1:zh-cn` / `oversea:theater:home:v1:en`). JWT session keys use `APP_PACKAGE_NAME` instead.
 
-### Dependencies (playlet-internal-server)
+**Defaults**: Oversea default language is English (`LanguageEnums.DEFAULT_LANGUE = en`); internal defaults to `zh-cn`. Both servers include Qiniu / JPush / mail config (synced from internal yml; oversea DB name differs).
+
+### Dependencies (playlet-internal-server / playlet-oversea-server)
 
 - **Data**: MySQL 8.0.33 + MyBatis-Plus 3.1.0 + Druid 1.1.8 + PageHelper 1.4.7
 - **Cache**: Redis (Jedis via spring-boot-starter-data-redis)
 - **Security**: Spring Security + JWT (jjwt 0.11.5 + java-jwt 3.8.3)
 - **API Docs**: SpringDoc OpenAPI 1.7.0 (Swagger UI at `/swagger-ui.html`)
-- **File Upload**: Qiniu SDK 7.13.0 (max 255MB)
-- **Utilities**: Hutool 5.6.0, FastJSON 1.2.30, OkHttp3, Lombok
+- **File Upload**: Qiniu SDK 7.13.0
+- **Push / OIDC**: JPush + nimbus-jose-jwt (Google/Apple)
+- **Utilities**: Hutool 5.6.0, FastJSON 1.2.83, OkHttp3, Lombok
 
 ### Package Structure (playlet-internal-server)
 
@@ -115,6 +118,7 @@ The oversea-server (`com.playlet.oversea`) mirrors this structure with the same 
 - **Redis required**: Both business servers require Redis on localhost:6379.
 - **MyBatis mapper scan**: New mappers must be in `com.playlet.internal.dao` (internal) or `com.playlet.oversea.dao` (oversea).
 - **JWT signing key**: Hardcoded in `Constants.SIGNING_KEY` — not externalized to config.
-- **File upload limit**: Max 255MB (`spring.servlet.multipart.max-file-size`).
+- **File upload limit**: See `spring.servlet.multipart.max-file-size` in each module's `application.yml` (internal currently 800MB).
+- **Feature parity**: Oversea mirrors internal business code under `com.playlet.oversea`; keep Redis `PROJECT_PREFIX` and `APP_PACKAGE_NAME` distinct when syncing. Create MySQL schema `playlet_oversea` (same tables as domestic) before starting oversea.
 - **Eclipse project**: `.project` and `.settings/` indicate Eclipse IDE usage.
 - **Lombok required**: Both servers use Lombok — ensure IDE has Lombok plugin installed.

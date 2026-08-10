@@ -1,0 +1,28 @@
+package com.playlet.oversea.dao.medal;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.playlet.oversea.entity.medal.UserMedalUnlockLogEntity;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface UserMedalUnlockLogDao extends BaseMapper<UserMedalUnlockLogEntity> {
+
+	@Select("<script>"
+			+ "select * from user_medal_unlock_log where 1=1 "
+			+ "<if test='uid != null'> and uid = #{uid} </if>"
+			+ "<if test='medalId != null'> and medal_id = #{medalId} </if>"
+			+ "<if test='unlockFlag != null'> and unlock_flag = #{unlockFlag} </if>"
+			+ "order by setTime desc, id desc"
+			+ "</script>")
+	List<UserMedalUnlockLogEntity> findAdminList(UserMedalUnlockLogEntity entity);
+
+	@Select("select count(1) from user_medal_unlock_log "
+			+ "where uid = #{uid} and trigger_action = #{triggerAction} and trigger_ref = #{triggerRef}")
+	int existsByUidActionRef(@Param("uid") Long uid,
+			@Param("triggerAction") String triggerAction,
+			@Param("triggerRef") String triggerRef);
+}

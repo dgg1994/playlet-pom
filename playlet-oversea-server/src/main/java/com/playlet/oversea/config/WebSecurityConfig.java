@@ -67,7 +67,8 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
     	http.cors().and().csrf().disable()
 		        .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS).and()
 		        .authorizeRequests()
-		        .antMatchers("/**").permitAll()
+		        //.antMatchers("/**").permitAll()
+		        .antMatchers("/api/**").permitAll()
                 .antMatchers("/statistics/**").permitAll()
                 .antMatchers("/druid/**").permitAll()
                 .antMatchers("/actuator/**").permitAll()
@@ -81,6 +82,7 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
                 .antMatchers("/configuration/ui").permitAll()
                 .antMatchers("/configuration/security").permitAll()
                 .antMatchers( "/*.html","/**/*.html","/**/*.css", "/**/*.js","/webSocket/**").permitAll()
+               
                 .anyRequest().authenticated()
                 .and()
                 .logout()

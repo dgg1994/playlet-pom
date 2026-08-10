@@ -1,0 +1,217 @@
+package com.playlet.oversea.service.impl;
+
+import cn.hutool.core.util.IdUtil;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
+import com.playlet.oversea.aop.SysLogAnnotation;
+import com.playlet.oversea.api.request.TagRequest;
+import com.playlet.oversea.api.response.TagGroupRespEntity;
+import com.playlet.oversea.base.ResponseBase;
+import com.playlet.oversea.config.heard.LanguageContext;
+import com.playlet.oversea.dao.drama.TagDao;
+import com.playlet.oversea.entity.drama.TagEntity;
+import com.playlet.oversea.service.DramaTagService;
+import com.playlet.oversea.utils.GenericityUtil;
+import com.playlet.oversea.utils.I18nUtil;
+import com.playlet.oversea.utils.StringUtils;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+import static com.playlet.oversea.base.BaseApiService.setResultError;
+import static com.playlet.oversea.base.BaseApiService.setResultSuccess;
+
+/**
+ * 类描述：标签管理实现
+ *
+ * @author GeminiSun
+ * @date 2026/07/16 09:33
+ */
+@Slf4j
+@RestController
+@CrossOrigin
+@Transactional(rollbackFor = Exception.class)
+public class DramaTagServiceImpl implements DramaTagService {
+
+    @Autowired
+    private TagDao tagDao;
+
+    @Override
+    @SysLogAnnotation(module = "短剧标签", type = "POST", remark = "标签列表")
+    public ResponseBase findList(@RequestBody TagEntity entity) {
+        try {
+            if (entity == null) {
+                entity = new TagEntity();
+            }
+            PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
+            List<TagEntity> list = tagDao.findAdminGroupList(entity);
+            List<TagGroupRespEntity> rows = new ArrayList<>();
+            if (list != null && list.size() > 0) {
+                List<String> groupIds = list.stream()
+                        .map(TagEntity::getGroupId)
+                        .filter(gid -> !StringUtils.isEmpty(gid))
+                        .collect(Collectors.toList());
+                Map<String, List<TagEntity>> tagsByGroup = new LinkedHashMap<>();
+                if (!groupIds.isEmpty()) {
+                    List<TagEntity> allTags = tagDao.findByGroupIds(groupIds);
+                    if (allTags != null) {
+                        for (TagEntity tag : allTags) {
+                            tagsByGroup.computeIfAbsent(tag.getGroupId(), k -> new ArrayList<>()).add(tag);
+                        }
+                    }
+                }
+                for (TagEntity group : list) {
+                    TagGroupRespEntity row = new TagGroupRespEntity();
+                    row.setGroupId(group.getGroupId());
+                    row.setSortWeight(group.getSortWeight());
+                    row.setStatus(group.getStatus());
+                    row.setSetTime(group.getSetTime());
+                    row.setGmtModified(group.getGmtModified());
+                    List<TagEntity> tags = tagsByGroup.get(group.getGroupId());
+                    if (tags != null) {
+                        for (TagEntity tag : tags) {
+                            if (!StringUtils.isEmpty(tag.getLangue())) {
+                                row.putLangName(tag.getLangue(), tag.getTagName());
+                            }
+                        }
+                    }
+                    rows.add(row);
+                }
+            }
+            PageInfo<TagEntity> page = new PageInfo<>(list);
+            PageInfo<TagGroupRespEntity> info = new PageInfo<>();
+            info.setList(rows);
+            info.setPageNum(page.getPageNum());
+            info.setPageSize(page.getPageSize());
+            info.setTotal(page.getTotal());
+            info.setPages(page.getPages());
+            return setResultSuccess(info, I18nUtil.getMessage("base_success"));
+        } catch (Exception e) {
+            log.error("service error", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public ResponseBase findListByLanguage() {
+        //获取当前请求语言
+        String language = LanguageContext.getLanguage();
+        List<TagEntity> tags = tagDao.selectList(new QueryWrapper<TagEntity>().eq("langue",language));
+        return setResultSuccess(tags, I18nUtil.getMessage("base_success"));
+    }
+
+    @Override
+    @SysLogAnnotation(module = "短剧标签", type = "POST", remark = "新增标签")
+    public ResponseBase save(@RequestBody TagRequest entity) {
+        try {
+            if (entity == null || entity.getTags() == null || entity.getTags().isEmpty()) {
+                return setResultError(I18nUtil.getMessage("base_error"));
+            }
+            String groupId = IdUtil.simpleUUID();
+            Integer sortWeight = entity.getSortWeight();
+            for (TagEntity tag : entity.getTags()) {
+                if (tag == null || StringUtils.isEmpty(tag.getTagName())) {
+                    return setResultError(I18nUtil.getMessage("base_error"));
+                }
+                String tagName = tag.getTagName().trim();
+                if (tagDao.findByTagName(tagName) != null) {
+                    return setResultError("标签名称已存在，不能新增：" + tagName);
+                }
+                TagEntity tagEntity = new TagEntity();
+                tagEntity.setLangue(tag.getLangue());
+                tagEntity.setGroupId(groupId);
+                tagEntity.setTagName(tagName);
+                tagEntity.setStatus(1);
+                tagEntity.setSortWeight(sortWeight);
+                GenericityUtil.setDate(tagEntity);
+                tagDao.insert(tagEntity);
+            }
+            return setResultSuccess(I18nUtil.getMessage("base_success"));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public ResponseBase update(@RequestBody TagRequest tagRequest) {
+        try {
+            String groupId = tagRequest.getGroupId();
+            Integer sortWeight = tagRequest.getSortWeight();
+            List<TagEntity> tags = tagRequest.getTags();
+            if (StringUtils.isEmpty(groupId) || tags == null || tags.isEmpty()) {
+                return setResultError(I18nUtil.getMessage("base_error"));
+            }
+            for (TagEntity tag : tags) {
+                TagEntity tagEntity = tagDao.selectOne(new QueryWrapper<TagEntity>().eq("group_id", groupId).eq("langue", tag.getLangue()));
+                if (tagEntity != null){
+                    tagEntity.setTagName(tag.getTagName());
+                    tagEntity.setGmtModified(new Date());
+                    tagEntity.setSortWeight(tag.getSortWeight());
+                    tagDao.updateById(tagEntity);
+                }else {
+                    tagEntity = new TagEntity();
+                    tagEntity.setLangue(tag.getLangue());
+                    tagEntity.setTagName(tag.getTagName());
+                    tagEntity.setGroupId(groupId);
+                    tagEntity.setStatus(1);
+                    tagEntity.setSortWeight(sortWeight);
+                    GenericityUtil.setDate(tagEntity);
+                    tagDao.insert(tagEntity);
+                }
+            }
+            return setResultSuccess(I18nUtil.getMessage("base_success"));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    @SysLogAnnotation(module = "短剧标签", type = "POST", remark = "变更标签状态")
+    public ResponseBase changeStatus(@RequestBody TagEntity entity) {
+        try {
+            if (entity == null || entity.getGroupId() == null || entity.getStatus() == null) {
+                return setResultError(I18nUtil.getMessage("base_error"));
+            }
+            if (entity.getStatus() != 0 && entity.getStatus() != 1) {
+                return setResultError("状态仅支持 0停用 / 1启用");
+            }
+            List<TagEntity> tagEntities = tagDao.selectList(new QueryWrapper<TagEntity>().eq("group_id", entity.getGroupId()));
+            if (tagEntities == null) {
+                return setResultError(I18nUtil.getMessage("base_data_null"));
+            }
+            tagDao.updateStatusByGroupId(entity.getStatus(),entity.getGroupId());
+            return setResultSuccess(I18nUtil.getMessage("base_success"));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    @SysLogAnnotation(module = "短剧标签", type = "POST", remark = "变更标签状态")
+    public ResponseBase changeStatus(@RequestParam("groupId") String groupId) {
+        try {
+            if (StringUtils.isEmpty(groupId)) {
+                return setResultError(I18nUtil.getMessage("base_error"));
+            }
+            List<TagEntity> tagEntities = tagDao.selectList(new QueryWrapper<TagEntity>().eq("group_id",groupId));
+            if (tagEntities == null) {
+                return setResultError(I18nUtil.getMessage("base_data_null"));
+            }
+            tagDao.deleteTagByGroupId(groupId);
+            return setResultSuccess(I18nUtil.getMessage("base_success"));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
+
+}

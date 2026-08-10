@@ -1,10 +1,12 @@
 package com.playlet.oversea.security;
+
 import com.playlet.oversea.constants.MenuConstants;
 import com.playlet.oversea.dao.system.SysUserDao;
 import com.playlet.oversea.entity.system.SysRoleEntity;
 import com.playlet.oversea.entity.system.SysUserEntity;
 import com.playlet.oversea.enums.RoleTypeEnums;
 import com.playlet.oversea.enums.UserStateEnums;
+import com.playlet.oversea.utils.PasswordHashUtils;
 
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -15,7 +17,6 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.util.DigestUtils;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,16 +45,23 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(userName);
         if (null != userDetails) {
-            String encodePassword = DigestUtils.md5DigestAsHex((password).getBytes());
-            if (userDetails.getPassword().equals(encodePassword)) {
+            String stored = userDetails.getPassword();
+            if (PasswordHashUtils.matches(password, stored)) {
+                // 旧 MD5 哈希登录成功后升级为 BCrypt
+                if (PasswordHashUtils.needsRehash(stored)) {
+                    try {
+                        SysUserEntity dbUser = sysUserMapper.findByAcctiveState(userName, UserStateEnums.NORMAL.getIndex());
+                        if (dbUser != null && dbUser.getId() != null) {
+                            sysUserMapper.updatePwd(dbUser.getId(), PasswordHashUtils.encode(password));
+                        }
+                    } catch (Exception ignore) {
+                        // 升级失败不影响本次登录
+                    }
+                }
                 ArrayList<GrantedAuthority> authorities = getUserAuthoritiesByUsername(userName);
                 return new UsernamePasswordAuthenticationToken(userName, password, authorities);
-            } else if (userDetails.getPassword().equals(password)) {
-                ArrayList<GrantedAuthority> authorities = getUserAuthoritiesByUsername(userName);
-                return new UsernamePasswordAuthenticationToken(userName, password, authorities);
-            } else {
-                throw new BadCredentialsException("账号密码错误");
             }
+            throw new BadCredentialsException("账号密码错误");
         } else {
             throw new UsernameNotFoundException("用户不存在");
         }

@@ -69,9 +69,16 @@ public class GenericityUtil {
     
     //分页
     public static <T> List<T> Page(List<T> list, Integer pageNumber, Integer pageSize){
+    	if (pageNumber == null || pageNumber < 1) {
+    		pageNumber = Constants.PAGENUMBER;
+    	}
+    	if (pageSize == null || pageSize < 1) {
+    		pageSize = Constants.PAGESIZE;
+    	} else {
+    		pageSize = Math.min(pageSize, Constants.MAX_PAGESIZE);
+    	}
     	if(pageSize >= list.size()) {
     		pageNumber = Constants.PAGENUMBER ;
-    		pageSize = Constants.PAGESIZE;
 		}
 		int indexNum = (pageNumber-1 )*pageSize;
 		int endNum = (pageNumber -1 )*pageSize+pageSize;
@@ -81,6 +88,9 @@ public class GenericityUtil {
 		if( indexNum > endNum) {
 			indexNum = (Constants.PAGENUMBER -1 )*Constants.PAGESIZE;
 			endNum = (Constants.PAGENUMBER -1 )*Constants.PAGESIZE+Constants.PAGESIZE;
+			if (endNum > list.size()) {
+				endNum = list.size();
+			}
 		}
 		list = list.subList(indexNum, endNum);
 	    return list;

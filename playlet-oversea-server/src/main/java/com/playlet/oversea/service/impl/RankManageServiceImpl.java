@@ -1,0 +1,291 @@
+package com.playlet.oversea.service.impl;
+
+import cn.hutool.core.util.IdUtil;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
+import com.playlet.oversea.aop.SysLogAnnotation;
+import com.playlet.oversea.api.request.RankBoardRequestEntity;
+import com.playlet.oversea.api.response.RankListItemEntity;
+import com.playlet.oversea.base.BaseApiService;
+import com.playlet.oversea.base.ResponseBase;
+import com.playlet.oversea.config.heard.LanguageContext;
+import com.playlet.oversea.dao.drama.DramaDao;
+import com.playlet.oversea.dao.drama.RankBoardDao;
+import com.playlet.oversea.dao.drama.RankListDao;
+import com.playlet.oversea.entity.drama.DramaEntity;
+import com.playlet.oversea.entity.drama.RankBoardEntity;
+import com.playlet.oversea.entity.drama.RankListEntity;
+import com.playlet.oversea.service.MediaUrlService;
+import com.playlet.oversea.service.RankManageService;
+import com.playlet.oversea.utils.GenericityUtil;
+import com.playlet.oversea.utils.I18nUtil;
+import com.playlet.oversea.utils.StringUtils;
+import com.playlet.oversea.utils.TheaterHomeCacheHelper;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Date;
+import java.util.List;
+
+@Slf4j
+@RestController
+@CrossOrigin
+@Transactional(rollbackFor = Exception.class)
+public class RankManageServiceImpl extends BaseApiService implements RankManageService {
+
+	@Autowired
+	private RankBoardDao rankBoardDao;
+	@Autowired
+	private RankListDao rankListDao;
+	@Autowired
+	private DramaDao dramaDao;
+	@Autowired
+	private MediaUrlService mediaUrlService;
+	@Autowired
+	private TheaterHomeCacheHelper theaterHomeCacheHelper;
+
+	@Override
+	@SysLogAnnotation(module = "榜单管理", type = "POST", remark = "榜定义列表")
+	public ResponseBase boardFindList(@RequestBody RankBoardEntity entity) {
+		if (entity == null) {
+			entity = new RankBoardEntity();
+		}
+		if (StringUtils.isEmpty(entity.getLangue())) {
+			entity.setLangue(LanguageContext.getLanguage());
+		}
+		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
+		return setResultSuccess(new PageInfo<>(rankBoardDao.findAdminList(entity)),
+				I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	@SysLogAnnotation(module = "榜单管理", type = "GET", remark = "榜定义详情")
+	public ResponseBase boardDetail(@RequestParam("id") Integer id) {
+		RankBoardEntity board = rankBoardDao.selectById(id);
+		if (board == null) {
+			return setResultError(I18nUtil.getMessage("base_data_null"));
+		}
+		return setResultSuccess(board, I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	@SysLogAnnotation(module = "榜单管理", type = "POST", remark = "新增榜定义")
+	public ResponseBase boardSave(@RequestBody RankBoardRequestEntity entity) {
+		try {
+			if (entity == null) {
+				return setResultError(I18nUtil.getMessage("base_error"));
+			}
+            List<RankBoardEntity> ranks = entity.getRanks();
+            if (ranks == null || ranks.size() == 0){
+                return setResultError(I18nUtil.getMessage("base_error"));
+            }
+            String groupId = IdUtil.simpleUUID();
+            for (RankBoardEntity rank : ranks) {
+                if (StringUtils.isEmpty(rank.getLangue())) {
+                    rank.setLangue(LanguageContext.getLanguage());
+                }
+                if (StringUtils.isEmpty(rank.getGroupId())) {
+                    rank.setGroupId(groupId);
+                }
+                if (rankBoardDao.findByBoardNameAndLangue(rank.getBoardName().trim(), rank.getLangue()) != null) {
+                    return setResultError(I18nUtil.getMessage("base_info_exist"));
+                }
+                rank.setBoardName(rank.getBoardName().trim());
+                rank.setBoardType(entity.getBoardType() == null ? 2 : entity.getBoardType());
+                rank.setTopN(entity.getTopN() == null ? 100 : entity.getTopN());
+                rank.setStatus(rank.getStatus() == null ? 1 : rank.getStatus());
+                rank.setSortWeight(entity.getSortWeight() == null ? 0 : entity.getSortWeight());
+                GenericityUtil.setDate(rank);
+                rankBoardDao.insert(rank);
+            }
+			theaterHomeCacheHelper.invalidateAll();
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	@Override
+	@SysLogAnnotation(module = "榜单管理", type = "POST", remark = "变更榜状态")
+	public ResponseBase boardChangeStatus(@RequestBody RankBoardEntity entity) {
+        try {
+            if (entity == null || entity.getGroupId() == null || entity.getStatus() == null) {
+                return setResultError(I18nUtil.getMessage("base_error"));
+            }
+            if (entity.getStatus() != 0 && entity.getStatus() != 1) {
+                return setResultError("状态仅支持 0停用 / 1启用");
+            }
+            List<RankBoardEntity> exist = rankBoardDao.selectGroupId(entity.getGroupId());
+            if (exist == null) {
+                return setResultError(I18nUtil.getMessage("base_data_null"));
+            }
+            rankBoardDao.updateByGroupId(entity.getGroupId(), entity.getStatus());
+			theaterHomeCacheHelper.invalidateAll();
+            return setResultSuccess(I18nUtil.getMessage("base_success"));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+	@Override
+	@SysLogAnnotation(module = "榜单管理", type = "GET", remark = "删除榜定义")
+	public ResponseBase boardDelete(@RequestParam("id") Integer id) {
+		RankBoardEntity exist = rankBoardDao.selectById(id);
+		if (exist == null) {
+			return setResultError(I18nUtil.getMessage("base_data_null"));
+		}
+		// 同 group 下已无其它语言榜时，一并清空条目
+		long otherCount = rankBoardDao.selectCount(
+				new QueryWrapper<RankBoardEntity>().eq("group_id", exist.getGroupId()).ne("id", id));
+		if (otherCount == 0 && StringUtils.isNotEmpty(exist.getGroupId())) {
+			rankListDao.deleteByBoardGroupId(exist.getGroupId());
+		}
+		rankBoardDao.deleteById(id);
+		theaterHomeCacheHelper.invalidateAll();
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	@SysLogAnnotation(module = "榜单管理", type = "POST", remark = "榜条目列表")
+	public ResponseBase listFindList(@RequestBody RankListEntity entity) {
+		if (entity == null) {
+			entity = new RankListEntity();
+		}
+		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
+		List<RankListItemEntity> adminList = rankListDao.findAdminList(entity);
+		if (adminList != null) {
+			for (RankListItemEntity item : adminList) {
+				item.setCoverUrl(mediaUrlService.sign(item.getCoverUrl()));
+			}
+		}
+		return setResultSuccess(new PageInfo<>(adminList), I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	@SysLogAnnotation(module = "榜单管理", type = "GET", remark = "榜条目详情")
+	public ResponseBase listDetail(@RequestParam("id") Integer id) {
+		RankListItemEntity row = rankListDao.findItemById(id);
+		if (row == null) {
+			return setResultError(I18nUtil.getMessage("base_data_null"));
+		}
+		row.setCoverUrl(mediaUrlService.sign(row.getCoverUrl()));
+		return setResultSuccess(row, I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	@SysLogAnnotation(module = "榜单管理", type = "POST", remark = "新增榜条目")
+	public ResponseBase listSave(@RequestBody RankListEntity entity) {
+		try {
+			if (entity == null || StringUtils.isEmpty(entity.getBoardGroupId())
+					|| StringUtils.isEmpty(entity.getDramaId())) {
+				return setResultError(I18nUtil.getMessage("base_error"));
+			}
+			RankBoardEntity board = rankBoardDao.findOneByGroupId(entity.getBoardGroupId());
+			if (board == null) {
+				return setResultError(I18nUtil.getMessage("rank_board_null"));
+			}
+			if (rankListDao.findByBoardAndDrama(entity.getBoardGroupId(), entity.getDramaId()) != null) {
+				return setResultError(I18nUtil.getMessage("rank_drama_exist"));
+			}
+			if (entity.getRankNo() == null || entity.getRankNo() < 1) {
+				return setResultError(I18nUtil.getMessage("rank_no_min"));
+			}
+			if (rankListDao.findByBoardAndRankNo(entity.getBoardGroupId(), entity.getRankNo()) != null) {
+				return setResultError(I18nUtil.getMessage("rank_no_occupied"));
+			}
+			if (board.getTopN() != null && entity.getRankNo() > board.getTopN()) {
+				return setResultError(I18nUtil.getMessage("rank_no_exceed_topn", board.getTopN()));
+			}
+			DramaEntity drama = dramaDao.findByDramaId(Integer.valueOf(entity.getDramaId()));
+			if (drama == null) {
+				return setResultError(I18nUtil.getMessage("drama_null"));
+			}
+			entity.setStatus(entity.getStatus() == null ? 1 : entity.getStatus());
+			GenericityUtil.setDate(entity);
+			rankListDao.insert(entity);
+			theaterHomeCacheHelper.invalidateAll();
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	@Override
+	@SysLogAnnotation(module = "榜单管理", type = "POST", remark = "编辑榜条目")
+	public ResponseBase listUpdate(@RequestBody RankListEntity entity) {
+		try {
+			if (entity == null || entity.getId() == null) {
+				return setResultError(I18nUtil.getMessage("base_error"));
+			}
+			RankListEntity exist = rankListDao.selectById(entity.getId());
+			if (exist == null) {
+				return setResultError(I18nUtil.getMessage("base_data_null"));
+			}
+			if (entity.getRankNo() != null && !entity.getRankNo().equals(exist.getRankNo())) {
+				if (entity.getRankNo() < 1) {
+					return setResultError(I18nUtil.getMessage("rank_no_min"));
+				}
+				RankListEntity occupied = rankListDao.findByBoardAndRankNo(exist.getBoardGroupId(), entity.getRankNo());
+				if (occupied != null && !occupied.getId().equals(exist.getId())) {
+					int oldNo = exist.getRankNo();
+					int newNo = entity.getRankNo();
+					exist.setRankNo(-exist.getId());
+					exist.setGmtModified(new Date());
+					rankListDao.updateById(exist);
+					occupied.setRankNo(oldNo);
+					occupied.setGmtModified(new Date());
+					rankListDao.updateById(occupied);
+					exist.setRankNo(newNo);
+				} else {
+					exist.setRankNo(entity.getRankNo());
+				}
+			}
+			if (StringUtils.isNotEmpty(entity.getDramaId()) && !entity.getDramaId().equals(exist.getDramaId())) {
+				if (rankListDao.findByBoardAndDrama(exist.getBoardGroupId(), entity.getDramaId()) != null) {
+					return setResultError(I18nUtil.getMessage("rank_drama_exist"));
+				}
+				DramaEntity drama = dramaDao.findByDramaId(Integer.valueOf(entity.getDramaId()));
+				if (drama == null) {
+					return setResultError(I18nUtil.getMessage("drama_null"));
+				}
+				exist.setDramaId(entity.getDramaId());
+			}
+			exist.setGmtModified(new Date());
+			rankListDao.updateById(exist);
+			theaterHomeCacheHelper.invalidateAll();
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	@Override
+	@SysLogAnnotation(module = "榜单管理", type = "POST", remark = "变更条目状态")
+	public ResponseBase listChangeStatus(@RequestBody RankListEntity entity) {
+		try {
+			if (entity == null || entity.getId() == null || entity.getStatus() == null) {
+				return setResultError(I18nUtil.getMessage("base_error"));
+			}
+			if (entity.getStatus() != 0 && entity.getStatus() != 1) {
+				return setResultError("状态仅支持 0停用 / 1启用");
+			}
+			RankListEntity exist = rankListDao.selectById(entity.getId());
+			if (exist == null) {
+				return setResultError(I18nUtil.getMessage("base_data_null"));
+			}
+			exist.setStatus(entity.getStatus());
+			exist.setGmtModified(new Date());
+			rankListDao.updateById(exist);
+			theaterHomeCacheHelper.invalidateAll();
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+}

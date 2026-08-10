@@ -494,7 +494,7 @@ public class CurrencyConverterUtil {
 	/**
 	 * 测试方法
 	 */
-	public static void main(String[] args) {
+	/*public static void main(String[] args) {
 		System.out.println("========== 原有方法测试 ==========");
 		
 		// 测试方法1 - 转换金额
@@ -524,5 +524,5 @@ public class CurrencyConverterUtil {
 		}
 		System.out.println();
 
-	}
+	}*/
 }

@@ -22,6 +22,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import com.playlet.internal.aop.AccessLimit;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
+import com.playlet.internal.constants.RedisKeyConstants;
 import com.playlet.internal.utils.CustomUtils;
 import com.playlet.internal.utils.RedisUtil;
 
@@ -44,7 +45,7 @@ public class LimitSubmitAspect {
 	        HttpServletResponse response = attributes.getResponse();
 			String ip = request.getLocalAddr();
 			String url = request.getRequestURL().toString();
-			String key = "req_limit_".concat(ip).concat(url);
+			String key = RedisKeyConstants.ACCESS_LIMIT_KEY.concat(ip).concat(url);
 			String redisUrl;
 			try {
 				redisUrl = redisUtil.get(key).toString();

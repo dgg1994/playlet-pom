@@ -23,10 +23,17 @@ public interface Constants {
 	int PAGENUMBER = 1;
 	
 	int PAGESIZE =10;
+
+	/** 分页每页上限，防止超大 pageSize 拖垮库 */
+	int MAX_PAGESIZE = 100;
 	
 	Integer ZERO_INT = 0;
 			
 	long REDIS_EXPIRE_TIME = 24 * 60 * 60 * 1000;
+
+	Integer USER_JWT_EXPIRE_TIME = 240 * 60 * 60 * 1000;
+
+	long USER_REDIS_EXPIRE_TIME = 240 * 60 * 60 * 1000;
 	
 	long CODE_EXPIRE_TIME = 5 * 60;
 			
@@ -77,6 +84,7 @@ public interface Constants {
     
     public static final String HEADER_LANGUAGE = "x-playlet-language";
     
+    
     //配置前端响应头
     public static final String HEADER_ACCESS = "Access-Control-Expose-Headers";
     
@@ -84,6 +92,10 @@ public interface Constants {
     
     public static final String GOOGLE_COCE = "googleCoce";
     
+    public String FILE_UPLOAD_SITE = "VD_%s/cover/";
     
+    public String VIDEO_UPLOAD_SITE = "VD_%s/EP_%s/";
+    
+    public String M3U8 = "m3u8";
 
 }

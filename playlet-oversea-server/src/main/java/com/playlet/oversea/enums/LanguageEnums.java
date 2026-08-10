@@ -18,7 +18,8 @@ public enum LanguageEnums {
 	TR(4, "tr-tr", "tr-tr", "土耳其"),
 	KO(5, "ko-kr", "ko-kr", "韩语"),
 	JA(6, "ja-jp", "ja-jp", "日语"),
-	PT_BR(6, "pt-br", "pt-br", "巴西语");
+	BN(7, "bn-bd", "bn-bd", "孟加拉"),
+	PT_BR(8, "pt-br", "pt-br", "巴西语");
 	
 
 	private Integer index;
@@ -124,12 +125,12 @@ public enum LanguageEnums {
 		return list;
 	}
 
-	/** 国际服默认语言：英文 */
+	/** 默认语言 en（海外） */
 	public static final String DEFAULT_LANGUE = EN_US.getName();
 
 	/**
-	 * 按语言码解析，未知/空回退英文。
-	 * 兼容 en-us / zh_CN 等写法。
+	 * 按项目语言码解析，未知/空回退英文（海外默认）。
+	 * 兼容偶发 zh_CN / zh-CN / ZH-CN。
 	 */
 	public static LanguageEnums of(String langue) {
 		if (langue == null || langue.trim().isEmpty()) {
@@ -141,6 +142,7 @@ public enum LanguageEnums {
 				return e;
 			}
 		}
+		// 宽松匹配：en-us -> en
 		if (key.startsWith("en")) {
 			return EN_US;
 		}
@@ -152,5 +154,4 @@ public enum LanguageEnums {
 		}
 		return EN_US;
 	}
-
 }
