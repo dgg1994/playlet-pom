@@ -7,8 +7,8 @@ spring:
     nacos:
       discovery:
         server-addr: http://127.0.0.1:8848
-        namespace: 1c50f6c5-e4b0-4ea0-8679-05182dfda2c6
-        # password: qwerdf
+        namespace: 6ed7d1da-d7db-4007-b4cb-6fe448c775e4
+        password: qwerdf
     gateway:
       discovery:
         locator:
@@ -22,6 +22,7 @@ spring:
           '[/**]':
             allowedOrigins:
               - "https://manager.yingchuanmedia.com"
+              - "http://localhost:3006"
             allowedMethods: "*"
             allowedHeaders: "*"
             exposedHeaders:
