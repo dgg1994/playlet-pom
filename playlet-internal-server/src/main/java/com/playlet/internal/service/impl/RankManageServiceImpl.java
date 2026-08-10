@@ -21,6 +21,7 @@ import com.playlet.internal.service.RankManageService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.StringUtils;
+import com.playlet.internal.utils.TheaterHomeCacheHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +47,8 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 	private DramaDao dramaDao;
 	@Autowired
 	private MediaUrlService mediaUrlService;
+	@Autowired
+	private TheaterHomeCacheHelper theaterHomeCacheHelper;
 
 	@Override
 	@SysLogAnnotation(module = "榜单管理", type = "POST", remark = "榜定义列表")
@@ -101,6 +104,7 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
                 GenericityUtil.setDate(rank);
                 rankBoardDao.insert(rank);
             }
+			theaterHomeCacheHelper.invalidateAll();
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -122,6 +126,7 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
                 return setResultError(I18nUtil.getMessage("base_data_null"));
             }
             rankBoardDao.updateByGroupId(entity.getGroupId(), entity.getStatus());
+			theaterHomeCacheHelper.invalidateAll();
             return setResultSuccess(I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -142,6 +147,7 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 			rankListDao.deleteByBoardGroupId(exist.getGroupId());
 		}
 		rankBoardDao.deleteById(id);
+		theaterHomeCacheHelper.invalidateAll();
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
@@ -203,6 +209,7 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 			entity.setStatus(entity.getStatus() == null ? 1 : entity.getStatus());
 			GenericityUtil.setDate(entity);
 			rankListDao.insert(entity);
+			theaterHomeCacheHelper.invalidateAll();
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -251,6 +258,7 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 			}
 			exist.setGmtModified(new Date());
 			rankListDao.updateById(exist);
+			theaterHomeCacheHelper.invalidateAll();
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -274,6 +282,7 @@ public class RankManageServiceImpl extends BaseApiService implements RankManageS
 			exist.setStatus(entity.getStatus());
 			exist.setGmtModified(new Date());
 			rankListDao.updateById(exist);
+			theaterHomeCacheHelper.invalidateAll();
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			throw new RuntimeException(e);

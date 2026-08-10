@@ -39,6 +39,7 @@ import com.playlet.internal.service.RankAlgoService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.QiniuUploadUtils;
+import com.playlet.internal.utils.TheaterHomeCacheHelper;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -65,6 +66,9 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 
 	@Autowired
 	private RankAlgoService rankAlgoService;
+
+	@Autowired
+	private TheaterHomeCacheHelper theaterHomeCacheHelper;
 
 	@Override
 	public ResponseBase addDrama(@Valid AddDramaQuery createPay, MultipartFile file) {
@@ -238,6 +242,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			}
 			entity.setRecommendedCarousel(status);
 			dramaDao.updateById(entity);
+			theaterHomeCacheHelper.invalidateAll();
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			throw new RuntimeException(e);

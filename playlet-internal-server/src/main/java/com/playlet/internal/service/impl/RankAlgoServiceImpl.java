@@ -9,6 +9,7 @@ import com.playlet.internal.entity.drama.RankBoardEntity;
 import com.playlet.internal.entity.drama.RankListEntity;
 import com.playlet.internal.service.RankAlgoService;
 import com.playlet.internal.utils.GenericityUtil;
+import com.playlet.internal.utils.TheaterHomeCacheHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,8 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 	private RankListDao rankListDao;
 	@Autowired
 	private DramaRankStatDailyDao dramaRankStatDailyDao;
+	@Autowired
+	private TheaterHomeCacheHelper theaterHomeCacheHelper;
 
 	/**
 	 * 刷一遍全部算法榜（热播、新剧、飙升、推荐、热搜、收藏）。
@@ -202,28 +205,28 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 	/** 清空旧名单，再按分数顺序写入 1、2、3… */
 	private void rewriteRankList(String groupId, List<DramaRankAggRow> rows) {
 		rankListDao.deleteByBoardGroupId(groupId);
-		if (rows == null || rows.isEmpty()) {
-			return;
-		}
-		int rankNo = 1;
-		for (DramaRankAggRow row : rows) {
-			if (row.getDramaId() == null) {
-				continue;
+		if (rows != null && !rows.isEmpty()) {
+			int rankNo = 1;
+			for (DramaRankAggRow row : rows) {
+				if (row.getDramaId() == null) {
+					continue;
+				}
+				RankListEntity entity = new RankListEntity();
+				entity.setBoardGroupId(groupId);
+				entity.setRankNo(rankNo++);
+				entity.setDramaId(String.valueOf(row.getDramaId()));
+				entity.setStatus(1);
+				try {
+					GenericityUtil.setDate(entity);
+				} catch (Exception e) {
+					Date now = new Date();
+					entity.setSetTime(now);
+					entity.setGmtModified(now);
+				}
+				rankListDao.insert(entity);
 			}
-			RankListEntity entity = new RankListEntity();
-			entity.setBoardGroupId(groupId);
-			entity.setRankNo(rankNo++);
-			entity.setDramaId(String.valueOf(row.getDramaId()));
-			entity.setStatus(1);
-			try {
-				GenericityUtil.setDate(entity);
-			} catch (Exception e) {
-				Date now = new Date();
-				entity.setSetTime(now);
-				entity.setGmtModified(now);
-			}
-			rankListDao.insert(entity);
 		}
+		theaterHomeCacheHelper.invalidateAll();
 	}
 
 	/** 统计从哪天开始：今天往前推 windowDays 天（含今天），时区上海 */

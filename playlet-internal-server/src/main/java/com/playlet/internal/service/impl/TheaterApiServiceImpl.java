@@ -59,11 +59,18 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 	private WatchGiftService watchGiftService;
 	@Autowired
 	private MedalProgressService medalProgressService;
+	@Autowired
+	private TheaterHomeCacheHelper theaterHomeCacheHelper;
 
 	@Override
 	public ResponseBase home() {
-		TheaterHomeRespEntity resp = new TheaterHomeRespEntity();
 		String langue = LanguageContext.getLanguage();
+		TheaterHomeRespEntity cached = theaterHomeCacheHelper.get(langue);
+		if (cached != null) {
+			return setResultSuccess(cached, I18nUtil.getMessage("base_success"));
+		}
+
+		TheaterHomeRespEntity resp = new TheaterHomeRespEntity();
 
 		// 轮播
 		List<DramaEntity> carouselDramas = dramaDao.selectList(new QueryWrapper<DramaEntity>()
@@ -102,6 +109,7 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 			block.setItems(preview);
 			resp.getBlocks().add(block);
 		}
+		theaterHomeCacheHelper.put(langue, resp);
 		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
 	}
 

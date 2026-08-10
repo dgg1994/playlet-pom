@@ -44,4 +44,9 @@ public class RedisKeyConstants {
     public static final String QINIU_EXISTS_KEY = "qiniu:exists:";
     /** 存在性缓存 TTL：10 分钟（码率探测热路径） */
     public static final long QINIU_EXISTS_TTL_SEC = 10L * 60;
+
+    /** 剧场首页整页缓存：后缀为 langue */
+    public static final String THEATER_HOME_KEY = "theater:home:v1:";
+    /** 首页缓存 TTL：60 秒（主动失效为主，TTL 兜底） */
+    public static final long THEATER_HOME_TTL_SEC = 60L;
 }
