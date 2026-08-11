@@ -38,4 +38,7 @@ public class QueryDramaQuery extends PageQueryHelperEntity{
 	@ApiModelProperty(name = "deleteState",value = "删除状态 1是0否",required = false,dataType = "Integer")
 	private Integer deleteState;
 
+	@ApiModelProperty(name = "groupId",value = "分组Id",required = false,dataType = "String")
+	private String groupId;
+
 }
