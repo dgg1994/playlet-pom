@@ -1,6 +1,10 @@
 package com.playlet.internal.service.impl;
 
 
+import com.playlet.internal.api.request.SensitiveRecordEntity;
+import com.playlet.internal.base.SensitiveCheckResult;
+import com.playlet.internal.enums.*;
+import com.playlet.internal.service.*;
 import lombok.extern.slf4j.Slf4j;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -25,17 +29,9 @@ import com.playlet.internal.entity.drama.DramaCommentLikeEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.DramaVideoCommentEntity;
 import com.playlet.internal.entity.drama.UserInteractMessageEntity;
-import com.playlet.internal.enums.CommentTypeEnums;
-import com.playlet.internal.enums.DeleteStateEnum;
-import com.playlet.internal.enums.InteractMessageTypeEnums;
-import com.playlet.internal.enums.PublicEnums;
-import com.playlet.internal.enums.WelfareActionTypeEnums;
 import com.playlet.internal.query.drama.AddDramaCommentQuery;
 import com.playlet.internal.query.drama.CommentGiveLikeQuery;
 import com.playlet.internal.query.drama.ReplyDramaCommentQuery;
-import com.playlet.internal.service.DramaCommentService;
-import com.playlet.internal.service.MedalProgressService;
-import com.playlet.internal.service.PushNotifyService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.HtmlSanitizeUtils;
 import com.playlet.internal.utils.I18nUtil;
@@ -61,6 +57,10 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 	private UserInteractMessageDao userInteractMessageDao;
 	@Autowired
 	private PushNotifyService pushNotifyService;
+	@Autowired
+	private SensitiveWordService sensitiveWordService;
+	@Autowired
+	private SensitiveRecordService sensitiveRecordService;
 
 	@Override
 	public ResponseBase publish(@Valid @RequestBody AddDramaCommentQuery createPay) {
@@ -95,6 +95,11 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 			entity.setReplyCount(0);
 			GenericityUtil.setDate(entity);
 			dramaVideoCommentDao.insert(entity);
+			// 敏感词校验
+			SensitiveCheckResult check = sensitiveWordService.check(createPay.getCommentInfo());
+			SensitiveRecordEntity sensitiveRecord = new SensitiveRecordEntity(entity.getId(),entity.getUserId(),entity.getDramaId(),0,entity.getCommentInfo(), SensitiveSourceEnums.DRAMA_COMMENT.getCode());
+			sensitiveRecordService.saveRecord(sensitiveRecord, check);
+
 			addDiscussScore(entity);
 			pushInteractMessage(
 					createPay.getUserId(),
@@ -141,6 +146,11 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 			dramaVideoCommentDao.insert(entity);
 			parent.setReplyCount((parent.getReplyCount() == null ? 0 : parent.getReplyCount()) + 1);
 			dramaVideoCommentDao.updateById(parent);
+			// 敏感词校验
+			SensitiveCheckResult check = sensitiveWordService.check(createPay.getCommentInfo());
+			SensitiveRecordEntity sensitiveRecord = new SensitiveRecordEntity(entity.getId(),entity.getUserId(),entity.getDramaId(),0,entity.getCommentInfo(), SensitiveSourceEnums.DRAMA_COMMENT.getCode());
+			sensitiveRecordService.saveRecord(sensitiveRecord, check);
+
 			addDiscussScore(entity);
 			pushInteractMessage(
 					createPay.getUserId(),

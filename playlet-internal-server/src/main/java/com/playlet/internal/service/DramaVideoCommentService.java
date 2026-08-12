@@ -31,7 +31,7 @@ public interface DramaVideoCommentService {
 	
 	/**
 	 * @category 评论/回复点赞、取消点赞
-	 * @param entity
+	 * @param giveLikeQuery
 	 * @return
 	 */
 	@PostMapping("/giveLike")

@@ -1,9 +1,21 @@
 package com.playlet.internal.service.impl;
 
 
+import com.playlet.internal.api.request.SensitiveRecordEntity;
+import com.playlet.internal.base.BaseApiService;
+import com.playlet.internal.base.ResponseBase;
+import com.playlet.internal.base.SensitiveCheckResult;
+import com.playlet.internal.dao.drama.*;
+import com.playlet.internal.entity.drama.*;
+import com.playlet.internal.enums.*;
+import com.playlet.internal.query.drama.AddDramaVideoCommentQuery;
+import com.playlet.internal.query.drama.CommentGiveLikeQuery;
+import com.playlet.internal.query.drama.ReplyVideoCommentQuery;
+import com.playlet.internal.service.*;
+import com.playlet.internal.utils.GenericityUtil;
+import com.playlet.internal.utils.HtmlSanitizeUtils;
+import com.playlet.internal.utils.I18nUtil;
 import lombok.extern.slf4j.Slf4j;
-import javax.validation.Valid;
-
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,32 +23,7 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.playlet.internal.base.BaseApiService;
-import com.playlet.internal.base.ResponseBase;
-import com.playlet.internal.dao.drama.DramaAssetDao;
-import com.playlet.internal.dao.drama.DramaCommentLikeDao;
-import com.playlet.internal.dao.drama.DramaDao;
-import com.playlet.internal.dao.drama.DramaVideoCommentDao;
-import com.playlet.internal.dao.drama.UserInteractMessageDao;
-import com.playlet.internal.entity.drama.DramaAssetEntity;
-import com.playlet.internal.entity.drama.DramaCommentLikeEntity;
-import com.playlet.internal.entity.drama.DramaEntity;
-import com.playlet.internal.entity.drama.DramaVideoCommentEntity;
-import com.playlet.internal.entity.drama.UserInteractMessageEntity;
-import com.playlet.internal.enums.CommentTypeEnums;
-import com.playlet.internal.enums.DeleteStateEnum;
-import com.playlet.internal.enums.InteractMessageTypeEnums;
-import com.playlet.internal.enums.PublicEnums;
-import com.playlet.internal.enums.WelfareActionTypeEnums;
-import com.playlet.internal.query.drama.AddDramaVideoCommentQuery;
-import com.playlet.internal.query.drama.CommentGiveLikeQuery;
-import com.playlet.internal.query.drama.ReplyVideoCommentQuery;
-import com.playlet.internal.service.DramaVideoCommentService;
-import com.playlet.internal.service.MedalProgressService;
-import com.playlet.internal.service.PushNotifyService;
-import com.playlet.internal.utils.GenericityUtil;
-import com.playlet.internal.utils.HtmlSanitizeUtils;
-import com.playlet.internal.utils.I18nUtil;
+import javax.validation.Valid;
 
 @RestController
 @Transactional(rollbackFor = Exception.class)
@@ -62,6 +49,10 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 	private UserInteractMessageDao userInteractMessageDao;
 	@Autowired
 	private PushNotifyService pushNotifyService;
+	@Autowired
+	private SensitiveWordService sensitiveWordService;
+	@Autowired
+	private SensitiveRecordService sensitiveRecordService;
 
 	@Override
 	public ResponseBase publish(@Valid @RequestBody AddDramaVideoCommentQuery createPay) {
@@ -76,6 +67,11 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 			entity.setDeleteState(DeleteStateEnum.NORMAL.getIndex());
 			GenericityUtil.setDate(entity);
 			dramaVideoCommentDao.insert(entity);
+			// 敏感词校验
+			SensitiveCheckResult check = sensitiveWordService.check(createPay.getCommentInfo());
+			SensitiveRecordEntity sensitiveRecord = new SensitiveRecordEntity(entity.getId(),entity.getUserId(),entity.getDramaId(),entity.getVideoId(),entity.getCommentInfo(), SensitiveSourceEnums.VIDEO_COMMENT.getCode());
+			sensitiveRecordService.saveRecord(sensitiveRecord, check);
+
 			//视频、短剧添加评论量
 			addDiscussScore(entity);
 			DramaEntity drama = dramaDao.selectById(entity.getDramaId());
@@ -120,6 +116,12 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 				commentEntity.setReplyCount(commentEntity.getReplyCount() + 1);
 				dramaVideoCommentDao.updateById(commentEntity);
 			}
+
+			// 敏感词校验
+			SensitiveCheckResult check = sensitiveWordService.check(createPay.getCommentInfo());
+			SensitiveRecordEntity sensitiveRecord = new SensitiveRecordEntity(entity.getId(),entity.getUserId(),entity.getDramaId(),entity.getVideoId(),entity.getCommentInfo(), SensitiveSourceEnums.VIDEO_COMMENT.getCode());
+			sensitiveRecordService.saveRecord(sensitiveRecord, check);
+
 			//视频、短剧添加评论量
 			addDiscussScore(entity);
 			pushInteractMessage(
