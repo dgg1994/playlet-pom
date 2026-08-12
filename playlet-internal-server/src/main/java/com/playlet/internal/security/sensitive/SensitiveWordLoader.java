@@ -1,65 +1,58 @@
 package com.playlet.internal.security.sensitive;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.playlet.internal.dao.security.SensitiveWordDao;
 import com.playlet.internal.entity.security.SensitiveWordEntity;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import javax.annotation.Resource;
 import java.util.List;
 
 /**
- * 类描述：加载数据库词库
- *
- * @author GeminiSun
- * @date 2026/08/12 09:27
+ * 从数据库加载启用中的敏感词，构建 DFA Trie。
  */
+@Slf4j
 @Component
 public class SensitiveWordLoader {
 
-    @Resource
-    private SensitiveWordDao sensitiveWordDao;
+	@Resource
+	private SensitiveWordDao sensitiveWordDao;
 
-    /**
-     * 加载DFA
-     */
-    public SensitiveNode load(){
-        SensitiveNode root =
-                new SensitiveNode();
-        List<SensitiveWordEntity> list =
-                sensitiveWordDao.selectList(null);
-        for(SensitiveWordEntity entity:list){
-            insert(
-                    root,
-                    entity.getWord(),
-                    entity.getLevel()
-            );
-        }
-        return root;
-    }
+	/**
+	 * 仅加载 status=1 的词。
+	 */
+	public SensitiveNode load() {
+		SensitiveNode root = new SensitiveNode();
+		List<SensitiveWordEntity> list = sensitiveWordDao.selectList(
+				new QueryWrapper<SensitiveWordEntity>().eq("status", 1));
+		int count = 0;
+		if (list != null) {
+			for (SensitiveWordEntity entity : list) {
+				if (entity == null || !StringUtils.hasText(entity.getWord())) {
+					continue;
+				}
+				int level = entity.getLevel() == null ? 1 : entity.getLevel();
+				insert(root, entity.getWord().trim(), level);
+				count++;
+			}
+		}
+		log.info("sensitive word DFA loaded, size={}", count);
+		return root;
+	}
 
-
-    /**
-     * 添加敏感词
-     */
-    private void insert(
-            SensitiveNode root,
-            String word,
-            Integer level){
-
-        SensitiveNode node=root;
-        for(char c:word.toCharArray()){
-            node.getChildren()
-                    .putIfAbsent(
-                            c,
-                            new SensitiveNode()
-                    );
-            node =
-                    node.getChildren()
-                            .get(c);
-        }
-
-        node.setEnd(true);
-        node.setWord(word);
-        node.setLevel(level);
-    }
+	private void insert(SensitiveNode root, String word, int level) {
+		SensitiveNode node = root;
+		for (char c : word.toCharArray()) {
+			node.getChildren().putIfAbsent(c, new SensitiveNode());
+			node = node.getChildren().get(c);
+		}
+		node.setEnd(true);
+		node.setWord(word);
+		// 同一路径多次插入时保留更高风险等级
+		if (node.getLevel() == null || level > node.getLevel()) {
+			node.setLevel(level);
+		}
+	}
 }

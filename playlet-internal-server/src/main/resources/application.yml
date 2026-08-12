@@ -38,3 +38,24 @@ springdoc:
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
+
+# 苹果/谷歌一键登录：将占位符改为控制台真实 Client ID
+oauth:
+  google:
+    clientIds:
+      # 安卓Client ID
+      - 111912267969-v14f1ke97ud27frocshmgm9kj7cs13vk.apps.googleusercontent.com
+      - 111912267969-dd3estevkld338ggr88h2pms6q28qjm9.apps.googleusercontent.com
+      - 111912267969-tbdsduhvn160qla6l1fk418nvf8ma8jr.apps.googleusercontent.com
+      # 苹果Client ID
+      - 524737367067-b1l3guk6lsruof35vvkogmp5027n4c78.apps.googleusercontent.com
+  apple:
+    clientId: com.berryv.app
+
+sensitive:
+  word:
+    enabled: true
+    refresh-minutes: 30
+    refresh-interval-ms: 1800000
+    replace-enabled: true
+    replace-char: "*"
