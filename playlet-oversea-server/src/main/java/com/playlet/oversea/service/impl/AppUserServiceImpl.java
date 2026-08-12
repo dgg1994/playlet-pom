@@ -43,12 +43,15 @@ import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.regex.Pattern;
 
 @Slf4j
 @RestController
 @Transactional(rollbackFor = Exception.class)
 @CrossOrigin
 public class AppUserServiceImpl extends BaseApiService implements AppUserService {
+
+	private static final Pattern BIRTH_MONTH_PATTERN = Pattern.compile("^\\d{4}-(0[1-9]|1[0-2])$");
 
 	@Autowired
 	private RedisUtil redisUtil;
@@ -429,10 +432,44 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		if (entity == null) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
-		// 忽略 body 中的 id，强制使用 token 归属，防止 IDOR
-		entity.setId(uid);
-		entity.setNickname(HtmlSanitizeUtils.plain(entity.getNickname()));
-		appAccountDao.updateNameById(entity);
+		if (!UserGenderEnums.isValid(entity.getGender())) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		AppAccountEntity existing = appAccountDao.selectById(uid);
+		if (existing == null) {
+			return setResultError(I18nUtil.getMessage("user.not_null"));
+		}
+		AppAccountEntity update = new AppAccountEntity();
+		update.setId(uid);
+		if (entity.getNickname() != null) {
+			update.setNickname(HtmlSanitizeUtils.plain(entity.getNickname()));
+		} else {
+			update.setNickname(existing.getNickname());
+		}
+		if (entity.getAvatar() != null) {
+			update.setAvatar(entity.getAvatar());
+		} else {
+			update.setAvatar(existing.getAvatar());
+		}
+		if (entity.getGender() != null) {
+			update.setGender(entity.getGender());
+		} else {
+			update.setGender(existing.getGender());
+		}
+		if (entity.getBirthMonth() != null) {
+			String birthMonth = entity.getBirthMonth().trim();
+			if (birthMonth.isEmpty()) {
+				update.setBirthMonth(null);
+			} else {
+				if (!BIRTH_MONTH_PATTERN.matcher(birthMonth).matches()) {
+					return setResultError(I18nUtil.getMessage("base_error"));
+				}
+				update.setBirthMonth(birthMonth);
+			}
+		} else {
+			update.setBirthMonth(existing.getBirthMonth());
+		}
+		appAccountDao.updateProfileById(update);
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 

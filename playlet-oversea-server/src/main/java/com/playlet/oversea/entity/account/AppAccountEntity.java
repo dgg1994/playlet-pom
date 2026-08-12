@@ -99,6 +99,18 @@ public class AppAccountEntity extends PageQueryHelperEntity {
 	@TableField("coin_balance")
 	@ApiModelProperty(name = "coinBalance",value = "金币余额",required = false,dataType = "Long")
 	private Long coinBalance;
+
+	@TableField("frozen_coin_balance")
+	@ApiModelProperty(name = "frozenCoinBalance", value = "冻结金币", required = false, dataType = "Long")
+	private Long frozenCoinBalance;
+
+	@TableField("gender")
+	@ApiModelProperty(name = "gender", value = "性别：0未知 1男 2女", required = false, dataType = "Integer")
+	private Integer gender;
+
+	@TableField("birth_month")
+	@ApiModelProperty(name = "birthMonth", value = "出生年月 yyyy-MM", required = false, dataType = "String")
+	private String birthMonth;
 	
 	@TableField("setTime")
 	@ApiModelProperty(name = "setTime",value = "注册时间",required = false,dataType = "Date")

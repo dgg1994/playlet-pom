@@ -407,15 +407,16 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 			return true;
 		}
 		AppAccountEntity account = appAccountDao.findByUid(uid);
-		long before = account == null || account.getCoinBalance() == null ? 0L : account.getCoinBalance();
-		if (before < amt) {
+		long balance = account == null || account.getCoinBalance() == null ? 0L : account.getCoinBalance();
+		long frozen = account == null || account.getFrozenCoinBalance() == null ? 0L : account.getFrozenCoinBalance();
+		if (balance - frozen < amt) {
 			return false;
 		}
 		UserCoinLedgerEntity ledger = new UserCoinLedgerEntity();
 		ledger.setUid(uid);
 		ledger.setChangeAmt(-amt);
-		ledger.setBalanceBefore(before);
-		ledger.setBalanceAfter(before - amt);
+		ledger.setBalanceBefore(balance);
+		ledger.setBalanceAfter(balance - amt);
 		ledger.setBizType(bizType);
 		ledger.setBizId(bizId);
 		ledger.setTaskCode(taskCode == null ? "" : taskCode);

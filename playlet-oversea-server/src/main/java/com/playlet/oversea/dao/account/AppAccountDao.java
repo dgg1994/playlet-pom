@@ -35,8 +35,16 @@ public interface AppAccountDao extends BaseMapper<AppAccountEntity> {
 	int addCoinBalance(@Param("uid") Integer uid, @Param("amt") int amt);
 
 	@Update("update app_account set coin_balance = ifnull(coin_balance,0) - #{amt}, gmtModified = now() "
-			+ "where id = #{uid} and ifnull(coin_balance,0) >= #{amt}")
+			+ "where id = #{uid} and ifnull(coin_balance,0) - ifnull(frozen_coin_balance,0) >= #{amt}")
 	int deductCoinBalance(@Param("uid") Integer uid, @Param("amt") int amt);
+
+	@Update("update app_account set frozen_coin_balance = ifnull(frozen_coin_balance,0) + #{amt}, gmtModified = now() "
+			+ "where id = #{uid} and ifnull(coin_balance,0) - ifnull(frozen_coin_balance,0) >= #{amt}")
+	int freezeCoinBalance(@Param("uid") Integer uid, @Param("amt") int amt);
+
+	@Update("update app_account set frozen_coin_balance = ifnull(frozen_coin_balance,0) - #{amt}, gmtModified = now() "
+			+ "where id = #{uid} and ifnull(frozen_coin_balance,0) >= #{amt}")
+	int unfreezeCoinBalance(@Param("uid") Integer uid, @Param("amt") int amt);
 
 	@Update("update app_account set registration_id = #{registrationId}, device_name = #{deviceName}, "
 			+ "gmtModified = now() where id = #{uid}")
@@ -47,8 +55,9 @@ public interface AppAccountDao extends BaseMapper<AppAccountEntity> {
 	@Update("update app_account set registration_id = #{registrationId}, gmtModified = now() where id = #{uid}")
 	int updateRegistrationId(@Param("uid") Integer uid, @Param("registrationId") String registrationId);
 
-	@Update("update app_account set nickname = #{nickname},avatar = #{avatar}, gmtModified = now() where id = #{id}")
-    void updateNameById(AppAccountEntity entity);
+	@Update("update app_account set nickname = #{nickname}, avatar = #{avatar}, gender = #{gender}, "
+			+ "birth_month = #{birthMonth}, gmtModified = now() where id = #{id}")
+	void updateProfileById(AppAccountEntity entity);
 
 	@Update("update app_account set sys_msg_read_publish_id = #{publishId}, gmtModified = now() "
 			+ "where id = #{uid} and ifnull(sys_msg_read_publish_id,0) < #{publishId}")
