@@ -35,21 +35,6 @@ public class SensitiveWordEntity extends PageQueryHelperEntity {
     private String word;
 
 
-    @TableField("category")
-    @ApiModelProperty(name = "category", value = "敏感词分类：色情/广告/辱骂/诈骗等", dataType = "String")
-    private String category;
-
-
-    @TableField("level")
-    @ApiModelProperty(name = "level", value = "敏感等级：1警告 2审核 3禁止", dataType = "Integer")
-    private Integer level;
-
-
-    @TableField("status")
-    @ApiModelProperty(name = "status", value = "状态：1启用 0禁用", dataType = "Integer")
-    private Integer status;
-
-
     @TableField("setTime")
     @ApiModelProperty(name = "setTime", value = "创建时间", dataType = "Date")
     private Date setTime;

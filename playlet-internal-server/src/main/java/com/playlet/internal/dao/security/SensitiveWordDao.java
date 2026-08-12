@@ -14,10 +14,7 @@ public interface SensitiveWordDao extends BaseMapper<SensitiveWordEntity> {
 	@Select("<script>"
 			+ "select * from sensitive_word where 1=1 "
 			+ "<if test='word != null and word != \"\"'> and word like concat('%', #{word}, '%') </if>"
-			+ "<if test='category != null and category != \"\"'> and category = #{category} </if>"
-			+ "<if test='level != null'> and level = #{level} </if>"
-			+ "<if test='status != null'> and status = #{status} </if>"
-			+ "order by level desc, id desc"
+			+ "order by id desc"
 			+ "</script>")
 	List<SensitiveWordEntity> findAdminList(SensitiveWordEntity entity);
 

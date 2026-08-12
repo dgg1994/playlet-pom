@@ -30,10 +30,6 @@ public interface SensitiveWordManageService {
 	@ApiOperation("编辑敏感词")
 	ResponseBase update(SensitiveWordEntity entity);
 
-	@PostMapping("/changeStatus")
-	@ApiOperation("启用/停用")
-	ResponseBase changeStatus(SensitiveWordEntity entity);
-
 	@PostMapping("/reload")
 	@ApiOperation("立即刷新内存词库")
 	ResponseBase reload();

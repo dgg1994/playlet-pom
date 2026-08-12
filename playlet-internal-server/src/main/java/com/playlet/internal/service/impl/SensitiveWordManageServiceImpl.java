@@ -72,12 +72,6 @@ public class SensitiveWordManageServiceImpl implements SensitiveWordManageServic
 				return setResultError(err);
 			}
 			entity.setWord(normalizeWord(entity.getWord()));
-			if (entity.getStatus() == null) {
-				entity.setStatus(1);
-			}
-			if (entity.getLevel() == null) {
-				entity.setLevel(1);
-			}
 			GenericityUtil.setDate(entity);
 			try {
 				sensitiveWordDao.insert(entity);
@@ -124,32 +118,6 @@ public class SensitiveWordManageServiceImpl implements SensitiveWordManageServic
 	}
 
 	@Override
-	@SysLogAnnotation(module = "敏感词管理", type = "POST", remark = "启停敏感词")
-	public ResponseBase changeStatus(@RequestBody SensitiveWordEntity entity) {
-		try {
-			if (entity == null || entity.getId() == null || entity.getStatus() == null) {
-				return setResultError(I18nUtil.getMessage("base_error"));
-			}
-			if (entity.getStatus() != 0 && entity.getStatus() != 1) {
-				return setResultError(I18nUtil.getMessage("base_error"));
-			}
-			SensitiveWordEntity old = sensitiveWordDao.selectById(entity.getId());
-			if (old == null) {
-				return setResultError(I18nUtil.getMessage("base_data_null"));
-			}
-			SensitiveWordEntity upd = new SensitiveWordEntity();
-			upd.setId(old.getId());
-			upd.setStatus(entity.getStatus());
-			GenericityUtil.updateDate(upd);
-			sensitiveWordDao.updateById(upd);
-			sensitiveWordService.reload();
-			return setResultSuccess(I18nUtil.getMessage("base_success"));
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
-	}
-
-	@Override
 	@SysLogAnnotation(module = "敏感词管理", type = "POST", remark = "刷新词库")
 	public ResponseBase reload() {
 		sensitiveWordService.reload();
@@ -172,9 +140,6 @@ public class SensitiveWordManageServiceImpl implements SensitiveWordManageServic
 		}
 		if (request.getWord() != null && StringUtils.isEmpty(request.getWord().trim())) {
 			return I18nUtil.getMessage("sensitive_word_required");
-		}
-		if (request.getLevel() != null && (request.getLevel() < 1 || request.getLevel() > 3)) {
-			return I18nUtil.getMessage("sensitive_word_level_invalid");
 		}
 		if (creating) {
 			SensitiveWordEntity exist = sensitiveWordDao.findByWord(normalizeWord(request.getWord()));

@@ -11,7 +11,7 @@ import javax.annotation.Resource;
 import java.util.List;
 
 /**
- * 从数据库加载启用中的敏感词，构建 DFA Trie。
+ * 从数据库加载敏感词，构建 DFA Trie。
  */
 @Slf4j
 @Component
@@ -20,21 +20,16 @@ public class SensitiveWordLoader {
 	@Resource
 	private SensitiveWordDao sensitiveWordDao;
 
-	/**
-	 * 仅加载 status=1 的词。
-	 */
 	public SensitiveNode load() {
 		SensitiveNode root = new SensitiveNode();
-		List<SensitiveWordEntity> list = sensitiveWordDao.selectList(
-				new QueryWrapper<SensitiveWordEntity>().eq("status", 1));
+		List<SensitiveWordEntity> list = sensitiveWordDao.selectList(new QueryWrapper<>());
 		int count = 0;
 		if (list != null) {
 			for (SensitiveWordEntity entity : list) {
 				if (entity == null || !StringUtils.hasText(entity.getWord())) {
 					continue;
 				}
-				int level = entity.getLevel() == null ? 1 : entity.getLevel();
-				insert(root, entity.getWord().trim(), level);
+				insert(root, entity.getWord().trim());
 				count++;
 			}
 		}
@@ -42,7 +37,7 @@ public class SensitiveWordLoader {
 		return root;
 	}
 
-	private void insert(SensitiveNode root, String word, int level) {
+	private void insert(SensitiveNode root, String word) {
 		SensitiveNode node = root;
 		for (char c : word.toCharArray()) {
 			node.getChildren().putIfAbsent(c, new SensitiveNode());
@@ -50,9 +45,6 @@ public class SensitiveWordLoader {
 		}
 		node.setEnd(true);
 		node.setWord(word);
-		// 同一路径多次插入时保留更高风险等级
-		if (node.getLevel() == null || level > node.getLevel()) {
-			node.setLevel(level);
-		}
+		node.setLevel(1);
 	}
 }
