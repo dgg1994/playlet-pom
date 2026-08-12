@@ -19,6 +19,7 @@ import com.playlet.internal.filter.JWTAuthenticationFilter;
 import com.playlet.internal.query.security.IllegalCommentHandleQuery;
 import com.playlet.internal.service.CommentModerationService;
 import com.playlet.internal.service.IllegalCommentManageService;
+import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +52,8 @@ public class IllegalCommentManageServiceImpl implements IllegalCommentManageServ
 	private AppAccountDao appAccountDao;
 	@Autowired
 	private SysUserDao sysUserDao;
+	@Autowired
+	private MediaUrlService mediaUrlService;
 
 	@Override
 	@SysLogAnnotation(module = "违规评论管理", type = "POST", remark = "违规记录列表")
@@ -60,6 +63,7 @@ public class IllegalCommentManageServiceImpl implements IllegalCommentManageServ
 		}
 		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
 		List<IllegalCommentRecordListResp> list = illegalCommentRecordDao.findAdminViewList(entity);
+		list.forEach(illegalCommentRecordListResp -> illegalCommentRecordListResp.setUserAvatar(mediaUrlService.sign(illegalCommentRecordListResp.getUserAvatar())));
 		if (list == null) {
 			list = new ArrayList<>();
 		}
