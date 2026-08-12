@@ -3,6 +3,7 @@ package com.playlet.internal.service.impl;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import com.playlet.internal.aop.SysLogAnnotation;
+import com.playlet.internal.api.response.IllegalCommentRecordListResp;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.account.AppAccountDao;
@@ -58,7 +59,7 @@ public class IllegalCommentManageServiceImpl implements IllegalCommentManageServ
 			entity = new IllegalCommentRecordEntity();
 		}
 		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
-		List<IllegalCommentRecordEntity> list = illegalCommentRecordDao.findAdminList(entity);
+		List<IllegalCommentRecordListResp> list = illegalCommentRecordDao.findAdminViewList(entity);
 		if (list == null) {
 			list = new ArrayList<>();
 		}
