@@ -181,16 +181,6 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 		if (StringUtils.isNotEmpty(entity.getDramaTitle())) {
 			entity.setDramaTitle(entity.getDramaTitle().trim());
 		}
-		// 关联表存的是 tag_group_id，前端常传标签主键 tagId，先解析成 groupId
-		if (StringUtils.isEmpty(entity.getTagGroupId()) && entity.getTagId() != null) {
-			TagEntity tag = tagDao.selectById(entity.getTagId());
-			if (tag == null || StringUtils.isEmpty(tag.getGroupId())) {
-				PageInfo<TheaterSearchItemEntity> empty = new PageInfo<>(new ArrayList<>());
-				empty.setTotal(0);
-				return setResultSuccess(empty, I18nUtil.getMessage("base_success"));
-			}
-			entity.setTagGroupId(tag.getGroupId());
-		}
 		// SQL 层分页，避免 GenericityUtil.Page 导致 hasNextPage/pages 元数据不准确
 		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
 		List<DramaEntity> dramaEntities = dramaDao.searchOnline(entity);

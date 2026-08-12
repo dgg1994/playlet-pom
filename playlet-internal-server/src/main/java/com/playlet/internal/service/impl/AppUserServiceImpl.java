@@ -314,7 +314,10 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			entity.setUserState(UserStateEnums.NORMAL.getIndex());
 			//添加注册来源 1：一键注册用户 2:正常注册用户
 			entity.setRegisterSource(source);
-			entity.setInvitationCode(RandomSuffixInviteCodeUtil.generateUniqueCode(Long.parseLong(entity.getId().toString()), 4, 6));
+			String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMddHHmmss"));
+			int randomNum = ThreadLocalRandom.current().nextInt(100, 999);
+			entity.setNickname("user_" + timestamp + randomNum);
+			//entity.setInvitationCode(RandomSuffixInviteCodeUtil.generateUniqueCode(Long.parseLong(entity.getId().toString()), 4, 6));
 			GenericityUtil.setDate(entity);
 			appAccountDao.insert(entity);
 		} catch (Exception e) {
