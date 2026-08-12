@@ -1,13 +1,18 @@
 package com.playlet.oversea.service.impl;
 
+import com.playlet.oversea.dao.account.AppAccountDao;
 import com.playlet.oversea.dao.medal.MedalConfigDao;
 import com.playlet.oversea.dao.medal.MedalConfigI18nDao;
 import com.playlet.oversea.dao.medal.UserMedalDao;
 import com.playlet.oversea.dao.medal.UserMedalUnlockLogDao;
+import com.playlet.oversea.dao.welfare.UserCoinLedgerDao;
+import com.playlet.oversea.entity.account.AppAccountEntity;
 import com.playlet.oversea.entity.medal.MedalConfigEntity;
 import com.playlet.oversea.entity.medal.MedalConfigI18nEntity;
 import com.playlet.oversea.entity.medal.UserMedalEntity;
 import com.playlet.oversea.entity.medal.UserMedalUnlockLogEntity;
+import com.playlet.oversea.entity.welfare.UserCoinLedgerEntity;
+import com.playlet.oversea.enums.CoinBizTypeEnums;
 import com.playlet.oversea.enums.WelfareActionTypeEnums;
 import com.playlet.oversea.service.MedalProgressService;
 import com.playlet.oversea.service.PushNotifyService;
@@ -28,6 +33,9 @@ import java.util.List;
 @Service
 public class MedalProgressServiceImpl implements MedalProgressService {
 
+	private static final String FALLBACK_LANGUE = "zh-cn";
+	private static final String MEDAL_REWARD_BIZ_PREFIX = "MEDAL:";
+
 	@Autowired
 	private MedalConfigDao medalConfigDao;
 	@Autowired
@@ -38,8 +46,10 @@ public class MedalProgressServiceImpl implements MedalProgressService {
 	private UserMedalUnlockLogDao userMedalUnlockLogDao;
 	@Autowired
 	private PushNotifyService pushNotifyService;
-
-	private static final String FALLBACK_LANGUE = "zh-cn";
+	@Autowired
+	private AppAccountDao appAccountDao;
+	@Autowired
+	private UserCoinLedgerDao userCoinLedgerDao;
 
 	@Override
 	@Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
@@ -123,6 +133,14 @@ public class MedalProgressServiceImpl implements MedalProgressService {
 		userMedalUnlockLogDao.insert(logRow);
 
 		if (unlock) {
+			int rewardCoin = medal.getRewardCoin() == null ? 0 : medal.getRewardCoin();
+			if (rewardCoin > 0) {
+				creditCoin(uid.intValue(), rewardCoin,
+						CoinBizTypeEnums.MEDAL_REWARD.getName(),
+						MEDAL_REWARD_BIZ_PREFIX + medal.getId(),
+						medal.getMedalCode(),
+						"medal unlock reward");
+			}
 			try {
 				String medalName = resolveMedalName(medal.getId());
 				pushNotifyService.notifyMedalUnlock(uid.intValue(), medal.getId(), medalName);
@@ -130,6 +148,36 @@ public class MedalProgressServiceImpl implements MedalProgressService {
 				log.warn("medal unlock push failed uid={} medalId={}: {}", uid, medal.getId(), e.getMessage());
 			}
 		}
+	}
+
+	private void creditCoin(Integer uid, int amt, String bizType, String bizId, String taskCode, String remark)
+			throws Exception {
+		if (amt <= 0) {
+			return;
+		}
+		UserCoinLedgerEntity exist = userCoinLedgerDao.findByBiz(uid, bizType, bizId);
+		if (exist != null) {
+			return;
+		}
+		AppAccountEntity account = appAccountDao.findByUid(uid);
+		long before = account == null || account.getCoinBalance() == null ? 0L : account.getCoinBalance();
+		UserCoinLedgerEntity ledger = new UserCoinLedgerEntity();
+		ledger.setUid(uid);
+		ledger.setChangeAmt(amt);
+		ledger.setBalanceBefore(before);
+		ledger.setBalanceAfter(before + amt);
+		ledger.setBizType(bizType);
+		ledger.setBizId(bizId);
+		ledger.setTaskCode(taskCode == null ? "" : taskCode);
+		ledger.setAdBoostFlag(0);
+		ledger.setRemark(remark == null ? "" : remark);
+		GenericityUtil.setDate(ledger);
+		try {
+			userCoinLedgerDao.insert(ledger);
+		} catch (DuplicateKeyException e) {
+			return;
+		}
+		appAccountDao.addCoinBalance(uid, amt);
 	}
 
 	/**

@@ -109,6 +109,9 @@ public class MedalManageServiceImpl implements MedalManageService {
 			if (entity.getTargetCount() == null) {
 				entity.setTargetCount(1);
 			}
+			if (entity.getRewardCoin() == null) {
+				entity.setRewardCoin(0);
+			}
 			GenericityUtil.setDate(entity);
 			try {
 				medalConfigDao.insert(entity);
@@ -228,6 +231,9 @@ public class MedalManageServiceImpl implements MedalManageService {
 			return I18nUtil.getMessage("medal_action_type_invalid");
 		}
 		if (request.getTargetCount() != null && request.getTargetCount() < 1) {
+			return I18nUtil.getMessage("base_error");
+		}
+		if (request.getRewardCoin() != null && request.getRewardCoin() < 0) {
 			return I18nUtil.getMessage("base_error");
 		}
 		return null;

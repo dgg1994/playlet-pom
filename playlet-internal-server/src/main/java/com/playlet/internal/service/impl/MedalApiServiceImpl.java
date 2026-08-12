@@ -107,6 +107,7 @@ public class MedalApiServiceImpl implements MedalApiService {
 		detail.setMedalCode(config.getMedalCode());
 		detail.setActionType(config.getActionType());
 		detail.setSortWeight(config.getSortWeight());
+		detail.setRewardCoin(config.getRewardCoin() == null ? 0 : config.getRewardCoin());
 		if (i18n != null) {
 			detail.setMedalName(i18n.getMedalName());
 			detail.setSlogan(i18n.getSlogan());
@@ -178,6 +179,7 @@ public class MedalApiServiceImpl implements MedalApiService {
 			item.setMedalCode(config.getMedalCode());
 			item.setIconUrl(mediaUrlService.sign(config.getIconKey()));
 			item.setUnlockTime(row.getUnlockTime());
+			item.setRewardCoin(config.getRewardCoin() == null ? 0 : config.getRewardCoin());
 			if (i18n != null) {
 				item.setMedalName(i18n.getMedalName());
 				item.setSlogan(i18n.getSlogan());

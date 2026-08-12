@@ -11,6 +11,7 @@ import java.util.List;
 public enum CoinBizTypeEnums {
 
 	TASK_REWARD("TASK_REWARD", "任务奖励"),
+	MEDAL_REWARD("MEDAL_REWARD", "勋章奖励"),
 	AD_BOOST("AD_BOOST", "广告加赠"),
 	SIGN_IN("SIGN_IN", "签到"),
 	WATCH_GIFT("WATCH_GIFT", "观影礼"),

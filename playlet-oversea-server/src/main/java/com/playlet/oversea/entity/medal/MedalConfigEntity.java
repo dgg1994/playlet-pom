@@ -35,6 +35,10 @@ public class MedalConfigEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "targetCount", value = "达标目标次数", dataType = "Integer")
 	private Integer targetCount;
 
+	@TableField("reward_coin")
+	@ApiModelProperty(name = "rewardCoin", value = "解锁奖励金币", dataType = "Integer")
+	private Integer rewardCoin;
+
 	@TableField("icon_key")
 	@ApiModelProperty(name = "iconKey", value = "已解锁图标七牛key", dataType = "String")
 	private String iconKey;

@@ -54,4 +54,7 @@ public class MedalDetailEntity {
 
 	@ApiModelProperty("排序权重")
 	private Integer sortWeight;
+
+	@ApiModelProperty("解锁奖励金币")
+	private Integer rewardCoin;
 }

@@ -27,4 +27,7 @@ public class MedalNotifyEntity {
 
 	@ApiModelProperty("解锁时间")
 	private Date unlockTime;
+
+	@ApiModelProperty("解锁奖励金币")
+	private Integer rewardCoin;
 }
