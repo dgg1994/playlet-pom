@@ -32,7 +32,10 @@ import com.playlet.internal.enums.VerifyStateEnums;
 import com.playlet.internal.query.drama.AddDramaQuery;
 import com.playlet.internal.query.drama.QueryDramaQuery;
 import com.playlet.internal.query.drama.UpdateDramaQuery;
-import com.playlet.internal.response.drama.DramaAssetRes;
+import com.playlet.internal.api.response.DramaAssetRespEntity;
+import com.playlet.internal.enums.DramaAssetAuditStatusEnums;
+import com.playlet.internal.enums.DramaAssetShelfStatusEnums;
+import com.playlet.internal.service.DramaAuditService;
 import com.playlet.internal.service.DramaService;
 import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.service.RankAlgoService;
@@ -70,6 +73,9 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 	@Autowired
 	private TheaterHomeCacheHelper theaterHomeCacheHelper;
 
+	@Autowired
+	private DramaAuditService dramaAuditService;
+
 	@Override
 	public ResponseBase addDrama(@Valid AddDramaQuery createPay, MultipartFile file) {
 		try {
@@ -82,6 +88,8 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			//新增短剧基础信息
 			entity.setRecommendedCarousel(RecommendedCarouselEnums.NOT_RECOMMENDED.getIndex());
 			entity.setVerifyStatus(VerifyStateEnums.REMOVED_SHELVES.getIndex());
+			entity.setAuditStatus(DramaAssetAuditStatusEnums.UNDER_REVIEW.getCode());
+			entity.setShelfStatus(DramaAssetShelfStatusEnums.OFF.getCode());
 			entity.setDeleteState(DeleteStateEnum.NORMAL.getIndex());
 			GenericityUtil.setDate(entity);
 			dramaDao.insert(entity);
@@ -99,6 +107,8 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			String url = QiniuUploadUtils.uploadFile(file,path);
 			entity.setCoverUrl(url);
 			dramaDao.updateById(entity);
+			// 剧评审：封面/简介/标签进入 AI 默认通过 + A/B 待审
+			dramaAuditService.initAuditSteps(entity.getId());
 			return setResultSuccess(entity,I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			log.error("service error", e);
@@ -114,6 +124,15 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			if(entity == null) {
 				return  setResultError(I18nUtil.getMessage("base_error"));
 			}
+			boolean metaChanged = false;
+			if (createPay.getDramaTitle() != null
+					&& !createPay.getDramaTitle().equals(entity.getDramaTitle())) {
+				metaChanged = true;
+			}
+			if (createPay.getDescriptionInfo() != null
+					&& !createPay.getDescriptionInfo().equals(entity.getDescriptionInfo())) {
+				metaChanged = true;
+			}
 			entity.setDramaTitle(createPay.getDramaTitle());
 			entity.setProducerFirm(createPay.getProducerFirm());
 			entity.setTotalEpisodes(createPay.getTotalEpisodes());
@@ -126,6 +145,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 				String path = String.format(Constants.FILE_UPLOAD_SITE, entity.getId());
 				String url = QiniuUploadUtils.uploadFile(file,path);
 				entity.setCoverUrl(url);
+				metaChanged = true;
 			}
 			if(createPay.getTagGroupIdList() != null && createPay.getTagGroupIdList().size() > 0) {
 				dramaTagRelDao.deleteByDramaId(entity.getId());
@@ -136,8 +156,20 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 					GenericityUtil.setDate(dramaTagRelEntity);
 					dramaTagRelDao.insert(dramaTagRelEntity);
 				}
+				metaChanged = true;
+			}
+			if (metaChanged) {
+				entity.setAuditStatus(DramaAssetAuditStatusEnums.UNDER_REVIEW.getCode());
+				entity.setShelfStatus(DramaAssetShelfStatusEnums.OFF.getCode());
+				entity.setVerifyStatus(VerifyStateEnums.REMOVED_SHELVES.getIndex());
+				entity.setAuditRejectReason(null);
+				entity.setAuditPassTime(null);
+				entity.setShelfTime(null);
 			}
 			dramaDao.updateById(entity);
+			if (metaChanged) {
+				dramaAuditService.initAuditSteps(entity.getId());
+			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			log.error("service error", e);
@@ -198,7 +230,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			}
 			if(VerifyStateEnums.AVAILABLE_NOW.getIndex().equals(verifyStatus)) {//发布视频
 				//查询是否已上传视频
-				List<DramaAssetRes> list = dramaAssetDao.findByDramaId(id);
+				List<DramaAssetRespEntity> list = dramaAssetDao.findByDramaId(id);
 				if(list == null || list.size() < 1) {
 					return  setResultError(I18nUtil.getMessage("video_not_release"));
 				}
@@ -257,7 +289,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			if(entity == null) {
 				return  setResultError(I18nUtil.getMessage("base_error"));
 			}
-			List<DramaAssetRes> list = dramaAssetDao.findByDramaId(id);
+			List<DramaAssetRespEntity> list = dramaAssetDao.findByDramaId(id);
 			return setResultSuccess(list, I18nUtil.getMessage("base_success")); 
 		} catch (Exception e) {
 			log.error("service error", e);
@@ -278,7 +310,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			entity.setTagList(tagList);
 			Integer uploadSetNum = dramaAssetDao.findByDramaIdNum(entity.getId());
 			entity.setUploadSetNum(uploadSetNum);
-			List<DramaAssetRes> list = dramaAssetDao.findByDramaId(id);
+			List<DramaAssetRespEntity> list = dramaAssetDao.findByDramaId(id);
 			entity.setVoideList(list);
 			entity.setCoverUrl(mediaUrlService.sign(entity.getCoverUrl()));
 			return setResultSuccess(entity, I18nUtil.getMessage("base_success")); 

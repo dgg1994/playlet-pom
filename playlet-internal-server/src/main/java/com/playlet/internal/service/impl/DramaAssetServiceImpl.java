@@ -7,14 +7,17 @@ import com.playlet.internal.dao.drama.DramaAssetDao;
 import com.playlet.internal.dao.drama.DramaDao;
 import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
+import com.playlet.internal.enums.DramaAssetAuditStatusEnums;
+import com.playlet.internal.enums.DramaAssetShelfStatusEnums;
 import com.playlet.internal.enums.DeleteStateEnum;
 import com.playlet.internal.enums.PublicEnums;
 import com.playlet.internal.enums.VideoDefinitionEnums;
 import com.playlet.internal.query.drama.AddDramaAssetQuery;
 import com.playlet.internal.query.drama.DramaVideoUploadTokenQuery;
-import com.playlet.internal.response.drama.DramaAssetReleaseResp;
-import com.playlet.internal.response.drama.DramaVideoUploadResp;
+import com.playlet.internal.api.response.DramaAssetReleaseRespEntity;
+import com.playlet.internal.api.response.DramaVideoUploadRespEntity;
 import com.playlet.internal.service.DramaAssetService;
+import com.playlet.internal.service.DramaAssetAuditService;
 import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
@@ -45,6 +48,9 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 	@Autowired
 	private MediaUrlService mediaUrlService;
 
+	@Autowired
+	private DramaAssetAuditService dramaAssetAuditService;
+
 	@Override
 	public ResponseBase uploadToken(@Valid @RequestBody DramaVideoUploadTokenQuery query) {
 		try {
@@ -52,7 +58,7 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			if (entity == null || DeleteStateEnum.DELETE.getIndex().equals(entity.getDeleteState())) {
 				return setResultError(I18nUtil.getMessage("drama_null"));
 			}
-			DramaVideoUploadResp cred = QiniuUploadUtils.createVideoUploadCredential(
+			DramaVideoUploadRespEntity cred = QiniuUploadUtils.createVideoUploadCredential(
 					query.getDramaId(), query.getSetNum(), query.getExt());
 			return setResultSuccess(cred, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
@@ -81,9 +87,40 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			}
 			// 多码率约定：库内存默认清晰度 key，如 oceans_720.m3u8；播放时再推导 360/480/720/1080
 			String newUrl = toDefaultMultiRateM3u8Key(key);
+			String videoName = StringUtils.isEmpty(createPay.getVideoName())
+					? key.substring(key.lastIndexOf('/') + 1) : createPay.getVideoName();
+
+			DramaAssetEntity existing = dramaAssetDao.findByDramaIdAndSetNum(entity.getId(), createPay.getSetNum());
+			if (existing != null) {
+				// 仅驳回后允许同集覆盖重传；审核中/已通过不可重复登记
+				if (existing.getAuditStatus() == null
+						|| !existing.getAuditStatus().equals(DramaAssetAuditStatusEnums.REJECTED.getCode())) {
+					return setResultError(I18nUtil.getMessage("base_info_exist"));
+				}
+				existing.setVideoName(videoName);
+				existing.setRemarkInfo(createPay.getRemarkInfo());
+				existing.setVideoType(entity.getVideoType());
+				existing.setVideoUrl(newUrl);
+				existing.setBelongUser(entity.getBelongUser());
+				existing.setVideoStatus(PublicEnums.ZERO.getIndex());
+				existing.setAuditStatus(DramaAssetAuditStatusEnums.UNDER_REVIEW.getCode());
+				existing.setShelfStatus(DramaAssetShelfStatusEnums.OFF.getCode());
+				existing.setAuditRejectReason(null);
+				existing.setAuditPassTime(null);
+				existing.setShelfTime(null);
+				GenericityUtil.updateDate(existing);
+				dramaAssetDao.updateById(existing);
+				dramaAssetAuditService.initAuditStepsOnRelease(existing.getId(), entity.getId());
+
+				DramaAssetReleaseRespEntity data = new DramaAssetReleaseRespEntity();
+				data.setId(existing.getId());
+				data.setKey(newUrl);
+				data.setVideoUrl(mediaUrlService.sign(newUrl));
+				return setResultSuccess(data, I18nUtil.getMessage("base_success"));
+			}
+
 			DramaAssetEntity assetEntity = new DramaAssetEntity();
-			assetEntity.setVideoName(StringUtils.isEmpty(createPay.getVideoName())
-					? key.substring(key.lastIndexOf('/') + 1) : createPay.getVideoName());
+			assetEntity.setVideoName(videoName);
 			assetEntity.setBelongUser(entity.getBelongUser());
 			assetEntity.setDeleteState(DeleteStateEnum.NORMAL.getIndex());
 			assetEntity.setDramaId(entity.getId());
@@ -91,10 +128,16 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			assetEntity.setSetNum(createPay.getSetNum());
 			assetEntity.setVideoType(entity.getVideoType());
 			assetEntity.setVideoUrl(newUrl);
-			assetEntity.setVideoStatus(PublicEnums.ONE.getIndex());
+			assetEntity.setVideoStatus(PublicEnums.ZERO.getIndex());
+			assetEntity.setAuditStatus(DramaAssetAuditStatusEnums.UNDER_REVIEW.getCode());
+			assetEntity.setShelfStatus(DramaAssetShelfStatusEnums.OFF.getCode());
+			assetEntity.setAuditRejectReason(null);
+			assetEntity.setAuditPassTime(null);
+			assetEntity.setShelfTime(null);
 			GenericityUtil.setDate(assetEntity);
 			dramaAssetDao.insert(assetEntity);
-			DramaAssetReleaseResp data = new DramaAssetReleaseResp();
+			dramaAssetAuditService.initAuditStepsOnRelease(assetEntity.getId(), entity.getId());
+			DramaAssetReleaseRespEntity data = new DramaAssetReleaseRespEntity();
 			data.setId(assetEntity.getId());
 			data.setKey(newUrl);
 			data.setVideoUrl(mediaUrlService.sign(newUrl));

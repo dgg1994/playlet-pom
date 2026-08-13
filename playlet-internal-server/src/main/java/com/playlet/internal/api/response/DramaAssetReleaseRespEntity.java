@@ -1,4 +1,4 @@
-package com.playlet.internal.response.drama;
+package com.playlet.internal.api.response;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -9,7 +9,7 @@ import lombok.Data;
  */
 @Data
 @ApiModel("剧集视频登记结果")
-public class DramaAssetReleaseResp {
+public class DramaAssetReleaseRespEntity {
 
 	@ApiModelProperty(value = "剧集资源主键 id", required = true)
 	private Integer id;

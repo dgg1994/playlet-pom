@@ -70,6 +70,26 @@ public class DramaAssetEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "videoStatus",value = "可用状态 1是0否",required = false,dataType = "Integer")
 	private Integer videoStatus;
 
+	@TableField("audit_status")
+	@ApiModelProperty(name = "auditStatus", value = "审核状态 0待审 1审核中 2通过 3驳回", required = false, dataType = "Integer")
+	private Integer auditStatus;
+
+	@TableField("shelf_status")
+	@ApiModelProperty(name = "shelfStatus", value = "上架状态 0未上架 1已上架", required = false, dataType = "Integer")
+	private Integer shelfStatus;
+
+	@TableField("audit_reject_reason")
+	@ApiModelProperty(name = "auditRejectReason", value = "驳回原因", required = false, dataType = "String")
+	private String auditRejectReason;
+
+	@TableField("audit_pass_time")
+	@ApiModelProperty(name = "auditPassTime", value = "审核通过时间", required = false, dataType = "Date")
+	private Date auditPassTime;
+
+	@TableField("shelf_time")
+	@ApiModelProperty(name = "shelfTime", value = "上架时间", required = false, dataType = "Date")
+	private Date shelfTime;
+
 	@TableField("delete_state")
 	@ApiModelProperty(name = "deleteState",value = "删除状态 1是0否",required = false,dataType = "Integer")
 	private Integer deleteState;

@@ -1,4 +1,4 @@
-package com.playlet.internal.response.drama;
+package com.playlet.internal.api.response;
 
 import java.util.Date;
 
@@ -6,7 +6,7 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 @Data
-public class DramaAssetRes {
+public class DramaAssetRespEntity {
 
 	@ApiModelProperty(name = "id",value = "主键",required = false,dataType = "Integer")
     private Integer id;
@@ -37,6 +37,21 @@ public class DramaAssetRes {
 	
 	@ApiModelProperty(name = "videoStatus",value = "可用状态 1是0否",required = false,dataType = "Integer")
 	private Integer videoStatus;
+
+	@ApiModelProperty(name = "auditStatus", value = "审核状态 0待审 1审核中 2通过 3驳回", required = false, dataType = "Integer")
+	private Integer auditStatus;
+
+	@ApiModelProperty(name = "shelfStatus", value = "上架状态 0未上架 1已上架", required = false, dataType = "Integer")
+	private Integer shelfStatus;
+
+	@ApiModelProperty(name = "auditRejectReason", value = "驳回原因", required = false, dataType = "String")
+	private String auditRejectReason;
+
+	@ApiModelProperty(name = "auditPassTime", value = "审核通过时间", required = false, dataType = "Date")
+	private Date auditPassTime;
+
+	@ApiModelProperty(name = "shelfTime", value = "上架时间", required = false, dataType = "Date")
+	private Date shelfTime;
 
 	@ApiModelProperty(name = "deleteState",value = "删除状态 1是0否",required = false,dataType = "Integer")
 	private Integer deleteState;

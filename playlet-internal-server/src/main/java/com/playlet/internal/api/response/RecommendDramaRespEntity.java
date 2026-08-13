@@ -1,10 +1,10 @@
-package com.playlet.internal.response.drama;
+package com.playlet.internal.api.response;
 import com.baomidou.mybatisplus.annotation.TableField;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 @Data
-public class RecommendDramaRes {
+public class RecommendDramaRespEntity {
 	
 	@ApiModelProperty(name = "id",value = "主键",required = false,dataType = "Integer")
     private Integer id;
@@ -46,7 +46,7 @@ public class RecommendDramaRes {
 	@ApiModelProperty(name = "isAi",value = "是否ai生成 1是0否",required = false,dataType = "Integer")
 	private Integer isAi;
 	
-	@ApiModelProperty(name = "vidoeRes",value = "视频内容",required = false,dataType = "RecommendVidoeRes")
-	private RecommendVidoeRes vidoeRes;
+	@ApiModelProperty(name = "vidoeRes",value = "视频内容",required = false,dataType = "RecommendVidoeRespEntity")
+	private RecommendVidoeRespEntity vidoeRes;
 
 }

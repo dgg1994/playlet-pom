@@ -5,7 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
-import com.playlet.internal.response.drama.DramaAssetRes;
+import com.playlet.internal.api.response.DramaAssetRespEntity;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -94,6 +94,26 @@ public class DramaEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "verifyStatus",value = "是否上架 1是0否 0下架1上架",required = false,dataType = "Integer")
 	private Integer verifyStatus;
 
+	@TableField("audit_status")
+	@ApiModelProperty(name = "auditStatus", value = "剧评审状态 0待审 1审核中 2通过 3驳回", required = false, dataType = "Integer")
+	private Integer auditStatus;
+
+	@TableField("shelf_status")
+	@ApiModelProperty(name = "shelfStatus", value = "剧上架状态 0未上架 1已上架", required = false, dataType = "Integer")
+	private Integer shelfStatus;
+
+	@TableField("audit_reject_reason")
+	@ApiModelProperty(name = "auditRejectReason", value = "剧评审驳回原因", required = false, dataType = "String")
+	private String auditRejectReason;
+
+	@TableField("audit_pass_time")
+	@ApiModelProperty(name = "auditPassTime", value = "剧评审通过时间", required = false, dataType = "Date")
+	private Date auditPassTime;
+
+	@TableField("shelf_time")
+	@ApiModelProperty(name = "shelfTime", value = "剧上架时间", required = false, dataType = "Date")
+	private Date shelfTime;
+
 	@TableField("delete_state")
 	@ApiModelProperty(name = "deleteState",value = "1是0否",required = false,dataType = "Integer")
 	private Integer deleteState;
@@ -143,7 +163,11 @@ public class DramaEntity extends PageQueryHelperEntity {
 	private String tagGroupId;
 
 	@TableField(exist = false)
-	@ApiModelProperty(name = "voideList",value = "已上传视频",required = false,dataType = "List<DramaAssetRes>")
-	private List<DramaAssetRes> voideList;
+	@ApiModelProperty(name = "voideList",value = "已上传视频",required = false,dataType = "List<DramaAssetRespEntity>")
+	private List<DramaAssetRespEntity> voideList;
+
+	@TableField(exist = false)
+	@ApiModelProperty(name = "dramaSteps", value = "剧评审步骤：AI / A组 / B组", required = false)
+	private List<DramaAuditStepEntity> dramaSteps;
 
 }

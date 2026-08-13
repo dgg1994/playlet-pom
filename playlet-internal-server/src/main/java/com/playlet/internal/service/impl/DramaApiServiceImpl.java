@@ -40,10 +40,10 @@ import com.playlet.internal.enums.VerifyStateEnums;
 import com.playlet.internal.enums.VideoDefinitionEnums;
 import com.playlet.internal.query.drama.BatchVideoDownloadQuery;
 import com.playlet.internal.query.drama.RecommendDramaQuery;
-import com.playlet.internal.response.drama.DramaAssetRes;
-import com.playlet.internal.response.drama.RecommendDramaRes;
-import com.playlet.internal.response.drama.RecommendPageResp;
-import com.playlet.internal.response.drama.RecommendVidoeRes;
+import com.playlet.internal.api.response.DramaAssetRespEntity;
+import com.playlet.internal.api.response.RecommendDramaRespEntity;
+import com.playlet.internal.api.response.RecommendPageRespEntity;
+import com.playlet.internal.api.response.RecommendVidoeRespEntity;
 import com.playlet.internal.service.DramaApiService;
 import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.utils.AppTokenUtil;
@@ -88,10 +88,10 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             int deleteState = DeleteStateEnum.NORMAL.getIndex();
             entity.setDeleteState(deleteState);
             entity.setVerifyStatus(VerifyStateEnums.AVAILABLE_NOW.getIndex());
-            List<RecommendDramaRes> list = dramaDao.recommendList(entity);
+            List<RecommendDramaRespEntity> list = dramaDao.recommendList(entity);
             if (list != null && !list.isEmpty()) {
                 // 获取资源id列表
-                List<Integer> dramaIds = list.stream().map(RecommendDramaRes::getId).collect(Collectors.toList());
+                List<Integer> dramaIds = list.stream().map(RecommendDramaRespEntity::getId).collect(Collectors.toList());
                 // 查看资源的第一集
                 List<DramaAssetEntity> firstAssets = dramaAssetDao.findFirstAssetsByDramaIds(dramaIds, deleteState);
                 Map<Integer, DramaAssetEntity> assetByDramaId = firstAssets == null ? Collections.emptyMap()
@@ -118,14 +118,14 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
                     }
                 }
 
-                for (RecommendDramaRes dramaRes : list) {
+                for (RecommendDramaRespEntity dramaRes : list) {
                     dramaRes.setCoverUrl(mediaUrlService.sign(dramaRes.getCoverUrl()));
                     DramaAssetEntity asset = assetByDramaId.get(dramaRes.getId());
                     if (asset == null) {
                         continue;
                     }
                     // 转换为推荐视频
-                    RecommendVidoeRes vidoeRes = toRecommendVideoRes(asset);
+                    RecommendVidoeRespEntity vidoeRes = toRecommendVideoRes(asset);
                     vidoeRes.setCollectScore(dramaRes.getCollectScore());
                     vidoeRes.setShareScore(dramaRes.getShareScore());
                     vidoeRes.setVideoUrl(null);
@@ -143,7 +143,7 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
                     dramaRes.setVidoeRes(vidoeRes);
                 }
             }
-            RecommendPageResp resp = new RecommendPageResp();
+            RecommendPageRespEntity resp = new RecommendPageRespEntity();
             resp.setSeed(entity.getSeed());
             resp.setPage(new PageInfo<>(list));
             return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
@@ -158,8 +158,8 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
      * @param asset 资源
      * @return
      */
-    private static RecommendVidoeRes toRecommendVideoRes(DramaAssetEntity asset) {
-        RecommendVidoeRes res = new RecommendVidoeRes();
+    private static RecommendVidoeRespEntity toRecommendVideoRes(DramaAssetEntity asset) {
+        RecommendVidoeRespEntity res = new RecommendVidoeRespEntity();
         res.setId(asset.getId());
         res.setVideoName(asset.getVideoName());
         res.setSetNum(asset.getSetNum());
@@ -205,12 +205,12 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
     public ResponseBase selections(Integer id, HttpServletRequest request) {
         try {
             Integer uid = AppTokenUtil.resolveUid(request);
-            List<DramaAssetRes> list = dramaAssetDao.findByDramaId(id);
+            List<DramaAssetRespEntity> list = dramaAssetDao.findByDramaId(id);
             if (list == null || list.isEmpty()) {
                 return setResultSuccess(list, I18nUtil.getMessage("base_success"));
             }
             if (uid == null) {
-                for (DramaAssetRes item : list) {
+                for (DramaAssetRespEntity item : list) {
                     item.setIsLike(PublicEnums.ZERO.getIndex());
                     item.setIsCollect(PublicEnums.ZERO.getIndex());
                 }
@@ -228,7 +228,7 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
                     : likedRows.stream()
                     .map(UserDramaLikeEntity::getEpisodeId)
                     .collect(Collectors.toSet());
-            for (DramaAssetRes item : list) {
+            for (DramaAssetRespEntity item : list) {
                 item.setIsLike(likedEpisodeIds.contains(String.valueOf(item.getId()))
                         ? PublicEnums.ONE.getIndex() : PublicEnums.ZERO.getIndex());
                 item.setIsCollect(isCollect);
@@ -464,9 +464,9 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
     @Override
     public ResponseBase relatedWork(Integer id) {
         try {
-            List<RecommendDramaRes> list = dramaDao.relatedWork(id, DeleteStateEnum.NORMAL.getIndex(), VerifyStateEnums.AVAILABLE_NOW.getIndex());
+            List<RecommendDramaRespEntity> list = dramaDao.relatedWork(id, DeleteStateEnum.NORMAL.getIndex(), VerifyStateEnums.AVAILABLE_NOW.getIndex());
             if (list != null) {
-                for (RecommendDramaRes item : list) {
+                for (RecommendDramaRespEntity item : list) {
                     item.setCoverUrl(mediaUrlService.sign(item.getCoverUrl()));
                 }
             }
@@ -480,10 +480,10 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
     @Override
     public ResponseBase playVideo(Integer id) {
         try {
-            RecommendDramaRes dramaRes = dramaDao.findById(id);
+            RecommendDramaRespEntity dramaRes = dramaDao.findById(id);
             if (dramaRes != null) {
                 dramaRes.setCoverUrl(mediaUrlService.sign(dramaRes.getCoverUrl()));
-                RecommendVidoeRes vidoeRes = dramaAssetDao.findDramaIdOne(dramaRes.getId(), DeleteStateEnum.NORMAL.getIndex());
+                RecommendVidoeRespEntity vidoeRes = dramaAssetDao.findDramaIdOne(dramaRes.getId(), DeleteStateEnum.NORMAL.getIndex());
                 vidoeRes.setCollectScore(dramaRes.getCollectScore());
                 vidoeRes.setShareScore(dramaRes.getShareScore());
                 if (vidoeRes.getVideoUrl() != null) {

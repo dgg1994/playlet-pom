@@ -3,7 +3,7 @@ package com.playlet.internal.utils;
 import com.playlet.internal.config.QiniuConfig;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.RedisKeyConstants;
-import com.playlet.internal.response.drama.DramaVideoUploadResp;
+import com.playlet.internal.api.response.DramaVideoUploadRespEntity;
 import com.qiniu.http.Response;
 import com.qiniu.storage.BucketManager;
 import com.qiniu.storage.Configuration;
@@ -145,7 +145,7 @@ public class QiniuUploadUtils {
 	 * 生成剧集视频前端直传凭证（UploadToken 绑定固定 key）。
 	 * key 形如 VD_{dramaId}/EP_{setNum}/{uuid}.{ext}
 	 */
-	public static DramaVideoUploadResp createVideoUploadCredential(Integer dramaId, Integer setNum, String ext) {
+	public static DramaVideoUploadRespEntity createVideoUploadCredential(Integer dramaId, Integer setNum, String ext) {
 		return getInstance().doCreateVideoUploadCredential(dramaId, setNum, ext);
 	}
 
@@ -159,7 +159,7 @@ public class QiniuUploadUtils {
 
 	// ==================== 实例方法 ====================
 
-	private DramaVideoUploadResp doCreateVideoUploadCredential(Integer dramaId, Integer setNum, String ext) {
+	private DramaVideoUploadRespEntity doCreateVideoUploadCredential(Integer dramaId, Integer setNum, String ext) {
 		if (dramaId == null || setNum == null) {
 			throw new RuntimeException("dramaId/setNum 不能为空");
 		}
@@ -172,7 +172,7 @@ public class QiniuUploadUtils {
 			expire = 3600L;
 		}
 		String token = qiniuAuth.uploadToken(qiniuConfig.getBucket(), key, expire, null);
-		DramaVideoUploadResp resp = new DramaVideoUploadResp();
+		DramaVideoUploadRespEntity resp = new DramaVideoUploadRespEntity();
 		resp.setUploadToken(token);
 		resp.setKey(key);
 		resp.setDomain(qiniuConfig.getDomain());

@@ -2,8 +2,8 @@ package com.playlet.internal.dao.drama;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.playlet.internal.entity.drama.DramaAssetEntity;
-import com.playlet.internal.response.drama.DramaAssetRes;
-import com.playlet.internal.response.drama.RecommendVidoeRes;
+import com.playlet.internal.api.response.DramaAssetRespEntity;
+import com.playlet.internal.api.response.RecommendVidoeRespEntity;
 
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -17,16 +17,22 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 
 	/** 按剧取一条可用资源（未删除且 video_status=1） */
 	@Select("select * from drama_asset where drama_id = #{dramaId} "
-			+ "and video_status = 1 and delete_state = 0 order by id desc limit 1")
+			+ "and video_status = 1 and shelf_status = 1 and delete_state = 0 order by id desc limit 1")
 	DramaAssetEntity findEnabledByDramaId(@Param("dramaId") Integer dramaId);
 
 	@Select("<script>"
 			+ "select * from drama_asset where delete_state = 0 "
 			+ "<if test='dramaId != null'> and drama_id = #{dramaId} </if>"
 			+ "<if test='videoStatus != null'> and video_status = #{videoStatus} </if>"
+			+ "<if test='auditStatus != null'> and audit_status = #{auditStatus} </if>"
+			+ "<if test='shelfStatus != null'> and shelf_status = #{shelfStatus} </if>"
 			+ "order by id desc"
 			+ "</script>")
 	List<DramaAssetEntity> findAdminList(DramaAssetEntity entity);
+
+	@Select("select * from drama_asset where drama_id = #{dramaId} and set_num = #{setNum} "
+			+ "and ifnull(delete_state, 0) = 0 order by id desc limit 1")
+	DramaAssetEntity findByDramaIdAndSetNum(@Param("dramaId") Integer dramaId, @Param("setNum") Integer setNum);
 
 	@Update("update drama_asset set delete_state = #{deleteState} where drama_id = #{dramaId}")
 	void updateDramaIdDeleteState(@Param("dramaId") Integer dramaId,@Param("deleteState") Integer deleteState);
@@ -34,11 +40,13 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 	@Select("select ifnull(count(*),0) from drama_asset where drama_id = #{dramaId}")
 	Integer findByDramaIdNum(@Param("dramaId") Integer dramaId);
 
-	@Select("select * from drama_asset where drama_id = #{dramaId} order by set_num")
-	List<DramaAssetRes> findByDramaId(@Param("dramaId") Integer dramaId);
+	@Select("select * from drama_asset where drama_id = #{dramaId} and delete_state = 0 "
+			+ "and video_status = 1 and shelf_status = 1 order by set_num")
+	List<DramaAssetRespEntity> findByDramaId(@Param("dramaId") Integer dramaId);
 
-	@Select("SELECT * from drama_asset where drama_id = #{dramaId} and delete_state = #{deleteState} order by set_num limit 1")
-	RecommendVidoeRes findDramaIdOne(@Param("dramaId") Integer dramaId,@Param("deleteState") Integer deleteState);
+	@Select("SELECT * from drama_asset where drama_id = #{dramaId} and delete_state = #{deleteState} "
+			+ "and video_status = 1 and shelf_status = 1 order by set_num limit 1")
+	RecommendVidoeRespEntity findDramaIdOne(@Param("dramaId") Integer dramaId,@Param("deleteState") Integer deleteState);
 
 	/** 批量取每部剧 set_num 最小的一集（推荐流装配，避免 N+1） */
 	@Select("<script>"

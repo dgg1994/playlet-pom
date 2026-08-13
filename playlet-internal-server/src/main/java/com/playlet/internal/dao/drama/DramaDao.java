@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.query.drama.QueryDramaQuery;
 import com.playlet.internal.query.drama.RecommendDramaQuery;
-import com.playlet.internal.response.drama.RecommendDramaRes;
+import com.playlet.internal.api.response.RecommendDramaRespEntity;
 
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -119,7 +119,7 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 
 	@Select("SELECT * FROM drama WHERE delete_state = #{deleteState} AND verify_status = #{verifyStatus} "
 			+ "ORDER BY CRC32(CONCAT(id, #{seed})), id")
-	List<RecommendDramaRes> recommendList(RecommendDramaQuery entity);
+	List<RecommendDramaRespEntity> recommendList(RecommendDramaQuery entity);
 
 	@Select("SELECT * from drama where id = (SELECT drama_id from drama_asset where id = #{id})")
 	DramaEntity findByVideoId(@Param("id") Integer id);
@@ -142,10 +142,10 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 	        + "        )"
 	        + "  ) "
 	        + "LIMIT 20")
-	List<RecommendDramaRes> relatedWork(@Param("id") Integer id,@Param("deleteState") Integer deleteState,@Param("verifyStatus") Integer verifyStatus);
+	List<RecommendDramaRespEntity> relatedWork(@Param("id") Integer id,@Param("deleteState") Integer deleteState,@Param("verifyStatus") Integer verifyStatus);
 
 	@Select("select * from drama where id = #{id}")
-	RecommendDramaRes findById(@Param("id") Integer id);
+	RecommendDramaRespEntity findById(@Param("id") Integer id);
 
 	@Select("select d.* from drama d "
 			+ "inner join rank_list rl on d.id = rl.drama_id "

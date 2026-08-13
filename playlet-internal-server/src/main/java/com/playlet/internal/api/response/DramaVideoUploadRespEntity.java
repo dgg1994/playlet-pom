@@ -1,4 +1,4 @@
-package com.playlet.internal.response.drama;
+package com.playlet.internal.api.response;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -9,7 +9,7 @@ import lombok.Data;
  */
 @Data
 @ApiModel("剧集视频七牛直传凭证")
-public class DramaVideoUploadResp {
+public class DramaVideoUploadRespEntity {
 
 	@ApiModelProperty(value = "七牛 UploadToken", required = true)
 	private String uploadToken;

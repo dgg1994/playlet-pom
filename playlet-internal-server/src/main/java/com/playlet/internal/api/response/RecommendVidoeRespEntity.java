@@ -1,10 +1,10 @@
-package com.playlet.internal.response.drama;
+package com.playlet.internal.api.response;
 
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 @Data
-public class RecommendVidoeRes {
+public class RecommendVidoeRespEntity {
 	
 	@ApiModelProperty(name = "id",value = "视频id",required = true,dataType = "String")
 	private Integer id;

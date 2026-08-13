@@ -28,7 +28,9 @@ public interface DramaAssetService {
 	 */
 	@PostMapping("/release")
 	@ApiOperation(value = "登记剧集视频", notes = "body: {dramaId, setNum, key, videoName?, remarkInfo?}。"
-			+ "校验 key 前缀并确认对象存在后写入 drama_asset。")
+			+ "校验 key 前缀并确认对象存在后写入 drama_asset。"
+			+ "同剧同集若已驳回则覆盖重传并重置 AI/A/B；审核中或已通过不可重复登记。"
+			+ "上传成功后 AI 默认通过，进入 A/B 审核；A/B 均通过后自动上架。")
 	ResponseBase addDrama(AddDramaAssetQuery entity);
 
 	/**

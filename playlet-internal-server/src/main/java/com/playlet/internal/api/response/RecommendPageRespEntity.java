@@ -1,4 +1,4 @@
-package com.playlet.internal.response.drama;
+package com.playlet.internal.api.response;
 
 import com.github.pagehelper.PageInfo;
 
@@ -8,11 +8,11 @@ import lombok.Data;
 
 @Data
 @ApiModel("推荐分页结果")
-public class RecommendPageResp {
+public class RecommendPageRespEntity {
 
 	@ApiModelProperty("会话随机种子，翻页时原样回传以保证不重复")
 	private String seed;
 
 	@ApiModelProperty("分页结果")
-	private PageInfo<RecommendDramaRes> page;
+	private PageInfo<RecommendDramaRespEntity> page;
 }
