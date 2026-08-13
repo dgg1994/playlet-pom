@@ -118,6 +118,20 @@ public class SensitiveWordManageServiceImpl implements SensitiveWordManageServic
 	}
 
 	@Override
+	public ResponseBase delete(Integer id) {
+		if (id == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		SensitiveWordEntity entity = sensitiveWordDao.selectById(id);
+		if (entity == null) {
+			return setResultError(I18nUtil.getMessage("base_data_null"));
+		}
+		sensitiveWordDao.deleteById(id);
+		sensitiveWordService.reload();
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
 	@SysLogAnnotation(module = "敏感词管理", type = "POST", remark = "刷新词库")
 	public ResponseBase reload() {
 		sensitiveWordService.reload();
