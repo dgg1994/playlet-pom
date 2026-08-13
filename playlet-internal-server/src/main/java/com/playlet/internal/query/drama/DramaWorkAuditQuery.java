@@ -26,4 +26,7 @@ public class DramaWorkAuditQuery extends PageQueryHelperEntity {
 
 	@ApiModelProperty(name = "auditStatus", value = "审核状态：0待审 1审核中 2通过 3驳回", required = false, dataType = "Integer")
 	private Integer auditStatus;
+
+	@ApiModelProperty(name = "langue", value = "标签语言，如 zh-cn；空则取请求头 x-playlet-language", required = false, dataType = "String")
+	private String langue;
 }

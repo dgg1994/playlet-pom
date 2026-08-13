@@ -7,6 +7,7 @@ import com.playlet.internal.api.response.DramaAssetAuditEpisodeRespEntity;
 import com.playlet.internal.api.response.DramaAuditDetailRespEntity;
 import com.playlet.internal.api.response.DramaWorkAuditListRespEntity;
 import com.playlet.internal.base.ResponseBase;
+import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.drama.*;
 import com.playlet.internal.entity.drama.DramaAssetAuditStepEntity;
@@ -63,6 +64,8 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
     @Autowired
     private DramaAssetAuditService dramaAssetAuditService;
     @Autowired
+    private TagDao tagDao;
+    @Autowired
     private MediaUrlService mediaUrlService;
 
     @Override
@@ -74,8 +77,14 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
         PageHelper.startPage(query.getPageNumber(), query.getPageSize());
         List<DramaWorkAuditListRespEntity> list = dramaWorkAuditDao.findDramaList(query);
         if (list != null) {
+            String language = StringUtils.isEmpty(query.getLangue())
+                    ? LanguageContext.getLanguage()
+                    : query.getLangue();
             for (DramaWorkAuditListRespEntity item : list) {
                 item.setCoverUrl(mediaUrlService.sign(item.getCoverUrl()));
+                if (item.getDramaId() != null) {
+                    item.setTagList(tagDao.findGroupLang(language, item.getDramaId()));
+                }
             }
         }
         return setResultSuccess(new PageInfo<>(list), I18nUtil.getMessage("base_success"));

@@ -17,7 +17,10 @@ public interface DramaWorkAuditDao {
 	 */
 	@Select("<script>"
 			+ "select d.id as bizId, d.id as dramaId, cast(null as signed) as assetId, 1 as workType,"
-			+ "  d.drama_title as workName, d.cover_url as coverUrl, d.audit_status as auditStatus,"
+			+ "  d.drama_title as workName, d.cover_url as coverUrl,"
+			+ "  d.description_info as descriptionInfo, d.producer_firm as producerFirm,"
+			+ "  d.audit_status as auditStatus, ifnull(d.shelf_status, 0) as shelfStatus,"
+			+ "  d.audit_reject_reason as auditRejectReason,"
 			+ "  ifnull(ai.status, 0) as aiStatus, ai.handle_remark as aiHandleRemark,"
 			+ "  ifnull(ga.status, 0) as groupAStatus, ga.handle_remark as groupAHandleRemark,"
 			+ "  ifnull(gb.status, 0) as groupBStatus, gb.handle_remark as groupBHandleRemark,"
