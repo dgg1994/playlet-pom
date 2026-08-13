@@ -82,6 +82,23 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
     }
 
     @Override
+    @SysLogAnnotation(module = "作品评审", type = "POST", remark = "短剧集列表")
+    public ResponseBase findEpisodeList(@RequestBody DramaWorkAuditQuery query) {
+        if (query == null) {
+            query = new DramaWorkAuditQuery();
+        }
+        PageHelper.startPage(query.getPageNumber(), query.getPageSize());
+        List<DramaWorkAuditListRespEntity> list = dramaWorkAuditDao.findEpisodeList(query);
+        if (list != null) {
+            for (DramaWorkAuditListRespEntity item : list) {
+                item.setCoverUrl(mediaUrlService.sign(item.getCoverUrl()));
+                item.setVideoUrl(mediaUrlService.signVideo(item.getVideoUrl()));
+            }
+        }
+        return setResultSuccess(new PageInfo<>(list), I18nUtil.getMessage("base_success"));
+    }
+
+    @Override
     @SysLogAnnotation(module = "作品评审", type = "POST", remark = "剧评审详情")
     public ResponseBase dramaDetail(@RequestBody DramaEntity entity) {
         if (entity == null || entity.getId() == null) {
@@ -125,6 +142,7 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
                 episode.setSteps(stepsByAssetId.getOrDefault(item.getAssetId(), Collections.emptyList()));
                 episodeList.add(episode);
             }
+            episodeList.sort(Comparator.comparing(e -> e.getSetNum() == null ? 0 : e.getSetNum()));
         }
 
         // 获取集信息

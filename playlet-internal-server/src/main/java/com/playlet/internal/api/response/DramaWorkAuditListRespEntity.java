@@ -23,6 +23,9 @@ public class DramaWorkAuditListRespEntity {
 	@ApiModelProperty("展示名称")
 	private String workName;
 
+	@ApiModelProperty("所属剧名（集列表）")
+	private String dramaTitle;
+
 	@ApiModelProperty("封面URL（签过名，可访问）")
 	private String coverUrl;
 
@@ -39,13 +42,22 @@ public class DramaWorkAuditListRespEntity {
 	private Integer auditStatus;
 
 	@ApiModelProperty("AI预审状态")
-	private Integer aiStatus;
+	private Integer aiStatus = 0;
+
+	@ApiModelProperty("AI预审备注")
+	private String aiHandleRemark;
 
 	@ApiModelProperty("A组状态")
-	private Integer groupAStatus;
+	private Integer groupAStatus = 0;
+
+	@ApiModelProperty("A组审核备注")
+	private String groupAHandleRemark;
 
 	@ApiModelProperty("B组状态")
-	private Integer groupBStatus;
+	private Integer groupBStatus = 0;
+
+	@ApiModelProperty("B组审核备注")
+	private String groupBHandleRemark;
 
 	@ApiModelProperty("上传/创建日期")
 	private Date uploadDate;

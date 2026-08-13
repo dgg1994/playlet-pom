@@ -18,7 +18,9 @@ public interface DramaWorkAuditDao {
 	@Select("<script>"
 			+ "select d.id as bizId, d.id as dramaId, cast(null as signed) as assetId, 1 as workType,"
 			+ "  d.drama_title as workName, d.cover_url as coverUrl, d.audit_status as auditStatus,"
-			+ "  ai.status as aiStatus, ga.status as groupAStatus, gb.status as groupBStatus,"
+			+ "  ifnull(ai.status, 0) as aiStatus, ai.handle_remark as aiHandleRemark,"
+			+ "  ifnull(ga.status, 0) as groupAStatus, ga.handle_remark as groupAHandleRemark,"
+			+ "  ifnull(gb.status, 0) as groupBStatus, gb.handle_remark as groupBHandleRemark,"
 			+ "  d.setTime as uploadDate"
 			+ " from drama d"
 			+ " left join drama_audit_step ai on ai.drama_id = d.id and ai.step_type = 1"
@@ -37,14 +39,17 @@ public interface DramaWorkAuditDao {
 	List<DramaWorkAuditListRespEntity> findDramaList(@Param("q") DramaWorkAuditQuery q);
 
 	/**
-	 * 集评审列表：按剧过滤，附带 AI/A/B 步骤状态。
+	 * 集评审列表：剧名检索、审核状态/页签筛选，附带 AI/A/B 步骤状态。
 	 */
 	@Select("<script>"
 			+ "select a.id as bizId, a.drama_id as dramaId, a.id as assetId, 2 as workType,"
 			+ "  concat(ifnull(d.drama_title, ''), ' ', lpad(ifnull(a.set_num, 0), 2, '0')) as workName,"
+			+ "  d.drama_title as dramaTitle,"
 			+ "  d.cover_url as coverUrl, a.set_num as setNum, a.video_name as videoName, a.video_url as videoUrl,"
 			+ "  a.audit_status as auditStatus,"
-			+ "  ai.status as aiStatus, ga.status as groupAStatus, gb.status as groupBStatus,"
+			+ "  ifnull(ai.status, 0) as aiStatus, ai.handle_remark as aiHandleRemark,"
+			+ "  ifnull(ga.status, 0) as groupAStatus, ga.handle_remark as groupAHandleRemark,"
+			+ "  ifnull(gb.status, 0) as groupBStatus, gb.handle_remark as groupBHandleRemark,"
 			+ "  a.setTime as uploadDate"
 			+ " from drama_asset a"
 			+ " left join drama d on d.id = a.drama_id"
@@ -53,6 +58,9 @@ public interface DramaWorkAuditDao {
 			+ " left join drama_asset_audit_step gb on gb.asset_id = a.id and gb.step_type = 3"
 			+ " where ifnull(a.delete_state, 0) = 0"
 			+ " <if test='q.dramaId != null'> and a.drama_id = #{q.dramaId} </if>"
+			+ " <if test='q.dramaTitle != null and q.dramaTitle != \"\"'> "
+			+ "   and d.drama_title like concat('%', #{q.dramaTitle}, '%') "
+			+ " </if>"
 			+ " <if test='q.keyword != null and q.keyword != \"\"'> "
 			+ "   and (d.drama_title like concat('%', #{q.keyword}, '%') "
 			+ "     or concat(ifnull(d.drama_title, ''), ' ', lpad(ifnull(a.set_num, 0), 2, '0')) like concat('%', #{q.keyword}, '%')) "
@@ -62,7 +70,7 @@ public interface DramaWorkAuditDao {
 			+ " <if test='q.listTab != null and q.listTab == 3'> and a.audit_status = 2 </if>"
 			+ " <if test='q.listTab != null and q.listTab == 4'> and a.audit_status = 3 </if>"
 			+ " <if test='q.auditStatus != null'> and a.audit_status = #{q.auditStatus} </if>"
-			+ " order by a.set_num asc, a.id asc"
+			+ " order by a.setTime desc, a.id desc"
 			+ "</script>")
 	List<DramaWorkAuditListRespEntity> findEpisodeList(@Param("q") DramaWorkAuditQuery q);
 }

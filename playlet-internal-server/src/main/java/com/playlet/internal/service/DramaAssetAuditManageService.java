@@ -24,6 +24,10 @@ public interface DramaAssetAuditManageService {
 	@ApiOperation("作品管理列表（仅剧：含封面 + 审核状态，按页签筛选）")
 	ResponseBase findList(DramaWorkAuditQuery query);
 
+	@PostMapping("/findEpisodeList")
+	@ApiOperation("短剧集列表（剧名检索 + 审核状态/页签筛选）")
+	ResponseBase findEpisodeList(DramaWorkAuditQuery query);
+
 	@PostMapping("/dramaDetail")
 	@ApiOperation("剧评审详情（剧信息 + dramaSteps + 集列表及每集 steps）")
 	ResponseBase dramaDetail(DramaEntity entity);
