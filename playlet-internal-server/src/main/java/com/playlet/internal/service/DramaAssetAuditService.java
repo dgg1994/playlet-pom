@@ -8,7 +8,7 @@ public interface DramaAssetAuditService {
 	void initAuditStepsOnRelease(Integer assetId, Integer dramaId);
 
 	/**
-	 * 按步骤重算聚合状态；满足条件时自动上架。
+	 * 按步骤重算聚合审核状态；过审不自动上架，驳回/待审强制下架并 sync 剧。
 	 */
 	void refreshAggregateAndAutoShelf(Integer assetId);
 }

@@ -10,8 +10,10 @@ import com.playlet.internal.enums.DramaAssetAuditStepTypeEnums;
 import com.playlet.internal.enums.DramaAssetShelfStatusEnums;
 import com.playlet.internal.enums.PublicEnums;
 import com.playlet.internal.service.DramaAssetAuditService;
+import com.playlet.internal.service.DramaAuditService;
 import com.playlet.internal.utils.GenericityUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +28,9 @@ public class DramaAssetAuditServiceImpl implements DramaAssetAuditService {
 	private DramaAssetDao dramaAssetDao;
 	@Autowired
 	private DramaAssetAuditStepDao dramaAssetAuditStepDao;
+	@Lazy
+	@Autowired
+	private DramaAuditService dramaAuditService;
 
 	@Override
 	public void initAuditStepsOnRelease(Integer assetId, Integer dramaId) {
@@ -116,16 +121,15 @@ public class DramaAssetAuditServiceImpl implements DramaAssetAuditService {
                 asset.setShelfTime(null);
                 asset.setAuditPassTime(null);
                 dramaAssetDao.updateById(asset);
+                dramaAuditService.syncDramaShelfByEpisodes(asset.getDramaId());
                 return;
             }
             // 通过
             if (allPass) {
+                // 过审 ≠ 上架：创作者/运营再点集上架
                 asset.setAuditStatus(DramaAssetAuditStatusEnums.APPROVED.getCode());
                 asset.setAuditRejectReason(null);
                 asset.setAuditPassTime(now);
-                asset.setShelfStatus(DramaAssetShelfStatusEnums.ON.getCode());
-                asset.setShelfTime(now);
-                asset.setVideoStatus(PublicEnums.ONE.getIndex());
                 dramaAssetDao.updateById(asset);
                 return;
             }
@@ -137,6 +141,7 @@ public class DramaAssetAuditServiceImpl implements DramaAssetAuditService {
             asset.setShelfTime(null);
             asset.setVideoStatus(PublicEnums.ZERO.getIndex());
             dramaAssetDao.updateById(asset);
+            dramaAuditService.syncDramaShelfByEpisodes(asset.getDramaId());
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

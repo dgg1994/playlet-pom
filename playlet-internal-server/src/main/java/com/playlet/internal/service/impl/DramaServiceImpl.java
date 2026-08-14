@@ -225,26 +225,24 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 	public ResponseBase verifyStatus(Integer id, Integer verifyStatus) {
 		try {
 			DramaEntity entity = dramaDao.selectById(id);
-			if(entity == null) {
-				return  setResultError(I18nUtil.getMessage("base_error"));
+			if (entity == null) {
+				return setResultError(I18nUtil.getMessage("base_error"));
 			}
-			if(VerifyStateEnums.AVAILABLE_NOW.getIndex().equals(verifyStatus)) {//发布视频
-				//查询是否已上传视频
-				List<DramaAssetRespEntity> list = dramaAssetDao.findByDramaId(id);
-				if(list == null || list.size() < 1) {
-					return  setResultError(I18nUtil.getMessage("video_not_release"));
-				}
-			}
-			entity.setVerifyStatus(verifyStatus);
-			dramaDao.updateById(entity);
-			// 上架后立即刷新新剧榜，避免等待定时任务
 			if (VerifyStateEnums.AVAILABLE_NOW.getIndex().equals(verifyStatus)) {
-				try {
-					rankAlgoService.refreshNewBoard();
-				} catch (Exception e) {
-					log.warn("refresh new board after shelf failed dramaId={}: {}", id, e.getMessage());
+				// 方案3：剧上架由集推导；管理端仅允许在「剧已过审且至少一集已上架」时纠正剧状态
+				if (entity.getAuditStatus() == null
+						|| !entity.getAuditStatus().equals(DramaAssetAuditStatusEnums.APPROVED.getCode())) {
+					return setResultError(I18nUtil.getMessage("base_error"));
 				}
+				Integer onShelf = dramaAssetDao.countOnShelfByDramaId(id);
+				if (onShelf == null || onShelf < 1) {
+					return setResultError(I18nUtil.getMessage("video_not_release"));
+				}
+				dramaAuditService.syncDramaShelfByEpisodes(id);
+				return setResultSuccess(I18nUtil.getMessage("base_success"));
 			}
+			// 下架：整剧 + 全部已上架集
+			dramaAuditService.forceUnshelfDramaAndEpisodes(id);
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			log.error("service error", e);

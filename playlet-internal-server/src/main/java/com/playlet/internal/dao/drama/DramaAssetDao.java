@@ -40,6 +40,16 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 	@Select("select ifnull(count(*),0) from drama_asset where drama_id = #{dramaId}")
 	Integer findByDramaIdNum(@Param("dramaId") Integer dramaId);
 
+	/** 已上架集数量（未删除） */
+	@Select("select ifnull(count(*),0) from drama_asset where drama_id = #{dramaId} "
+			+ "and ifnull(delete_state, 0) = 0 and shelf_status = 1")
+	Integer countOnShelfByDramaId(@Param("dramaId") Integer dramaId);
+
+	/** 整剧下架时批量下架集 */
+	@Update("update drama_asset set shelf_status = 0, video_status = 0, shelf_time = null, gmtModified = now() "
+			+ "where drama_id = #{dramaId} and ifnull(delete_state, 0) = 0 and shelf_status = 1")
+	int unshelfAllByDramaId(@Param("dramaId") Integer dramaId);
+
 	@Select("select * from drama_asset where drama_id = #{dramaId} and delete_state = 0 "
 			+ "and video_status = 1 and shelf_status = 1 order by set_num")
 	List<DramaAssetRespEntity> findByDramaId(@Param("dramaId") Integer dramaId);

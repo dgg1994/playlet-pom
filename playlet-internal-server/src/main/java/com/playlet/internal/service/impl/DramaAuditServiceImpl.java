@@ -1,5 +1,6 @@
 package com.playlet.internal.service.impl;
 
+import com.playlet.internal.dao.drama.DramaAssetDao;
 import com.playlet.internal.dao.drama.DramaAuditStepDao;
 import com.playlet.internal.dao.drama.DramaDao;
 import com.playlet.internal.entity.drama.DramaAuditStepEntity;
@@ -31,6 +32,8 @@ public class DramaAuditServiceImpl implements DramaAuditService {
 	private DramaDao dramaDao;
 	@Autowired
 	private DramaAuditStepDao dramaAuditStepDao;
+	@Autowired
+	private DramaAssetDao dramaAssetDao;
 	@Autowired
 	private RankAlgoService rankAlgoService;
 
@@ -114,35 +117,93 @@ public class DramaAuditServiceImpl implements DramaAuditService {
 			boolean allPass = isPass(ai) && isPass(a) && isPass(b);
 			if (anyReject) {
 				drama.setAuditStatus(DramaAssetAuditStatusEnums.REJECTED.getCode());
-				drama.setShelfStatus(DramaAssetShelfStatusEnums.OFF.getCode());
-				drama.setVerifyStatus(VerifyStateEnums.REMOVED_SHELVES.getIndex());
 				drama.setAuditRejectReason(rejectReason);
-				drama.setShelfTime(null);
 				drama.setAuditPassTime(null);
 				dramaDao.updateById(drama);
+				forceUnshelfDramaAndEpisodes(dramaId);
 				return;
 			}
 			if (allPass) {
+				// 过审 ≠ 上架：仅标记审核通过，上架由集上架 sync 推导
 				drama.setAuditStatus(DramaAssetAuditStatusEnums.APPROVED.getCode());
 				drama.setAuditRejectReason(null);
 				drama.setAuditPassTime(now);
-				drama.setShelfStatus(DramaAssetShelfStatusEnums.ON.getCode());
-				drama.setShelfTime(now);
-				drama.setVerifyStatus(VerifyStateEnums.AVAILABLE_NOW.getIndex());
 				dramaDao.updateById(drama);
-				try {
-					rankAlgoService.refreshNewBoard();
-				} catch (Exception e) {
-					log.warn("refresh new board after drama audit shelf failed dramaId={}: {}", dramaId, e.getMessage());
-				}
+				syncDramaShelfByEpisodes(dramaId);
 				return;
 			}
 			drama.setAuditStatus(DramaAssetAuditStatusEnums.UNDER_REVIEW.getCode());
 			drama.setAuditRejectReason(null);
 			drama.setAuditPassTime(null);
+			dramaDao.updateById(drama);
+			forceUnshelfDramaAndEpisodes(dramaId);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	@Override
+	public void syncDramaShelfByEpisodes(Integer dramaId) {
+		try {
+			if (dramaId == null) {
+				return;
+			}
+			DramaEntity drama = dramaDao.selectById(dramaId);
+			if (drama == null) {
+				return;
+			}
+			Integer onShelfCount = dramaAssetDao.countOnShelfByDramaId(dramaId);
+			boolean hasOnShelf = onShelfCount != null && onShelfCount > 0;
+			boolean dramaApproved = drama.getAuditStatus() != null
+					&& drama.getAuditStatus().equals(DramaAssetAuditStatusEnums.APPROVED.getCode());
+			Date now = new Date();
+			drama.setGmtModified(now);
+
+			if (hasOnShelf && dramaApproved) {
+				boolean alreadyOn = drama.getShelfStatus() != null
+						&& drama.getShelfStatus().equals(DramaAssetShelfStatusEnums.ON.getCode())
+						&& VerifyStateEnums.AVAILABLE_NOW.getIndex().equals(drama.getVerifyStatus());
+				drama.setShelfStatus(DramaAssetShelfStatusEnums.ON.getCode());
+				drama.setVerifyStatus(VerifyStateEnums.AVAILABLE_NOW.getIndex());
+				if (drama.getShelfTime() == null) {
+					drama.setShelfTime(now);
+				}
+				dramaDao.updateById(drama);
+				if (!alreadyOn) {
+					try {
+						rankAlgoService.refreshNewBoard();
+					} catch (Exception e) {
+						log.warn("refresh new board after drama shelf sync failed dramaId={}: {}",
+								dramaId, e.getMessage());
+					}
+				}
+				return;
+			}
+
 			drama.setShelfStatus(DramaAssetShelfStatusEnums.OFF.getCode());
-			drama.setShelfTime(null);
 			drama.setVerifyStatus(VerifyStateEnums.REMOVED_SHELVES.getIndex());
+			drama.setShelfTime(null);
+			dramaDao.updateById(drama);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	@Override
+	public void forceUnshelfDramaAndEpisodes(Integer dramaId) {
+		try {
+			if (dramaId == null) {
+				return;
+			}
+			dramaAssetDao.unshelfAllByDramaId(dramaId);
+			DramaEntity drama = dramaDao.selectById(dramaId);
+			if (drama == null) {
+				return;
+			}
+			drama.setShelfStatus(DramaAssetShelfStatusEnums.OFF.getCode());
+			drama.setVerifyStatus(VerifyStateEnums.REMOVED_SHELVES.getIndex());
+			drama.setShelfTime(null);
+			drama.setGmtModified(new Date());
 			dramaDao.updateById(drama);
 		} catch (Exception e) {
 			throw new RuntimeException(e);

@@ -13,12 +13,15 @@ import com.playlet.internal.enums.DeleteStateEnum;
 import com.playlet.internal.enums.PublicEnums;
 import com.playlet.internal.enums.VideoDefinitionEnums;
 import com.playlet.internal.query.drama.AddDramaAssetQuery;
+import com.playlet.internal.query.drama.DramaAssetShelfQuery;
 import com.playlet.internal.query.drama.DramaVideoUploadTokenQuery;
 import com.playlet.internal.api.response.DramaAssetReleaseRespEntity;
 import com.playlet.internal.api.response.DramaVideoUploadRespEntity;
 import com.playlet.internal.service.DramaAssetService;
 import com.playlet.internal.service.DramaAssetAuditService;
+import com.playlet.internal.service.DramaAuditService;
 import com.playlet.internal.service.MediaUrlService;
+import com.playlet.internal.utils.AppTokenUtil;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.QiniuUploadUtils;
@@ -31,17 +34,19 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
+import java.util.Date;
 
 @RestController
 @Transactional(rollbackFor = Exception.class)
 @CrossOrigin
 @Slf4j
-public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetService{
-	
+public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetService {
+
 	@Autowired
 	private DramaDao dramaDao;
-	
+
 	@Autowired
 	private DramaAssetDao dramaAssetDao;
 
@@ -50,6 +55,9 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 
 	@Autowired
 	private DramaAssetAuditService dramaAssetAuditService;
+
+	@Autowired
+	private DramaAuditService dramaAuditService;
 
 	@Override
 	public ResponseBase uploadToken(@Valid @RequestBody DramaVideoUploadTokenQuery query) {
@@ -85,14 +93,12 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			if (!QiniuUploadUtils.exists(key)) {
 				return setResultError(I18nUtil.getMessage("video_not_null"));
 			}
-			// 多码率约定：库内存默认清晰度 key，如 oceans_720.m3u8；播放时再推导 360/480/720/1080
 			String newUrl = toDefaultMultiRateM3u8Key(key);
 			String videoName = StringUtils.isEmpty(createPay.getVideoName())
 					? key.substring(key.lastIndexOf('/') + 1) : createPay.getVideoName();
 
 			DramaAssetEntity existing = dramaAssetDao.findByDramaIdAndSetNum(entity.getId(), createPay.getSetNum());
 			if (existing != null) {
-				// 仅驳回后允许同集覆盖重传；审核中/已通过不可重复登记
 				if (existing.getAuditStatus() == null
 						|| !existing.getAuditStatus().equals(DramaAssetAuditStatusEnums.REJECTED.getCode())) {
 					return setResultError(I18nUtil.getMessage("base_info_exist"));
@@ -149,23 +155,113 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 	}
 
 	@Override
+	public ResponseBase shelf(@Valid @RequestBody DramaAssetShelfQuery query, HttpServletRequest request) {
+		try {
+			Integer uid = AppTokenUtil.resolveUid(request);
+			if (uid == null) {
+				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
+			}
+			DramaAssetEntity asset = dramaAssetDao.selectById(query.getAssetId());
+			if (asset == null || DeleteStateEnum.DELETE.getIndex().equals(asset.getDeleteState())) {
+				return setResultError(I18nUtil.getMessage("base_data_null"));
+			}
+			DramaEntity drama = dramaDao.selectById(asset.getDramaId());
+			if (drama == null || DeleteStateEnum.DELETE.getIndex().equals(drama.getDeleteState())) {
+				return setResultError(I18nUtil.getMessage("drama_null"));
+			}
+			ResponseBase ownerErr = assertOwner(drama, uid);
+			if (ownerErr != null) {
+				return ownerErr;
+			}
+			if (!isApproved(asset.getAuditStatus()) || !isApproved(drama.getAuditStatus())) {
+				return setResultError(I18nUtil.getMessage("base_error"));
+			}
+			if (asset.getShelfStatus() != null
+					&& asset.getShelfStatus().equals(DramaAssetShelfStatusEnums.ON.getCode())) {
+				return setResultSuccess(I18nUtil.getMessage("base_success"));
+			}
+			Date now = new Date();
+			asset.setShelfStatus(DramaAssetShelfStatusEnums.ON.getCode());
+			asset.setVideoStatus(PublicEnums.ONE.getIndex());
+			asset.setShelfTime(now);
+			asset.setGmtModified(now);
+			dramaAssetDao.updateById(asset);
+			dramaAuditService.syncDramaShelfByEpisodes(drama.getId());
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {
+			log.error("drama asset shelf error", e);
+			throw new RuntimeException(e);
+		}
+	}
+
+	@Override
+	public ResponseBase unshelf(@Valid @RequestBody DramaAssetShelfQuery query, HttpServletRequest request) {
+		try {
+			Integer uid = AppTokenUtil.resolveUid(request);
+			if (uid == null) {
+				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
+			}
+			DramaAssetEntity asset = dramaAssetDao.selectById(query.getAssetId());
+			if (asset == null || DeleteStateEnum.DELETE.getIndex().equals(asset.getDeleteState())) {
+				return setResultError(I18nUtil.getMessage("base_data_null"));
+			}
+			DramaEntity drama = dramaDao.selectById(asset.getDramaId());
+			if (drama == null || DeleteStateEnum.DELETE.getIndex().equals(drama.getDeleteState())) {
+				return setResultError(I18nUtil.getMessage("drama_null"));
+			}
+			ResponseBase ownerErr = assertOwner(drama, uid);
+			if (ownerErr != null) {
+				return ownerErr;
+			}
+			if (asset.getShelfStatus() == null
+					|| asset.getShelfStatus().equals(DramaAssetShelfStatusEnums.OFF.getCode())) {
+				dramaAuditService.syncDramaShelfByEpisodes(drama.getId());
+				return setResultSuccess(I18nUtil.getMessage("base_success"));
+			}
+			Date now = new Date();
+			asset.setShelfStatus(DramaAssetShelfStatusEnums.OFF.getCode());
+			asset.setVideoStatus(PublicEnums.ZERO.getIndex());
+			asset.setShelfTime(null);
+			asset.setGmtModified(now);
+			dramaAssetDao.updateById(asset);
+			dramaAuditService.syncDramaShelfByEpisodes(drama.getId());
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {
+			log.error("drama asset unshelf error", e);
+			throw new RuntimeException(e);
+		}
+	}
+
+	@Override
 	public ResponseBase delDrama(@RequestParam("id") Long id) {
 		try {
 			DramaAssetEntity entity = dramaAssetDao.selectById(id);
 			if (entity == null) {
 				return setResultError(I18nUtil.getMessage("base_error"));
 			}
+			Integer dramaId = entity.getDramaId();
 			dramaAssetDao.deleteById(id);
+			if (dramaId != null) {
+				dramaAuditService.syncDramaShelfByEpisodes(dramaId);
+			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
-		} catch (Exception e) {}
+		} catch (Exception e) {
+			log.error("del drama asset error", e);
+			throw new RuntimeException(e);
+		}
+	}
+
+	private static ResponseBase assertOwner(DramaEntity drama, Integer uid) {
+		if (drama.getBelongUser() != null && !drama.getBelongUser().equals(uid)) {
+			return setResultError(I18nUtil.getMessage("purview_error_null"));
+		}
 		return null;
 	}
 
-	/**
-	 * 上传源片后，DB 存默认清晰度 m3u8 key：
-	 * oceans.mp4 / oceans.m3u8 -> oceans_720.m3u8
-	 * oceans_720.m3u8 已带码率后缀则规范为默认清晰度
-	 */
+	private static boolean isApproved(Integer auditStatus) {
+		return auditStatus != null && auditStatus.equals(DramaAssetAuditStatusEnums.APPROVED.getCode());
+	}
+
 	private String toDefaultMultiRateM3u8Key(String uploadedKey) {
 		String m3u8Key = QiniuUploadUtils.replaceFileExtension(uploadedKey, Constants.M3U8);
 		if (m3u8Key == null || m3u8Key.isEmpty()) {
