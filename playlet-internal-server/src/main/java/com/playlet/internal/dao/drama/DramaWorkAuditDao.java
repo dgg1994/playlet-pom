@@ -35,7 +35,7 @@ public interface DramaWorkAuditDao {
 			+ " left join drama_audit_step gb on gb.drama_id = d.id and gb.step_type = 3"
 			+ " where ifnull(d.delete_state, 0) = 0"
 			+ " <if test='q.dramaId != null'> and d.id = #{q.dramaId} </if>"
-			+ " <if test='q.keyword != null and q.keyword != \"\"'> and d.drama_title like concat('%', #{q.keyword}, '%') </if>"
+			+ " <if test='q.dramaTitle != null and q.dramaTitle != \"\"'> and d.drama_title like concat('%', #{q.dramaTitle}, '%') </if>"
 			+ " <if test='q.auditStatus != null and (q.auditStatus == 0 or q.auditStatus == 1)'> "
 			+ "   and ifnull(d.audit_status, 0) in (0, 1) "
 			+ " </if>"
