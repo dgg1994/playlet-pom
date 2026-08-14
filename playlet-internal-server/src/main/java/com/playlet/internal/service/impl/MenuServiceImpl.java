@@ -103,6 +103,10 @@ public class MenuServiceImpl extends BaseApiService implements MenuService {
 	        List<RouterVo> routers = new LinkedList<RouterVo>();
 	        for (SysMenuEntity menu : menus)
 	        {
+	            // 路由仅返回目录/菜单，排除按钮（menu_type=F）
+	            if (UserConstants.TYPE_BUTTON.equals(menu.getMenuType())) {
+	                continue;
+	            }
 	            RouterVo router = new RouterVo();
 	            router.setHidden("1".equals(menu.getVisible()));
 	            router.setName(getRouteName(menu));
