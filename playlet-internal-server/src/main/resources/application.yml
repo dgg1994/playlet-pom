@@ -26,12 +26,6 @@ dscoins:
     googleLimit:
       enable: false
 
-# 作家端谷歌认证：false 时登录不校验验证码（仅本地调试）
-playlet:
-  creator:
-    google-auth:
-      enable: false
-
 management:
   endpoints:
     web:

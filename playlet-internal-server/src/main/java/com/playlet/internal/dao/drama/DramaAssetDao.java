@@ -54,6 +54,11 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 			+ "and video_status = 1 and shelf_status = 1 order by set_num")
 	List<DramaAssetRespEntity> findByDramaId(@Param("dramaId") Integer dramaId);
 
+	/** 作家详情：该剧全部未删除集（含审核中/驳回，不限上架） */
+	@Select("select * from drama_asset where drama_id = #{dramaId} and ifnull(delete_state, 0) = 0 "
+			+ "order by set_num, id")
+	List<DramaAssetEntity> findNotDeletedByDramaId(@Param("dramaId") Integer dramaId);
+
 	@Select("SELECT * from drama_asset where drama_id = #{dramaId} and delete_state = #{deleteState} "
 			+ "and video_status = 1 and shelf_status = 1 order by set_num limit 1")
 	RecommendVidoeRespEntity findDramaIdOne(@Param("dramaId") Integer dramaId,@Param("deleteState") Integer deleteState);
