@@ -23,7 +23,6 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -33,7 +32,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 
 /**
@@ -57,12 +59,6 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
     private RedisUtil redisUtil;
     @Autowired
     private MediaUrlService mediaUrlService;
-
-    /**
-     * 全局开关：false 时仍要求验证码字段，但不验真（仅本地调试，对齐运营端 googleLimit）
-     */
-    @Value("${playlet.creator.google-auth.enable:true}")
-    private Boolean googleAuthGlobalEnable;
 
     @Override
     public ResponseBase sendEmailCode(@RequestParam("userAccount") String userAccount,
@@ -122,10 +118,6 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         if (!verifyCode(email, query.getEmailCode())) {
             return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
         }
-        String nicknameErr = validateNickname(query.getNickname());
-        if (nicknameErr != null) {
-            return setResultError(nicknameErr);
-        }
         if (query.getIdentityType() != null && !CreatorIdentityTypeEnums.isValid(query.getIdentityType())) {
             return setResultError(I18nUtil.getMessage("base_error"));
         }
@@ -136,12 +128,10 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         CreatorAccountEntity account = new CreatorAccountEntity();
         account.setUserAccount(email);
         account.setUserPassword(PasswordHashUtils.encode(query.getUserPassword()));
-        // 注册即签发独立谷歌密钥，默认开启认证（勿使用运营端共享 Constants.user_googleKey）
-        account.setGoogleSecretkey(GoogleAuthenticatorUtil.createKey(email).getKey());
-        account.setGoogleAuthEnable(CreatorGoogleAuthEnableEnums.ON.getCode());
         account.setMobilePrefix(trimToNull(query.getMobilePrefix()));
         account.setMobileNumber(trimToNull(query.getMobileNumber()));
-        account.setNickname(resolveNickname(query.getNickname(), email));
+        // 注册昵称与 C 端一致：user_ + yyMMddHHmmss + 3 位随机数
+        account.setNickname(generateAutoNickname());
         account.setUserState(UserStateEnums.NORMAL.getIndex());
         account.setCoinBalance(0L);
         account.setFrozenCoinBalance(0L);
@@ -187,19 +177,6 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         }
         if (!PasswordHashUtils.matches(query.getUserPassword(), account.getUserPassword())) {
             return setResultError(I18nUtil.getMessage("user.password_error"));
-        }
-        // 账号开启且已有密钥时校验
-        boolean needGoogle = CreatorGoogleAuthEnableEnums.isOn(account.getGoogleAuthEnable())
-                && StringUtils.isNotEmpty(account.getGoogleSecretkey());
-        if (needGoogle) {
-            if (query.getGoogleCode() == null) {
-                return setResultError(I18nUtil.getMessage("creator.google_code_required"));
-            }
-            if (!Boolean.FALSE.equals(googleAuthGlobalEnable)
-                    && !verifyGoogleCode(account.getGoogleSecretkey(), query.getGoogleCode())) {
-                log.info("creator google verify fail creatorId={}", account.getId());
-                return setResultError(I18nUtil.getMessage("creator.google_verify_fail"));
-            }
         }
         if (PasswordHashUtils.needsRehash(account.getUserPassword())) {
             account.setUserPassword(PasswordHashUtils.encode(query.getUserPassword()));
@@ -358,34 +335,6 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         return bearer;
     }
 
-    private String ensureGoogleSecret(CreatorAccountEntity account) {
-        if (StringUtils.isNotEmpty(account.getGoogleSecretkey())) {
-            return account.getGoogleSecretkey();
-        }
-        String key = GoogleAuthenticatorUtil.createKey(account.getUserAccount()).getKey();
-        account.setGoogleSecretkey(key);
-        account.setGmtModified(new Date());
-        try {
-            creatorAccountDao.updateById(account);
-        } catch (Exception e) {
-            log.error("creator ensure google secret failed creatorId={}", account.getId(), e);
-            throw new BaseException(I18nUtil.getMessage("base_error"), e);
-        }
-        return key;
-    }
-
-    private boolean verifyGoogleCode(String secret, Integer code) {
-        if (StringUtils.isEmpty(secret) || code == null) {
-            return false;
-        }
-        try {
-            return GoogleAuthenticatorUtil.verifyCode(secret, code);
-        } catch (Exception e) {
-            log.error("creator google verify exception", e);
-            return false;
-        }
-    }
-
     private boolean verifyCode(String email, String code) {
         if (StringUtils.isEmpty(code)) {
             return false;
@@ -476,7 +425,6 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         resp.setTotalIncomeCoin(nvl(account.getTotalIncomeCoin()));
         resp.setLastLoginTime(account.getLastLoginTime());
         resp.setSetTime(account.getSetTime());
-        resp.setGoogleAuthEnable(account.getGoogleAuthEnable());
         if (profile != null) {
             resp.setIdentityType(profile.getIdentityType());
             resp.setOnepayAccount(profile.getOnepayAccount());
@@ -489,6 +437,15 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
             resp.setIdCardBack(mediaUrlService.sign(profile.getIdCardBack()));
         }
         return resp;
+    }
+
+    /** 与 C 端注册一致：user_ + yyMMddHHmmss + 100~998 随机数 */
+    private String generateAutoNickname() {
+        String timestamp = LocalDateTime.now().format(
+                DateTimeFormatter.ofPattern(CreatorConstants.NICKNAME_AUTO_TIME_PATTERN));
+        int randomNum = ThreadLocalRandom.current().nextInt(
+                CreatorConstants.NICKNAME_AUTO_RANDOM_ORIGIN, CreatorConstants.NICKNAME_AUTO_RANDOM_BOUND);
+        return CreatorConstants.NICKNAME_AUTO_PREFIX + timestamp + randomNum;
     }
 
     private String validateNickname(String nickname) {

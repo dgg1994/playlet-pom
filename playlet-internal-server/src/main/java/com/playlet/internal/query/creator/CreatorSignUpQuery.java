@@ -28,9 +28,6 @@ public class CreatorSignUpQuery {
 	@ApiModelProperty(name = "emailCode", value = "邮箱验证码", required = true)
 	private String emailCode;
 
-	@ApiModelProperty(name = "nickname", value = "展示昵称，最多9字")
-	private String nickname;
-
 	@ApiModelProperty(name = "mobilePrefix", value = "手机区号")
 	private String mobilePrefix;
 

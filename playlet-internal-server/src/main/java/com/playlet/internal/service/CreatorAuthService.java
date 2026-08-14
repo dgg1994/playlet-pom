@@ -34,11 +34,11 @@ public interface CreatorAuthService {
 			@RequestParam(value = "scene", required = false) Integer scene);
 
 	@PostMapping("/signUp")
-	@ApiOperation(value = "注册", notes = "userAccount 即邮箱；校验验证码后写入账号+入驻资料，并生成谷歌密钥（默认开启认证）。data 返回 Bearer token", response = ResponseBase.class)
+	@ApiOperation(value = "注册", notes = "userAccount 即邮箱；校验验证码后写入账号+入驻资料。昵称按 C 端规则自动生成。data 返回 Bearer token", response = ResponseBase.class)
 	ResponseBase signUp(CreatorSignUpQuery query);
 
 	@PostMapping("/login")
-	@ApiOperation(value = "登录", notes = "邮箱 + 密码；账号开启谷歌认证时需 googleCode。data 返回 Bearer token", response = ResponseBase.class)
+	@ApiOperation(value = "登录", notes = "邮箱 + 密码。data 返回 Bearer token", response = ResponseBase.class)
 	ResponseBase login(CreatorLoginQuery query);
 
 	@PostMapping("/forgetPassword")
