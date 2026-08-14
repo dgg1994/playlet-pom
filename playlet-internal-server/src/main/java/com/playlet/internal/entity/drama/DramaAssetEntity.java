@@ -71,7 +71,7 @@ public class DramaAssetEntity extends PageQueryHelperEntity {
 	private Integer videoStatus;
 
 	@TableField("audit_status")
-	@ApiModelProperty(name = "auditStatus", value = "审核状态 0待审 1审核中 2通过 3驳回", required = false, dataType = "Integer")
+	@ApiModelProperty(name = "auditStatus", value = "审核状态 0待审 1审核中 2通过 3驳回 4申诉中", required = false, dataType = "Integer")
 	private Integer auditStatus;
 
 	@TableField("shelf_status")
@@ -85,6 +85,18 @@ public class DramaAssetEntity extends PageQueryHelperEntity {
 	@TableField("audit_pass_time")
 	@ApiModelProperty(name = "auditPassTime", value = "审核通过时间", required = false, dataType = "Date")
 	private Date auditPassTime;
+
+	@TableField("appeal_status")
+	@ApiModelProperty(name = "appealStatus", value = "申诉状态 0无 1申诉中 2申诉通过 3申诉驳回", required = false, dataType = "Integer")
+	private Integer appealStatus;
+
+	@TableField("appeal_reason")
+	@ApiModelProperty(name = "appealReason", value = "申诉理由", required = false, dataType = "String")
+	private String appealReason;
+
+	@TableField("appeal_time")
+	@ApiModelProperty(name = "appealTime", value = "申诉时间", required = false, dataType = "Date")
+	private Date appealTime;
 
 	@TableField("shelf_time")
 	@ApiModelProperty(name = "shelfTime", value = "上架时间", required = false, dataType = "Date")

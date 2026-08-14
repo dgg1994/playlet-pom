@@ -1,5 +1,7 @@
 package com.playlet.internal.service.impl;
 
+import com.playlet.internal.api.response.DramaAssetReleaseRespEntity;
+import com.playlet.internal.api.response.DramaVideoUploadRespEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
@@ -7,25 +9,16 @@ import com.playlet.internal.dao.drama.DramaAssetDao;
 import com.playlet.internal.dao.drama.DramaDao;
 import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
-import com.playlet.internal.enums.DramaAssetAuditStatusEnums;
-import com.playlet.internal.enums.DramaAssetShelfStatusEnums;
-import com.playlet.internal.enums.DeleteStateEnum;
-import com.playlet.internal.enums.PublicEnums;
-import com.playlet.internal.enums.VideoDefinitionEnums;
+import com.playlet.internal.enums.*;
 import com.playlet.internal.query.drama.AddDramaAssetQuery;
+import com.playlet.internal.query.drama.DramaAssetAppealQuery;
 import com.playlet.internal.query.drama.DramaAssetShelfQuery;
 import com.playlet.internal.query.drama.DramaVideoUploadTokenQuery;
-import com.playlet.internal.api.response.DramaAssetReleaseRespEntity;
-import com.playlet.internal.api.response.DramaVideoUploadRespEntity;
-import com.playlet.internal.service.DramaAssetService;
 import com.playlet.internal.service.DramaAssetAuditService;
+import com.playlet.internal.service.DramaAssetService;
 import com.playlet.internal.service.DramaAuditService;
 import com.playlet.internal.service.MediaUrlService;
-import com.playlet.internal.utils.AppTokenUtil;
-import com.playlet.internal.utils.GenericityUtil;
-import com.playlet.internal.utils.I18nUtil;
-import com.playlet.internal.utils.QiniuUploadUtils;
-import com.playlet.internal.utils.StringUtils;
+import com.playlet.internal.utils.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -114,6 +107,10 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 				existing.setAuditRejectReason(null);
 				existing.setAuditPassTime(null);
 				existing.setShelfTime(null);
+				// 驳回重传：清空申诉态，按新稿重新进审
+				existing.setAppealStatus(DramaAppealStatusEnums.NONE.getCode());
+				existing.setAppealReason(null);
+				existing.setAppealTime(null);
 				GenericityUtil.updateDate(existing);
 				dramaAssetDao.updateById(existing);
 				dramaAssetAuditService.initAuditStepsOnRelease(existing.getId(), entity.getId());
@@ -228,6 +225,54 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			log.error("drama asset unshelf error", e);
+			throw new RuntimeException(e);
+		}
+	}
+
+	@Override
+	public ResponseBase appeal(@Valid @RequestBody DramaAssetAppealQuery query, HttpServletRequest request) {
+		try {
+			Integer uid = SysUserTokenUtil.resolveAdminId(request);
+			if (uid == null) {
+				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
+			}
+			DramaAssetEntity asset = dramaAssetDao.selectById(query.getAssetId());
+			if (asset == null || DeleteStateEnum.DELETE.getIndex().equals(asset.getDeleteState())) {
+				return setResultError(I18nUtil.getMessage("base_data_null"));
+			}
+			DramaEntity drama = dramaDao.selectById(asset.getDramaId());
+			if (drama == null || DeleteStateEnum.DELETE.getIndex().equals(drama.getDeleteState())) {
+				return setResultError(I18nUtil.getMessage("drama_null"));
+			}
+			ResponseBase ownerErr = assertOwner(drama, uid);
+			if (ownerErr != null) {
+				return ownerErr;
+			}
+			// 仅驳回可申诉
+			if (asset.getAuditStatus() == null
+					|| !asset.getAuditStatus().equals(DramaAssetAuditStatusEnums.REJECTED.getCode())) {
+				return setResultError(I18nUtil.getMessage("base_error"));
+			}
+			// 申诉中不可重复提交
+			if (DramaAssetAuditStatusEnums.isAppealing(asset.getAuditStatus())
+					|| (asset.getAppealStatus() != null
+					&& asset.getAppealStatus().equals(DramaAppealStatusEnums.APPEALING.getCode()))) {
+				return setResultError(I18nUtil.getMessage("base_info_exist"));
+			}
+			Date now = new Date();
+			asset.setAppealStatus(DramaAppealStatusEnums.APPEALING.getCode());
+			asset.setAppealReason(query.getRemark().trim());
+			asset.setAppealTime(now);
+			asset.setAuditStatus(DramaAssetAuditStatusEnums.APPEALING.getCode());
+			asset.setGmtModified(now);
+			dramaAssetDao.updateById(asset);
+			log.info("drama asset appeal submitted assetId={} dramaId={} uid={}",
+					asset.getId(), asset.getDramaId(), uid);
+			// 重置 AI/A/B 进入再审，聚合逻辑保持 audit_status=4
+			dramaAssetAuditService.initAuditStepsOnRelease(asset.getId(), asset.getDramaId());
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {
+			log.error("drama asset appeal failed assetId={}", query.getAssetId(), e);
 			throw new RuntimeException(e);
 		}
 	}

@@ -10,17 +10,13 @@ import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.drama.*;
-import com.playlet.internal.dao.system.SysUserDao;
 import com.playlet.internal.entity.drama.DramaAssetAuditStepEntity;
 import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaAuditStepEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
-import com.playlet.internal.entity.system.SysUserEntity;
 import com.playlet.internal.enums.DramaAssetAuditStatusEnums;
 import com.playlet.internal.enums.DramaAssetAuditStepStatusEnums;
 import com.playlet.internal.enums.DramaAssetAuditStepTypeEnums;
-import com.playlet.internal.enums.UserStateEnums;
-import com.playlet.internal.filter.JWTAuthenticationFilter;
 import com.playlet.internal.query.drama.DramaAssetAuditHandleQuery;
 import com.playlet.internal.query.drama.DramaAuditHandleQuery;
 import com.playlet.internal.query.drama.DramaWorkAuditQuery;
@@ -31,10 +27,10 @@ import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.StringUtils;
+import com.playlet.internal.utils.SysUserTokenUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -71,8 +67,6 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
     private TagDao tagDao;
     @Autowired
     private MediaUrlService mediaUrlService;
-    @Autowired
-    private SysUserDao sysUserDao;
 
     @Override
     @SysLogAnnotation(module = "作品评审", type = "POST", remark = "作品管理列表")
@@ -97,7 +91,6 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
     }
 
     @Override
-
     @SysLogAnnotation(module = "作品评审", type = "POST", remark = "短剧集列表")
     public ResponseBase findEpisodeList(@RequestBody DramaWorkAuditQuery query) {
         if (query == null) {
@@ -203,7 +196,7 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
                 return setResultError(I18nUtil.getMessage("base_error"));
             }
             // 获取当前登录管理员 id（sys_user）
-            Integer adminId = resolveAdminId(request);
+            Integer adminId = SysUserTokenUtil.resolveAdminId(request);
             if (adminId == null) {
                 return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
             }
@@ -253,7 +246,7 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
                 return setResultError(I18nUtil.getMessage("base_error"));
             }
             // 获取当前登录管理员 id（sys_user）
-            Integer adminId = resolveAdminId(request);
+            Integer adminId = SysUserTokenUtil.resolveAdminId(request);
             if (adminId == null) {
                 return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
             }
@@ -266,18 +259,6 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
             log.error("drama asset audit handle error", e);
             throw new RuntimeException(e);
         }
-    }
-
-    /**
-     * 解析管理端登录用户 id（sys_user.id）。
-     */
-    private Integer resolveAdminId(HttpServletRequest request) {
-        UsernamePasswordAuthenticationToken token = JWTAuthenticationFilter.getAuthentication(request);
-        if (token == null) {
-            return null;
-        }
-        SysUserEntity admin = sysUserDao.findByAcctiveState(token.getName(), UserStateEnums.NORMAL.getIndex());
-        return admin == null ? null : admin.getId();
     }
 
     /**

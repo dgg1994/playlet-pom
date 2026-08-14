@@ -7,10 +7,14 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.query.drama.AddDramaQuery;
+import com.playlet.internal.query.drama.DramaAppealQuery;
 import com.playlet.internal.query.drama.QueryDramaQuery;
 import com.playlet.internal.query.drama.UpdateDramaQuery;
 
 import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+
+import javax.servlet.http.HttpServletRequest;
 
 @RequestMapping("/drama")
 @Api(value = "短剧管理", tags = "短剧管理")
@@ -37,7 +41,6 @@ public interface DramaService {
 	/**
 	 * @category 短剧基础信息列表
 	 * @param entity
-	 * @param file
 	 * @return
 	 */
 	@PostMapping("/findList")
@@ -82,5 +85,10 @@ public interface DramaService {
 	 */
 	@GetMapping("/findInfo")
 	ResponseBase findInfo(Integer id);
+
+	@PostMapping("/appeal")
+	@ApiOperation(value = "剧申诉", notes = "仅驳回后可发起；auditStatus=4 申诉中并重置 AI/A/B 进入再审；校验 belongUser。"
+			+ "运营列表传 auditStatus=4 可见。")
+	ResponseBase appeal(DramaAppealQuery query, HttpServletRequest request);
 
 }

@@ -4,6 +4,7 @@ import com.playlet.internal.dao.drama.DramaAssetAuditStepDao;
 import com.playlet.internal.dao.drama.DramaAssetDao;
 import com.playlet.internal.entity.drama.DramaAssetAuditStepEntity;
 import com.playlet.internal.entity.drama.DramaAssetEntity;
+import com.playlet.internal.enums.DramaAppealStatusEnums;
 import com.playlet.internal.enums.DramaAssetAuditStatusEnums;
 import com.playlet.internal.enums.DramaAssetAuditStepStatusEnums;
 import com.playlet.internal.enums.DramaAssetAuditStepTypeEnums;
@@ -112,6 +113,7 @@ public class DramaAssetAuditServiceImpl implements DramaAssetAuditService {
 
             boolean anyReject = isReject(ai) || isReject(a) || isReject(b);
             boolean allPass = isPass(ai) && isPass(a) && isPass(b);
+            boolean wasAppealing = isAppealing(asset);
             // 驳回
             if (anyReject) {
                 asset.setAuditStatus(DramaAssetAuditStatusEnums.REJECTED.getCode());
@@ -120,6 +122,9 @@ public class DramaAssetAuditServiceImpl implements DramaAssetAuditService {
                 asset.setAuditRejectReason(rejectReason);
                 asset.setShelfTime(null);
                 asset.setAuditPassTime(null);
+                if (wasAppealing) {
+                    asset.setAppealStatus(DramaAppealStatusEnums.APPEAL_REJECT.getCode());
+                }
                 dramaAssetDao.updateById(asset);
                 dramaAuditService.syncDramaShelfByEpisodes(asset.getDramaId());
                 return;
@@ -130,11 +135,18 @@ public class DramaAssetAuditServiceImpl implements DramaAssetAuditService {
                 asset.setAuditStatus(DramaAssetAuditStatusEnums.APPROVED.getCode());
                 asset.setAuditRejectReason(null);
                 asset.setAuditPassTime(now);
+                if (wasAppealing) {
+                    asset.setAppealStatus(DramaAppealStatusEnums.APPEAL_PASS.getCode());
+                }
                 dramaAssetDao.updateById(asset);
                 return;
             }
-            // 待审
-            asset.setAuditStatus(DramaAssetAuditStatusEnums.UNDER_REVIEW.getCode());
+            // 待审：申诉再审保持 4，勿回写成审核中
+            if (wasAppealing) {
+                asset.setAuditStatus(DramaAssetAuditStatusEnums.APPEALING.getCode());
+            } else {
+                asset.setAuditStatus(DramaAssetAuditStatusEnums.UNDER_REVIEW.getCode());
+            }
             asset.setAuditRejectReason(null);
             asset.setAuditPassTime(null);
             asset.setShelfStatus(DramaAssetShelfStatusEnums.OFF.getCode());
@@ -164,6 +176,18 @@ public class DramaAssetAuditServiceImpl implements DramaAssetAuditService {
 	 */
 	private static boolean isReject(Integer status) {
 		return status != null && status.equals(DramaAssetAuditStepStatusEnums.REJECT.getCode());
+	}
+
+	/** 申诉再审中：audit_status=4，或历史数据仅写了 appeal_status=1。 */
+	private static boolean isAppealing(DramaAssetEntity asset) {
+		if (asset == null) {
+			return false;
+		}
+		if (DramaAssetAuditStatusEnums.isAppealing(asset.getAuditStatus())) {
+			return true;
+		}
+		return asset.getAppealStatus() != null
+				&& asset.getAppealStatus().equals(DramaAppealStatusEnums.APPEALING.getCode());
 	}
 
 	/**

@@ -38,7 +38,7 @@ public class DramaAssetRespEntity {
 	@ApiModelProperty(name = "videoStatus",value = "可用状态 1是0否",required = false,dataType = "Integer")
 	private Integer videoStatus;
 
-	@ApiModelProperty(name = "auditStatus", value = "审核状态 0待审 1审核中 2通过 3驳回", required = false, dataType = "Integer")
+	@ApiModelProperty(name = "auditStatus", value = "审核状态 0待审 1审核中 2通过 3驳回 4申诉中", required = false, dataType = "Integer")
 	private Integer auditStatus;
 
 	@ApiModelProperty(name = "shelfStatus", value = "上架状态 0未上架 1已上架", required = false, dataType = "Integer")

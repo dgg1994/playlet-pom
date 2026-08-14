@@ -5,6 +5,7 @@ import com.playlet.internal.dao.drama.DramaAuditStepDao;
 import com.playlet.internal.dao.drama.DramaDao;
 import com.playlet.internal.entity.drama.DramaAuditStepEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
+import com.playlet.internal.enums.DramaAppealStatusEnums;
 import com.playlet.internal.enums.DramaAssetAuditStatusEnums;
 import com.playlet.internal.enums.DramaAssetAuditStepStatusEnums;
 import com.playlet.internal.enums.DramaAssetAuditStepTypeEnums;
@@ -115,10 +116,15 @@ public class DramaAuditServiceImpl implements DramaAuditService {
 
 			boolean anyReject = isReject(ai) || isReject(a) || isReject(b);
 			boolean allPass = isPass(ai) && isPass(a) && isPass(b);
+			boolean wasAppealing = isAppealing(drama);
 			if (anyReject) {
 				drama.setAuditStatus(DramaAssetAuditStatusEnums.REJECTED.getCode());
 				drama.setAuditRejectReason(rejectReason);
 				drama.setAuditPassTime(null);
+				// 申诉中再驳回 → 3，离开申诉页签
+				if (wasAppealing) {
+					drama.setAppealStatus(DramaAppealStatusEnums.APPEAL_REJECT.getCode());
+				}
 				dramaDao.updateById(drama);
 				forceUnshelfDramaAndEpisodes(dramaId);
 				return;
@@ -128,11 +134,19 @@ public class DramaAuditServiceImpl implements DramaAuditService {
 				drama.setAuditStatus(DramaAssetAuditStatusEnums.APPROVED.getCode());
 				drama.setAuditRejectReason(null);
 				drama.setAuditPassTime(now);
+				if (wasAppealing) {
+					drama.setAppealStatus(DramaAppealStatusEnums.APPEAL_PASS.getCode());
+				}
 				dramaDao.updateById(drama);
 				syncDramaShelfByEpisodes(dramaId);
 				return;
 			}
-			drama.setAuditStatus(DramaAssetAuditStatusEnums.UNDER_REVIEW.getCode());
+			// 申诉再审过程中保持 4，勿回写成审核中
+			if (wasAppealing) {
+				drama.setAuditStatus(DramaAssetAuditStatusEnums.APPEALING.getCode());
+			} else {
+				drama.setAuditStatus(DramaAssetAuditStatusEnums.UNDER_REVIEW.getCode());
+			}
 			drama.setAuditRejectReason(null);
 			drama.setAuditPassTime(null);
 			dramaDao.updateById(drama);
@@ -216,6 +230,18 @@ public class DramaAuditServiceImpl implements DramaAuditService {
 
 	private static boolean isReject(Integer status) {
 		return status != null && status.equals(DramaAssetAuditStepStatusEnums.REJECT.getCode());
+	}
+
+	/** 申诉再审中：audit_status=4，或历史数据仅写了 appeal_status=1。 */
+	private static boolean isAppealing(DramaEntity drama) {
+		if (drama == null) {
+			return false;
+		}
+		if (DramaAssetAuditStatusEnums.isAppealing(drama.getAuditStatus())) {
+			return true;
+		}
+		return drama.getAppealStatus() != null
+				&& drama.getAppealStatus().equals(DramaAppealStatusEnums.APPEALING.getCode());
 	}
 
 	private void safeSetDate(Object entity) {

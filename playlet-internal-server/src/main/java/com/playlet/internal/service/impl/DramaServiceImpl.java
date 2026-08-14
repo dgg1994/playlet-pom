@@ -1,20 +1,9 @@
 package com.playlet.internal.service.impl;
-import java.util.List;
-
-import javax.validation.Valid;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.playlet.internal.enums.RecommendedCarouselEnums;
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
-
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
+import com.playlet.internal.api.response.DramaAssetRespEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
@@ -27,24 +16,29 @@ import com.playlet.internal.dao.drama.TagDao;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.DramaTagRelEntity;
 import com.playlet.internal.entity.drama.TagEntity;
-import com.playlet.internal.enums.DeleteStateEnum;
-import com.playlet.internal.enums.VerifyStateEnums;
+import com.playlet.internal.enums.*;
 import com.playlet.internal.query.drama.AddDramaQuery;
+import com.playlet.internal.query.drama.DramaAppealQuery;
 import com.playlet.internal.query.drama.QueryDramaQuery;
 import com.playlet.internal.query.drama.UpdateDramaQuery;
-import com.playlet.internal.api.response.DramaAssetRespEntity;
-import com.playlet.internal.enums.DramaAssetAuditStatusEnums;
-import com.playlet.internal.enums.DramaAssetShelfStatusEnums;
 import com.playlet.internal.service.DramaAuditService;
 import com.playlet.internal.service.DramaService;
 import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.service.RankAlgoService;
-import com.playlet.internal.utils.GenericityUtil;
-import com.playlet.internal.utils.I18nUtil;
-import com.playlet.internal.utils.QiniuUploadUtils;
-import com.playlet.internal.utils.TheaterHomeCacheHelper;
-
+import com.playlet.internal.utils.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.validation.Valid;
+import java.util.Date;
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -165,6 +159,10 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 				entity.setAuditRejectReason(null);
 				entity.setAuditPassTime(null);
 				entity.setShelfTime(null);
+				// 元数据变更重审：清空申诉态
+				entity.setAppealStatus(DramaAppealStatusEnums.NONE.getCode());
+				entity.setAppealReason(null);
+				entity.setAppealTime(null);
 			}
 			dramaDao.updateById(entity);
 			if (metaChanged) {
@@ -317,6 +315,48 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			throw new RuntimeException(e);
 		}
 	}
-	
+
+	@Override
+	public ResponseBase appeal(@Valid @RequestBody DramaAppealQuery query, HttpServletRequest request) {
+		try {
+			Integer uid = SysUserTokenUtil.resolveAdminId(request);
+			if (uid == null) {
+				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
+			}
+			DramaEntity drama = dramaDao.selectById(query.getDramaId());
+			if (drama == null || DeleteStateEnum.DELETE.getIndex().equals(drama.getDeleteState())) {
+				return setResultError(I18nUtil.getMessage("drama_null"));
+			}
+			// 归属校验
+			if (drama.getBelongUser() != null && !drama.getBelongUser().equals(uid)) {
+				return setResultError(I18nUtil.getMessage("purview_error_null"));
+			}
+			// 仅驳回可申诉
+			if (drama.getAuditStatus() == null
+					|| !drama.getAuditStatus().equals(DramaAssetAuditStatusEnums.REJECTED.getCode())) {
+				return setResultError(I18nUtil.getMessage("base_error"));
+			}
+			// 申诉中不可重复提交
+			if (DramaAssetAuditStatusEnums.isAppealing(drama.getAuditStatus())
+					|| (drama.getAppealStatus() != null
+					&& drama.getAppealStatus().equals(DramaAppealStatusEnums.APPEALING.getCode()))) {
+				return setResultError(I18nUtil.getMessage("base_info_exist"));
+			}
+			Date now = new Date();
+			drama.setAppealStatus(DramaAppealStatusEnums.APPEALING.getCode());
+			drama.setAppealReason(query.getRemark().trim());
+			drama.setAppealTime(now);
+			drama.setAuditStatus(DramaAssetAuditStatusEnums.APPEALING.getCode());
+			drama.setGmtModified(now);
+			dramaDao.updateById(drama);
+			log.info("drama appeal submitted dramaId={} uid={}", drama.getId(), uid);
+			// 重置 AI/A/B 进入再审，聚合逻辑保持 audit_status=4
+			dramaAuditService.initAuditSteps(drama.getId());
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {
+			log.error("drama appeal failed dramaId={}", query.getDramaId(), e);
+			throw new RuntimeException(e);
+		}
+	}
 
 }

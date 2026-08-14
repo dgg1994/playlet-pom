@@ -21,11 +21,11 @@ import javax.servlet.http.HttpServletRequest;
 public interface DramaAssetAuditManageService {
 
 	@PostMapping("/findList")
-	@ApiOperation("作品管理列表（仅剧：封面/简介/标签等评审对象 + 审核状态，按页签筛选）")
+	@ApiOperation("作品管理列表（仅剧：封面/简介/标签等评审对象 + 审核状态；auditStatus：0/1待审 2通过 3驳回 4申诉中）")
 	ResponseBase findList(DramaWorkAuditQuery query);
 
 	@PostMapping("/findEpisodeList")
-	@ApiOperation("短剧集列表（剧名检索 + 审核状态/页签筛选）")
+	@ApiOperation("短剧集列表（剧名检索 + auditStatus：0/1待审 2通过 3驳回 4申诉中）")
 	ResponseBase findEpisodeList(DramaWorkAuditQuery query);
 
 	@PostMapping("/dramaDetail")

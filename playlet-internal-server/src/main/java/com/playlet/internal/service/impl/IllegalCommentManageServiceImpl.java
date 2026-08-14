@@ -8,23 +8,20 @@ import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.account.AppAccountDao;
 import com.playlet.internal.dao.security.IllegalCommentRecordDao;
-import com.playlet.internal.dao.system.SysUserDao;
 import com.playlet.internal.entity.account.AppAccountEntity;
 import com.playlet.internal.entity.security.IllegalCommentRecordEntity;
-import com.playlet.internal.entity.system.SysUserEntity;
 import com.playlet.internal.enums.IllegalCommentHandleTypeEnums;
 import com.playlet.internal.enums.IllegalCommentStatusEnums;
 import com.playlet.internal.enums.UserStateEnums;
-import com.playlet.internal.filter.JWTAuthenticationFilter;
 import com.playlet.internal.query.security.IllegalCommentHandleQuery;
 import com.playlet.internal.service.CommentModerationService;
 import com.playlet.internal.service.IllegalCommentManageService;
 import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
+import com.playlet.internal.utils.SysUserTokenUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -50,8 +47,6 @@ public class IllegalCommentManageServiceImpl implements IllegalCommentManageServ
 	private CommentModerationService commentModerationService;
 	@Autowired
 	private AppAccountDao appAccountDao;
-	@Autowired
-	private SysUserDao sysUserDao;
 	@Autowired
 	private MediaUrlService mediaUrlService;
 
@@ -87,7 +82,7 @@ public class IllegalCommentManageServiceImpl implements IllegalCommentManageServ
 	@SysLogAnnotation(module = "违规评论管理", type = "POST", remark = "违规记录处置")
 	public ResponseBase handle(@RequestBody IllegalCommentHandleQuery query, HttpServletRequest request) {
 		try {
-			Integer adminId = resolveAdminId(request);
+			Integer adminId = SysUserTokenUtil.resolveAdminId(request);
 			if (adminId == null) {
 				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
 			}
@@ -178,20 +173,6 @@ public class IllegalCommentManageServiceImpl implements IllegalCommentManageServ
 		account.setUserState(UserStateEnums.DISABLE.getIndex());
 		account.setGmtModified(new Date());
 		appAccountDao.updateById(account);
-	}
-
-	/**
-	 * 解析管理员ID
-	 * @param request
-	 * @return
-	 */
-	private Integer resolveAdminId(HttpServletRequest request) {
-		UsernamePasswordAuthenticationToken token = JWTAuthenticationFilter.getAuthentication(request);
-		if (token == null) {
-			return null;
-		}
-		SysUserEntity admin = sysUserDao.findByAcctiveState(token.getName(), UserStateEnums.NORMAL.getIndex());
-		return admin == null ? null : admin.getId();
 	}
 
 	/**

@@ -7,6 +7,9 @@ import lombok.Data;
 import java.util.Date;
 import java.util.List;
 
+/**
+ * 作品评审列表行（剧或集）。
+ */
 @Data
 public class DramaWorkAuditListRespEntity {
 
@@ -49,7 +52,7 @@ public class DramaWorkAuditListRespEntity {
 	@ApiModelProperty("视频播放URL（签过名，仅集）")
 	private String videoUrl;
 
-	@ApiModelProperty("聚合审核状态")
+	@ApiModelProperty("聚合审核状态 0待审 1审核中 2通过 3驳回 4申诉中")
 	private Integer auditStatus;
 
 	@ApiModelProperty("上架状态 0未上架 1已上架")
@@ -57,6 +60,15 @@ public class DramaWorkAuditListRespEntity {
 
 	@ApiModelProperty("驳回原因")
 	private String auditRejectReason;
+
+	@ApiModelProperty("申诉状态 0无 1申诉中 2申诉通过 3申诉驳回")
+	private Integer appealStatus = 0;
+
+	@ApiModelProperty("申诉理由")
+	private String appealReason;
+
+	@ApiModelProperty("申诉时间")
+	private Date appealTime;
 
 	@ApiModelProperty("AI预审状态")
 	private Integer aiStatus = 0;
