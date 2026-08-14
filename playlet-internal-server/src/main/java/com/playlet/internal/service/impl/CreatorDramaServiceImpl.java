@@ -17,6 +17,7 @@ import com.playlet.internal.entity.creator.CreatorAccountEntity;
 import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.enums.DeleteStateEnum;
+import com.playlet.internal.enums.DramaAssetAuditStatusEnums;
 import com.playlet.internal.query.creator.CreatorDramaListQuery;
 import com.playlet.internal.service.CreatorDramaService;
 import com.playlet.internal.service.MediaUrlService;
@@ -72,12 +73,8 @@ public class CreatorDramaServiceImpl extends BaseApiService implements CreatorDr
 		if (list == null) {
 			list = Collections.emptyList();
 		}
-		String language = LanguageContext.getLanguage();
 		for (CreatorDramaListRespEntity item : list) {
 			item.setCoverUrl(mediaUrlService.sign(item.getCoverUrl()));
-			if (item.getId() != null) {
-				item.setTagList(tagDao.findGroupLang(language, item.getId()));
-			}
 		}
 		log.info("creator drama findList creatorId={} size={}", account.getId(), list.size());
 		return setResultSuccess(new PageInfo<>(list), I18nUtil.getMessage("base_success"));
@@ -122,6 +119,7 @@ public class CreatorDramaServiceImpl extends BaseApiService implements CreatorDr
 		resp.setAppealReason(drama.getAppealReason());
 		resp.setAppealTime(drama.getAppealTime());
 		resp.setSetTime(drama.getSetTime());
+		resp.setGmtModified(drama.getGmtModified());
 		resp.setTagList(tagDao.findGroupLang(language, drama.getId()));
 		List<DramaAssetEntity> assets = dramaAssetDao.findNotDeletedByDramaId(drama.getId());
 		List<CreatorDramaAssetRespEntity> assetList = new ArrayList<>();
@@ -142,14 +140,27 @@ public class CreatorDramaServiceImpl extends BaseApiService implements CreatorDr
 		resp.setSetNum(asset.getSetNum());
 		resp.setVideoName(asset.getVideoName());
 		resp.setVideoUrl(mediaUrlService.signVideo(asset.getVideoUrl()));
-		resp.setVideoType(asset.getVideoType());
 		resp.setAuditStatus(asset.getAuditStatus());
+		resp.setAuditStatusName(DramaAssetAuditStatusEnums.getLabel(asset.getAuditStatus()));
 		resp.setShelfStatus(asset.getShelfStatus());
 		resp.setAuditRejectReason(asset.getAuditRejectReason());
-		resp.setAppealStatus(asset.getAppealStatus());
-		resp.setAppealReason(asset.getAppealReason());
-		resp.setAppealTime(asset.getAppealTime());
 		resp.setSetTime(asset.getSetTime());
+		// 时长/曝光/完播尚无落库字段，先空值给前端展示 "-"
+		resp.setDurationSeconds(null);
+		resp.setDurationText(formatDuration(null));
+		resp.setExposureCount(null);
+		resp.setCompleteCount(null);
+		resp.setCompleteRate(null);
 		return resp;
+	}
+
+	/** 秒数转 7'55"；空则不展示 */
+	private static String formatDuration(Integer seconds) {
+		if (seconds == null || seconds < 0) {
+			return null;
+		}
+		int minute = seconds / 60;
+		int second = seconds % 60;
+		return minute + "'" + String.format("%02d", second) + "\"";
 	}
 }

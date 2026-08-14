@@ -22,7 +22,7 @@ public interface CreatorDramaDao {
 			+ "  d.total_episodes as totalEpisodes, d.finished_state as finishedState, d.video_type as videoType,"
 			+ "  d.audit_status as auditStatus, ifnull(d.shelf_status, 0) as shelfStatus,"
 			+ "  d.audit_reject_reason as auditRejectReason, ifnull(d.appeal_status, 0) as appealStatus,"
-			+ "  d.setTime as setTime,"
+			+ "  d.setTime as setTime, d.gmtModified as gmtModified,"
 			+ "  (select ifnull(count(*), 0) from drama_asset a"
 			+ "    where a.drama_id = d.id and ifnull(a.delete_state, 0) = 0) as uploadSetNum"
 			+ " from drama d"

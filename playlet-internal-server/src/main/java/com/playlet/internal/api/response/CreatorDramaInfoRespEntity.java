@@ -68,4 +68,7 @@ public class CreatorDramaInfoRespEntity {
 
 	@ApiModelProperty("创建时间")
 	private Date setTime;
+
+	@ApiModelProperty("更新时间")
+	private Date gmtModified;
 }

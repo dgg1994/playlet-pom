@@ -26,6 +26,18 @@ public enum DramaAssetAuditStatusEnums {
 		return label;
 	}
 
+	public static String getLabel(Integer code) {
+		if (code == null) {
+			return null;
+		}
+		for (DramaAssetAuditStatusEnums item : values()) {
+			if (item.code == code) {
+				return item.label;
+			}
+		}
+		return null;
+	}
+
 	/** 是否申诉再审中（列表「申诉」页签）。 */
 	public static boolean isAppealing(Integer code) {
 		return code != null && code.equals(APPEALING.code);

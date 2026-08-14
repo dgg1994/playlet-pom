@@ -2,7 +2,6 @@ package com.playlet.internal.utils;
 
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.CreatorConstants;
-import com.playlet.internal.constants.RedisKeyConstants;
 import com.playlet.internal.dao.creator.CreatorAccountDao;
 import com.playlet.internal.entity.creator.CreatorAccountEntity;
 import com.playlet.internal.enums.UserStateEnums;
@@ -16,7 +15,7 @@ import org.springframework.util.StringUtils;
 import javax.servlet.http.HttpServletRequest;
 
 /**
- * 作家端 token 解析（与 C 端 APP_PACKAGE_NAME 会话隔离）。
+ * 作家端 token 解析。会话与 C 端相同：Redis key = APP_PACKAGE_NAME + 登录邮箱。
  */
 @Slf4j
 @Component
@@ -88,14 +87,16 @@ public class CreatorTokenUtil {
 		redisUtil.del(sessionKey(email));
 	}
 
+	/** 与 C 端 / 运营过滤器一致：playletInternalServer + 账号 */
 	public static String sessionKey(String email) {
-		return RedisKeyConstants.CREATOR_TOKEN_KEY + email;
+		return Constants.APP_PACKAGE_NAME + email;
 	}
 
 	public static String jwtSubject(String email) {
-		return CreatorConstants.JWT_SUBJECT_PREFIX + email;
+		return email;
 	}
 
+	/** 兼容历史 token subject：creator:email */
 	private static String stripSubject(String subject) {
 		if (subject != null && subject.startsWith(CreatorConstants.JWT_SUBJECT_PREFIX)) {
 			return subject.substring(CreatorConstants.JWT_SUBJECT_PREFIX.length());

@@ -8,7 +8,7 @@ public final class CreatorConstants {
 	private CreatorConstants() {
 	}
 
-	/** JWT subject 前缀，避免与 C 端 / 运营账号 Redis 会话撞车 */
+	/** 历史 JWT subject 前缀（新签发已改为纯邮箱，解析时仍剥离） */
 	public static final String JWT_SUBJECT_PREFIX = "creator:";
 
 	/** 展示昵称最大字数（原型：不超过九个字；注册自动生成不受此限） */
