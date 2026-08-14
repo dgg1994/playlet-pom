@@ -78,4 +78,7 @@ public class CreatorInfoRespEntity {
 
 	@ApiModelProperty("注册时间")
 	private Date setTime;
+
+	@ApiModelProperty("谷歌认证开关 0关 1开")
+	private Integer googleAuthEnable;
 }

@@ -32,6 +32,16 @@ public class CreatorAccountEntity {
 	@com.alibaba.fastjson.annotation.JSONField(serialize = false)
 	private String userPassword;
 
+	@TableField("google_secretkey")
+	@ApiModelProperty(name = "googleSecretkey", value = "谷歌验证密钥")
+	@com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
+	@com.alibaba.fastjson.annotation.JSONField(serialize = false)
+	private String googleSecretkey;
+
+	@TableField("google_auth_enable")
+	@ApiModelProperty(name = "googleAuthEnable", value = "谷歌认证开关 0关 1开")
+	private Integer googleAuthEnable;
+
 	@TableField("mobile_prefix")
 	@ApiModelProperty(name = "mobilePrefix", value = "手机区号")
 	private String mobilePrefix;
