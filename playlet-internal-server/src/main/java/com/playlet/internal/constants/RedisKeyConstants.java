@@ -55,6 +55,10 @@ public class RedisKeyConstants {
 
     /** 邮箱验证码：后缀为 email */
     public static final String EMAIL_CODE_KEY = PROJECT_PREFIX + "email:code:";
+    /** 作家端邮箱验证码：后缀为登录邮箱 */
+    public static final String CREATOR_EMAIL_CODE_KEY = PROJECT_PREFIX + "creator:email:code:";
+    /** 作家端登录会话：后缀为登录邮箱 */
+    public static final String CREATOR_TOKEN_KEY = PROJECT_PREFIX + "creator:token:";
     /** 接口幂等：后缀为 requestId */
     public static final String IDEMPOTENT_KEY = PROJECT_PREFIX + "idempotent:";
     /** 访问限流：后缀为 ip+url */
