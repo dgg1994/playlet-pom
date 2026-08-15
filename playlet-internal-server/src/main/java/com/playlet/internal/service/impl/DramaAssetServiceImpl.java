@@ -1,7 +1,6 @@
 package com.playlet.internal.service.impl;
 
 import com.playlet.internal.api.response.DramaAssetBatchShelfFailItem;
-import com.playlet.internal.api.response.DramaAssetBatchShelfRespEntity;
 import com.playlet.internal.api.response.DramaAssetReleaseRespEntity;
 import com.playlet.internal.api.response.DramaVideoUploadRespEntity;
 import com.playlet.internal.base.BaseApiService;
@@ -12,16 +11,8 @@ import com.playlet.internal.dao.drama.DramaDao;
 import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.enums.*;
-import com.playlet.internal.query.drama.AddDramaAssetQuery;
-import com.playlet.internal.query.drama.DramaAssetAppealQuery;
-import com.playlet.internal.query.drama.DramaAssetBatchShelfQuery;
-import com.playlet.internal.query.drama.DramaAssetShelfQuery;
-import com.playlet.internal.query.drama.DramaVideoUploadTokenQuery;
-import com.playlet.internal.service.DramaAssetAuditService;
-import com.playlet.internal.service.DramaAssetDurationService;
-import com.playlet.internal.service.DramaAssetService;
-import com.playlet.internal.service.DramaAuditService;
-import com.playlet.internal.service.MediaUrlService;
+import com.playlet.internal.query.drama.*;
+import com.playlet.internal.service.*;
 import com.playlet.internal.utils.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,12 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 @RestController
 @Transactional(rollbackFor = Exception.class)
@@ -216,7 +202,7 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 	private ResponseBase batchShelfOrUnshelf(DramaAssetBatchShelfQuery query, HttpServletRequest request,
 			boolean shelfOn) {
 		try {
-			Integer uid = AppTokenUtil.resolveUid(request);
+			Integer uid = CreatorTokenUtil.resolveCreatorId(request);
 			if (uid == null) {
 				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
 			}
@@ -227,7 +213,6 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			if (assetIds.size() > Constants.MAX_PAGESIZE) {
 				return setResultError(I18nUtil.getMessage("base_error"));
 			}
-			DramaAssetBatchShelfRespEntity resp = new DramaAssetBatchShelfRespEntity();
 			Set<Integer> dramaIdsToSync = new HashSet<>();
 			for (Integer assetId : assetIds) {
 				ShelfOneResult result = shelfOneWithDrama(assetId, uid, shelfOn);
@@ -235,10 +220,8 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 					DramaAssetBatchShelfFailItem fail = new DramaAssetBatchShelfFailItem();
 					fail.setAssetId(assetId);
 					fail.setMessage(result.errorMsg);
-					resp.getFailItems().add(fail);
 					continue;
 				}
-				resp.getSuccessIds().add(assetId);
 				if (result.dramaId != null) {
 					dramaIdsToSync.add(result.dramaId);
 				}
@@ -246,11 +229,7 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			for (Integer dramaId : dramaIdsToSync) {
 				dramaAuditService.syncDramaShelfByEpisodes(dramaId);
 			}
-			resp.setSuccessCount(resp.getSuccessIds().size());
-			resp.setFailCount(resp.getFailItems().size());
-			log.info("drama asset batch {} uid={} success={} fail={}",
-					shelfOn ? "shelf" : "unshelf", uid, resp.getSuccessCount(), resp.getFailCount());
-			return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			log.error("drama asset batch {} error", shelfOn ? "shelf" : "unshelf", e);
 			throw new RuntimeException(e);
