@@ -21,6 +21,7 @@ import com.playlet.internal.entity.template.EmailTemplateEntity;
 import com.playlet.internal.enums.DramaAssetAuditStatusEnums;
 import com.playlet.internal.enums.DramaAssetAuditStepStatusEnums;
 import com.playlet.internal.enums.DramaAssetAuditStepTypeEnums;
+import com.playlet.internal.enums.LanguageEnums;
 import com.playlet.internal.enums.MessageEnums;
 import com.playlet.internal.query.drama.DramaAssetAuditHandleQuery;
 import com.playlet.internal.query.drama.DramaAuditHandleQuery;
@@ -210,7 +211,10 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
             applyStepHandle(step, query.getAction(), adminId, query.getRemark());
             dramaAuditStepDao.updateById(step);
             dramaAuditService.refreshAggregateAndAutoShelf(query.getDramaId());
-            // 审核意见发送到作家邮箱
+            // 驳回结果邮件通知作家（失败不影响评审事务）
+            if (isRejectAction(query.getAction())) {
+                sendAuditRejectEmail(drama.getBelongUser(), drama.getDramaTitle(), null, query.getRemark());
+            }
             return setResultSuccess(I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
             log.error("drama audit handle error", e);
@@ -261,7 +265,13 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
             applyStepHandle(step, query.getAction(), adminId, query.getRemark());
             dramaAssetAuditStepDao.updateById(step);
             dramaAssetAuditService.refreshAggregateAndAutoShelf(query.getAssetId());
-            // 审核意见发送到作家邮箱
+            // 驳回结果邮件通知作家（失败不影响评审事务）
+            if (isRejectAction(query.getAction())) {
+                DramaEntity drama = dramaDao.selectById(asset.getDramaId());
+                String dramaTitle = drama == null ? null : drama.getDramaTitle();
+                Integer belongUser = drama == null ? null : drama.getBelongUser();
+                sendAuditRejectEmail(belongUser, dramaTitle, asset.getSetNum(), query.getRemark());
+            }
             return setResultSuccess(I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
             log.error("drama asset audit handle error", e);
@@ -273,38 +283,81 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
      * 校验动作、审核组；驳回时备注必填。
      */
     private ResponseBase validateHandleBasics(Integer action, Integer stepType, String remark) {
-        if (action == null || (action != 1 && action != 2)) {
+        if (!DramaAssetAuditStepStatusEnums.isHandleAction(action)) {
             return setResultError(I18nUtil.getMessage("base_error"));
         }
         DramaAssetAuditStepTypeEnums type = DramaAssetAuditStepTypeEnums.fromCode(stepType);
         if (type == null || type == DramaAssetAuditStepTypeEnums.AI) {
             return setResultError(I18nUtil.getMessage("base_error"));
         }
-        if (action == 2 && StringUtils.isEmpty(remark)) {
+        if (isRejectAction(action) && StringUtils.isEmpty(remark)) {
             return setResultError(I18nUtil.getMessage("base_error"));
         }
         return null;
     }
 
     /**
-     * 发送评审邮件给作家
+     * 评审驳回邮件：模板 1006，占位 作者名 / 作品名 / 集序号 / 驳回原因。
+     * 剧级驳回时集序号传 "-"。
      */
-    private void sendEmail(Integer uid){
-        CreatorAccountEntity creatorAccountEntity = creatorAccountDao.selectById(uid);
-        String language = LanguageContext.getLanguage();
-        EmailTemplateEntity templateEntity = emailTemplateDao.findByNum(MessageEnums.SEND_CODE_ZH.getIndex(), language);
-        if (templateEntity != null && templateEntity.getTemplateContent() != null
-                && templateEntity.getTemplateContent().length() > 0) {
-            String code = OrderCodeFactory.getRandomStr(6);
-            //添加动态数据（邮件/验证码做 HTML 转义，防 XSS）
-            String htmlContent = MessageFormatUtils.format(
-                    templateEntity.getTemplateContent(),
-                    HtmlSanitizeUtils.plain(creatorAccountEntity.getUserAccount()),
-                    HtmlSanitizeUtils.plain(code));
-            //组装html内容
-            String html = MessageFormatUtils.saveHtml(htmlContent, language);
-            EmailUtil.sendEmail(creatorAccountEntity.getUserAccount(), templateEntity.getTemplateSubject(), html);
+    private void sendAuditRejectEmail(Integer creatorId, String dramaTitle, Integer setNum, String rejectReason) {
+        if (creatorId == null) {
+            log.warn("skip audit reject email: creatorId null dramaTitle={}", dramaTitle);
+            return;
         }
+        try {
+            CreatorAccountEntity creator = creatorAccountDao.selectById(creatorId);
+            if (creator == null || StringUtils.isEmpty(creator.getUserAccount())) {
+                log.warn("skip audit reject email: creator missing creatorId={}", creatorId);
+                return;
+            }
+            String language = LanguageContext.getLanguage();
+            EmailTemplateEntity template = emailTemplateDao.findByNum(
+                    MessageEnums.CREATOR_AUDIT_REJECT.getIndex(), language);
+            // 当前语言无模板时回退默认语言
+            if (template == null || StringUtils.isEmpty(template.getTemplateContent())) {
+                template = emailTemplateDao.findByNum(
+                        MessageEnums.CREATOR_AUDIT_REJECT.getIndex(), LanguageEnums.DEFAULT_LANGUE);
+            }
+            if (template == null || StringUtils.isEmpty(template.getTemplateContent())) {
+                log.warn("skip audit reject email: template missing creatorId={}", creatorId);
+                return;
+            }
+            String authorName = resolveCreatorDisplayName(creator);
+            String title = StringUtils.isEmpty(dramaTitle) ? "-" : dramaTitle.trim();
+            String episode = setNum == null ? "-" : String.valueOf(setNum);
+            String reason = StringUtils.isEmpty(rejectReason) ? "-" : rejectReason.trim();
+            String htmlContent = MessageFormatUtils.format(
+                    template.getTemplateContent(),
+                    HtmlSanitizeUtils.plain(authorName),
+                    HtmlSanitizeUtils.plain(title),
+                    HtmlSanitizeUtils.plain(episode),
+                    HtmlSanitizeUtils.plain(reason));
+            String html = MessageFormatUtils.saveHtml(htmlContent, language);
+            EmailUtil.sendEmail(creator.getUserAccount(), template.getTemplateSubject(), html);
+            log.info("audit reject email sent creatorId={} dramaTitle={} setNum={}",
+                    creatorId, title, episode);
+        } catch (Exception e) {
+            log.error("audit reject email failed creatorId={} dramaTitle={}", creatorId, dramaTitle, e);
+        }
+    }
+
+    private static String resolveCreatorDisplayName(CreatorAccountEntity creator) {
+        if (creator == null) {
+            return "-";
+        }
+        if (StringUtils.isNotEmpty(creator.getNickname())) {
+            return creator.getNickname().trim();
+        }
+        return creator.getUserAccount();
+    }
+
+    private static boolean isRejectAction(Integer action) {
+        return action != null && action.equals(DramaAssetAuditStepStatusEnums.REJECT.getCode());
+    }
+
+    private static boolean isPassAction(Integer action) {
+        return action != null && action.equals(DramaAssetAuditStepStatusEnums.PASS.getCode());
     }
 
     /**
@@ -355,10 +408,10 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
     }
 
     /**
-     * 转为处理状态。
+     * 处理动作映射为步骤状态（action 与步骤状态码一致）。
      */
     private static int toHandleStatus(Integer action) {
-        return action != null && action == 1
+        return isPassAction(action)
                 ? DramaAssetAuditStepStatusEnums.PASS.getCode()
                 : DramaAssetAuditStepStatusEnums.REJECT.getCode();
     }

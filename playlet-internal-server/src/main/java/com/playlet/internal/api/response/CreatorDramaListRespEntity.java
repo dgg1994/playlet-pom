@@ -37,6 +37,9 @@ public class CreatorDramaListRespEntity {
 	@ApiModelProperty("审核状态 0待审 1审核中 2通过 3驳回 4申诉中")
 	private Integer auditStatus;
 
+	@ApiModelProperty("驳回原因（审核驳回时有值）")
+	private String auditRejectReason;
+
 	@ApiModelProperty("上架状态 0未上架 1已上架")
 	private Integer shelfStatus;
 }

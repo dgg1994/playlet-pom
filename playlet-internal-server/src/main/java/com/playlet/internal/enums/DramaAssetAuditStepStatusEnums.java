@@ -1,7 +1,7 @@
 package com.playlet.internal.enums;
 
 /**
- *  drama asset 审核状态
+ * 审核步骤状态；A/B 处理入参 action 亦复用 PASS(1)/REJECT(2)。
  */
 public enum DramaAssetAuditStepStatusEnums {
 	PENDING(0, "待审核"),
@@ -22,5 +22,23 @@ public enum DramaAssetAuditStepStatusEnums {
 
 	public String getLabel() {
 		return label;
+	}
+
+	public static DramaAssetAuditStepStatusEnums fromCode(Integer code) {
+		if (code == null) {
+			return null;
+		}
+		for (DramaAssetAuditStepStatusEnums item : values()) {
+			if (item.code == code) {
+				return item;
+			}
+		}
+		return null;
+	}
+
+	/** 是否为处理动作（通过/驳回），不含待审。 */
+	public static boolean isHandleAction(Integer code) {
+		DramaAssetAuditStepStatusEnums item = fromCode(code);
+		return item == PASS || item == REJECT;
 	}
 }

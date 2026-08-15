@@ -24,7 +24,7 @@ import javax.servlet.http.HttpServletRequest;
 public interface CreatorDramaService {
 
 	@PostMapping("/findList")
-	@ApiOperation(value = "我的作品列表", notes = "仅剧卡片：封面/标题/总集数/更新时间。剧集走 GET /findInfo?id=")
+	@ApiOperation(value = "我的作品列表", notes = "剧卡片：封面/标题/总集数/审核状态/驳回原因/更新时间。剧集走 GET /findInfo?id=")
 	ResponseBase findList(CreatorDramaListQuery query, HttpServletRequest request);
 
 	@GetMapping("/findInfo")
