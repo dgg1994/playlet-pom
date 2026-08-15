@@ -23,7 +23,7 @@ import javax.servlet.http.HttpServletRequest;
 public interface CreatorCommentService {
 
 	@PostMapping("/findList")
-	@ApiOperation(value = "评论列表", notes = "本人作品集评；支持剧名搜索、按热度/时间排序；置顶优先")
+	@ApiOperation(value = "评论列表", notes = "本人作品评论；支持 dramaId、commentType(1集评/2剧评，默认1)、剧名搜索、热度/时间排序；置顶优先")
 	ResponseBase findList(CreatorCommentListQuery query, HttpServletRequest request);
 
 	@PostMapping("/pin")

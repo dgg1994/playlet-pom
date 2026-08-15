@@ -23,4 +23,5 @@ public class CreatorCommentListRow {
 	private Integer pinFlag;
 	private Date pinTime;
 	private Date setTime;
+	private Integer commentType;
 }

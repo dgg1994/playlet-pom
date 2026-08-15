@@ -9,14 +9,19 @@ import com.playlet.internal.api.response.DramaWorkAuditListRespEntity;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.constants.Constants;
+import com.playlet.internal.dao.creator.CreatorAccountDao;
 import com.playlet.internal.dao.drama.*;
+import com.playlet.internal.dao.template.EmailTemplateDao;
+import com.playlet.internal.entity.creator.CreatorAccountEntity;
 import com.playlet.internal.entity.drama.DramaAssetAuditStepEntity;
 import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaAuditStepEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
+import com.playlet.internal.entity.template.EmailTemplateEntity;
 import com.playlet.internal.enums.DramaAssetAuditStatusEnums;
 import com.playlet.internal.enums.DramaAssetAuditStepStatusEnums;
 import com.playlet.internal.enums.DramaAssetAuditStepTypeEnums;
+import com.playlet.internal.enums.MessageEnums;
 import com.playlet.internal.query.drama.DramaAssetAuditHandleQuery;
 import com.playlet.internal.query.drama.DramaAuditHandleQuery;
 import com.playlet.internal.query.drama.DramaWorkAuditQuery;
@@ -24,10 +29,7 @@ import com.playlet.internal.service.DramaAssetAuditManageService;
 import com.playlet.internal.service.DramaAssetAuditService;
 import com.playlet.internal.service.DramaAuditService;
 import com.playlet.internal.service.MediaUrlService;
-import com.playlet.internal.utils.GenericityUtil;
-import com.playlet.internal.utils.I18nUtil;
-import com.playlet.internal.utils.StringUtils;
-import com.playlet.internal.utils.SysUserTokenUtil;
+import com.playlet.internal.utils.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,6 +69,10 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
     private TagDao tagDao;
     @Autowired
     private MediaUrlService mediaUrlService;
+    @Autowired
+    private EmailTemplateDao emailTemplateDao;
+    @Autowired
+    private CreatorAccountDao creatorAccountDao;
 
     @Override
     @SysLogAnnotation(module = "作品评审", type = "POST", remark = "作品管理列表")
@@ -204,6 +210,7 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
             applyStepHandle(step, query.getAction(), adminId, query.getRemark());
             dramaAuditStepDao.updateById(step);
             dramaAuditService.refreshAggregateAndAutoShelf(query.getDramaId());
+            // 审核意见发送到作家邮箱
             return setResultSuccess(I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
             log.error("drama audit handle error", e);
@@ -254,6 +261,7 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
             applyStepHandle(step, query.getAction(), adminId, query.getRemark());
             dramaAssetAuditStepDao.updateById(step);
             dramaAssetAuditService.refreshAggregateAndAutoShelf(query.getAssetId());
+            // 审核意见发送到作家邮箱
             return setResultSuccess(I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
             log.error("drama asset audit handle error", e);
@@ -276,6 +284,27 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
             return setResultError(I18nUtil.getMessage("base_error"));
         }
         return null;
+    }
+
+    /**
+     * 发送评审邮件给作家
+     */
+    private void sendEmail(Integer uid){
+        CreatorAccountEntity creatorAccountEntity = creatorAccountDao.selectById(uid);
+        String language = LanguageContext.getLanguage();
+        EmailTemplateEntity templateEntity = emailTemplateDao.findByNum(MessageEnums.SEND_CODE_ZH.getIndex(), language);
+        if (templateEntity != null && templateEntity.getTemplateContent() != null
+                && templateEntity.getTemplateContent().length() > 0) {
+            String code = OrderCodeFactory.getRandomStr(6);
+            //添加动态数据（邮件/验证码做 HTML 转义，防 XSS）
+            String htmlContent = MessageFormatUtils.format(
+                    templateEntity.getTemplateContent(),
+                    HtmlSanitizeUtils.plain(creatorAccountEntity.getUserAccount()),
+                    HtmlSanitizeUtils.plain(code));
+            //组装html内容
+            String html = MessageFormatUtils.saveHtml(htmlContent, language);
+            EmailUtil.sendEmail(creatorAccountEntity.getUserAccount(), templateEntity.getTemplateSubject(), html);
+        }
     }
 
     /**

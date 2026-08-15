@@ -28,6 +28,9 @@ public class CreatorCommentListRespEntity {
 	@ApiModelProperty("集序号")
 	private Integer setNum;
 
+	@ApiModelProperty("评论类型 1集评 2剧评")
+	private Integer commentType;
+
 	@ApiModelProperty("上下文文案，如：在 xxx 第05集 发表了评论")
 	private String contextText;
 

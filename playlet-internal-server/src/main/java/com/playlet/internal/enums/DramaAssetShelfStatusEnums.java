@@ -22,4 +22,16 @@ public enum DramaAssetShelfStatusEnums {
 	public String getLabel() {
 		return label;
 	}
+
+	public static DramaAssetShelfStatusEnums fromCode(Integer code) {
+		if (code == null) {
+			return null;
+		}
+		for (DramaAssetShelfStatusEnums item : values()) {
+			if (item.code == code) {
+				return item;
+			}
+		}
+		return null;
+	}
 }

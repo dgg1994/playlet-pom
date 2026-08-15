@@ -1,6 +1,5 @@
 package com.playlet.internal.service.impl;
 
-import com.playlet.internal.api.response.DramaAssetBatchShelfFailItem;
 import com.playlet.internal.api.response.DramaAssetReleaseRespEntity;
 import com.playlet.internal.api.response.DramaVideoUploadRespEntity;
 import com.playlet.internal.base.BaseApiService;
@@ -22,9 +21,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-import java.util.*;
+import java.util.Date;
 
 @RestController
 @Transactional(rollbackFor = Exception.class)
@@ -153,223 +151,6 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 	}
 
 	@Override
-	public ResponseBase shelf(@Valid @RequestBody DramaAssetShelfQuery query, HttpServletRequest request) {
-		try {
-			Integer uid = AppTokenUtil.resolveUid(request);
-			if (uid == null) {
-				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
-			}
-			String err = shelfOne(query.getAssetId(), uid, true);
-			if (err != null) {
-				return setResultError(err);
-			}
-			return setResultSuccess(I18nUtil.getMessage("base_success"));
-		} catch (Exception e) {
-			log.error("drama asset shelf error", e);
-			throw new RuntimeException(e);
-		}
-	}
-
-	@Override
-	public ResponseBase unshelf(@Valid @RequestBody DramaAssetShelfQuery query, HttpServletRequest request) {
-		try {
-			Integer uid = AppTokenUtil.resolveUid(request);
-			if (uid == null) {
-				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
-			}
-			String err = shelfOne(query.getAssetId(), uid, false);
-			if (err != null) {
-				return setResultError(err);
-			}
-			return setResultSuccess(I18nUtil.getMessage("base_success"));
-		} catch (Exception e) {
-			log.error("drama asset unshelf error", e);
-			throw new RuntimeException(e);
-		}
-	}
-
-	@Override
-	public ResponseBase batchShelf(@Valid @RequestBody DramaAssetBatchShelfQuery query, HttpServletRequest request) {
-		return batchShelfOrUnshelf(query, request, true);
-	}
-
-	@Override
-	public ResponseBase batchUnshelf(@Valid @RequestBody DramaAssetBatchShelfQuery query, HttpServletRequest request) {
-		return batchShelfOrUnshelf(query, request, false);
-	}
-
-	/** 批量上架/下架：逐条处理，剧维度去重后统一 sync */
-	private ResponseBase batchShelfOrUnshelf(DramaAssetBatchShelfQuery query, HttpServletRequest request,
-			boolean shelfOn) {
-		try {
-			Integer uid = CreatorTokenUtil.resolveCreatorId(request);
-			if (uid == null) {
-				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
-			}
-			List<Integer> assetIds = normalizeAssetIds(query.getAssetIds());
-			if (assetIds.isEmpty()) {
-				return setResultError(I18nUtil.getMessage("base_error"));
-			}
-			if (assetIds.size() > Constants.MAX_PAGESIZE) {
-				return setResultError(I18nUtil.getMessage("base_error"));
-			}
-			Set<Integer> dramaIdsToSync = new HashSet<>();
-			for (Integer assetId : assetIds) {
-				ShelfOneResult result = shelfOneWithDrama(assetId, uid, shelfOn);
-				if (result.errorMsg != null) {
-					DramaAssetBatchShelfFailItem fail = new DramaAssetBatchShelfFailItem();
-					fail.setAssetId(assetId);
-					fail.setMessage(result.errorMsg);
-					continue;
-				}
-				if (result.dramaId != null) {
-					dramaIdsToSync.add(result.dramaId);
-				}
-			}
-			for (Integer dramaId : dramaIdsToSync) {
-				dramaAuditService.syncDramaShelfByEpisodes(dramaId);
-			}
-			return setResultSuccess(I18nUtil.getMessage("base_success"));
-		} catch (Exception e) {
-			log.error("drama asset batch {} error", shelfOn ? "shelf" : "unshelf", e);
-			throw new RuntimeException(e);
-		}
-	}
-
-	/** 单集上架/下架并立刻 sync 整剧（单接口用） */
-	private String shelfOne(Integer assetId, Integer uid, boolean shelfOn) {
-		ShelfOneResult result = shelfOneWithDrama(assetId, uid, shelfOn);
-		if (result.errorMsg != null) {
-			return result.errorMsg;
-		}
-		if (result.dramaId != null) {
-			dramaAuditService.syncDramaShelfByEpisodes(result.dramaId);
-		}
-		return null;
-	}
-
-	/**
-	 * 单集上下架核心逻辑；成功时返回 dramaId 供批量去重 sync，失败返回 errorMsg。
-	 */
-	private ShelfOneResult shelfOneWithDrama(Integer assetId, Integer uid, boolean shelfOn) {
-		ShelfOneResult result = new ShelfOneResult();
-		if (assetId == null) {
-			result.errorMsg = I18nUtil.getMessage("base_error");
-			return result;
-		}
-		DramaAssetEntity asset = dramaAssetDao.selectById(assetId);
-		if (asset == null || DeleteStateEnum.DELETE.getIndex().equals(asset.getDeleteState())) {
-			result.errorMsg = I18nUtil.getMessage("base_data_null");
-			return result;
-		}
-		DramaEntity drama = dramaDao.selectById(asset.getDramaId());
-		if (drama == null || DeleteStateEnum.DELETE.getIndex().equals(drama.getDeleteState())) {
-			result.errorMsg = I18nUtil.getMessage("drama_null");
-			return result;
-		}
-		ResponseBase ownerErr = assertOwner(drama, uid);
-		if (ownerErr != null) {
-			result.errorMsg = ownerErr.getMsg();
-			return result;
-		}
-		Date now = new Date();
-		if (shelfOn) {
-			if (!isApproved(asset.getAuditStatus()) || !isApproved(drama.getAuditStatus())) {
-				result.errorMsg = I18nUtil.getMessage("base_error");
-				return result;
-			}
-			// 已上架：幂等成功
-			if (asset.getShelfStatus() == null
-					|| !asset.getShelfStatus().equals(DramaAssetShelfStatusEnums.ON.getCode())) {
-				asset.setShelfStatus(DramaAssetShelfStatusEnums.ON.getCode());
-				asset.setVideoStatus(PublicEnums.ONE.getIndex());
-				asset.setShelfTime(now);
-				asset.setGmtModified(now);
-				dramaAssetDao.updateById(asset);
-			}
-		} else {
-			// 已下架：幂等成功，仍需 sync
-			if (asset.getShelfStatus() != null
-					&& !asset.getShelfStatus().equals(DramaAssetShelfStatusEnums.OFF.getCode())) {
-				asset.setShelfStatus(DramaAssetShelfStatusEnums.OFF.getCode());
-				asset.setVideoStatus(PublicEnums.ZERO.getIndex());
-				asset.setShelfTime(null);
-				asset.setGmtModified(now);
-				dramaAssetDao.updateById(asset);
-			}
-		}
-		result.dramaId = drama.getId();
-		return result;
-	}
-
-	/** 去重并去掉 null */
-	private static List<Integer> normalizeAssetIds(List<Integer> raw) {
-		if (raw == null || raw.isEmpty()) {
-			return new ArrayList<>();
-		}
-		Set<Integer> uniq = new LinkedHashSet<>();
-		for (Integer id : raw) {
-			if (id != null) {
-				uniq.add(id);
-			}
-		}
-		return new ArrayList<>(uniq);
-	}
-
-	private static class ShelfOneResult {
-		private Integer dramaId;
-		private String errorMsg;
-	}
-
-	@Override
-	public ResponseBase appeal(@Valid @RequestBody DramaAssetAppealQuery query, HttpServletRequest request) {
-		try {
-			Integer uid = SysUserTokenUtil.resolveAdminId(request);
-			if (uid == null) {
-				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
-			}
-			DramaAssetEntity asset = dramaAssetDao.selectById(query.getAssetId());
-			if (asset == null || DeleteStateEnum.DELETE.getIndex().equals(asset.getDeleteState())) {
-				return setResultError(I18nUtil.getMessage("base_data_null"));
-			}
-			DramaEntity drama = dramaDao.selectById(asset.getDramaId());
-			if (drama == null || DeleteStateEnum.DELETE.getIndex().equals(drama.getDeleteState())) {
-				return setResultError(I18nUtil.getMessage("drama_null"));
-			}
-			ResponseBase ownerErr = assertOwner(drama, uid);
-			if (ownerErr != null) {
-				return ownerErr;
-			}
-			// 仅驳回可申诉
-			if (asset.getAuditStatus() == null
-					|| !asset.getAuditStatus().equals(DramaAssetAuditStatusEnums.REJECTED.getCode())) {
-				return setResultError(I18nUtil.getMessage("base_error"));
-			}
-			// 申诉中不可重复提交
-			if (DramaAssetAuditStatusEnums.isAppealing(asset.getAuditStatus())
-					|| (asset.getAppealStatus() != null
-					&& asset.getAppealStatus().equals(DramaAppealStatusEnums.APPEALING.getCode()))) {
-				return setResultError(I18nUtil.getMessage("base_info_exist"));
-			}
-			Date now = new Date();
-			asset.setAppealStatus(DramaAppealStatusEnums.APPEALING.getCode());
-			asset.setAppealReason(query.getRemark().trim());
-			asset.setAppealTime(now);
-			asset.setAuditStatus(DramaAssetAuditStatusEnums.APPEALING.getCode());
-			asset.setGmtModified(now);
-			dramaAssetDao.updateById(asset);
-			log.info("drama asset appeal submitted assetId={} dramaId={} uid={}",
-					asset.getId(), asset.getDramaId(), uid);
-			// 重置 AI/A/B 进入再审，聚合逻辑保持 audit_status=4
-			dramaAssetAuditService.initAuditStepsOnRelease(asset.getId(), asset.getDramaId());
-			return setResultSuccess(I18nUtil.getMessage("base_success"));
-		} catch (Exception e) {
-			log.error("drama asset appeal failed assetId={}", query.getAssetId(), e);
-			throw new RuntimeException(e);
-		}
-	}
-
-	@Override
 	public ResponseBase delDrama(@RequestParam("id") Long id) {
 		try {
 			DramaAssetEntity entity = dramaAssetDao.selectById(id);
@@ -386,17 +167,6 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			log.error("del drama asset error", e);
 			throw new RuntimeException(e);
 		}
-	}
-
-	private static ResponseBase assertOwner(DramaEntity drama, Integer uid) {
-		if (drama.getBelongUser() != null && !drama.getBelongUser().equals(uid)) {
-			return setResultError(I18nUtil.getMessage("purview_error_null"));
-		}
-		return null;
-	}
-
-	private static boolean isApproved(Integer auditStatus) {
-		return auditStatus != null && auditStatus.equals(DramaAssetAuditStatusEnums.APPROVED.getCode());
 	}
 
 	private String toDefaultMultiRateM3u8Key(String uploadedKey) {

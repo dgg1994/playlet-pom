@@ -107,6 +107,12 @@ public class CreatorCommentServiceImpl extends BaseApiService implements Creator
 		if (StringUtils.isNotEmpty(query.getDramaTitle())) {
 			query.setDramaTitle(query.getDramaTitle().trim());
 		}
+		// commentType 缺省按集评，非法值直接拒
+		if (query.getCommentType() == null) {
+			query.setCommentType(CommentTypeEnums.VIDEO.getCode());
+		} else if (CommentTypeEnums.fromCode(query.getCommentType()) == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
 		CreatorCommentSortEnums sort = CreatorCommentSortEnums.fromCode(query.getSortType());
 		if (sort == null) {
 			return setResultError(I18nUtil.getMessage("base_error"));
@@ -126,7 +132,8 @@ public class CreatorCommentServiceImpl extends BaseApiService implements Creator
 		pageInfo.setPages(basePage.getPages());
 		pageInfo.setPageNum(basePage.getPageNum());
 		pageInfo.setPageSize(basePage.getPageSize());
-		log.info("creator comment findList creatorId={} size={}", account.getId(), list.size());
+		log.info("creator comment findList creatorId={} dramaId={} commentType={} size={}",
+				account.getId(), query.getDramaId(), query.getCommentType(), list.size());
 		return setResultSuccess(pageInfo, I18nUtil.getMessage("base_success"));
 	}
 
@@ -221,7 +228,11 @@ public class CreatorCommentServiceImpl extends BaseApiService implements Creator
 		DramaVideoCommentEntity entity = new DramaVideoCommentEntity();
 		entity.setDramaId(parent.getDramaId());
 		entity.setVideoId(parent.getVideoId());
-		entity.setCommentType(CommentTypeEnums.VIDEO.getCode());
+		// 回复类型跟父评一致（集评/剧评）
+		Integer parentType = parent.getCommentType() == null
+				? CommentTypeEnums.VIDEO.getCode()
+				: parent.getCommentType();
+		entity.setCommentType(parentType);
 		entity.setUserId(CreatorConstants.COMMENT_CREATOR_USER_ID_PLACEHOLDER);
 		entity.setFromCreatorId(account.getId());
 		entity.setCommentInfo(decision.getContent());
@@ -396,6 +407,9 @@ public class CreatorCommentServiceImpl extends BaseApiService implements Creator
 		resp.setDramaTitle(row.getDramaTitle());
 		resp.setVideoId(row.getVideoId());
 		resp.setSetNum(row.getSetNum());
+		resp.setCommentType(row.getCommentType() == null
+				? CommentTypeEnums.VIDEO.getCode()
+				: row.getCommentType());
 		boolean isReply = row.getParentId() != null && row.getParentId() > 0;
 		resp.setReplyFlag(isReply ? PublicEnums.ONE.getIndex() : PublicEnums.ZERO.getIndex());
 		resp.setParentId(row.getParentId() == null ? 0 : row.getParentId());
