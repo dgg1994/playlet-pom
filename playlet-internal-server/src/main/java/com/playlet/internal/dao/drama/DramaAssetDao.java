@@ -86,6 +86,14 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 	@Update("update drama_asset set duration_seconds = #{durationSeconds}, gmtModified = now() where id = #{id}")
 	int updateDurationSeconds(@Param("id") Integer id, @Param("durationSeconds") Integer durationSeconds);
 
+	/** 曝光量 +1（观看上报去重后调用） */
+	@Update("update drama_asset set exposure_count = ifnull(exposure_count,0) + 1, gmtModified = now() where id = #{id}")
+	int incrExposureCount(@Param("id") Integer id);
+
+	/** 完播量 +1（进度达阈值且去重后调用） */
+	@Update("update drama_asset set complete_count = ifnull(complete_count,0) + 1, gmtModified = now() where id = #{id}")
+	int incrCompleteCount(@Param("id") Integer id);
+
 	@Select("select video_url from drama_asset where id = #{id}")
 	String findVideoUrl(@Param("id") Integer id);
 

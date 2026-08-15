@@ -61,6 +61,8 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 	private MedalProgressService medalProgressService;
 	@Autowired
 	private TheaterHomeCacheHelper theaterHomeCacheHelper;
+	@Autowired
+	private DramaAssetPlayStatService dramaAssetPlayStatService;
 
 	@Override
 	public ResponseBase home() {
@@ -257,6 +259,9 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 			}
 			// 每次上报记 1 次 pv；有效秒数用裁剪后的 delta
 			pushRankWatchStat(dramaId, deltaSec);
+			// 作家端剧集曝光/完播（Redis 去重后异步落库）
+			dramaAssetPlayStatService.onWatchReport(uid, row.getEpisodeId(), row.getWatchProgress(),
+					entity.getEpisodeProgress());
 
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {

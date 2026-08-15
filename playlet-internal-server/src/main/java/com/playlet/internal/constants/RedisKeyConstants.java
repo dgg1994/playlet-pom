@@ -63,4 +63,9 @@ public class RedisKeyConstants {
     public static final String ACCESS_LIMIT_KEY = PROJECT_PREFIX + "req_limit:";
     /** 后台登录谷歌验证码暂存：后缀为 username */
     public static final String GOOGLE_CODE_KEY = PROJECT_PREFIX + "googleCode:";
+
+    /** 剧集曝光去重：后缀 uid:assetId */
+    public static final String PLAY_EXPOSE_DEDUP = PROJECT_PREFIX + "theater:play:expose:";
+    /** 剧集完播去重：后缀 uid:assetId */
+    public static final String PLAY_COMPLETE_DEDUP = PROJECT_PREFIX + "theater:play:complete:";
 }

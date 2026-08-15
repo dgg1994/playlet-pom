@@ -37,13 +37,13 @@ public class CreatorDramaAssetRespEntity {
 	@ApiModelProperty("上架状态 0未上架 1已上架")
 	private Integer shelfStatus;
 
-	@ApiModelProperty("曝光量；暂无统计时为空，前端展示 -")
+	@ApiModelProperty("曝光量")
 	private Long exposureCount;
 
-	@ApiModelProperty("完播量；暂无统计时为空，前端展示 -")
+	@ApiModelProperty("完播量")
 	private Long completeCount;
 
-	@ApiModelProperty("完播率 0-100；暂无统计时为空，前端展示 -")
+	@ApiModelProperty("完播率 0-100（曝光为 0 时为 0）")
 	private Double completeRate;
 
 	@ApiModelProperty("上传日期")

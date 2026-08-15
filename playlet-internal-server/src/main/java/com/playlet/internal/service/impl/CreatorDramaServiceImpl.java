@@ -147,10 +147,16 @@ public class CreatorDramaServiceImpl extends BaseApiService implements CreatorDr
 		resp.setSetTime(asset.getSetTime());
 		resp.setDurationSeconds(asset.getDurationSeconds());
 		resp.setDurationText(formatDuration(asset.getDurationSeconds()));
-		// 曝光/完播尚无统计，先空值给前端展示 "-"
-		resp.setExposureCount(null);
-		resp.setCompleteCount(null);
-		resp.setCompleteRate(null);
+		long exposure = asset.getExposureCount() == null ? 0L : asset.getExposureCount();
+		long complete = asset.getCompleteCount() == null ? 0L : asset.getCompleteCount();
+		resp.setExposureCount(exposure);
+		resp.setCompleteCount(complete);
+		// 完播率 = 完播 / 曝光 * 100，保留 1 位小数
+		if (exposure <= 0) {
+			resp.setCompleteRate(0.0);
+		} else {
+			resp.setCompleteRate(Math.round(complete * 1000.0 / exposure) / 10.0);
+		}
 		return resp;
 	}
 

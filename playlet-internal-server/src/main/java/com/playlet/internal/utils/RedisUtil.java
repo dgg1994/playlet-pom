@@ -129,6 +129,24 @@ public final class RedisUtil {
         }
     }
 
+    /**
+     * 仅当 key 不存在时写入并设置过期；用于去重计数。
+     * @return true 表示首次写入成功；false 表示已存在或异常
+     */
+    public boolean setIfAbsent(String key, Object value, long time) {
+        try {
+            if (time > 0) {
+                Boolean ok = redisTemplate.opsForValue().setIfAbsent(key, value, time, TimeUnit.SECONDS);
+                return Boolean.TRUE.equals(ok);
+            }
+            Boolean ok = redisTemplate.opsForValue().setIfAbsent(key, value);
+            return Boolean.TRUE.equals(ok);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
 
     /**
      * 递增

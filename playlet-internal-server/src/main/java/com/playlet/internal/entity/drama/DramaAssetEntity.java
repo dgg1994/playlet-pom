@@ -69,6 +69,14 @@ public class DramaAssetEntity extends PageQueryHelperEntity {
 	@TableField("duration_seconds")
 	@ApiModelProperty(name = "durationSeconds", value = "视频时长（秒）", required = false, dataType = "Integer")
 	private Integer durationSeconds;
+
+	@TableField("exposure_count")
+	@ApiModelProperty(name = "exposureCount", value = "曝光量", required = false, dataType = "Long")
+	private Long exposureCount;
+
+	@TableField("complete_count")
+	@ApiModelProperty(name = "completeCount", value = "完播量", required = false, dataType = "Long")
+	private Long completeCount;
 	
 	@TableField("video_status")
 	@ApiModelProperty(name = "videoStatus",value = "可用状态 1是0否",required = false,dataType = "Integer")
