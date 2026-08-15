@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.query.drama.AddDramaAssetQuery;
 import com.playlet.internal.query.drama.DramaAssetAppealQuery;
+import com.playlet.internal.query.drama.DramaAssetBatchShelfQuery;
 import com.playlet.internal.query.drama.DramaAssetShelfQuery;
 import com.playlet.internal.query.drama.DramaVideoUploadTokenQuery;
 
@@ -45,6 +46,16 @@ public interface DramaAssetService {
 	@PostMapping("/unshelf")
 	@ApiOperation(value = "集下架", notes = "下架本集；若该剧已无上架集则自动下架整剧。创作者调用时校验 belongUser。")
 	ResponseBase unshelf(DramaAssetShelfQuery query, HttpServletRequest request);
+
+	@PostMapping("/batchShelf")
+	@ApiOperation(value = "批量集上架", notes = "body: {assetIds}；逐条校验归属/审核；部分失败时返回成功数与失败明细。"
+			+ "每部剧只同步一次整剧上架状态。")
+	ResponseBase batchShelf(DramaAssetBatchShelfQuery query, HttpServletRequest request);
+
+	@PostMapping("/batchUnshelf")
+	@ApiOperation(value = "批量集下架", notes = "body: {assetIds}；逐条校验归属；部分失败时返回成功数与失败明细。"
+			+ "每部剧只同步一次整剧下架状态。")
+	ResponseBase batchUnshelf(DramaAssetBatchShelfQuery query, HttpServletRequest request);
 
 	@PostMapping("/appeal")
 	@ApiOperation(value = "集申诉", notes = "仅驳回后可发起；auditStatus=4 申诉中并重置 AI/A/B 进入再审；校验 belongUser。"

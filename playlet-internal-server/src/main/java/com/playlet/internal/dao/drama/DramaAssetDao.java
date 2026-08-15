@@ -82,7 +82,9 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 	@Update("update drama_asset set like_score = greatest(ifnull(like_score,0) - 1, 0), gmtModified = now() where id = #{assetId}")
 	int decrLikeScore(@Param("assetId") Integer assetId);
 
-
+	/** 写入七牛 avinfo 解析出的时长 */
+	@Update("update drama_asset set duration_seconds = #{durationSeconds}, gmtModified = now() where id = #{id}")
+	int updateDurationSeconds(@Param("id") Integer id, @Param("durationSeconds") Integer durationSeconds);
 
 	@Select("select video_url from drama_asset where id = #{id}")
 	String findVideoUrl(@Param("id") Integer id);

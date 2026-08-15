@@ -10,11 +10,14 @@ import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.CreatorConstants;
+import com.playlet.internal.dao.account.AppAccountDao;
+import com.playlet.internal.dao.creator.CreatorAccountDao;
 import com.playlet.internal.dao.creator.CreatorCommentDao;
 import com.playlet.internal.dao.drama.DramaAssetDao;
 import com.playlet.internal.dao.drama.DramaDao;
 import com.playlet.internal.dao.drama.DramaVideoCommentDao;
 import com.playlet.internal.dao.drama.UserInteractMessageDao;
+import com.playlet.internal.entity.account.AppAccountEntity;
 import com.playlet.internal.entity.creator.CreatorAccountEntity;
 import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
@@ -53,7 +56,11 @@ import javax.validation.Valid;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * 作家评论管理：列表 / 置顶 / 软删 / 作者身份回复。
@@ -72,6 +79,10 @@ public class CreatorCommentServiceImpl extends BaseApiService implements Creator
 	private DramaDao dramaDao;
 	@Autowired
 	private DramaAssetDao dramaAssetDao;
+	@Autowired
+	private AppAccountDao appAccountDao;
+	@Autowired
+	private CreatorAccountDao creatorAccountDao;
 	@Autowired
 	private MediaUrlService mediaUrlService;
 	@Autowired
@@ -108,10 +119,8 @@ public class CreatorCommentServiceImpl extends BaseApiService implements Creator
 			rows = Collections.emptyList();
 		}
 		PageInfo<CreatorCommentListRow> basePage = new PageInfo<>(rows);
-		List<CreatorCommentListRespEntity> list = new ArrayList<>(rows.size());
-		for (CreatorCommentListRow row : rows) {
-			list.add(toListResp(row));
-		}
+		// 第二步：批量补用户昵称头像、父评摘要
+		List<CreatorCommentListRespEntity> list = buildListResp(rows);
 		PageInfo<CreatorCommentListRespEntity> pageInfo = new PageInfo<>(list);
 		pageInfo.setTotal(basePage.getTotal());
 		pageInfo.setPages(basePage.getPages());
@@ -280,7 +289,107 @@ public class CreatorCommentServiceImpl extends BaseApiService implements Creator
 		return comment;
 	}
 
-	private CreatorCommentListRespEntity toListResp(CreatorCommentListRow row) {
+	/**
+	 * 批量补齐评论用户、父评摘要后组装列表。
+	 */
+	private List<CreatorCommentListRespEntity> buildListResp(List<CreatorCommentListRow> rows) {
+		if (rows == null || rows.isEmpty()) {
+			return Collections.emptyList();
+		}
+		Set<Integer> userIds = new HashSet<>();
+		Set<Integer> creatorIds = new HashSet<>();
+		Set<Integer> parentIds = new HashSet<>();
+		for (CreatorCommentListRow row : rows) {
+			collectAuthorIds(row.getFromCreatorId(), row.getUserId(), userIds, creatorIds);
+			if (row.getParentId() != null && row.getParentId() > 0) {
+				parentIds.add(row.getParentId());
+			}
+		}
+
+		Map<Integer, DramaVideoCommentEntity> parentMap = loadParentMap(parentIds);
+		for (DramaVideoCommentEntity parent : parentMap.values()) {
+			if (parent == null) {
+				continue;
+			}
+			collectAuthorIds(parent.getFromCreatorId(), parent.getUserId(), userIds, creatorIds);
+		}
+		Map<Integer, AppAccountEntity> userMap = loadUserMap(userIds);
+		Map<Integer, CreatorAccountEntity> creatorMap = loadCreatorMap(creatorIds);
+
+		List<CreatorCommentListRespEntity> list = new ArrayList<>(rows.size());
+		for (CreatorCommentListRow row : rows) {
+			list.add(toListResp(row, parentMap, userMap, creatorMap));
+		}
+		return list;
+	}
+
+	private void collectAuthorIds(Integer fromCreatorId, Integer userId,
+			Set<Integer> userIds, Set<Integer> creatorIds) {
+		if (fromCreatorId != null && fromCreatorId > 0) {
+			creatorIds.add(fromCreatorId);
+			return;
+		}
+		if (userId != null && userId > 0) {
+			userIds.add(userId);
+		}
+	}
+
+	private Map<Integer, DramaVideoCommentEntity> loadParentMap(Set<Integer> parentIds) {
+		if (parentIds == null || parentIds.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		List<DramaVideoCommentEntity> parents = dramaVideoCommentDao.findByIds(new ArrayList<>(parentIds));
+		if (parents == null || parents.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		Map<Integer, DramaVideoCommentEntity> map = new HashMap<>(parents.size());
+		for (DramaVideoCommentEntity parent : parents) {
+			if (parent != null && parent.getId() != null) {
+				map.put(parent.getId(), parent);
+			}
+		}
+		return map;
+	}
+
+
+	private Map<Integer, AppAccountEntity> loadUserMap(Set<Integer> userIds) {
+		if (userIds == null || userIds.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		List<AppAccountEntity> users = appAccountDao.findByUids(new ArrayList<>(userIds));
+		if (users == null || users.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		Map<Integer, AppAccountEntity> map = new HashMap<>(users.size());
+		for (AppAccountEntity user : users) {
+			if (user != null && user.getId() != null) {
+				map.put(user.getId(), user);
+			}
+		}
+		return map;
+	}
+
+	private Map<Integer, CreatorAccountEntity> loadCreatorMap(Set<Integer> creatorIds) {
+		if (creatorIds == null || creatorIds.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		List<CreatorAccountEntity> creators = creatorAccountDao.findByIds(new ArrayList<>(creatorIds));
+		if (creators == null || creators.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		Map<Integer, CreatorAccountEntity> map = new HashMap<>(creators.size());
+		for (CreatorAccountEntity creator : creators) {
+			if (creator != null && creator.getId() != null) {
+				map.put(creator.getId(), creator);
+			}
+		}
+		return map;
+	}
+
+	private CreatorCommentListRespEntity toListResp(CreatorCommentListRow row,
+			Map<Integer, DramaVideoCommentEntity> parentMap,
+			Map<Integer, AppAccountEntity> userMap,
+			Map<Integer, CreatorAccountEntity> creatorMap) {
 		CreatorCommentListRespEntity resp = new CreatorCommentListRespEntity();
 		resp.setId(row.getId());
 		resp.setDramaId(row.getDramaId());
@@ -292,31 +401,84 @@ public class CreatorCommentServiceImpl extends BaseApiService implements Creator
 		resp.setParentId(row.getParentId() == null ? 0 : row.getParentId());
 		resp.setUserId(row.getUserId());
 		resp.setFromCreatorId(row.getFromCreatorId());
-		resp.setUserName(row.getUserName());
-		resp.setAvatar(mediaUrlService.sign(row.getAvatar()));
+		fillAuthor(resp, row.getFromCreatorId(), row.getUserId(), userMap, creatorMap);
 		resp.setCommentInfo(row.getCommentInfo());
 		resp.setLikeCount(row.getLikeCount() == null ? 0 : row.getLikeCount());
 		resp.setPinFlag(row.getPinFlag() == null ? 0 : row.getPinFlag());
 		resp.setPinTime(row.getPinTime());
 		resp.setSetTime(row.getSetTime());
 		resp.setContextText(buildContextText(row.getDramaTitle(), row.getSetNum(), isReply));
-		if (isReply && row.getParentCommentId() != null) {
-			CreatorCommentParentRespEntity parent = new CreatorCommentParentRespEntity();
-			parent.setId(row.getParentCommentId());
-			parent.setUserName(row.getParentUserName());
-			parent.setAvatar(mediaUrlService.sign(row.getParentAvatar()));
-			parent.setCommentInfo(row.getParentCommentInfo());
-			resp.setParentComment(parent);
+		if (isReply) {
+			DramaVideoCommentEntity parent = parentMap.get(row.getParentId());
+			if (parent != null) {
+				CreatorCommentParentRespEntity parentResp = new CreatorCommentParentRespEntity();
+				parentResp.setId(parent.getId());
+				parentResp.setCommentInfo(parent.getCommentInfo());
+				fillParentAuthor(parentResp, parent.getFromCreatorId(), parent.getUserId(), userMap, creatorMap);
+				resp.setParentComment(parentResp);
+			}
 		}
 		return resp;
 	}
 
-	/** 原型文案：在 {剧名} 第xx集 发表了评论 / 回复了评论 */
+	/** 填充评论作者展示名/头像：优先作家身份 */
+	private void fillAuthor(CreatorCommentListRespEntity resp, Integer fromCreatorId, Integer userId,
+			Map<Integer, AppAccountEntity> userMap, Map<Integer, CreatorAccountEntity> creatorMap) {
+		if (fromCreatorId != null && fromCreatorId > 0) {
+			CreatorAccountEntity creator = creatorMap.get(fromCreatorId);
+			if (creator != null) {
+				resp.setUserName(resolveCreatorName(creator));
+				resp.setAvatar(mediaUrlService.sign(creator.getAvatar()));
+				return;
+			}
+		}
+		AppAccountEntity user = userId == null ? null : userMap.get(userId);
+		if (user != null) {
+			resp.setUserName(user.getNickname());
+			resp.setAvatar(mediaUrlService.sign(user.getAvatar()));
+			return;
+		}
+		resp.setUserName(null);
+		resp.setAvatar(null);
+	}
+
+	private void fillParentAuthor(CreatorCommentParentRespEntity parentResp, Integer fromCreatorId,
+			Integer userId, Map<Integer, AppAccountEntity> userMap,
+			Map<Integer, CreatorAccountEntity> creatorMap) {
+		if (fromCreatorId != null && fromCreatorId > 0) {
+			CreatorAccountEntity creator = creatorMap.get(fromCreatorId);
+			if (creator != null) {
+				parentResp.setUserName(resolveCreatorName(creator));
+				parentResp.setAvatar(mediaUrlService.sign(creator.getAvatar()));
+				return;
+			}
+		}
+		AppAccountEntity user = userId == null ? null : userMap.get(userId);
+		if (user != null) {
+			parentResp.setUserName(user.getNickname());
+			parentResp.setAvatar(mediaUrlService.sign(user.getAvatar()));
+			return;
+		}
+		parentResp.setUserName(null);
+		parentResp.setAvatar(null);
+	}
+
+	private static String resolveCreatorName(CreatorAccountEntity creator) {
+		if (creator == null) {
+			return null;
+		}
+		if (StringUtils.isNotEmpty(creator.getNickname())) {
+			return creator.getNickname();
+		}
+		return creator.getUserAccount();
+	}
+
+	/** 原型文案：在 {剧名} 第xx集 发表了评论 / 回复了评论（多语言） */
 	private static String buildContextText(String dramaTitle, Integer setNum, boolean isReply) {
 		String title = StringUtils.isEmpty(dramaTitle) ? "" : dramaTitle;
 		String ep = setNum == null ? "--" : String.format("%02d", setNum);
-		String action = isReply ? "回复了评论" : "发表了评论";
-		return "在 " + title + " 第" + ep + "集 " + action;
+		String code = isReply ? "creator.comment.context_reply" : "creator.comment.context_post";
+		return I18nUtil.getMessage(code, title, ep);
 	}
 
 	private void addDiscussScore(DramaVideoCommentEntity entity) {

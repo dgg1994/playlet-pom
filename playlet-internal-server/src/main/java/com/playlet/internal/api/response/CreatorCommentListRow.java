@@ -5,7 +5,7 @@ import lombok.Data;
 import java.util.Date;
 
 /**
- * 作家评论列表 Dao 行（含父评扁平字段）。
+ * 作家评论列表 Dao 行（分页主查字段，用户/父评由 Service 批量补齐）。
  */
 @Data
 public class CreatorCommentListRow {
@@ -18,17 +18,9 @@ public class CreatorCommentListRow {
 	private Integer parentId;
 	private Integer userId;
 	private Integer fromCreatorId;
-	private String userName;
-	private String avatar;
 	private String commentInfo;
 	private Integer likeCount;
 	private Integer pinFlag;
 	private Date pinTime;
 	private Date setTime;
-
-	private Integer parentCommentId;
-	private String parentUserName;
-	private String parentAvatar;
-	private String parentCommentInfo;
-	private Integer parentFromCreatorId;
 }

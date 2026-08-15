@@ -7,6 +7,8 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 /**
  * 作家登录账号。
  */
@@ -15,6 +17,12 @@ public interface CreatorAccountDao extends BaseMapper<CreatorAccountEntity> {
 
 	@Select("select * from creator_account where user_account = #{userAccount} limit 1")
 	CreatorAccountEntity findByAccount(@Param("userAccount") String userAccount);
+
+	@Select("<script>"
+			+ "select * from creator_account where id in "
+			+ "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
+			+ "</script>")
+	List<CreatorAccountEntity> findByIds(@Param("ids") List<Integer> ids);
 
 	@Update("update creator_account set last_login_time = now(), gmtModified = now() where id = #{id}")
 	int updateLastLoginTime(@Param("id") Integer id);

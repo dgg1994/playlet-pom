@@ -145,9 +145,9 @@ public class CreatorDramaServiceImpl extends BaseApiService implements CreatorDr
 		resp.setShelfStatus(asset.getShelfStatus());
 		resp.setAuditRejectReason(asset.getAuditRejectReason());
 		resp.setSetTime(asset.getSetTime());
-		// 时长/曝光/完播尚无落库字段，先空值给前端展示 "-"
-		resp.setDurationSeconds(null);
-		resp.setDurationText(formatDuration(null));
+		resp.setDurationSeconds(asset.getDurationSeconds());
+		resp.setDurationText(formatDuration(asset.getDurationSeconds()));
+		// 曝光/完播尚无统计，先空值给前端展示 "-"
 		resp.setExposureCount(null);
 		resp.setCompleteCount(null);
 		resp.setCompleteRate(null);

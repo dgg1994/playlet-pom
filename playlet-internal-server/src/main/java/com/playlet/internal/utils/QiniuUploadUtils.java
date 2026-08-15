@@ -1,5 +1,7 @@
 package com.playlet.internal.utils;
 
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
 import com.playlet.internal.config.QiniuConfig;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.RedisKeyConstants;
@@ -11,6 +13,8 @@ import com.qiniu.storage.Region;
 import com.qiniu.storage.UploadManager;
 import com.qiniu.util.Auth;
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,6 +29,7 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 七牛云上传工具类。
@@ -41,6 +46,11 @@ public class QiniuUploadUtils {
 	private static final Set<String> VIDEO_EXT = new HashSet<>(Arrays.asList(
 			"mp4", "mov", "m4v", "webm", "mkv", "avi", "ts", "m3u8"
 	));
+
+	private static final OkHttpClient AVINFO_HTTP = new OkHttpClient.Builder()
+			.connectTimeout(8, TimeUnit.SECONDS)
+			.readTimeout(15, TimeUnit.SECONDS)
+			.build();
 
 	@Autowired
 	private QiniuConfig qiniuConfig;
@@ -447,5 +457,55 @@ public class QiniuUploadUtils {
 		int lastDotIndex = path.lastIndexOf(".");
 		String replaced = lastDotIndex == -1 ? path + "." + ext : path.substring(0, lastDotIndex) + "." + ext;
 		return replaced + query;
+	}
+
+	/**
+	 * 调七牛 avinfo 解析视频时长（秒）。
+	 * 应对「原始上传文件」key（如 mp4），勿对尚未生成的转码 m3u8 调用。
+	 * @return 时长秒；失败返回 null
+	 */
+	public static Integer fetchDurationSeconds(String keyOrUrl) {
+		return getInstance().doFetchDurationSeconds(keyOrUrl);
+	}
+
+	private Integer doFetchDurationSeconds(String keyOrUrl) {
+		String key = qiniuConfig.extractKey(keyOrUrl);
+		if (key == null || key.isEmpty()) {
+			return null;
+		}
+		// 公有直链或私有签名 URL，再挂 ?avinfo
+		String baseUrl = qiniuConfig.toAccessUrl(key, qiniuConfig.getUrlExpireSeconds(), qiniuAuth);
+		if (baseUrl == null || baseUrl.isEmpty()) {
+			return null;
+		}
+		String avinfoUrl = baseUrl.contains("?") ? baseUrl + "&avinfo" : baseUrl + "?avinfo";
+		Request request = new Request.Builder().url(avinfoUrl).get().build();
+		try (okhttp3.Response response = AVINFO_HTTP.newCall(request).execute()) {
+			if (response.body() == null || !response.isSuccessful()) {
+				log.warn("qiniu avinfo http fail key={} code={}", key, response.code());
+				return null;
+			}
+			String body = response.body().string();
+			JSONObject root = JSON.parseObject(body);
+			if (root == null) {
+				return null;
+			}
+			JSONObject format = root.getJSONObject("format");
+			if (format == null) {
+				return null;
+			}
+			String durationText = format.getString("duration");
+			if (durationText == null || durationText.isEmpty()) {
+				return null;
+			}
+			double seconds = Double.parseDouble(durationText);
+			if (seconds <= 0 || Double.isNaN(seconds)) {
+				return null;
+			}
+			return (int) Math.round(seconds);
+		} catch (Exception e) {
+			log.warn("qiniu avinfo parse fail key={}: {}", key, e.getMessage());
+			return null;
+		}
 	}
 }
