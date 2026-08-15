@@ -1,12 +1,12 @@
 package com.playlet.internal.service.impl;
 
+import com.playlet.internal.api.response.CreatorHomeFeedRespEntity;
 import com.playlet.internal.api.response.CreatorHomeHotDramaRespEntity;
 import com.playlet.internal.api.response.CreatorHomeHotTagAggRow;
 import com.playlet.internal.api.response.CreatorHomeHotTagRespEntity;
 import com.playlet.internal.api.response.CreatorHomeNoticeRespEntity;
 import com.playlet.internal.api.response.CreatorHomeRankAggRow;
 import com.playlet.internal.api.response.CreatorHomeRankItemRespEntity;
-import com.playlet.internal.api.response.CreatorHomeRespEntity;
 import com.playlet.internal.api.response.CreatorHomeStatsRespEntity;
 import com.playlet.internal.api.response.DramaRankAggRow;
 import com.playlet.internal.base.BaseApiService;
@@ -49,7 +49,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 作家首页：首屏聚合与影响力/成长力榜切换。
+ * 作家首页：stats / feed / notices / rank。
  */
 @Slf4j
 @RestController
@@ -73,18 +73,39 @@ public class CreatorHomeServiceImpl extends BaseApiService implements CreatorHom
 	private MediaUrlService mediaUrlService;
 
 	@Override
-	public ResponseBase home(HttpServletRequest request) {
+	public ResponseBase stats(HttpServletRequest request) {
 		CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
 		if (account == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
-		CreatorHomeRespEntity resp = new CreatorHomeRespEntity();
-		resp.setStats(buildStats(account));
+		CreatorHomeStatsRespEntity stats = buildStats(account);
+		log.info("creator home stats creatorId={}", account.getId());
+		return setResultSuccess(stats, I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	public ResponseBase feed(HttpServletRequest request) {
+		CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
+		if (account == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		CreatorHomeFeedRespEntity resp = new CreatorHomeFeedRespEntity();
 		resp.setHotDramas(buildHotDramas());
 		resp.setHotTags(buildHotTags());
-		resp.setNotices(buildNotices());
-		log.info("creator home creatorId={}", account.getId());
+		log.info("creator home feed creatorId={} dramas={} tags={}", account.getId(),
+				resp.getHotDramas().size(), resp.getHotTags().size());
 		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	public ResponseBase notices(HttpServletRequest request) {
+		CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
+		if (account == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		List<CreatorHomeNoticeRespEntity> list = buildNotices();
+		log.info("creator home notices creatorId={} size={}", account.getId(), list.size());
+		return setResultSuccess(list, I18nUtil.getMessage("base_success"));
 	}
 
 	@Override

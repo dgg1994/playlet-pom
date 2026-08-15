@@ -11,16 +11,23 @@ import org.springframework.web.bind.annotation.RequestParam;
 import javax.servlet.http.HttpServletRequest;
 
 /**
- * 作家端首页：聚合首屏 + 榜单切换。
- * 网关：/china/admin/api/creator/home/** 或 /entrance/api/creator/home/**
+ * 作家端首页
  */
 @RequestMapping("/creator/home")
 @Api(value = "作家端首页", tags = "作家端首页")
 public interface CreatorHomeService {
 
-	@GetMapping("")
-	@ApiOperation(value = "首页聚合", notes = "概览 + 热点剧 + 热点题材 + 公告摘要 + 默认影响力榜")
-	ResponseBase home(HttpServletRequest request);
+	@GetMapping("/stats")
+	@ApiOperation(value = "顶部数据概览", notes = "今日/昨日收益、余额、累计、播放、在播")
+	ResponseBase stats(HttpServletRequest request);
+
+	@GetMapping("/feed")
+	@ApiOperation(value = "首页Feed", notes = "近期热点剧集 + 热点题材")
+	ResponseBase feed(HttpServletRequest request);
+
+	@GetMapping("/notices")
+	@ApiOperation(value = "系统公告摘要", notes = "首页公告列表摘要；查看更多可后续扩展分页")
+	ResponseBase notices(HttpServletRequest request);
 
 	@GetMapping("/rank")
 	@ApiImplicitParam(name = "type", value = "1影响力 2成长力，默认1", required = false, dataType = "Integer",

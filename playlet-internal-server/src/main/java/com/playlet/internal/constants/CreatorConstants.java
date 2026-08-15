@@ -53,4 +53,13 @@ public final class CreatorConstants {
 
 	/** 热点题材：近窗内出现次数 ≥ 此值打火标 */
 	public static final int HOT_TAG_FIRE_MIN_CNT = 3;
+
+	/** 作家身份回复落库的 user_id 占位（真实身份看 from_creator_id） */
+	public static final int COMMENT_CREATOR_USER_ID_PLACEHOLDER = 0;
+
+	/** 置顶：是 */
+	public static final int COMMENT_PIN_ON = 1;
+
+	/** 置顶：否 */
+	public static final int COMMENT_PIN_OFF = 0;
 }
