@@ -1,6 +1,7 @@
 package com.playlet.internal.service;
 
 
+import com.playlet.internal.api.request.OnePayBindVerifyRequest;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.entity.account.AppAccountEntity;
 import com.playlet.internal.query.account.BindPushQuery;
@@ -12,6 +13,7 @@ import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -63,7 +65,14 @@ public interface AppUserService {
 			response = ResponseBase.class)
     ResponseBase update(AppAccountEntity entity, HttpServletRequest request);
 
-	
+	@PostMapping("/bindOnePay")
+	@ApiOperation(value = "绑定OnePay帐号", notes = "需登录；RestTemplate POST 调三方校验")
+	ResponseBase bindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request);
+
+	@PostMapping("/unBindOnePay")
+	@ApiOperation(value = "解除绑定OnePay帐号", notes = "需登录")
+	ResponseBase unBindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request);
+
     @PostMapping("/bindPush")
     @ApiOperation(value = "绑定极光推送", notes = "无需登录。App 启动后上报 cid 或 registrationId；可选 deviceName。"
 			+ "已登录时会同时写入账号 registration_id，并从请求头 language 写入 push_langue，便于互动/勋章/系统消息按接收人语言推送。", response = ResponseBase.class)
