@@ -1,9 +1,14 @@
 package com.playlet.internal.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.playlet.internal.api.request.OnePayBindVerifyRequest;
 import com.playlet.internal.api.response.CreatorInfoRespEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
+import com.playlet.internal.config.OnePayProperties;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.CreatorConstants;
 import com.playlet.internal.constants.RedisKeyConstants;
@@ -24,11 +29,14 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
@@ -59,6 +67,10 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
     private RedisUtil redisUtil;
     @Autowired
     private MediaUrlService mediaUrlService;
+    @Autowired
+    private RestTemplate restTemplate;
+    @Autowired
+    private OnePayProperties onePayProperties;
 
     @Override
     public ResponseBase sendEmailCode(@RequestParam("userAccount") String userAccount,
@@ -95,9 +107,6 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
             redisUtil.set(RedisKeyConstants.CREATOR_EMAIL_CODE_KEY + email, code, Constants.CODE_EXPIRE_TIME);
             log.info("creator email code sent scene={} email={}", sceneEnum.getCode(), maskEmail(email));
             return setResultSuccess(I18nUtil.getMessage("send_success"));
-        } catch (BaseException e) {
-            log.error("creator send email code biz error email={}", maskEmail(email), e);
-            throw e;
         } catch (Exception e) {
             log.error("creator send email code failed email={}", maskEmail(email), e);
             throw new BaseException(I18nUtil.getMessage("base_error"), e);
@@ -142,12 +151,6 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         try {
             creatorAccountDao.insert(account);
             creatorProfileDao.insert(buildProfile(account.getId(), query, now));
-        } catch (DuplicateKeyException e) {
-            log.error("creator signUp duplicate email={}", maskEmail(email), e);
-            return setResultError(I18nUtil.getMessage("user.account_exist"));
-        } catch (BaseException e) {
-            log.error("creator signUp biz error email={}", maskEmail(email), e);
-            throw e;
         } catch (Exception e) {
             log.error("creator signUp failed email={}", maskEmail(email), e);
             throw new BaseException(I18nUtil.getMessage("base_error"), e);
@@ -311,6 +314,66 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         }
         return setResultSuccess(toInfoResp(account, creatorProfileDao.findByCreatorId(account.getId())));
     }
+
+    @Override
+    public ResponseBase bindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request) {
+        try {
+            Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
+            if (creatorId == null) {
+                return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+            }
+            // 校验验证码
+            if (!verifyCode(query.getAccount(), query.getVerificationCode())) {
+                return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
+            }
+            ResponseEntity<String> result = restTemplate.postForEntity(
+                    onePayProperties.getBindVerifyUrl(), query, String.class);
+            if (result.getStatusCode() != HttpStatus.OK){
+                // 对面不存在该用户信息
+                return setResultError(I18nUtil.getMessage("base_error"));
+            }
+            String body = result.getBody();
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode jsonNode = objectMapper.readTree(body);
+            String openid = jsonNode
+                    .get("data")
+                    .get("openid")
+                    .asText();
+            // 绑定onepay信息到作家端帐号
+            CreatorProfileEntity creatorProfileEntity = creatorProfileDao.selectOne(new QueryWrapper<CreatorProfileEntity>().eq("creator_id", creatorId));
+            if (creatorProfileEntity == null){
+                return setResultError(I18nUtil.getMessage("base_error"));
+            }
+            creatorProfileEntity.setOnepayOpenId(openid);
+            bindOnePay(creatorProfileEntity, query.getAccount(), new Date());
+            creatorProfileDao.updateById(creatorProfileEntity);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return setResultSuccess(I18nUtil.getMessage("base_success"));
+    }
+
+    @Override
+    public ResponseBase unBindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request) {
+        Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
+        if (creatorId == null) {
+            return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+        }
+        // 校验验证码
+        if (!verifyCode(query.getAccount(), query.getVerificationCode())) {
+            return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
+        }
+        CreatorProfileEntity creatorProfileEntity = creatorProfileDao.selectOne(new QueryWrapper<CreatorProfileEntity>().eq("creator_id", creatorId));
+        if (creatorProfileEntity == null){
+            return setResultError(I18nUtil.getMessage("base_error"));
+        }
+        // 解绑
+        creatorProfileEntity.setOnepayBindStatus(OnePayBindStatusEnums.UNBOUND.getCode());
+        creatorProfileEntity.setGmtModified(new Date());
+        creatorProfileDao.updateById(creatorProfileEntity);
+        return setResultSuccess(I18nUtil.getMessage("base_success"));
+    }
+
 
     @Override
     public ResponseBase signOut(HttpServletRequest request) {

@@ -1,5 +1,6 @@
 package com.playlet.internal.service;
 
+import com.playlet.internal.api.request.OnePayBindVerifyRequest;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.query.creator.CreatorForgetPwdQuery;
 import com.playlet.internal.query.creator.CreatorLoginQuery;
@@ -12,6 +13,7 @@ import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -56,6 +58,14 @@ public interface CreatorAuthService {
 	@GetMapping("/findInfo")
 	@ApiOperation("当前登录作家资料")
 	ResponseBase findInfo(HttpServletRequest request);
+
+	@PostMapping("/bindOnePay")
+	@ApiOperation(value = "绑定OnePay帐号", notes = "需登录；RestTemplate POST 调三方校验")
+	ResponseBase bindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request);
+
+	@PostMapping("/unBindOnePay")
+	@ApiOperation(value = "解除绑定OnePay帐号", notes = "需登录")
+	ResponseBase unBindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request);
 
 	@GetMapping("/signOut")
 	@ApiOperation("退出登录")

@@ -36,6 +36,6 @@ public interface CreatorCommentService {
 	ResponseBase delete(@RequestParam("id") Integer id, HttpServletRequest request);
 
 	@PostMapping("/reply")
-	@ApiOperation(value = "回复评论", notes = "以作者身份回复；写入 from_creator_id")
+	@ApiOperation(value = "回复评论", notes = "commentType=1 剧集评（需 videoId）/ 2 短剧评；作者身份写入 from_creator_id，不可评分")
 	ResponseBase reply(CreatorCommentReplyQuery query, HttpServletRequest request);
 }

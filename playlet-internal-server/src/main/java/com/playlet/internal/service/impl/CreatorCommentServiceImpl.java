@@ -219,31 +219,65 @@ public class CreatorCommentServiceImpl extends BaseApiService implements Creator
 		if (account == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
-		DramaVideoCommentEntity parent = loadOwnedComment(query.getCommentId(), account.getId(), true);
+		CommentTypeEnums commentType;
+		if (query.getCommentType() == null) {
+			commentType = CommentTypeEnums.VIDEO;
+		} else {
+			commentType = CommentTypeEnums.fromCode(query.getCommentType());
+			if (commentType == null) {
+				return setResultError(I18nUtil.getMessage("base_error"));
+			}
+		}
+		if (CommentTypeEnums.VIDEO.equals(commentType) && query.getVideoId() == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		return doReply(account, query.getDramaId(), query.getVideoId(), query.getParentId(),
+				query.getReplyToUserId(), query.getCommentInfo(), commentType);
+	}
+
+	/**
+	 * 作者身份回复：落库格式对齐 C 端剧评/集评，userId 用占位、from_creator_id 为当前作家。
+	 */
+	private ResponseBase doReply(CreatorAccountEntity account, Integer dramaId, Integer videoId,
+			Integer parentId, Integer replyToUserId, String commentInfo, CommentTypeEnums commentType) {
+		boolean dramaReply = CommentTypeEnums.DRAMA.equals(commentType);
+		DramaVideoCommentEntity parent = loadOwnedComment(parentId, account.getId(), true);
 		if (parent == null) {
 			return setResultError(I18nUtil.getMessage("purview_error_null"));
 		}
-		String sanitized = HtmlSanitizeUtils.plain(query.getCommentInfo());
+		boolean parentIsDrama = CommentTypeEnums.isDrama(parent.getCommentType());
+		if (dramaReply != parentIsDrama) {
+			return setResultError(I18nUtil.getMessage("base_data_null"));
+		}
+		if (dramaId == null || !dramaId.equals(parent.getDramaId())) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		if (!dramaReply) {
+			Integer parentVideoId = parent.getVideoId();
+			if (videoId == null || parentVideoId == null || !videoId.equals(parentVideoId)) {
+				return setResultError(I18nUtil.getMessage("base_error"));
+			}
+		}
+		String sanitized = HtmlSanitizeUtils.plain(commentInfo);
 		if (StringUtils.isEmpty(sanitized)) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
+		Integer persistVideoId = dramaReply ? 0 : videoId;
+		Integer sourceCode = dramaReply
+				? SensitiveSourceEnums.DRAMA_COMMENT.getCode()
+				: SensitiveSourceEnums.VIDEO_COMMENT.getCode();
 		SensitiveDecision decision = sensitiveWordService.decide(sanitized);
 		if (decision.isReject()) {
 			sensitiveRecordService.saveRecord(new SensitiveRecordEntity(
-					null, CreatorConstants.COMMENT_CREATOR_USER_ID_PLACEHOLDER, parent.getDramaId(),
-					parent.getVideoId(), sanitized, SensitiveSourceEnums.VIDEO_COMMENT.getCode()),
-					decision.getCheck());
+					null, CreatorConstants.COMMENT_CREATOR_USER_ID_PLACEHOLDER, dramaId,
+					persistVideoId, sanitized, sourceCode), decision.getCheck());
 			return setResultError(I18nUtil.getMessage("sensitive_forbidden"));
 		}
 
 		DramaVideoCommentEntity entity = new DramaVideoCommentEntity();
-		entity.setDramaId(parent.getDramaId());
-		entity.setVideoId(parent.getVideoId());
-		// 回复类型跟父评一致（集评/剧评）
-		Integer parentType = parent.getCommentType() == null
-				? CommentTypeEnums.VIDEO.getCode()
-				: parent.getCommentType();
-		entity.setCommentType(parentType);
+		entity.setDramaId(dramaId);
+		entity.setVideoId(persistVideoId);
+		entity.setCommentType(commentType.getCode());
 		entity.setUserId(CreatorConstants.COMMENT_CREATOR_USER_ID_PLACEHOLDER);
 		entity.setFromCreatorId(account.getId());
 		entity.setCommentInfo(decision.getContent());
@@ -251,11 +285,7 @@ public class CreatorCommentServiceImpl extends BaseApiService implements Creator
 		entity.setLikeCount(0);
 		entity.setReplyCount(0);
 		entity.setParentId(parent.getId());
-		// 回复目标：优先观众 uid；父评也是作者时保持占位
-		Integer replyToUid = parent.getUserId() == null
-				? CreatorConstants.COMMENT_CREATOR_USER_ID_PLACEHOLDER
-				: parent.getUserId();
-		entity.setReplyToUserId(replyToUid);
+		entity.setReplyToUserId(replyToUserId);
 		entity.setPinFlag(CreatorConstants.COMMENT_PIN_OFF);
 		entity.setDeleteState(decision.isHidden()
 				? DeleteStateEnum.DELETE.getIndex()
@@ -267,22 +297,24 @@ public class CreatorCommentServiceImpl extends BaseApiService implements Creator
 				sensitiveRecordService.saveRecord(new SensitiveRecordEntity(
 						entity.getId(), CreatorConstants.COMMENT_CREATOR_USER_ID_PLACEHOLDER,
 						entity.getDramaId(), entity.getVideoId(), entity.getCommentInfo(),
-						SensitiveSourceEnums.VIDEO_COMMENT.getCode()), decision.getCheck());
+						sourceCode), decision.getCheck());
 			}
 			if (decision.isHidden()) {
 				return setResultSuccess(I18nUtil.getMessage("sensitive_under_review"));
 			}
 			incrementParentReplyCount(parent.getId());
 			addDiscussScore(entity);
-			pushInteractMessage(parent.getUserId(), entity.getId(), parent.getId(),
-					entity.getDramaId(), entity.getVideoId(), entity.getCommentInfo());
+			pushInteractMessage(replyToUserId, entity.getId(), parent.getId(),
+					entity.getDramaId(), persistVideoId, entity.getCommentInfo(), dramaReply);
+		} catch (BaseException e) {
+			log.error("creator comment reply biz error creatorId={} parentId={}", account.getId(), parentId, e);
+			throw e;
 		} catch (Exception e) {
-			log.error("creator comment reply failed creatorId={} parentId={}", account.getId(),
-					query.getCommentId(), e);
-			throw new RuntimeException(e);
+			log.error("creator comment reply failed creatorId={} parentId={}", account.getId(), parentId, e);
+			throw new BaseException("操作失败", e);
 		}
-		log.info("creator comment reply creatorId={} parentId={} commentId={}", account.getId(),
-				parent.getId(), entity.getId());
+		log.info("creator comment reply creatorId={} parentId={} commentId={} type={}",
+				account.getId(), parent.getId(), entity.getId(), commentType.getCode());
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
@@ -560,29 +592,32 @@ public class CreatorCommentServiceImpl extends BaseApiService implements Creator
 
 	/** 通知被回复观众；fromUid 用占位，C 端可按 comment.from_creator_id 展示作者 */
 	private void pushInteractMessage(Integer toUid, Integer commentId, Integer replyCommentId,
-			Integer dramaId, Integer videoId, String content) {
+			Integer dramaId, Integer videoId, String content, boolean dramaReply) {
 		if (toUid == null || toUid <= 0) {
 			return;
 		}
 		Integer fromUid = CreatorConstants.COMMENT_CREATOR_USER_ID_PLACEHOLDER;
 		String episodeId = videoId == null || videoId <= 0 ? null : String.valueOf(videoId);
+		String messageType = dramaReply
+				? InteractMessageTypeEnums.REPLY_DRAMA.getCode()
+				: InteractMessageTypeEnums.REPLY_VIDEO.getCode();
+		String bizPrefix = dramaReply ? "creator_drama_reply:" : "creator_video_reply:";
 		UserInteractMessageEntity msg = new UserInteractMessageEntity();
 		msg.setToUid(toUid);
 		msg.setFromUid(fromUid);
-		msg.setMessageType(InteractMessageTypeEnums.REPLY_VIDEO.getCode());
+		msg.setMessageType(messageType);
 		msg.setCommentId(commentId);
 		msg.setReplyCommentId(replyCommentId);
 		msg.setDramaId(dramaId);
 		msg.setEpisodeId(episodeId);
 		msg.setContent(content);
-		msg.setBizId("creator_video_reply:" + commentId);
+		msg.setBizId(bizPrefix + commentId);
 		msg.setIsRead(0);
 		msg.setStatus(1);
 		try {
 			GenericityUtil.setDate(msg);
 			userInteractMessageDao.insert(msg);
-			pushNotifyService.notifyInteract(toUid, fromUid,
-					InteractMessageTypeEnums.REPLY_VIDEO.getCode(), msg.getId(), dramaId, episodeId);
+			pushNotifyService.notifyInteract(toUid, fromUid, messageType, msg.getId(), dramaId, episodeId);
 		} catch (Exception e) {
 			log.warn("creator comment push failed commentId={}: {}", commentId, e.getMessage());
 		}
