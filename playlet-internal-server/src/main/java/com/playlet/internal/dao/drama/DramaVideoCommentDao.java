@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 import org.springframework.stereotype.Repository;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
@@ -145,4 +146,16 @@ public interface DramaVideoCommentDao extends BaseMapper<DramaVideoCommentEntity
 			@Param("deleteState") Integer deleteState,
 			@Param("setTime") java.util.Date setTime,
 			@Param("id") Integer id);
+
+	/**
+	 * 取消同剧其它置顶，保证每剧仅一条。
+	 */
+	@Update("update drama_video_comment set pin_flag = #{pinOff}, pin_time = null, gmtModified = now() "
+			+ "where drama_id = #{dramaId} and id != #{keepCommentId} "
+			+ "and ifnull(pin_flag, 0) = #{pinOn} and delete_state = #{deleteState}")
+	int unpinOthersOnDrama(@Param("dramaId") Integer dramaId,
+			@Param("keepCommentId") Integer keepCommentId,
+			@Param("pinOn") Integer pinOn,
+			@Param("pinOff") Integer pinOff,
+			@Param("deleteState") Integer deleteState);
 }

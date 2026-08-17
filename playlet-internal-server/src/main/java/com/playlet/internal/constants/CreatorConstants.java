@@ -62,4 +62,7 @@ public final class CreatorConstants {
 
 	/** 置顶：否 */
 	public static final int COMMENT_PIN_OFF = 0;
+
+	/** 每部剧同时仅允许一条置顶评论 */
+	public static final int COMMENT_PIN_MAX_PER_DRAMA = 1;
 }

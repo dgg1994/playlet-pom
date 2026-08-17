@@ -24,6 +24,7 @@ import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.DramaVideoCommentEntity;
 import com.playlet.internal.entity.drama.UserInteractMessageEntity;
 import com.playlet.internal.enums.CommentTypeEnums;
+import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.enums.CreatorCommentSortEnums;
 import com.playlet.internal.enums.DeleteStateEnum;
 import com.playlet.internal.enums.InteractMessageTypeEnums;
@@ -153,14 +154,24 @@ public class CreatorCommentServiceImpl extends BaseApiService implements Creator
 			return setResultError(I18nUtil.getMessage("purview_error_null"));
 		}
 		try {
+			// 每剧仅一条置顶：置新顶时先取消该剧其它置顶
+			if (pinOn && comment.getDramaId() != null) {
+				dramaVideoCommentDao.unpinOthersOnDrama(comment.getDramaId(), comment.getId(),
+						CreatorConstants.COMMENT_PIN_ON, CreatorConstants.COMMENT_PIN_OFF,
+						DeleteStateEnum.NORMAL.getIndex());
+			}
 			comment.setPinFlag(query.getPinFlag());
 			comment.setPinTime(pinOn ? new Date() : null);
 			GenericityUtil.updateDate(comment);
 			dramaVideoCommentDao.updateById(comment);
+		} catch (BaseException e) {
+			log.error("creator comment pin biz error creatorId={} commentId={}", account.getId(),
+					query.getCommentId(), e);
+			throw e;
 		} catch (Exception e) {
 			log.error("creator comment pin failed creatorId={} commentId={}", account.getId(),
 					query.getCommentId(), e);
-			throw new RuntimeException(e);
+			throw new BaseException("操作失败", e);
 		}
 		log.info("creator comment pin creatorId={} commentId={} pinFlag={}", account.getId(),
 				query.getCommentId(), query.getPinFlag());
