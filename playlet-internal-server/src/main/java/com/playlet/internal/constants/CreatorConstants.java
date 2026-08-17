@@ -65,4 +65,37 @@ public final class CreatorConstants {
 
 	/** 每部剧同时仅允许一条置顶评论 */
 	public static final int COMMENT_PIN_MAX_PER_DRAMA = 1;
+
+	/** 站内信有效 */
+	public static final int MSG_STATUS_VALID = 1;
+
+	/** 站内信未读 */
+	public static final int MSG_UNREAD = 0;
+
+	/** 站内信已读 */
+	public static final int MSG_READ = 1;
+
+	/** 列表来源：个人收件箱 */
+	public static final String MSG_SOURCE_INBOX = "INBOX";
+
+	/** 列表来源：站务广播 */
+	public static final String MSG_SOURCE_BROADCAST = "BROADCAST";
+
+	/** 跳转：剧详情 */
+	public static final String MSG_JUMP_DRAMA = "drama";
+
+	/** 跳转：集详情 */
+	public static final String MSG_JUMP_ASSET = "asset";
+
+	/** 评审驳回幂等前缀（后接 drama:{id} 或 asset:{id}） */
+	public static final String MSG_BIZ_AUDIT_REJECT_DRAMA = "audit_reject:drama:";
+
+	/** 评审驳回幂等前缀（集） */
+	public static final String MSG_BIZ_AUDIT_REJECT_ASSET = "audit_reject:asset:";
+
+	/** 幂等键步骤后缀，避免申诉后再驳回被去重 */
+	public static final String MSG_BIZ_STEP = ":step:";
+
+	/** 站内信正文最大长度（对齐表字段） */
+	public static final int MSG_CONTENT_MAX_LEN = 2048;
 }

@@ -26,4 +26,9 @@ public interface CreatorAccountDao extends BaseMapper<CreatorAccountEntity> {
 
 	@Update("update creator_account set last_login_time = now(), gmtModified = now() where id = #{id}")
 	int updateLastLoginTime(@Param("id") Integer id);
+
+	/** 推进站务广播已读游标（只增不减） */
+	@Update("update creator_account set sys_msg_read_publish_id = #{publishId}, gmtModified = now() "
+			+ "where id = #{creatorId} and ifnull(sys_msg_read_publish_id,0) < #{publishId}")
+	int updateSysMsgReadCursor(@Param("creatorId") Integer creatorId, @Param("publishId") Long publishId);
 }

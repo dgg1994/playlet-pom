@@ -68,6 +68,10 @@ public class CreatorAccountEntity {
 	@ApiModelProperty(name = "lastLoginTime", value = "最近登录时间")
 	private Date lastLoginTime;
 
+	@TableField("sys_msg_read_publish_id")
+	@ApiModelProperty(name = "sysMsgReadPublishId", value = "站务广播已读游标")
+	private Long sysMsgReadPublishId;
+
 	@TableField("setTime")
 	@ApiModelProperty(name = "setTime", value = "注册时间")
 	private Date setTime;
