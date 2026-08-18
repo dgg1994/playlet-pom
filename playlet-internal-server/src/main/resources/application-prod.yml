@@ -79,5 +79,6 @@ sms:
 # OnePay 绑定校验
 onepay:
   bind-verify-url: ""
+  withdraw-url: ""
   connect-timeout-ms: 5000
   read-timeout-ms: 10000

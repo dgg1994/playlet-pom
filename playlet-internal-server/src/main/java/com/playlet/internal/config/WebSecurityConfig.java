@@ -83,6 +83,7 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
                 .antMatchers("/configuration/security").permitAll()
                 .antMatchers( "/*.html","/**/*.html","/**/*.css", "/**/*.js","/webSocket/**").permitAll()
                
+                .antMatchers("/wallet/onepay/callback").permitAll()
                 .anyRequest().authenticated()
                 .and()
                 .logout()

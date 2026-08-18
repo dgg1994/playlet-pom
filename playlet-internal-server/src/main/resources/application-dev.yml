@@ -80,5 +80,6 @@ sms:
 # OnePay 绑定校验（POST JSON: account + verificationCode；响应 code=200 即成功）
 onepay:
   bind-verify-url: "http://localhost:8086/onetoken/chickAccount"
+  withdraw-url: "http://localhost:8086/onetoken/withdraw"
   connect-timeout-ms: 5000
   read-timeout-ms: 10000
