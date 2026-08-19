@@ -98,4 +98,10 @@ public final class CreatorConstants {
 
 	/** 站内信正文最大长度（对齐表字段） */
 	public static final int MSG_CONTENT_MAX_LEN = 2048;
+
+	/** 数据分析排序：按热度 */
+	public static final int ANALYTICS_SORT_HOT = 1;
+
+	/** 数据分析排序：按时间 */
+	public static final int ANALYTICS_SORT_TIME = 2;
 }

@@ -2,15 +2,12 @@ package com.playlet.internal.service.impl;
 
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
-import com.playlet.internal.api.response.CreatorDramaAssetRespEntity;
-import com.playlet.internal.api.response.CreatorDramaInfoRespEntity;
-import com.playlet.internal.api.response.CreatorDramaListRespEntity;
-import com.playlet.internal.api.response.DramaAssetBatchShelfFailItem;
-import com.playlet.internal.api.response.DramaAssetBatchShelfRespEntity;
+import com.playlet.internal.api.response.*;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.constants.Constants;
+import com.playlet.internal.constants.CreatorConstants;
 import com.playlet.internal.dao.creator.CreatorDramaDao;
 import com.playlet.internal.dao.drama.DramaAssetDao;
 import com.playlet.internal.dao.drama.DramaDao;
@@ -23,6 +20,7 @@ import com.playlet.internal.enums.DramaAppealStatusEnums;
 import com.playlet.internal.enums.DramaAssetAuditStatusEnums;
 import com.playlet.internal.enums.DramaAssetShelfStatusEnums;
 import com.playlet.internal.enums.PublicEnums;
+import com.playlet.internal.query.creator.CreatorDramaAnalyticsQuery;
 import com.playlet.internal.query.creator.CreatorDramaListQuery;
 import com.playlet.internal.query.drama.DramaAppealQuery;
 import com.playlet.internal.query.drama.DramaAssetAppealQuery;
@@ -44,6 +42,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -290,6 +290,55 @@ public class CreatorDramaServiceImpl extends BaseApiService implements CreatorDr
 					creatorId, query.getShelfStatus(), e);
 			throw new RuntimeException(e);
 		}
+	}
+
+	@Override
+	public ResponseBase analytics(@RequestBody(required = false) CreatorDramaAnalyticsQuery query,
+			HttpServletRequest request) {
+		Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
+		if (creatorId == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		if (query == null) {
+			query = new CreatorDramaAnalyticsQuery();
+		}
+		if (StringUtils.isNotEmpty(query.getDramaTitle())) {
+			query.setDramaTitle(query.getDramaTitle().trim());
+		}
+		Integer sortType = query.getSortType();
+		if (sortType == null || (sortType != CreatorConstants.ANALYTICS_SORT_HOT
+				&& sortType != CreatorConstants.ANALYTICS_SORT_TIME)) {
+			query.setSortType(CreatorConstants.ANALYTICS_SORT_HOT);
+		}
+		PageHelper.startPage(query.getPageNumber(), query.getPageSize());
+		List<DramaAnalyticsRespEntity> list = dramaDao.analyticsList(query, creatorId);
+		if (list == null) {
+			list = Collections.emptyList();
+		}
+		for (DramaAnalyticsRespEntity item : list) {
+			item.setCoverUrl(mediaUrlService.sign(item.getCoverUrl()));
+			item.setCompleteRate(calcCompleteRate(item.getComplete(), item.getExposure()));
+			if (item.getIncomeCoin() == null) {
+				item.setIncomeCoin(0L);
+			}
+			if (item.getScoreNum() != null) {
+				item.setScoreNum(item.getScoreNum().setScale(1, RoundingMode.HALF_UP));
+			}
+		}
+		log.info("creator drama analytics creatorId={} size={}", creatorId, list.size());
+		return setResultSuccess(new PageInfo<>(list), I18nUtil.getMessage("base_success"));
+	}
+
+	/** 完播率 = 完播量 / 曝光量 * 100，曝光为 0 则 0 */
+	private static BigDecimal calcCompleteRate(Long complete, Long exposure) {
+		long exp = exposure == null ? 0L : exposure;
+		long cmp = complete == null ? 0L : complete;
+		if (exp <= 0L) {
+			return BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP);
+		}
+		return BigDecimal.valueOf(cmp)
+				.multiply(BigDecimal.valueOf(100))
+				.divide(BigDecimal.valueOf(exp), 1, RoundingMode.HALF_UP);
 	}
 
 	/** 单集上架/下架并立刻 sync 整剧（单接口用） */
