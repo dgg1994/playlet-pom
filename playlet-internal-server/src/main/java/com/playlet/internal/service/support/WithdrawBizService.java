@@ -161,6 +161,8 @@ public class WithdrawBizService extends BaseApiService {
 					handler.findOpenId(uid), points, cfg, orderNo);
 			GenericityUtil.setDate(order);
 			userWithdrawOrderDao.insert(order);
+			// 提交提现先记冻结流水，成功/失败再分别记扣减或退回
+			handler.writeWithdrawFreezeLedger(uid, points, orderNo);
 			final Long orderId = order.getId();
 			// 避免外部已受理、本地事务却回滚
 			if (TransactionSynchronizationManager.isSynchronizationActive()) {

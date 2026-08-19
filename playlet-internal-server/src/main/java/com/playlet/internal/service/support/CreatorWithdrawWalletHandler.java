@@ -73,6 +73,33 @@ public class CreatorWithdrawWalletHandler implements WithdrawWalletHandler {
 	}
 
 	@Override
+	public void writeWithdrawFreezeLedger(Integer uid, int amt, String orderNo) {
+		if (uid == null || amt <= 0) {
+			return;
+		}
+		String bizType = CoinBizTypeEnums.WITHDRAW_FREEZE.getName();
+		String bizId = "WITHDRAW:" + orderNo;
+		if (creatorCoinLedgerDao.findByBiz(uid, bizType, bizId) != null) {
+			return;
+		}
+		CreatorAccountEntity account = creatorAccountDao.selectById(uid);
+		long before = nvl(account == null ? null : account.getCoinBalance());
+		long frozenAfter = nvl(account == null ? null : account.getFrozenCoinBalance());
+		long frozenBefore = Math.max(0L, frozenAfter - amt);
+		CreatorCoinLedgerEntity ledger = new CreatorCoinLedgerEntity();
+		ledger.setCreatorId(uid);
+		ledger.setChangeAmt(0L);
+		ledger.setBalanceBefore(before);
+		ledger.setBalanceAfter(before);
+		ledger.setFrozenBefore(frozenBefore);
+		ledger.setFrozenAfter(frozenAfter);
+		ledger.setBizType(bizType);
+		ledger.setBizId(bizId);
+		ledger.setRemark("提现冻结");
+		insertLedger(ledger, uid, bizId, "creator withdraw freeze ledger");
+	}
+
+	@Override
 	public void writeWithdrawLedger(Integer uid, int amt, String orderNo) {
 		if (uid == null || amt <= 0) {
 			return;
@@ -95,14 +122,44 @@ public class CreatorWithdrawWalletHandler implements WithdrawWalletHandler {
 		ledger.setBizType(bizType);
 		ledger.setBizId(bizId);
 		ledger.setRemark("提现扣减");
+		insertLedger(ledger, uid, bizId, "creator withdraw ledger");
+	}
+
+	@Override
+	public void writeWithdrawRefundLedger(Integer uid, int amt, String orderNo) {
+		if (uid == null || amt <= 0) {
+			return;
+		}
+		String bizType = CoinBizTypeEnums.WITHDRAW_REFUND.getName();
+		String bizId = "WITHDRAW:" + orderNo;
+		if (creatorCoinLedgerDao.findByBiz(uid, bizType, bizId) != null) {
+			return;
+		}
+		CreatorAccountEntity account = creatorAccountDao.selectById(uid);
+		long before = nvl(account == null ? null : account.getCoinBalance());
+		long frozenAfter = nvl(account == null ? null : account.getFrozenCoinBalance());
+		CreatorCoinLedgerEntity ledger = new CreatorCoinLedgerEntity();
+		ledger.setCreatorId(uid);
+		ledger.setChangeAmt(0L);
+		ledger.setBalanceBefore(before);
+		ledger.setBalanceAfter(before);
+		ledger.setFrozenBefore(frozenAfter + amt);
+		ledger.setFrozenAfter(frozenAfter);
+		ledger.setBizType(bizType);
+		ledger.setBizId(bizId);
+		ledger.setRemark("提现退回");
+		insertLedger(ledger, uid, bizId, "creator withdraw refund ledger");
+	}
+
+	private void insertLedger(CreatorCoinLedgerEntity ledger, Integer uid, String bizId, String scene) {
 		try {
 			GenericityUtil.setDate(ledger);
 			creatorCoinLedgerDao.insert(ledger);
 		} catch (DuplicateKeyException e) {
-			log.warn("creator withdraw ledger duplicate creatorId={} bizId={}", uid, bizId);
+			log.warn("{} duplicate creatorId={} bizId={}", scene, uid, bizId);
 		} catch (Exception e) {
-			log.error("creator withdraw ledger insert failed creatorId={} bizId={}", uid, bizId, e);
-			throw new BaseException("creator withdraw ledger insert failed", e);
+			log.error("{} insert failed creatorId={} bizId={}", scene, uid, bizId, e);
+			throw new BaseException(scene + " insert failed", e);
 		}
 	}
 

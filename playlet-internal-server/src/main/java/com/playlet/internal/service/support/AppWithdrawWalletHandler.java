@@ -66,6 +66,37 @@ public class AppWithdrawWalletHandler implements WithdrawWalletHandler {
 	}
 
 	@Override
+	public void writeWithdrawFreezeLedger(Integer uid, int amt, String orderNo) {
+		if (uid == null || amt <= 0) {
+			return;
+		}
+		String bizType = CoinBizTypeEnums.WITHDRAW_FREEZE.getName();
+		String bizId = "WITHDRAW:" + orderNo;
+		if (userCoinLedgerDao.findByBiz(uid, bizType, bizId) != null) {
+			return;
+		}
+		AppAccountEntity account = appAccountDao.findByUid(uid);
+		long before = nvl(account == null ? null : account.getCoinBalance());
+		long frozenBefore = nvl(account == null ? null : account.getFrozenCoinBalance()) - amt;
+		if (frozenBefore < 0) {
+			frozenBefore = 0;
+		}
+		UserCoinLedgerEntity ledger = new UserCoinLedgerEntity();
+		ledger.setUid(uid);
+		ledger.setChangeAmt(0);
+		ledger.setBalanceBefore(before);
+		ledger.setBalanceAfter(before);
+		ledger.setFrozenBefore(frozenBefore);
+		ledger.setFrozenAfter(frozenBefore + amt);
+		ledger.setBizType(bizType);
+		ledger.setBizId(bizId);
+		ledger.setTaskCode("");
+		ledger.setAdBoostFlag(0);
+		ledger.setRemark("提现冻结");
+		insertLedger(ledger, uid, bizId, "withdraw freeze ledger");
+	}
+
+	@Override
 	public void writeWithdrawLedger(Integer uid, int amt, String orderNo) {
 		if (uid == null || amt <= 0) {
 			return;
@@ -77,25 +108,60 @@ public class AppWithdrawWalletHandler implements WithdrawWalletHandler {
 			return;
 		}
 		AppAccountEntity account = appAccountDao.findByUid(uid);
-		long before = account == null || account.getCoinBalance() == null ? 0L : account.getCoinBalance();
+		long before = nvl(account == null ? null : account.getCoinBalance());
+		long frozen = nvl(account == null ? null : account.getFrozenCoinBalance());
 		UserCoinLedgerEntity ledger = new UserCoinLedgerEntity();
 		ledger.setUid(uid);
 		ledger.setChangeAmt(-amt);
 		ledger.setBalanceBefore(before);
 		ledger.setBalanceAfter(before - amt);
+		ledger.setFrozenBefore(frozen);
+		ledger.setFrozenAfter(Math.max(0L, frozen - amt));
 		ledger.setBizType(bizType);
 		ledger.setBizId(bizId);
 		ledger.setTaskCode("");
 		ledger.setAdBoostFlag(0);
 		ledger.setRemark("提现扣减");
+		insertLedger(ledger, uid, bizId, "withdraw ledger");
+	}
+
+	@Override
+	public void writeWithdrawRefundLedger(Integer uid, int amt, String orderNo) {
+		if (uid == null || amt <= 0) {
+			return;
+		}
+		String bizType = CoinBizTypeEnums.WITHDRAW_REFUND.getName();
+		String bizId = "WITHDRAW:" + orderNo;
+		if (userCoinLedgerDao.findByBiz(uid, bizType, bizId) != null) {
+			return;
+		}
+		AppAccountEntity account = appAccountDao.findByUid(uid);
+		long before = nvl(account == null ? null : account.getCoinBalance());
+		long frozen = nvl(account == null ? null : account.getFrozenCoinBalance());
+		UserCoinLedgerEntity ledger = new UserCoinLedgerEntity();
+		ledger.setUid(uid);
+		ledger.setChangeAmt(0);
+		ledger.setBalanceBefore(before);
+		ledger.setBalanceAfter(before);
+		ledger.setFrozenBefore(frozen + amt);
+		ledger.setFrozenAfter(frozen);
+		ledger.setBizType(bizType);
+		ledger.setBizId(bizId);
+		ledger.setTaskCode("");
+		ledger.setAdBoostFlag(0);
+		ledger.setRemark("提现退回");
+		insertLedger(ledger, uid, bizId, "withdraw refund ledger");
+	}
+
+	private void insertLedger(UserCoinLedgerEntity ledger, Integer uid, String bizId, String scene) {
 		try {
 			GenericityUtil.setDate(ledger);
 			userCoinLedgerDao.insert(ledger);
 		} catch (DuplicateKeyException e) {
-			log.warn("withdraw ledger duplicate uid={} bizId={}", uid, bizId);
+			log.warn("{} duplicate uid={} bizId={}", scene, uid, bizId);
 		} catch (Exception e) {
-			log.error("withdraw ledger insert failed uid={} bizId={}", uid, bizId, e);
-			throw new BaseException("withdraw ledger insert failed", e);
+			log.error("{} insert failed uid={} bizId={}", scene, uid, bizId, e);
+			throw new BaseException(scene + " insert failed", e);
 		}
 	}
 

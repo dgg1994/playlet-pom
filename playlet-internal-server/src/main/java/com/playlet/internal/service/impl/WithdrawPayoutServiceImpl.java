@@ -157,6 +157,7 @@ public class WithdrawPayoutServiceImpl implements WithdrawPayoutService {
 			if (amt > 0 && handler.unfreeze(order.getUid(), amt) <= 0) {
 				throw new BaseException("unfreeze coin failed");
 			}
+			handler.writeWithdrawRefundLedger(order.getUid(), amt, order.getOrderNo());
 			userWithdrawOrderDao.casStatus(order.getId(),
 					WithdrawOrderStatusEnums.FAILED.getCode(),
 					WithdrawOrderStatusEnums.REFUNDED.getCode());
