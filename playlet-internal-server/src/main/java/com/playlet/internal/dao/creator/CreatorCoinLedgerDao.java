@@ -17,4 +17,9 @@ public interface CreatorCoinLedgerDao extends BaseMapper<CreatorCoinLedgerEntity
 			+ "where creator_id = #{creatorId} and change_amt > 0 "
 			+ "and date(setTime) = #{bizDate}")
 	Long sumPositiveIncomeByDate(@Param("creatorId") Integer creatorId, @Param("bizDate") String bizDate);
+
+	@Select("select * from creator_coin_ledger where creator_id = #{creatorId} and biz_type = #{bizType} "
+			+ "and biz_id = #{bizId} limit 1")
+	CreatorCoinLedgerEntity findByBiz(@Param("creatorId") Integer creatorId, @Param("bizType") String bizType,
+			@Param("bizId") String bizId);
 }

@@ -1,5 +1,6 @@
 package com.playlet.internal.service.impl;
 
+import com.playlet.internal.api.request.OnePayBindVerifyRequest;
 import com.playlet.internal.api.response.CreatorInfoRespEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
@@ -18,6 +19,8 @@ import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.query.creator.*;
 import com.playlet.internal.service.CreatorAuthService;
 import com.playlet.internal.service.MediaUrlService;
+import com.playlet.internal.service.support.CreatorOnePayBindOps;
+import com.playlet.internal.service.support.OnePayBindService;
 import com.playlet.internal.utils.*;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -59,6 +62,10 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
     private RedisUtil redisUtil;
     @Autowired
     private MediaUrlService mediaUrlService;
+    @Autowired
+    private OnePayBindService onePayBindService;
+    @Autowired
+    private CreatorOnePayBindOps creatorOnePayBindOps;
 
     @Override
     public ResponseBase sendEmailCode(@RequestParam("userAccount") String userAccount,
@@ -76,6 +83,9 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
             return setResultError(I18nUtil.getMessage("user.account_exist"));
         }
         if (sceneEnum == CreatorEmailCodeSceneEnums.RESET_PWD && exist == null) {
+            return setResultError(I18nUtil.getMessage("user.account_error"));
+        }
+        if (sceneEnum == CreatorEmailCodeSceneEnums.BIND_ONEPAY && exist == null) {
             return setResultError(I18nUtil.getMessage("user.account_error"));
         }
         try {
@@ -314,6 +324,31 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         return setResultSuccess(I18nUtil.getMessage("base_success"));
     }
 
+    @Override
+    public ResponseBase bindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request) {
+        CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
+        if (account == null) {
+            return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+        }
+        CreatorProfileEntity profile = creatorProfileDao.findByCreatorId(account.getId());
+        Integer bindStatus = profile == null ? OnePayBindStatusEnums.UNBOUND.getCode() : profile.getOnepayBindStatus();
+        return onePayBindService.bind(account.getId(), query, account.getUserAccount(),
+                RedisKeyConstants.CREATOR_EMAIL_CODE_KEY, bindStatus, creatorOnePayBindOps);
+    }
+
+    @Override
+    public ResponseBase unBindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request) {
+        CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
+        if (account == null) {
+            return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+        }
+        CreatorProfileEntity profile = creatorProfileDao.findByCreatorId(account.getId());
+        Integer bindStatus = profile == null ? OnePayBindStatusEnums.UNBOUND.getCode() : profile.getOnepayBindStatus();
+        String onepayAccount = profile == null ? null : profile.getOnepayAccount();
+        return onePayBindService.unbind(account.getId(), query, account.getUserAccount(),
+                RedisKeyConstants.CREATOR_EMAIL_CODE_KEY, bindStatus, onepayAccount, creatorOnePayBindOps);
+    }
+
     @SuppressWarnings("deprecation")
     private String issueToken(String email) {
         String token = Jwts.builder()
@@ -348,7 +383,6 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         profile.setBillAddress(trimToNull(query.getBillAddress()));
         profile.setOrgName(trimToNull(query.getOrgName()));
         profile.setOrgLicense(trimToNull(query.getOrgLicense()));
-        bindOnePay(profile, query.getOnepayAccount(), now);
         return profile;
     }
 
@@ -382,23 +416,7 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         if (query.getOrgLicense() != null) {
             profile.setOrgLicense(trimToNull(query.getOrgLicense()));
         }
-        if (query.getOnepayAccount() != null) {
-            bindOnePay(profile, query.getOnepayAccount(), now);
-        }
         profile.setGmtModified(now);
-    }
-
-    private void bindOnePay(CreatorProfileEntity profile, String onepayAccount, Date now) {
-        String account = trimToNull(onepayAccount);
-        if (account == null) {
-            profile.setOnepayAccount(null);
-            profile.setOnepayBindStatus(OnePayBindStatusEnums.UNBOUND.getCode());
-            profile.setOnepayBindTime(null);
-            return;
-        }
-        profile.setOnepayAccount(account);
-        profile.setOnepayBindStatus(OnePayBindStatusEnums.BOUND.getCode());
-        profile.setOnepayBindTime(now);
     }
 
     private CreatorInfoRespEntity toInfoResp(CreatorAccountEntity account, CreatorProfileEntity profile) {

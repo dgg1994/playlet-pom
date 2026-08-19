@@ -66,11 +66,13 @@ public interface AppUserService {
     ResponseBase update(AppAccountEntity entity, HttpServletRequest request);
 
 	@PostMapping("/bindOnePay")
-	@ApiOperation(value = "绑定OnePay帐号", notes = "需登录；RestTemplate POST 调三方校验")
+	@ApiOperation(value = "绑定OnePay帐号", notes = "需登录。verificationCode 为登录邮箱验证码（先调 sendEmailCode）；"
+			+ "account 为 OnePay 账号，提交三方校验。已绑定需先解绑。")
 	ResponseBase bindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request);
 
 	@PostMapping("/unBindOnePay")
-	@ApiOperation(value = "解除绑定OnePay帐号", notes = "需登录")
+	@ApiOperation(value = "解除绑定OnePay帐号", notes = "需登录。verificationCode 为登录邮箱验证码；"
+			+ "account 须与当前绑定账号一致。有进行中提现时不可解绑。")
 	ResponseBase unBindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request);
 
     @PostMapping("/bindPush")

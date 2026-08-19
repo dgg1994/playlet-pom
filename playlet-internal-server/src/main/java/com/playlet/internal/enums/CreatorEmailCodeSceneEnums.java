@@ -5,7 +5,8 @@ package com.playlet.internal.enums;
  */
 public enum CreatorEmailCodeSceneEnums {
 	REGISTER(1, "注册"),
-	RESET_PWD(2, "找回密码");
+	RESET_PWD(2, "找回密码"),
+	BIND_ONEPAY(3, "绑定/解绑OnePay");
 
 	private final int code;
 	private final String label;

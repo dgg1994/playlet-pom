@@ -31,6 +31,10 @@ public class UserWithdrawOrderEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "uid", value = "用户uid", dataType = "Integer")
 	private Integer uid;
 
+	@TableField("user_type")
+	@ApiModelProperty(name = "userType", value = "主体 1 C端 2 作家", dataType = "Integer")
+	private Integer userType;
+
 	@TableField("asset_code")
 	@ApiModelProperty(name = "assetCode", value = "币种编码", dataType = "String")
 	private String assetCode;

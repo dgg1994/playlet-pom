@@ -1,12 +1,9 @@
 package com.playlet.internal.service.impl;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.api.request.OnePayBindVerifyRequest;
 import com.playlet.internal.api.request.UserRegisterEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
-import com.playlet.internal.config.OnePayProperties;
 import com.playlet.internal.config.OauthLoginProperties;
 import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.constants.Constants;
@@ -28,6 +25,8 @@ import com.playlet.internal.query.account.PushSwitchQuery;
 import com.playlet.internal.query.account.UpdatePwdEntity;
 import com.playlet.internal.service.AppUserService;
 import com.playlet.internal.service.MediaUrlService;
+import com.playlet.internal.service.support.AppOnePayBindOps;
+import com.playlet.internal.service.support.OnePayBindService;
 import com.playlet.internal.utils.*;
 import com.playlet.internal.utils.oidc.OidcIdTokenPayload;
 import com.playlet.internal.utils.oidc.OidcTokenVerifier;
@@ -35,14 +34,11 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestTemplate;
 import javax.servlet.http.HttpServletRequest;
 import java.lang.reflect.InvocationTargetException;
 import java.time.LocalDateTime;
@@ -88,10 +84,10 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	private UserDramaLikeDao UserDramaLikeDao;
 
 	@Autowired
-	private RestTemplate restTemplate;
+	private OnePayBindService onePayBindService;
 
 	@Autowired
-	private OnePayProperties onePayProperties;
+	private AppOnePayBindOps appOnePayBindOps;
 
 	@SuppressWarnings("deprecation")
 	@Override
@@ -495,46 +491,12 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
 		}
-		if (query == null || StringUtils.isEmpty(query.getAccount())
-				|| StringUtils.isEmpty(query.getVerificationCode())) {
-			return setResultError(I18nUtil.getMessage("base_error"));
-		}
-		// 校验 OnePay 账号验证码（Redis key 后缀为 account）
-		if (!verifyCode(query.getAccount(), query.getVerificationCode())) {
-			return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
-		}
 		AppAccountEntity account = appAccountDao.findByUid(uid);
 		if (account == null) {
 			return setResultError(I18nUtil.getMessage("user.not_null"));
 		}
-		try {
-			ResponseEntity<String> result = restTemplate.postForEntity(
-					onePayProperties.getBindVerifyUrl(), query, String.class);
-			if (result.getStatusCode() != HttpStatus.OK) {
-				log.warn("onepay bind verify failed uid={} account={} status={}",
-						uid, query.getAccount(), result.getStatusCode());
-				return setResultError(I18nUtil.getMessage("base_error"));
-			}
-			String body = result.getBody();
-			ObjectMapper objectMapper = new ObjectMapper();
-			JsonNode jsonNode = objectMapper.readTree(body);
-			String openid = jsonNode.get("data").get("openid").asText();
-			// 绑定 OnePay 信息到 C 端账号
-			AppAccountEntity update = new AppAccountEntity();
-			update.setId(uid);
-			update.setOnepayOpenId(openid);
-			update.setOnepayAccount(query.getAccount().trim());
-			update.setOnepayBindStatus(OnePayBindStatusEnums.BOUND.getCode());
-			update.setOnepayBindTime(new Date());
-			update.setGmtModified(new Date());
-			appAccountDao.updateById(update);
-			redisUtil.del(RedisKeyConstants.EMAIL_CODE_KEY + query.getAccount());
-			log.info("app user bind onepay uid={} account={}", uid, query.getAccount());
-		} catch (Exception e) {
-			log.error("app user bind onepay failed uid={} account={}", uid, query.getAccount(), e);
-			throw new RuntimeException(e);
-		}
-		return setResultSuccess(I18nUtil.getMessage("base_success"));
+		return onePayBindService.bind(uid, query, resolveLoginEmail(account),
+				RedisKeyConstants.EMAIL_CODE_KEY, account.getOnepayBindStatus(), appOnePayBindOps);
 	}
 
 	@Override
@@ -543,26 +505,13 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
 		}
-		if (query == null || StringUtils.isEmpty(query.getAccount())
-				|| StringUtils.isEmpty(query.getVerificationCode())) {
-			return setResultError(I18nUtil.getMessage("base_error"));
-		}
-		// 校验验证码后解绑
-		if (!verifyCode(query.getAccount(), query.getVerificationCode())) {
-			return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
-		}
 		AppAccountEntity account = appAccountDao.findByUid(uid);
 		if (account == null) {
 			return setResultError(I18nUtil.getMessage("user.not_null"));
 		}
-		AppAccountEntity update = new AppAccountEntity();
-		update.setId(uid);
-		update.setOnepayBindStatus(OnePayBindStatusEnums.UNBOUND.getCode());
-		update.setGmtModified(new Date());
-		appAccountDao.updateById(update);
-		redisUtil.del(RedisKeyConstants.EMAIL_CODE_KEY + query.getAccount());
-		log.info("app user unbind onepay uid={} account={}", uid, query.getAccount());
-		return setResultSuccess(I18nUtil.getMessage("base_success"));
+		return onePayBindService.unbind(uid, query, resolveLoginEmail(account),
+				RedisKeyConstants.EMAIL_CODE_KEY, account.getOnepayBindStatus(),
+				account.getOnepayAccount(), appOnePayBindOps);
 	}
 
 	@Override
@@ -762,6 +711,17 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		}
 		Object cache = redisUtil.get(RedisKeyConstants.EMAIL_CODE_KEY + email);
 		return cache != null && cache.toString().equals(code);
+	}
+
+	/** 登录邮箱：优先 user_email */
+	private static String resolveLoginEmail(AppAccountEntity account) {
+		if (account == null) {
+			return "";
+		}
+		if (!StringUtils.isEmpty(account.getUserEmail())) {
+			return account.getUserEmail();
+		}
+		return account.getUserAccount() == null ? "" : account.getUserAccount();
 	}
 
 }

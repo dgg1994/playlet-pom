@@ -14,6 +14,6 @@ public class OnePayBindVerifyRequest {
 	@ApiModelProperty(value = "OnePay 账号", required = true)
 	private String account;
 
-	@ApiModelProperty(value = "OnePay 验证码", required = true)
+	@ApiModelProperty(value = "登录邮箱验证码（sendEmailCode）", required = true)
 	private String verificationCode;
 }

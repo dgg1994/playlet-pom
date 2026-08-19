@@ -2,24 +2,19 @@ package com.playlet.internal.service.impl;
 
 import com.playlet.internal.api.request.OnePayWithdrawPayoutRequest;
 import com.playlet.internal.config.OnePayProperties;
-import com.playlet.internal.dao.account.AppAccountDao;
-import com.playlet.internal.dao.welfare.UserCoinLedgerDao;
 import com.playlet.internal.dao.welfare.UserWithdrawOrderDao;
-import com.playlet.internal.entity.account.AppAccountEntity;
-import com.playlet.internal.entity.welfare.UserCoinLedgerEntity;
 import com.playlet.internal.entity.welfare.UserWithdrawOrderEntity;
-import com.playlet.internal.enums.CoinBizTypeEnums;
 import com.playlet.internal.enums.WithdrawOrderStatusEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.WithdrawPayoutService;
-import com.playlet.internal.utils.GenericityUtil;
+import com.playlet.internal.service.support.WithdrawWalletHandler;
+import com.playlet.internal.service.support.WithdrawWalletHandlerRegistry;
 import com.playlet.internal.utils.StringUtils;
 import com.playlet.internal.utils.TransactionUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Async;
@@ -28,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 /**
- * OnePay 打款：提交后只冻结；确认到账再解冻并扣减。
+ * OnePay 打款：提交后只冻结；确认到账再解冻并扣减。按订单 user_type 路由 C 端 / 作家钱包。
  */
 @Slf4j
 @Service
@@ -40,9 +35,7 @@ public class WithdrawPayoutServiceImpl implements WithdrawPayoutService {
 	@Autowired
 	private UserWithdrawOrderDao userWithdrawOrderDao;
 	@Autowired
-	private AppAccountDao appAccountDao;
-	@Autowired
-	private UserCoinLedgerDao userCoinLedgerDao;
+	private WithdrawWalletHandlerRegistry walletHandlerRegistry;
 	@Autowired
 	private RestTemplate restTemplate;
 	@Autowired
@@ -67,7 +60,6 @@ public class WithdrawPayoutServiceImpl implements WithdrawPayoutService {
 				return;
 			}
 			if (StringUtils.isEmpty(onePayProperties.getWithdrawUrl())) {
-				// 未配置打款地址：走 mock，便于联调
 				if (mockSuccess) {
 					self.confirmSuccess(order.getOrderNo(), "MOCK_" + order.getOrderNo(), null);
 				} else {
@@ -78,7 +70,6 @@ public class WithdrawPayoutServiceImpl implements WithdrawPayoutService {
 			if (!callOnePay(order)) {
 				self.failAndUnfreeze(order.getOrderNo(), "onepay reject");
 			}
-			// HTTP 200 仅表示受理，等回调再解冻扣减
 		} catch (Exception e) {
 			log.error("withdraw payout failed orderId={}", orderId, e);
 			UserWithdrawOrderEntity order = userWithdrawOrderDao.selectById(orderId);
@@ -132,17 +123,19 @@ public class WithdrawPayoutServiceImpl implements WithdrawPayoutService {
 			return;
 		}
 		int amt = nvlPoints(order.getPointsAmt());
+		WithdrawWalletHandler handler = walletHandlerRegistry.of(order.getUserType());
 		try {
-			writeWithdrawLedger(order.getUid(), amt, order.getOrderNo());
-			if (appAccountDao.settleFrozenCoin(order.getUid(), amt) <= 0) {
+			handler.writeWithdrawLedger(order.getUid(), amt, order.getOrderNo());
+			if (handler.settleFrozen(order.getUid(), amt) <= 0) {
 				throw new BaseException("settle frozen coin failed");
 			}
 		} catch (Exception e) {
-			log.error("withdraw settle failed orderNo={}", orderNo, e);
+			log.error("withdraw settle failed orderNo={} userType={}", orderNo, order.getUserType(), e);
 			TransactionUtils.markRollbackOnly();
 			throw new BaseException("withdraw settle failed", e);
 		}
-		log.info("withdraw success orderNo={} uid={} amt={}", orderNo, order.getUid(), amt);
+		log.info("withdraw success orderNo={} userType={} uid={} amt={}",
+				orderNo, order.getUserType(), order.getUid(), amt);
 	}
 
 	/** OnePay 失败：只解冻，不扣 coin_balance */
@@ -159,19 +152,21 @@ public class WithdrawPayoutServiceImpl implements WithdrawPayoutService {
 			return;
 		}
 		int amt = nvlPoints(order.getPointsAmt());
+		WithdrawWalletHandler handler = walletHandlerRegistry.of(order.getUserType());
 		try {
-			if (amt > 0 && appAccountDao.unfreezeCoinBalance(order.getUid(), amt) <= 0) {
+			if (amt > 0 && handler.unfreeze(order.getUid(), amt) <= 0) {
 				throw new BaseException("unfreeze coin failed");
 			}
 			userWithdrawOrderDao.casStatus(order.getId(),
 					WithdrawOrderStatusEnums.FAILED.getCode(),
 					WithdrawOrderStatusEnums.REFUNDED.getCode());
 		} catch (Exception e) {
-			log.error("withdraw unfreeze failed orderNo={}", orderNo, e);
+			log.error("withdraw unfreeze failed orderNo={} userType={}", orderNo, order.getUserType(), e);
 			TransactionUtils.markRollbackOnly();
 			throw new BaseException("withdraw unfreeze failed", e);
 		}
-		log.info("withdraw failed and unfrozen orderNo={} uid={} amt={}", orderNo, order.getUid(), amt);
+		log.info("withdraw failed and unfrozen orderNo={} userType={} uid={} amt={}",
+				orderNo, order.getUserType(), order.getUid(), amt);
 	}
 
 	private UserWithdrawOrderEntity loadPayingOrPending(String orderNo) {
@@ -195,12 +190,12 @@ public class WithdrawPayoutServiceImpl implements WithdrawPayoutService {
 		OnePayWithdrawPayoutRequest req = new OnePayWithdrawPayoutRequest();
 		req.setOrderNo(order.getOrderNo());
 		req.setOnePayAccount(order.getWalletAddress());
-		AppAccountEntity account = appAccountDao.findByUid(order.getUid());
-		req.setOnePayOpenId(account == null ? null : account.getOnepayOpenId());
+		WithdrawWalletHandler handler = walletHandlerRegistry.of(order.getUserType());
+		req.setOnePayOpenId(handler.findOpenId(order.getUid()));
 		req.setPoints(nvlPoints(order.getPointsAmt()));
 		try {
-			log.info("onepay withdraw request orderNo={} uid={} points={}",
-					order.getOrderNo(), order.getUid(), req.getPoints());
+			log.info("onepay withdraw request orderNo={} userType={} uid={} points={}",
+					order.getOrderNo(), order.getUserType(), order.getUid(), req.getPoints());
 			ResponseEntity<String> result = restTemplate.postForEntity(
 					onePayProperties.getWithdrawUrl(), req, String.class);
 			if (result.getStatusCode() != HttpStatus.OK) {
@@ -212,36 +207,6 @@ public class WithdrawPayoutServiceImpl implements WithdrawPayoutService {
 		} catch (Exception e) {
 			log.error("onepay withdraw http failed orderNo={}", order.getOrderNo(), e);
 			return false;
-		}
-	}
-
-	private void writeWithdrawLedger(Integer uid, int amt, String orderNo) throws Exception {
-		if (uid == null || amt <= 0) {
-			return;
-		}
-		String bizType = CoinBizTypeEnums.WITHDRAW.getName();
-		String bizId = "WITHDRAW:" + orderNo;
-		UserCoinLedgerEntity exist = userCoinLedgerDao.findByBiz(uid, bizType, bizId);
-		if (exist != null) {
-			return;
-		}
-		AppAccountEntity account = appAccountDao.findByUid(uid);
-		long before = account == null || account.getCoinBalance() == null ? 0L : account.getCoinBalance();
-		UserCoinLedgerEntity ledger = new UserCoinLedgerEntity();
-		ledger.setUid(uid);
-		ledger.setChangeAmt(-amt);
-		ledger.setBalanceBefore(before);
-		ledger.setBalanceAfter(before - amt);
-		ledger.setBizType(bizType);
-		ledger.setBizId(bizId);
-		ledger.setTaskCode("");
-		ledger.setAdBoostFlag(0);
-		ledger.setRemark("提现扣减");
-		GenericityUtil.setDate(ledger);
-		try {
-			userCoinLedgerDao.insert(ledger);
-		} catch (DuplicateKeyException e) {
-			log.warn("withdraw ledger duplicate uid={} bizId={}", uid, bizId);
 		}
 	}
 

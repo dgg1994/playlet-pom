@@ -39,8 +39,8 @@ public class RedisKeyConstants {
     public static final String SHARE_CD_UID_DRAMA = PROJECT_PREFIX + "theater:share:cd:uid:";
     public static final long SHARE_CD_SEC = 30L;
 
-    /** 提现提交防重：uid */
-    public static final String WITHDRAW_SUBMIT_LOCK = PROJECT_PREFIX + "wallet:withdraw:lock:uid:";
+    /** 提现提交防重：后缀 userType:uid */
+    public static final String WITHDRAW_SUBMIT_LOCK = PROJECT_PREFIX + "wallet:withdraw:lock:";
     public static final long WITHDRAW_SUBMIT_LOCK_SEC = 5L;
 
     /** 七牛对象存在性缓存：key 后缀为对象 key */

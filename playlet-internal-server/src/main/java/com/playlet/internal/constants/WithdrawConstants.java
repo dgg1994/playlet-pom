@@ -17,4 +17,9 @@ public final class WithdrawConstants {
 	public static final int CALLBACK_SUCCESS = 1;
 	/** OnePay 回调：失败 */
 	public static final int CALLBACK_FAIL = 0;
+
+	/** C 端提现单号前缀 */
+	public static final String ORDER_NO_PREFIX_APP = "W";
+	/** 作家提现单号前缀 */
+	public static final String ORDER_NO_PREFIX_CREATOR = "CW";
 }
