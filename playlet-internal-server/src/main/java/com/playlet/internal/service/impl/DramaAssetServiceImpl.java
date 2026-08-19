@@ -22,8 +22,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.validation.Valid;
-import java.util.Date;
-
 @RestController
 @Transactional(rollbackFor = Exception.class)
 @CrossOrigin
@@ -92,32 +90,8 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 						|| !existing.getAuditStatus().equals(DramaAssetAuditStatusEnums.REJECTED.getCode())) {
 					return setResultError(I18nUtil.getMessage("base_info_exist"));
 				}
-				existing.setVideoName(videoName);
-				existing.setRemarkInfo(createPay.getRemarkInfo());
-				existing.setVideoType(entity.getVideoType());
-				existing.setVideoUrl(newUrl);
-				existing.setBelongUser(entity.getBelongUser());
-				existing.setVideoStatus(PublicEnums.ZERO.getIndex());
-				existing.setAuditStatus(DramaAssetAuditStatusEnums.UNDER_REVIEW.getCode());
-				existing.setShelfStatus(DramaAssetShelfStatusEnums.OFF.getCode());
-				existing.setAuditRejectReason(null);
-				existing.setAuditPassTime(null);
-				existing.setShelfTime(null);
-				// 驳回重传：清空申诉态，按新稿重新进审
-				existing.setAppealStatus(DramaAppealStatusEnums.NONE.getCode());
-				existing.setAppealReason(null);
-				existing.setAppealTime(null);
-				GenericityUtil.updateDate(existing);
-				dramaAssetDao.updateById(existing);
-				dramaAssetAuditService.initAuditStepsOnRelease(existing.getId(), entity.getId());
-				// 对原始上传文件拉时长，勿用转码后的 m3u8 key
-				dramaAssetDurationService.fillDurationFromAvinfo(existing.getId(), key);
-
-				DramaAssetReleaseRespEntity data = new DramaAssetReleaseRespEntity();
-				data.setId(existing.getId());
-				data.setKey(newUrl);
-				data.setVideoUrl(mediaUrlService.sign(newUrl));
-				return setResultSuccess(data, I18nUtil.getMessage("base_success"));
+				return resetRejectedAsset(existing, entity, createPay.getSetNum(), createPay.getRemarkInfo(),
+						videoName, newUrl, key);
 			}
 
 			DramaAssetEntity assetEntity = new DramaAssetEntity();
@@ -146,6 +120,51 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			return setResultSuccess(data, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			log.error("service error", e);
+			throw new RuntimeException(e);
+		}
+	}
+
+	@Override
+	public ResponseBase updateDrama(@Valid @RequestBody UpdateDramaAssetQuery query) {
+		try {
+			DramaEntity drama = dramaDao.selectById(query.getDramaId());
+			if (drama == null) {
+				return setResultError(I18nUtil.getMessage("drama_null"));
+			}
+			DramaAssetEntity current = dramaAssetDao.selectById(query.getId());
+			if (current == null || DeleteStateEnum.DELETE.getIndex().equals(current.getDeleteState())) {
+				return setResultError(I18nUtil.getMessage("base_data_null"));
+			}
+			if (!drama.getId().equals(current.getDramaId())) {
+				return setResultError(I18nUtil.getMessage("purview_error_null"));
+			}
+			// 仅允许驳回后修改，避免审核中/已通过稿件被覆盖
+			if (current.getAuditStatus() == null
+					|| current.getAuditStatus() != DramaAssetAuditStatusEnums.REJECTED.getCode()) {
+				return setResultError(I18nUtil.getMessage("base_info_exist"));
+			}
+			DramaAssetEntity duplicate = dramaAssetDao.findByDramaIdAndSetNum(drama.getId(), query.getSetNum());
+			if (duplicate != null && !duplicate.getId().equals(current.getId())) {
+				return setResultError(I18nUtil.getMessage("base_info_exist"));
+			}
+			String key = QiniuUploadUtils.extractKey(query.getKey());
+			if (StringUtils.isEmpty(key)) {
+				return setResultError(I18nUtil.getMessage("video_not_null"));
+			}
+			String prefix = QiniuUploadUtils.videoKeyPrefix(drama.getId(), query.getSetNum());
+			if (!key.startsWith(prefix)) {
+				return setResultError(I18nUtil.getMessage("purview_error_null"));
+			}
+			if (!QiniuUploadUtils.exists(key)) {
+				return setResultError(I18nUtil.getMessage("video_not_null"));
+			}
+			String newUrl = toDefaultMultiRateM3u8Key(key);
+			String videoName = StringUtils.isEmpty(query.getVideoName())
+					? key.substring(key.lastIndexOf('/') + 1) : query.getVideoName();
+			return resetRejectedAsset(current, drama, query.getSetNum(), query.getRemarkInfo(),
+					videoName, newUrl, key);
+		} catch (Exception e) {
+			log.error("update drama asset error", e);
 			throw new RuntimeException(e);
 		}
 	}
@@ -183,6 +202,35 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			return VideoDefinitionEnums.replaceDefinitionSuffix(withoutExt, VideoDefinitionEnums.DEFAULT) + ".m3u8";
 		}
 		return VideoDefinitionEnums.DEFAULT.toM3u8Key(withoutExt);
+	}
+
+	/**
+	 * 驳回稿重传/修改：更新剧集并重置审核链路。
+	 */
+	private ResponseBase resetRejectedAsset(DramaAssetEntity asset, DramaEntity drama, Integer setNum,
+			String remarkInfo, String videoName, String videoUrl, String sourceKey) throws Exception {
+		asset.setSetNum(setNum);
+		asset.setVideoName(videoName);
+		asset.setRemarkInfo(remarkInfo);
+		asset.setVideoType(drama.getVideoType());
+		asset.setVideoUrl(videoUrl);
+		asset.setBelongUser(drama.getBelongUser());
+		asset.setVideoStatus(PublicEnums.ZERO.getIndex());
+		asset.setAuditStatus(DramaAssetAuditStatusEnums.UNDER_REVIEW.getCode());
+		asset.setShelfStatus(DramaAssetShelfStatusEnums.OFF.getCode());
+		asset.setAuditRejectReason(null);
+		asset.setAuditPassTime(null);
+		asset.setShelfTime(null);
+		// 驳回重传：清空申诉态，按新稿重新进审
+		asset.setAppealStatus(DramaAppealStatusEnums.NONE.getCode());
+		asset.setAppealReason(null);
+		asset.setAppealTime(null);
+		GenericityUtil.updateDate(asset);
+		dramaAssetDao.updateById(asset);
+		dramaAssetAuditService.initAuditStepsOnRelease(asset.getId(), drama.getId());
+		// 对原始上传文件拉时长，勿用转码后的 m3u8 key
+		dramaAssetDurationService.fillDurationFromAvinfo(asset.getId(), sourceKey);
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
 }

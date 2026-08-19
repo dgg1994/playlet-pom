@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.query.drama.AddDramaAssetQuery;
 import com.playlet.internal.query.drama.DramaVideoUploadTokenQuery;
+import com.playlet.internal.query.drama.UpdateDramaAssetQuery;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -32,6 +33,15 @@ public interface DramaAssetService {
 			+ "同剧同集若已驳回则覆盖重传并重置 AI/A/B；审核中或已通过不可重复登记。"
 			+ "上传成功后 AI 默认通过，进入 A/B 审核；过审后需再调作家端 /creator/drama/shelf 上架。")
 	ResponseBase addDrama(AddDramaAssetQuery entity);
+
+	/**
+	 * 修改已登记剧集（纯 JSON，不再接收 MultipartFile）。
+	 */
+	@PostMapping("/update")
+	@ApiOperation(value = "修改剧集视频", notes = "body: {id, dramaId, setNum, key, videoName?, remarkInfo?}。"
+			+ "仅允许修改已驳回剧集；可改集序并重传视频。"
+			+ "修改成功后清空上一轮驳回/申诉痕迹，AI 审核默认通过，A/B 组恢复待审核，整集重新进入审核中。")
+	ResponseBase updateDrama(UpdateDramaAssetQuery entity);
 
 	/**
 	 * 删除剧集视频。

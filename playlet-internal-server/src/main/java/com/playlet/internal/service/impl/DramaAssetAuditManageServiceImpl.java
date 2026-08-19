@@ -190,15 +190,15 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
             if (drama == null) {
                 return setResultError(I18nUtil.getMessage("base_data_null"));
             }
-            // 状态校验
+            // 整剧已驳回（含另一审核组驳回）则不可再审
             if (isRejected(drama.getAuditStatus())) {
-                return setResultError(I18nUtil.getMessage("base_error"));
+                return setResultError(I18nUtil.getMessage("audit.drama_rejected"));
             }
-            // 审核组校验
+            // AI 须先通过
             DramaAuditStepEntity ai = dramaAuditStepDao.findByDramaIdAndStepType(
                     query.getDramaId(), DramaAssetAuditStepTypeEnums.AI.getCode());
             if (!isPass(ai == null ? null : ai.getStatus())) {
-                return setResultError(I18nUtil.getMessage("base_error"));
+                return setResultError(I18nUtil.getMessage("audit.ai_not_pass"));
             }
             // 步骤校验
             DramaAuditStepEntity step = dramaAuditStepDao.findByDramaIdAndStepType(
@@ -206,9 +206,9 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
             if (step == null) {
                 return setResultError(I18nUtil.getMessage("base_data_null"));
             }
-            // 状态校验
+            // 本组须待审
             if (!isPending(step.getStatus())) {
-                return setResultError(I18nUtil.getMessage("base_error"));
+                return stepNotPendingError(step.getStatus());
             }
             // 获取当前登录管理员 id（sys_user）
             Integer adminId = SysUserTokenUtil.resolveAdminId(request);
@@ -245,15 +245,15 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
             if (asset == null) {
                 return setResultError(I18nUtil.getMessage("base_data_null"));
             }
-            // 状态校验
+            // 整集已驳回（含另一审核组驳回）则不可再审
             if (isRejected(asset.getAuditStatus())) {
-                return setResultError(I18nUtil.getMessage("base_error"));
+                return setResultError(I18nUtil.getMessage("audit.episode_rejected"));
             }
-            // 步骤校验
+            // AI 须先通过
             DramaAssetAuditStepEntity ai = dramaAssetAuditStepDao.findByAssetIdAndStepType(
                     query.getAssetId(), DramaAssetAuditStepTypeEnums.AI.getCode());
             if (!isPass(ai == null ? null : ai.getStatus())) {
-                return setResultError(I18nUtil.getMessage("base_error"));
+                return setResultError(I18nUtil.getMessage("audit.ai_not_pass"));
             }
             // 步骤校验
             DramaAssetAuditStepEntity step = dramaAssetAuditStepDao.findByAssetIdAndStepType(
@@ -261,9 +261,9 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
             if (step == null) {
                 return setResultError(I18nUtil.getMessage("base_data_null"));
             }
-            // 状态校验
+            // 本组须待审
             if (!isPending(step.getStatus())) {
-                return setResultError(I18nUtil.getMessage("base_error"));
+                return stepNotPendingError(step.getStatus());
             }
             // 获取当前登录管理员 id（sys_user）
             Integer adminId = SysUserTokenUtil.resolveAdminId(request);
@@ -294,16 +294,27 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
      */
     private ResponseBase validateHandleBasics(Integer action, Integer stepType, String remark) {
         if (!DramaAssetAuditStepStatusEnums.isHandleAction(action)) {
-            return setResultError(I18nUtil.getMessage("base_error"));
+            return setResultError(I18nUtil.getMessage("audit.action_invalid"));
         }
         DramaAssetAuditStepTypeEnums type = DramaAssetAuditStepTypeEnums.fromCode(stepType);
         if (type == null || type == DramaAssetAuditStepTypeEnums.AI) {
-            return setResultError(I18nUtil.getMessage("base_error"));
+            return setResultError(I18nUtil.getMessage("audit.step_type_invalid"));
         }
         if (isRejectAction(action) && StringUtils.isEmpty(remark)) {
-            return setResultError(I18nUtil.getMessage("base_error"));
+            return setResultError(I18nUtil.getMessage("audit.reject_remark_required"));
         }
         return null;
+    }
+
+    /** 本审核组非待审时的提示（已通过 / 已驳回 / 其他） */
+    private static ResponseBase stepNotPendingError(Integer stepStatus) {
+        if (isPass(stepStatus)) {
+            return setResultError(I18nUtil.getMessage("audit.step_already_passed"));
+        }
+        if (isStepReject(stepStatus)) {
+            return setResultError(I18nUtil.getMessage("audit.step_already_rejected"));
+        }
+        return setResultError(I18nUtil.getMessage("audit.step_not_pending"));
     }
 
     /**
@@ -472,6 +483,10 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
      */
     private static boolean isPending(Integer status) {
         return status != null && status.equals(DramaAssetAuditStepStatusEnums.PENDING.getCode());
+    }
+
+    private static boolean isStepReject(Integer status) {
+        return status != null && status.equals(DramaAssetAuditStepStatusEnums.REJECT.getCode());
     }
 
     /**
