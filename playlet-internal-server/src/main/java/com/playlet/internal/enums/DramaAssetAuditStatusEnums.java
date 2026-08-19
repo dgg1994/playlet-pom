@@ -42,4 +42,14 @@ public enum DramaAssetAuditStatusEnums {
 	public static boolean isAppealing(Integer code) {
 		return code != null && code.equals(APPEALING.code);
 	}
+
+	/** 是否已驳回。 */
+	public static boolean isRejected(Integer code) {
+		return code != null && code.equals(REJECTED.code);
+	}
+
+	/** 是否已审核通过。 */
+	public static boolean isApproved(Integer code) {
+		return code != null && code.equals(APPROVED.code);
+	}
 }

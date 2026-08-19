@@ -41,4 +41,16 @@ public enum DramaAssetAuditStepStatusEnums {
 		DramaAssetAuditStepStatusEnums item = fromCode(code);
 		return item == PASS || item == REJECT;
 	}
+
+	public static boolean isPending(Integer code) {
+		return fromCode(code) == PENDING;
+	}
+
+	public static boolean isPass(Integer code) {
+		return fromCode(code) == PASS;
+	}
+
+	public static boolean isReject(Integer code) {
+		return fromCode(code) == REJECT;
+	}
 }

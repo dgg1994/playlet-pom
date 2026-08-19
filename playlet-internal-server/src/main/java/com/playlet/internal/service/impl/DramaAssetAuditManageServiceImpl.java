@@ -180,49 +180,25 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
     @SysLogAnnotation(module = "作品评审", type = "POST", remark = "剧评审A/B")
     public ResponseBase dramaHandle(@Valid @RequestBody DramaAuditHandleQuery query, HttpServletRequest request) {
         try {
-            // 参数校验
             ResponseBase basicErr = validateHandleBasics(query.getAction(), query.getStepType(), query.getRemark());
             if (basicErr != null) {
                 return basicErr;
             }
-            // 数据校验
-            DramaEntity drama = dramaDao.selectById(query.getDramaId());
-            if (drama == null) {
-                return setResultError(I18nUtil.getMessage("base_data_null"));
+            AuditLoadResult<DramaHandleContext> loadResult = loadDramaHandleContext(query);
+            if (loadResult.error != null) {
+                return loadResult.error;
             }
-            // 整剧已驳回（含另一审核组驳回）则不可再审
-            if (isRejected(drama.getAuditStatus())) {
-                return setResultError(I18nUtil.getMessage("audit.drama_rejected"));
-            }
-            // AI 须先通过
-            DramaAuditStepEntity ai = dramaAuditStepDao.findByDramaIdAndStepType(
-                    query.getDramaId(), DramaAssetAuditStepTypeEnums.AI.getCode());
-            if (!isPass(ai == null ? null : ai.getStatus())) {
-                return setResultError(I18nUtil.getMessage("audit.ai_not_pass"));
-            }
-            // 步骤校验
-            DramaAuditStepEntity step = dramaAuditStepDao.findByDramaIdAndStepType(
-                    query.getDramaId(), query.getStepType());
-            if (step == null) {
-                return setResultError(I18nUtil.getMessage("base_data_null"));
-            }
-            // 本组须待审
-            if (!isPending(step.getStatus())) {
-                return stepNotPendingError(step.getStatus());
-            }
-            // 获取当前登录管理员 id（sys_user）
-            Integer adminId = SysUserTokenUtil.resolveAdminId(request);
+            Integer adminId = resolveAdminId(request);
             if (adminId == null) {
                 return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
             }
-            // 处理步骤
-            applyStepHandle(step, query.getAction(), adminId, query.getRemark());
-            dramaAuditStepDao.updateById(step);
-            dramaAuditService.refreshAggregateAndAutoShelf(query.getDramaId());
-            // 驳回：邮件 + 站内信（失败不影响评审事务）
+            DramaHandleContext ctx = loadResult.data;
+            applyStepHandle(ctx.step, query.getAction(), adminId, query.getRemark());
+            dramaAuditStepDao.updateById(ctx.step);
+            dramaAuditService.refreshAggregateAndAutoShelf(ctx.drama.getId());
             if (isRejectAction(query.getAction())) {
-                notifyAuditReject(drama.getBelongUser(), drama.getId(), null, drama.getDramaTitle(),
-                        null, query.getRemark(), step.getId());
+                notifyAuditReject(ctx.drama.getBelongUser(), ctx.drama.getId(), null, ctx.drama.getDramaTitle(),
+                        null, query.getRemark(), ctx.step.getId());
             }
             return setResultSuccess(I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
@@ -235,52 +211,25 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
     @SysLogAnnotation(module = "作品评审", type = "POST", remark = "集评审A/B")
     public ResponseBase handle(@Valid @RequestBody DramaAssetAuditHandleQuery query, HttpServletRequest request) {
         try {
-            // 参数校验
             ResponseBase basicErr = validateHandleBasics(query.getAction(), query.getStepType(), query.getRemark());
             if (basicErr != null) {
                 return basicErr;
             }
-            // 数据校验
-            DramaAssetEntity asset = dramaAssetDao.selectById(query.getAssetId());
-            if (asset == null) {
-                return setResultError(I18nUtil.getMessage("base_data_null"));
+            AuditLoadResult<AssetHandleContext> loadResult = loadAssetHandleContext(query);
+            if (loadResult.error != null) {
+                return loadResult.error;
             }
-            // 整集已驳回（含另一审核组驳回）则不可再审
-            if (isRejected(asset.getAuditStatus())) {
-                return setResultError(I18nUtil.getMessage("audit.episode_rejected"));
-            }
-            // AI 须先通过
-            DramaAssetAuditStepEntity ai = dramaAssetAuditStepDao.findByAssetIdAndStepType(
-                    query.getAssetId(), DramaAssetAuditStepTypeEnums.AI.getCode());
-            if (!isPass(ai == null ? null : ai.getStatus())) {
-                return setResultError(I18nUtil.getMessage("audit.ai_not_pass"));
-            }
-            // 步骤校验
-            DramaAssetAuditStepEntity step = dramaAssetAuditStepDao.findByAssetIdAndStepType(
-                    query.getAssetId(), query.getStepType());
-            if (step == null) {
-                return setResultError(I18nUtil.getMessage("base_data_null"));
-            }
-            // 本组须待审
-            if (!isPending(step.getStatus())) {
-                return stepNotPendingError(step.getStatus());
-            }
-            // 获取当前登录管理员 id（sys_user）
-            Integer adminId = SysUserTokenUtil.resolveAdminId(request);
+            Integer adminId = resolveAdminId(request);
             if (adminId == null) {
                 return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
             }
-            // 处理步骤
-            applyStepHandle(step, query.getAction(), adminId, query.getRemark());
-            dramaAssetAuditStepDao.updateById(step);
-            dramaAssetAuditService.refreshAggregateAndAutoShelf(query.getAssetId());
-            // 驳回：邮件 + 站内信（失败不影响评审事务）
+            AssetHandleContext ctx = loadResult.data;
+            applyStepHandle(ctx.step, query.getAction(), adminId, query.getRemark());
+            dramaAssetAuditStepDao.updateById(ctx.step);
+            dramaAssetAuditService.refreshAggregateAndAutoShelf(ctx.asset.getId());
             if (isRejectAction(query.getAction())) {
-                DramaEntity drama = dramaDao.selectById(asset.getDramaId());
-                String dramaTitle = drama == null ? null : drama.getDramaTitle();
-                Integer belongUser = drama == null ? null : drama.getBelongUser();
-                notifyAuditReject(belongUser, asset.getDramaId(), asset.getId(), dramaTitle,
-                        asset.getSetNum(), query.getRemark(), step.getId());
+                notifyAuditReject(ctx.creatorId, ctx.asset.getDramaId(), ctx.asset.getId(), ctx.dramaTitle,
+                        ctx.asset.getSetNum(), query.getRemark(), ctx.step.getId());
             }
             return setResultSuccess(I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
@@ -296,8 +245,7 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
         if (!DramaAssetAuditStepStatusEnums.isHandleAction(action)) {
             return setResultError(I18nUtil.getMessage("audit.action_invalid"));
         }
-        DramaAssetAuditStepTypeEnums type = DramaAssetAuditStepTypeEnums.fromCode(stepType);
-        if (type == null || type == DramaAssetAuditStepTypeEnums.AI) {
+        if (!DramaAssetAuditStepTypeEnums.isManualGroup(stepType)) {
             return setResultError(I18nUtil.getMessage("audit.step_type_invalid"));
         }
         if (isRejectAction(action) && StringUtils.isEmpty(remark)) {
@@ -306,12 +254,96 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
         return null;
     }
 
-    /** 本审核组非待审时的提示（已通过 / 已驳回 / 其他） */
-    private static ResponseBase stepNotPendingError(Integer stepStatus) {
-        if (isPass(stepStatus)) {
+    /** 加载剧审核上下文，并集中完成状态前置校验。 */
+    private AuditLoadResult<DramaHandleContext> loadDramaHandleContext(DramaAuditHandleQuery query) {
+        DramaEntity drama = dramaDao.selectById(query.getDramaId());
+        if (drama == null) {
+            return AuditLoadResult.error(setResultError(I18nUtil.getMessage("base_data_null")));
+        }
+        ResponseBase aggregateErr = validateAggregateAuditStatus(drama.getAuditStatus(), true);
+        if (aggregateErr != null) {
+            return AuditLoadResult.error(aggregateErr);
+        }
+        DramaAuditStepEntity ai = dramaAuditStepDao.findByDramaIdAndStepType(
+                query.getDramaId(), DramaAssetAuditStepTypeEnums.AI.getCode());
+        ResponseBase aiErr = validateAiStepPassed(ai == null ? null : ai.getStatus());
+        if (aiErr != null) {
+            return AuditLoadResult.error(aiErr);
+        }
+        DramaAuditStepEntity step = dramaAuditStepDao.findByDramaIdAndStepType(
+                query.getDramaId(), query.getStepType());
+        if (step == null) {
+            return AuditLoadResult.error(setResultError(I18nUtil.getMessage("base_data_null")));
+        }
+        ResponseBase pendingErr = validateManualStepPending(step.getStatus());
+        if (pendingErr != null) {
+            return AuditLoadResult.error(pendingErr);
+        }
+        return AuditLoadResult.success(new DramaHandleContext(drama, step));
+    }
+
+    /** 加载集审核上下文，并集中完成状态前置校验。 */
+    private AuditLoadResult<AssetHandleContext> loadAssetHandleContext(DramaAssetAuditHandleQuery query) {
+        DramaAssetEntity asset = dramaAssetDao.selectById(query.getAssetId());
+        if (asset == null) {
+            return AuditLoadResult.error(setResultError(I18nUtil.getMessage("base_data_null")));
+        }
+        ResponseBase aggregateErr = validateAggregateAuditStatus(asset.getAuditStatus(), false);
+        if (aggregateErr != null) {
+            return AuditLoadResult.error(aggregateErr);
+        }
+        DramaAssetAuditStepEntity ai = dramaAssetAuditStepDao.findByAssetIdAndStepType(
+                query.getAssetId(), DramaAssetAuditStepTypeEnums.AI.getCode());
+        ResponseBase aiErr = validateAiStepPassed(ai == null ? null : ai.getStatus());
+        if (aiErr != null) {
+            return AuditLoadResult.error(aiErr);
+        }
+        DramaAssetAuditStepEntity step = dramaAssetAuditStepDao.findByAssetIdAndStepType(
+                query.getAssetId(), query.getStepType());
+        if (step == null) {
+            return AuditLoadResult.error(setResultError(I18nUtil.getMessage("base_data_null")));
+        }
+        ResponseBase pendingErr = validateManualStepPending(step.getStatus());
+        if (pendingErr != null) {
+            return AuditLoadResult.error(pendingErr);
+        }
+        DramaEntity drama = dramaDao.selectById(asset.getDramaId());
+        String dramaTitle = drama == null ? null : drama.getDramaTitle();
+        Integer creatorId = drama == null ? null : drama.getBelongUser();
+        return AuditLoadResult.success(new AssetHandleContext(asset, step, dramaTitle, creatorId));
+    }
+
+    /** 统一获取当前登录管理员。 */
+    private static Integer resolveAdminId(HttpServletRequest request) {
+        return SysUserTokenUtil.resolveAdminId(request);
+    }
+
+    /** 聚合审核状态校验：已驳回即终态，不允许另一组继续处理。 */
+    private static ResponseBase validateAggregateAuditStatus(Integer auditStatus, boolean dramaLevel) {
+        if (!DramaAssetAuditStatusEnums.isRejected(auditStatus)) {
+            return null;
+        }
+        return setResultError(I18nUtil.getMessage(dramaLevel
+                ? "audit.drama_rejected" : "audit.episode_rejected"));
+    }
+
+    /** AI 必须先通过，人工审核才有意义。 */
+    private static ResponseBase validateAiStepPassed(Integer aiStatus) {
+        if (DramaAssetAuditStepStatusEnums.isPass(aiStatus)) {
+            return null;
+        }
+        return setResultError(I18nUtil.getMessage("audit.ai_not_pass"));
+    }
+
+    /** A/B 组只能从待审核处理一次，状态已落地后禁止重复覆盖。 */
+    private static ResponseBase validateManualStepPending(Integer stepStatus) {
+        if (DramaAssetAuditStepStatusEnums.isPending(stepStatus)) {
+            return null;
+        }
+        if (DramaAssetAuditStepStatusEnums.isPass(stepStatus)) {
             return setResultError(I18nUtil.getMessage("audit.step_already_passed"));
         }
-        if (isStepReject(stepStatus)) {
+        if (DramaAssetAuditStepStatusEnums.isReject(stepStatus)) {
             return setResultError(I18nUtil.getMessage("audit.step_already_rejected"));
         }
         return setResultError(I18nUtil.getMessage("audit.step_not_pending"));
@@ -463,33 +495,6 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
     }
 
     /**
-     * 转为处理状态。
-     */
-    private static boolean isRejected(Integer auditStatus) {
-        return auditStatus != null && auditStatus.equals(DramaAssetAuditStatusEnums.REJECTED.getCode());
-    }
-
-    /**
-     * 转为处理状态。
-     */
-    private static boolean isPass(Integer status) {
-        return status != null && status.equals(DramaAssetAuditStepStatusEnums.PASS.getCode());
-    }
-
-    /**
-     * 转为处理状态。
-     * @param status
-     * @return
-     */
-    private static boolean isPending(Integer status) {
-        return status != null && status.equals(DramaAssetAuditStepStatusEnums.PENDING.getCode());
-    }
-
-    private static boolean isStepReject(Integer status) {
-        return status != null && status.equals(DramaAssetAuditStepStatusEnums.REJECT.getCode());
-    }
-
-    /**
      * 提交处理。
      */
     private void applyStepHandle(DramaAuditStepEntity step, Integer action, Integer adminId, String remark)
@@ -520,5 +525,48 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
         return isPassAction(action)
                 ? DramaAssetAuditStepStatusEnums.PASS.getCode()
                 : DramaAssetAuditStepStatusEnums.REJECT.getCode();
+    }
+
+    private static final class DramaHandleContext {
+        private final DramaEntity drama;
+        private final DramaAuditStepEntity step;
+
+        private DramaHandleContext(DramaEntity drama, DramaAuditStepEntity step) {
+            this.drama = drama;
+            this.step = step;
+        }
+    }
+
+    private static final class AssetHandleContext {
+        private final DramaAssetEntity asset;
+        private final DramaAssetAuditStepEntity step;
+        private final String dramaTitle;
+        private final Integer creatorId;
+
+        private AssetHandleContext(DramaAssetEntity asset, DramaAssetAuditStepEntity step,
+                String dramaTitle, Integer creatorId) {
+            this.asset = asset;
+            this.step = step;
+            this.dramaTitle = dramaTitle;
+            this.creatorId = creatorId;
+        }
+    }
+
+    private static final class AuditLoadResult<T> {
+        private final T data;
+        private final ResponseBase error;
+
+        private AuditLoadResult(T data, ResponseBase error) {
+            this.data = data;
+            this.error = error;
+        }
+
+        private static <T> AuditLoadResult<T> success(T data) {
+            return new AuditLoadResult<>(data, null);
+        }
+
+        private static <T> AuditLoadResult<T> error(ResponseBase error) {
+            return new AuditLoadResult<>(null, error);
+        }
     }
 }

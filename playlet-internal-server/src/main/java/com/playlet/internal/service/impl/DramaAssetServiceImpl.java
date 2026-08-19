@@ -69,20 +69,15 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			if (entity == null) {
 				return setResultError(I18nUtil.getMessage("base_error"));
 			}
-			String key = QiniuUploadUtils.extractKey(createPay.getKey());
-			if (StringUtils.isEmpty(key)) {
+			String key = validateUploadedVideo(createPay.getKey());
+			if (key == null) {
 				return setResultError(I18nUtil.getMessage("video_not_null"));
 			}
-			String prefix = QiniuUploadUtils.videoKeyPrefix(entity.getId(), createPay.getSetNum());
-			if (!key.startsWith(prefix)) {
+			if (!hasValidVideoPrefix(entity.getId(), createPay.getSetNum(), key)) {
 				return setResultError(I18nUtil.getMessage("purview_error_null"));
 			}
-			if (!QiniuUploadUtils.exists(key)) {
-				return setResultError(I18nUtil.getMessage("video_not_null"));
-			}
 			String newUrl = toDefaultMultiRateM3u8Key(key);
-			String videoName = StringUtils.isEmpty(createPay.getVideoName())
-					? key.substring(key.lastIndexOf('/') + 1) : createPay.getVideoName();
+			String videoName = resolveVideoName(createPay.getVideoName(), key);
 
 			DramaAssetEntity existing = dramaAssetDao.findByDramaIdAndSetNum(entity.getId(), createPay.getSetNum());
 			if (existing != null) {
@@ -113,11 +108,7 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			dramaAssetDao.insert(assetEntity);
 			dramaAssetAuditService.initAuditStepsOnRelease(assetEntity.getId(), entity.getId());
 			dramaAssetDurationService.fillDurationFromAvinfo(assetEntity.getId(), key);
-			DramaAssetReleaseRespEntity data = new DramaAssetReleaseRespEntity();
-			data.setId(assetEntity.getId());
-			data.setKey(newUrl);
-			data.setVideoUrl(mediaUrlService.sign(newUrl));
-			return setResultSuccess(data, I18nUtil.getMessage("base_success"));
+			return setResultSuccess(buildReleaseResp(assetEntity.getId(), newUrl), I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			log.error("service error", e);
 			throw new RuntimeException(e);
@@ -147,20 +138,15 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			if (duplicate != null && !duplicate.getId().equals(current.getId())) {
 				return setResultError(I18nUtil.getMessage("base_info_exist"));
 			}
-			String key = QiniuUploadUtils.extractKey(query.getKey());
-			if (StringUtils.isEmpty(key)) {
+			String key = validateUploadedVideo(query.getKey());
+			if (key == null) {
 				return setResultError(I18nUtil.getMessage("video_not_null"));
 			}
-			String prefix = QiniuUploadUtils.videoKeyPrefix(drama.getId(), query.getSetNum());
-			if (!key.startsWith(prefix)) {
+			if (!hasValidVideoPrefix(drama.getId(), query.getSetNum(), key)) {
 				return setResultError(I18nUtil.getMessage("purview_error_null"));
 			}
-			if (!QiniuUploadUtils.exists(key)) {
-				return setResultError(I18nUtil.getMessage("video_not_null"));
-			}
 			String newUrl = toDefaultMultiRateM3u8Key(key);
-			String videoName = StringUtils.isEmpty(query.getVideoName())
-					? key.substring(key.lastIndexOf('/') + 1) : query.getVideoName();
+			String videoName = resolveVideoName(query.getVideoName(), key);
 			return resetRejectedAsset(current, drama, query.getSetNum(), query.getRemarkInfo(),
 					videoName, newUrl, key);
 		} catch (Exception e) {
@@ -230,7 +216,38 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 		dramaAssetAuditService.initAuditStepsOnRelease(asset.getId(), drama.getId());
 		// 对原始上传文件拉时长，勿用转码后的 m3u8 key
 		dramaAssetDurationService.fillDurationFromAvinfo(asset.getId(), sourceKey);
-		return setResultSuccess(I18nUtil.getMessage("base_success"));
+		return setResultSuccess(buildReleaseResp(asset.getId(), videoUrl), I18nUtil.getMessage("base_success"));
+	}
+
+	/** 统一校验直传文件：提取 key、确认七牛对象存在。 */
+	private String validateUploadedVideo(String rawKey) {
+		String key = QiniuUploadUtils.extractKey(rawKey);
+		if (StringUtils.isEmpty(key)) {
+			return null;
+		}
+		if (!QiniuUploadUtils.exists(key)) {
+			return null;
+		}
+		return key;
+	}
+
+	/** 只允许提交本剧、本集申请到的七牛 key。 */
+	private boolean hasValidVideoPrefix(Integer dramaId, Integer setNum, String key) {
+		return key != null && key.startsWith(QiniuUploadUtils.videoKeyPrefix(dramaId, setNum));
+	}
+
+	/** 未传原文件名时，默认取 key 最后一段。 */
+	private static String resolveVideoName(String videoName, String key) {
+		return StringUtils.isEmpty(videoName) ? key.substring(key.lastIndexOf('/') + 1) : videoName;
+	}
+
+	/** 统一 release/update 成功响应。 */
+	private DramaAssetReleaseRespEntity buildReleaseResp(Integer id, String key) {
+		DramaAssetReleaseRespEntity data = new DramaAssetReleaseRespEntity();
+		data.setId(id);
+		data.setKey(key);
+		data.setVideoUrl(mediaUrlService.sign(key));
+		return data;
 	}
 
 }

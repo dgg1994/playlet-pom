@@ -37,23 +37,14 @@ public class OnePayBindService extends BaseApiService {
 			return setResultError(I18nUtil.getMessage("withdraw.onepay_already_bound"));
 		}
 		String onepayAccount = query.getAccount().trim();
-		String openid;
 		try {
-			openid = onePayVerifyClient.verifyAccount(query, uid, onepayAccount);
-		} catch (Exception e) {
-			log.error("bind onepay http failed uid={} account={}", uid, OnePayVerifyClient.maskAccount(onepayAccount), e);
-			throw new BaseException(I18nUtil.getMessage("base_error"), e);
-		}
-		if (StringUtils.isEmpty(openid)) {
-			return setResultError(I18nUtil.getMessage("withdraw.onepay_verify_failed"));
-		}
-		try {
+			String openid = onePayVerifyClient.verifyAccount(query, uid, onepayAccount);
+			if (StringUtils.isEmpty(openid)) {
+				return setResultError(I18nUtil.getMessage("withdraw.onepay_verify_failed"));
+			}
 			ops.bind(uid, onepayAccount, openid, new Date());
 			redisUtil.del(emailCodeKeyPrefix + loginEmail);
 			log.info("bind onepay uid={} account={}", uid, OnePayVerifyClient.maskAccount(onepayAccount));
-		} catch (DuplicateKeyException e) {
-			log.warn("bind onepay duplicate uid={} account={}", uid, OnePayVerifyClient.maskAccount(onepayAccount));
-			return setResultError(I18nUtil.getMessage("withdraw.onepay_exist"));
 		} catch (Exception e) {
 			log.error("bind onepay failed uid={} account={}", uid, OnePayVerifyClient.maskAccount(onepayAccount), e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);

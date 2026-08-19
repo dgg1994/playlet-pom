@@ -35,4 +35,10 @@ public enum DramaAssetAuditStepTypeEnums {
 		}
 		return null;
 	}
+
+	/** 是否人工审核组（A / B），AI 不算。 */
+	public static boolean isManualGroup(Integer code) {
+		DramaAssetAuditStepTypeEnums item = fromCode(code);
+		return item == GROUP_A || item == GROUP_B;
+	}
 }
