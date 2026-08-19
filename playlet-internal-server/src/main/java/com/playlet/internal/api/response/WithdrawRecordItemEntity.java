@@ -29,8 +29,8 @@ public class WithdrawRecordItemEntity {
 	@ApiModelProperty("实到金额")
 	private BigDecimal actualAmt;
 
-	@ApiModelProperty("收款地址（脱敏）")
-	private String walletAddressMasked;
+	@ApiModelProperty("OnePay 账号（脱敏）")
+	private String onepayAccountMasked;
 
 	@ApiModelProperty("状态码")
 	private Integer status;
@@ -38,8 +38,8 @@ public class WithdrawRecordItemEntity {
 	@ApiModelProperty("状态文案")
 	private String statusLabel;
 
-	@ApiModelProperty("链上哈希")
-	private String txHash;
+	@ApiModelProperty("OnePay 三方流水号")
+	private String thirdOrderNo;
 
 	@ApiModelProperty("失败原因")
 	private String failReason;

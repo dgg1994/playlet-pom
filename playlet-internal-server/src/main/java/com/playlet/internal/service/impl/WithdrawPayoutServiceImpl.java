@@ -189,9 +189,8 @@ public class WithdrawPayoutServiceImpl implements WithdrawPayoutService {
 	private boolean callOnePay(UserWithdrawOrderEntity order) {
 		OnePayWithdrawPayoutRequest req = new OnePayWithdrawPayoutRequest();
 		req.setOrderNo(order.getOrderNo());
-		req.setOnePayAccount(order.getWalletAddress());
-		WithdrawWalletHandler handler = walletHandlerRegistry.of(order.getUserType());
-		req.setOnePayOpenId(handler.findOpenId(order.getUid()));
+		req.setOnePayAccount(order.getOnepayAccount());
+		req.setOnePayOpenId(order.getOnepayOpenId());
 		req.setPoints(nvlPoints(order.getPointsAmt()));
 		try {
 			log.info("onepay withdraw request orderNo={} userType={} uid={} points={}",

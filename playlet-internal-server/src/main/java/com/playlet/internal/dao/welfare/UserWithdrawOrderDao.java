@@ -47,11 +47,11 @@ public interface UserWithdrawOrderDao extends BaseMapper<UserWithdrawOrderEntity
 	int casStatus(@Param("id") Long id, @Param("fromStatus") Integer fromStatus,
 			@Param("toStatus") Integer toStatus);
 
-	@Update("update user_withdraw_order set status = #{toStatus}, tx_hash = #{txHash}, "
+	@Update("update user_withdraw_order set status = #{toStatus}, third_order_no = #{thirdOrderNo}, "
 			+ "fail_reason = #{failReason}, gmtModified = now() "
 			+ "where id = #{id} and status = #{fromStatus}")
 	int casFinish(@Param("id") Long id, @Param("fromStatus") Integer fromStatus,
-			@Param("toStatus") Integer toStatus, @Param("txHash") String txHash,
+			@Param("toStatus") Integer toStatus, @Param("thirdOrderNo") String thirdOrderNo,
 			@Param("failReason") String failReason);
 
 	/** 进行中提现单：待处理 + 打款中 */

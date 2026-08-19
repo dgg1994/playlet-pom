@@ -77,8 +77,8 @@ public class WithdrawBizService extends BaseApiService {
 		Integer allUsed = userWithdrawOrderDao.sumPointsToday(uid, userType.getCode(), todayStart());
 		resp.setTodayUsedPoints(allUsed == null ? 0 : allUsed);
 		UserWithdrawOrderEntity latestAny = userWithdrawOrderDao.findLatestByUid(uid, userType.getCode());
-		if (latestAny != null && !StringUtils.isEmpty(latestAny.getWalletAddress())) {
-			resp.setLastWalletAddress(latestAny.getWalletAddress());
+		if (latestAny != null && !StringUtils.isEmpty(latestAny.getOnepayAccount())) {
+			resp.setLastWalletAddress(latestAny.getOnepayAccount());
 		}
 
 		List<WithdrawConfigEntity> cfgs = withdrawConfigDao.findActiveList();
@@ -101,8 +101,8 @@ public class WithdrawBizService extends BaseApiService {
 			item.setTodayUsedPoints(used == null ? 0 : used);
 			UserWithdrawOrderEntity latest = userWithdrawOrderDao.findLatestByUidAndAsset(uid, userType.getCode(),
 					cfg.getAssetCode(), cfg.getNetwork());
-			if (latest != null && !StringUtils.isEmpty(latest.getWalletAddress())) {
-				item.setLastWalletAddress(latest.getWalletAddress());
+			if (latest != null && !StringUtils.isEmpty(latest.getOnepayAccount())) {
+				item.setLastWalletAddress(latest.getOnepayAccount());
 			}
 			assets.add(item);
 		}
@@ -157,7 +157,8 @@ public class WithdrawBizService extends BaseApiService {
 			if (handler.freeze(uid, points) <= 0) {
 				return setResultError(I18nUtil.getMessage("withdraw.balance_not_enough"));
 			}
-			UserWithdrawOrderEntity order = buildOrder(uid, userType, snap.getOnepayAccount(), points, cfg, orderNo);
+			UserWithdrawOrderEntity order = buildOrder(uid, userType, snap.getOnepayAccount(),
+					handler.findOpenId(uid), points, cfg, orderNo);
 			GenericityUtil.setDate(order);
 			userWithdrawOrderDao.insert(order);
 			final Long orderId = order.getId();
@@ -208,14 +209,15 @@ public class WithdrawBizService extends BaseApiService {
 
 	/** 落单快照：userType 必须写入，回调靠它路由钱包 */
 	private UserWithdrawOrderEntity buildOrder(Integer uid, WithdrawUserTypeEnums userType, String onepayAccount,
-			int points, WithdrawConfigEntity cfg, String orderNo) {
+			String onepayOpenId, int points, WithdrawConfigEntity cfg, String orderNo) {
 		UserWithdrawOrderEntity order = new UserWithdrawOrderEntity();
 		order.setOrderNo(orderNo);
 		order.setUid(uid);
 		order.setUserType(userType.getCode());
 		order.setAssetCode(cfg == null ? WithdrawConstants.ASSET_ONEPAY : cfg.getAssetCode());
 		order.setNetwork(cfg == null ? WithdrawConstants.NETWORK_ONEPAY : cfg.getNetwork());
-		order.setWalletAddress(onepayAccount);
+		order.setOnepayAccount(onepayAccount);
+		order.setOnepayOpenId(onepayOpenId);
 		order.setPointsAmt(points);
 		order.setRate(cfg == null || cfg.getPointsPerUnit() == null ? 1 : cfg.getPointsPerUnit());
 		order.setFeeAmt(cfg == null ? BigDecimal.ZERO : scale(cfg.getServiceFee()));
@@ -234,10 +236,10 @@ public class WithdrawBizService extends BaseApiService {
 		// 列表展示为支出
 		item.setPointsAmt(row.getPointsAmt() == null ? 0 : -Math.abs(row.getPointsAmt()));
 		item.setActualAmt(scale(row.getActualAmt()));
-		item.setWalletAddressMasked(maskAddress(row.getWalletAddress()));
+		item.setOnepayAccountMasked(maskAccount(row.getOnepayAccount()));
 		item.setStatus(row.getStatus());
 		item.setStatusLabel(WithdrawOrderStatusEnums.getLableByCode(row.getStatus()));
-		item.setTxHash(row.getTxHash());
+		item.setThirdOrderNo(row.getThirdOrderNo());
 		item.setFailReason(row.getFailReason());
 		item.setSetTime(row.getSetTime());
 		return item;
@@ -251,12 +253,24 @@ public class WithdrawBizService extends BaseApiService {
 		return WithdrawConstants.ORDER_NO_PREFIX_APP;
 	}
 
-	/** 收款账号脱敏：前6后4 */
-	private static String maskAddress(String address) {
-		if (StringUtils.isEmpty(address) || address.length() < 12) {
-			return address;
+	/** OnePay 账号脱敏：邮箱走名称脱敏，其他走前2后2 */
+	private static String maskAccount(String account) {
+		if (StringUtils.isEmpty(account)) {
+			return account;
 		}
-		return address.substring(0, 6) + "..." + address.substring(address.length() - 4);
+		if (account.contains("@")) {
+			int at = account.indexOf('@');
+			String name = account.substring(0, at);
+			String domain = account.substring(at);
+			if (name.length() <= 1) {
+				return "*" + domain;
+			}
+			return name.charAt(0) + "***" + domain;
+		}
+		if (account.length() < 6) {
+			return "***";
+		}
+		return account.substring(0, 2) + "***" + account.substring(account.length() - 2);
 	}
 
 	private static BigDecimal scale(BigDecimal v) {
