@@ -225,16 +225,16 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 				return setResultError(I18nUtil.getMessage("base_error"));
 			}
 			if (VerifyStateEnums.AVAILABLE_NOW.getIndex().equals(verifyStatus)) {
-				// 方案3：剧上架由集推导；管理端仅允许在「剧已过审且至少一集已上架」时纠正剧状态
-				if (entity.getAuditStatus() == null
-						|| !entity.getAuditStatus().equals(DramaAssetAuditStatusEnums.APPROVED.getCode())) {
+				// 整剧上架：剧须已过审，且至少一集已过审；批量上架已过审集后推导剧状态
+				if (!DramaAssetAuditStatusEnums.isApproved(entity.getAuditStatus())) {
 					return setResultError(I18nUtil.getMessage("base_error"));
 				}
-				Integer onShelf = dramaAssetDao.countOnShelfByDramaId(id);
-				if (onShelf == null || onShelf < 1) {
+				Integer approvedCount = dramaAssetDao.countApprovedByDramaId(id);
+				if (approvedCount == null || approvedCount < 1) {
 					return setResultError(I18nUtil.getMessage("video_not_release"));
 				}
-				dramaAuditService.syncDramaShelfByEpisodes(id);
+				dramaAuditService.forceShelfDramaAndApprovedEpisodes(id);
+				log.info("drama verifyStatus shelf on dramaId={} approvedEpisodeCount={}", id, approvedCount);
 				return setResultSuccess(I18nUtil.getMessage("base_success"));
 			}
 			// 下架：整剧 + 全部已上架集

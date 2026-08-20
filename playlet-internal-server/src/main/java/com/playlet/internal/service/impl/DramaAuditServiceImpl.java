@@ -224,6 +224,22 @@ public class DramaAuditServiceImpl implements DramaAuditService {
 		}
 	}
 
+	@Override
+	public void forceShelfDramaAndApprovedEpisodes(Integer dramaId) {
+		try {
+			if (dramaId == null) {
+				return;
+			}
+			// 批量上架已过审集，再推导剧级 verifyStatus / shelfStatus
+			int shelved = dramaAssetDao.shelfApprovedByDramaId(dramaId);
+			log.info("force shelf drama approved episodes dramaId={} shelvedCount={}", dramaId, shelved);
+			syncDramaShelfByEpisodes(dramaId);
+		} catch (Exception e) {
+			log.error("force shelf drama failed dramaId={}", dramaId, e);
+			throw new RuntimeException(e);
+		}
+	}
+
 	private static boolean isPass(Integer status) {
 		return status != null && status.equals(DramaAssetAuditStepStatusEnums.PASS.getCode());
 	}

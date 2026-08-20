@@ -26,4 +26,9 @@ public interface DramaAuditService {
 	 * 强制下架整剧及其所有已上架集，再按集同步（用于剧驳回等）。
 	 */
 	void forceUnshelfDramaAndEpisodes(Integer dramaId);
+
+	/**
+	 * 管理端整剧上架：批量上架已过审集，再按集同步剧可见性（与 {@link #forceUnshelfDramaAndEpisodes} 对称）。
+	 */
+	void forceShelfDramaAndApprovedEpisodes(Integer dramaId);
 }
