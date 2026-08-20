@@ -30,6 +30,9 @@ public final class CreatorConstants {
 	/** 首页展示：金币→元，100 金币 = 1.00 元 */
 	public static final int COIN_PER_YUAN = 100;
 
+	/** 收益管理页趋势图天数（含今天，共 7 个自然日） */
+	public static final int REVENUE_TREND_DAYS = 7;
+
 	/** 首页热点剧条数 */
 	public static final int HOME_HOT_DRAMA_LIMIT = 10;
 

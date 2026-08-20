@@ -19,6 +19,10 @@ import javax.servlet.http.HttpServletRequest;
 @Api(value = "作家端钱包提现", tags = "作家端钱包提现")
 public interface CreatorWithdrawService {
 
+	@GetMapping("/revenue/summary")
+	@ApiOperation(value = "收益概览", notes = "今日/累计/待结算收益（元）、近7日 incomeTrend、OnePay 结算账户；需作家登录")
+	ResponseBase revenueSummary(HttpServletRequest request);
+
 	@GetMapping("/withdraw/home")
 	@ApiOperation(value = "提现首页", notes = "可用金币 + 可提现资产列表；需作家登录")
 	ResponseBase withdrawHome(HttpServletRequest request);
@@ -30,4 +34,8 @@ public interface CreatorWithdrawService {
 	@GetMapping("/withdraw/records")
 	@ApiOperation(value = "提现记录", notes = "分页；地址脱敏；需作家登录")
 	ResponseBase withdrawRecords(PageQueryHelperEntity page, HttpServletRequest request);
+
+	@GetMapping("/fund/records")
+	@ApiOperation(value = "资金流水", notes = "分页查询 creator_coin_ledger；按时间倒序；需作家登录")
+	ResponseBase fundRecords(PageQueryHelperEntity page, HttpServletRequest request);
 }

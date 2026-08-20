@@ -7,6 +7,7 @@ import com.playlet.internal.constants.Constants;
 import com.playlet.internal.enums.WithdrawUserTypeEnums;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
 import com.playlet.internal.service.CreatorWithdrawService;
+import com.playlet.internal.service.support.CreatorRevenueBizService;
 import com.playlet.internal.service.support.WithdrawBizService;
 import com.playlet.internal.utils.CreatorTokenUtil;
 import com.playlet.internal.utils.I18nUtil;
@@ -26,6 +27,17 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 
 	@Autowired
 	private WithdrawBizService withdrawBizService;
+	@Autowired
+	private CreatorRevenueBizService creatorRevenueBizService;
+
+	@Override
+	public ResponseBase revenueSummary(HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return setResultSuccess(creatorRevenueBizService.buildSummary(uid), I18nUtil.getMessage("base_success"));
+	}
 
 	@Override
 	public ResponseBase withdrawHome(HttpServletRequest request) {
@@ -53,5 +65,14 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
 		return withdrawBizService.records(page, uid, WithdrawUserTypeEnums.CREATOR);
+	}
+
+	@Override
+	public ResponseBase fundRecords(PageQueryHelperEntity page, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return setResultSuccess(creatorRevenueBizService.fundRecords(uid, page), I18nUtil.getMessage("base_success"));
 	}
 }

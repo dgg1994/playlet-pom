@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.playlet.internal.query.pub.PageQueryHelperEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -16,7 +17,7 @@ import java.util.Date;
 @Data
 @TableName("creator_coin_ledger")
 @ApiModel(value = "作家金币流水", description = "收益入账 / 提现冻结 / 退回 / 调账")
-public class CreatorCoinLedgerEntity {
+public class CreatorCoinLedgerEntity extends PageQueryHelperEntity {
 
 	@TableId(type = IdType.AUTO)
 	@ApiModelProperty(name = "id", value = "主键")

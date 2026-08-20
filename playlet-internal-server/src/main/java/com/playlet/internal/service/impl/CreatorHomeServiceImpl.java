@@ -14,7 +14,6 @@ import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.CreatorConstants;
-import com.playlet.internal.constants.RankBoardGroupConstants;
 import com.playlet.internal.dao.creator.CreatorCoinLedgerDao;
 import com.playlet.internal.dao.creator.CreatorHomeDao;
 import com.playlet.internal.dao.drama.DramaRankStatDailyDao;
@@ -27,6 +26,7 @@ import com.playlet.internal.enums.CreatorHomeRankTypeEnums;
 import com.playlet.internal.enums.LanguageEnums;
 import com.playlet.internal.service.CreatorHomeService;
 import com.playlet.internal.service.MediaUrlService;
+import com.playlet.internal.utils.CreatorBizUtils;
 import com.playlet.internal.utils.CreatorTokenUtil;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.StringUtils;
@@ -37,11 +37,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -55,9 +51,6 @@ import java.util.Map;
 @RestController
 @CrossOrigin
 public class CreatorHomeServiceImpl extends BaseApiService implements CreatorHomeService {
-
-	private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-	private static final ZoneId ZONE = ZoneId.of(RankBoardGroupConstants.TIMEZONE);
 
 	@Autowired
 	private CreatorHomeDao creatorHomeDao;
@@ -129,9 +122,9 @@ public class CreatorHomeServiceImpl extends BaseApiService implements CreatorHom
 
 	/** 顶部概览：流水日收益 + 账号余额/累计 + 日播放 + 在播 */
 	private CreatorHomeStatsRespEntity buildStats(CreatorAccountEntity account) {
-		LocalDate today = LocalDate.now(ZONE);
-		String todayStr = today.format(DATE_FMT);
-		String yesterdayStr = today.minusDays(1).format(DATE_FMT);
+		LocalDate today = CreatorBizUtils.today();
+		String todayStr = CreatorBizUtils.formatDate(today);
+		String yesterdayStr = CreatorBizUtils.formatDate(today.minusDays(1));
 
 		Long todayIncomeCoin = creatorCoinLedgerDao.sumPositiveIncomeByDate(account.getId(), todayStr);
 		Long yesterdayIncomeCoin = creatorCoinLedgerDao.sumPositiveIncomeByDate(account.getId(), yesterdayStr);
@@ -146,10 +139,10 @@ public class CreatorHomeServiceImpl extends BaseApiService implements CreatorHom
 		Integer onAirEpisode = creatorHomeDao.countOnAirEpisode(account.getId());
 
 		CreatorHomeStatsRespEntity stats = new CreatorHomeStatsRespEntity();
-		stats.setTodayIncomeYuan(coinToYuan(todayIncomeCoin));
-		stats.setYesterdayIncomeYuan(coinToYuan(yesterdayIncomeCoin));
-		stats.setBalanceYuan(coinToYuan(available));
-		stats.setTotalIncomeYuan(coinToYuan(totalIncome));
+		stats.setTodayIncomeYuan(CreatorBizUtils.coinToYuan(todayIncomeCoin));
+		stats.setYesterdayIncomeYuan(CreatorBizUtils.coinToYuan(yesterdayIncomeCoin));
+		stats.setBalanceYuan(CreatorBizUtils.coinToYuan(available));
+		stats.setTotalIncomeYuan(CreatorBizUtils.coinToYuan(totalIncome));
 		stats.setTodayPlayCount(todayPlay == null ? 0L : todayPlay);
 		stats.setYesterdayPlayCount(yesterdayPlay == null ? 0L : yesterdayPlay);
 		stats.setOnAirDramaCount(onAirDrama == null ? 0 : onAirDrama);
@@ -246,12 +239,12 @@ public class CreatorHomeServiceImpl extends BaseApiService implements CreatorHom
 	}
 
 	private List<CreatorHomeRankAggRow> queryGrowthRows() {
-		LocalDate today = LocalDate.now(ZONE);
+		LocalDate today = CreatorBizUtils.today();
 		int window = CreatorConstants.GROWTH_WINDOW_DAYS;
-		String todayStr = today.format(DATE_FMT);
-		String recentFrom = today.minusDays(window - 1L).format(DATE_FMT);
-		String prevTo = today.minusDays(window).format(DATE_FMT);
-		String prevFrom = today.minusDays(window * 2L - 1L).format(DATE_FMT);
+		String todayStr = CreatorBizUtils.formatDate(today);
+		String recentFrom = CreatorBizUtils.formatDate(today.minusDays(window - 1L));
+		String prevTo = CreatorBizUtils.formatDate(today.minusDays(window));
+		String prevFrom = CreatorBizUtils.formatDate(today.minusDays(window * 2L - 1L));
 		return creatorHomeDao.findGrowthRank(todayStr, recentFrom, prevFrom, prevTo,
 				CreatorConstants.GROWTH_MIN_RECENT_SECONDS, CreatorConstants.HOME_RANK_LIMIT);
 	}
@@ -290,14 +283,8 @@ public class CreatorHomeServiceImpl extends BaseApiService implements CreatorHom
 		return "";
 	}
 
-	private static BigDecimal coinToYuan(Long coin) {
-		long value = coin == null ? 0L : coin;
-		return BigDecimal.valueOf(value)
-				.divide(BigDecimal.valueOf(CreatorConstants.COIN_PER_YUAN), 2, RoundingMode.HALF_UP);
-	}
-
 	private static String windowFromDate(int windowDays) {
-		return LocalDate.now(ZONE).minusDays(Math.max(windowDays - 1, 0)).format(DATE_FMT);
+		return CreatorBizUtils.formatDate(CreatorBizUtils.today().minusDays(Math.max(windowDays - 1, 0)));
 	}
 
 	private static String resolveLangue() {
