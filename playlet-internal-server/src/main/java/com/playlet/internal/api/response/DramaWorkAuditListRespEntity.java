@@ -90,4 +90,7 @@ public class DramaWorkAuditListRespEntity {
 
 	@ApiModelProperty("上传/创建日期")
 	private Date uploadDate;
+
+	@ApiModelProperty("作家昵称")
+	private String nickname;
 }
