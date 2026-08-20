@@ -116,14 +116,15 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			if(entity == null) {
 				return  setResultError(I18nUtil.getMessage("base_error"));
 			}
-			boolean metaChanged = false;
+			// 仅剧名、简介、封面变更才触发重审；标签/集数等其它字段不影响审核状态
+			boolean auditResetRequired = false;
 			if (createPay.getDramaTitle() != null
 					&& !createPay.getDramaTitle().equals(entity.getDramaTitle())) {
-				metaChanged = true;
+				auditResetRequired = true;
 			}
 			if (createPay.getDescriptionInfo() != null
 					&& !createPay.getDescriptionInfo().equals(entity.getDescriptionInfo())) {
-				metaChanged = true;
+				auditResetRequired = true;
 			}
 			entity.setDramaTitle(createPay.getDramaTitle());
 			entity.setProducerFirm(createPay.getProducerFirm());
@@ -133,24 +134,23 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			entity.setDescriptionInfo(createPay.getDescriptionInfo());
 			entity.setBelongUser(createPay.getBelongUser());
 			entity.setIsAi(createPay.getIsAi());
-			if(file != null) {
+			if (file != null) {
 				String path = String.format(Constants.FILE_UPLOAD_SITE, entity.getId());
-				String url = QiniuUploadUtils.uploadFile(file,path);
+				String url = QiniuUploadUtils.uploadFile(file, path);
 				entity.setCoverUrl(url);
-				metaChanged = true;
+				auditResetRequired = true;
 			}
-			if(createPay.getTagGroupIdList() != null && createPay.getTagGroupIdList().size() > 0) {
+			if (createPay.getTagGroupIdList() != null && createPay.getTagGroupIdList().size() > 0) {
 				dramaTagRelDao.deleteByDramaId(entity.getId());
 				for (int i = 0; i < createPay.getTagGroupIdList().size(); i++) {
 					DramaTagRelEntity dramaTagRelEntity = new DramaTagRelEntity();
 					dramaTagRelEntity.setDramaId(entity.getId());
-					dramaTagRelEntity.setTagGroupId(createPay.getTagGroupIdList().get(i));;
+					dramaTagRelEntity.setTagGroupId(createPay.getTagGroupIdList().get(i));
 					GenericityUtil.setDate(dramaTagRelEntity);
 					dramaTagRelDao.insert(dramaTagRelEntity);
 				}
-				metaChanged = true;
 			}
-			if (metaChanged) {
+			if (auditResetRequired) {
 				entity.setAuditStatus(DramaAssetAuditStatusEnums.UNDER_REVIEW.getCode());
 				entity.setShelfStatus(DramaAssetShelfStatusEnums.OFF.getCode());
 				entity.setVerifyStatus(VerifyStateEnums.REMOVED_SHELVES.getIndex());
@@ -163,7 +163,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 				entity.setAppealTime(null);
 			}
 			dramaDao.updateById(entity);
-			if (metaChanged) {
+			if (auditResetRequired) {
 				dramaAuditService.initAuditSteps(entity.getId());
 			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
