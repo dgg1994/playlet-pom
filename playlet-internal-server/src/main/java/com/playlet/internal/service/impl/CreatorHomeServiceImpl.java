@@ -37,6 +37,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -139,10 +140,11 @@ public class CreatorHomeServiceImpl extends BaseApiService implements CreatorHom
 		Integer onAirEpisode = creatorHomeDao.countOnAirEpisode(account.getId());
 
 		CreatorHomeStatsRespEntity stats = new CreatorHomeStatsRespEntity();
-		stats.setTodayIncomeYuan(CreatorBizUtils.coinToYuan(todayIncomeCoin));
-		stats.setYesterdayIncomeYuan(CreatorBizUtils.coinToYuan(yesterdayIncomeCoin));
-		stats.setBalanceYuan(CreatorBizUtils.coinToYuan(available));
-		stats.setTotalIncomeYuan(CreatorBizUtils.coinToYuan(totalIncome));
+		// 字段名保持 *Yuan，数值直接为金币（不做比例兑换）
+		stats.setTodayIncomeYuan(BigDecimal.valueOf(todayIncomeCoin == null ? 0L : todayIncomeCoin));
+		stats.setYesterdayIncomeYuan(BigDecimal.valueOf(yesterdayIncomeCoin == null ? 0L : yesterdayIncomeCoin));
+		stats.setBalanceYuan(BigDecimal.valueOf(available));
+		stats.setTotalIncomeYuan(BigDecimal.valueOf(totalIncome));
 		stats.setTodayPlayCount(todayPlay == null ? 0L : todayPlay);
 		stats.setYesterdayPlayCount(yesterdayPlay == null ? 0L : yesterdayPlay);
 		stats.setOnAirDramaCount(onAirDrama == null ? 0 : onAirDrama);

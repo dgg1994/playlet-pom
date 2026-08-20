@@ -43,9 +43,9 @@ public class CreatorRevenueBizService {
 		CreatorRevenueSummaryRespEntity resp = new CreatorRevenueSummaryRespEntity();
 		CreatorAccountEntity account = creatorAccountDao.selectById(creatorId);
 		if (account == null) {
-			resp.setTodayIncomeYuan(CreatorBizUtils.zeroYuan());
-			resp.setTotalIncomeYuan(CreatorBizUtils.zeroYuan());
-			resp.setPendingSettleYuan(CreatorBizUtils.zeroYuan());
+			resp.setTodayIncomeCoin(0L);
+			resp.setTotalIncomeCoin(0L);
+			resp.setPendingSettleCoin(0L);
 			resp.setSettlementAccount(buildSettlementAccount(null));
 			resp.setIncomeTrend(buildIncomeTrend(creatorId));
 			return resp;
@@ -53,10 +53,11 @@ public class CreatorRevenueBizService {
 		LocalDate today = CreatorBizUtils.today();
 		String todayStr = CreatorBizUtils.formatDate(today);
 		Long todayIncomeCoin = creatorCoinLedgerDao.sumPositiveIncomeByDate(creatorId, todayStr);
-		resp.setTodayIncomeYuan(CreatorBizUtils.coinToYuan(todayIncomeCoin));
-		resp.setTotalIncomeYuan(CreatorBizUtils.coinToYuan(account.getTotalIncomeCoin()));
+		// 收益概览直接返回金币，不做元换算
+		resp.setTodayIncomeCoin(todayIncomeCoin == null ? 0L : todayIncomeCoin);
+		resp.setTotalIncomeCoin(account.getTotalIncomeCoin() == null ? 0L : account.getTotalIncomeCoin());
 		// 待结算日结未上线前固定 0；后续接 pending_settle_coin
-		resp.setPendingSettleYuan(CreatorBizUtils.zeroYuan());
+		resp.setPendingSettleCoin(0L);
 		resp.setSettlementAccount(buildSettlementAccount(creatorProfileDao.findByCreatorId(creatorId)));
 		resp.setIncomeTrend(buildIncomeTrend(creatorId));
 		return resp;
@@ -99,7 +100,7 @@ public class CreatorRevenueBizService {
 			String dateStr = CreatorBizUtils.formatDate(day);
 			CreatorRevenueTrendItemRespEntity item = new CreatorRevenueTrendItemRespEntity();
 			item.setDate(dateStr);
-			item.setIncomeYuan(CreatorBizUtils.coinToYuan(coinByDate.getOrDefault(dateStr, 0L)));
+			item.setIncomeCoin(coinByDate.getOrDefault(dateStr, 0L));
 			trend.add(item);
 		}
 		return trend;
@@ -117,21 +118,10 @@ public class CreatorRevenueBizService {
 				&& account.getBindStatus() == OnePayBindStatusEnums.BOUND.getCode()
 				&& StringUtils.isNotEmpty(profile.getOnepayAccount());
 		if (bound) {
-			account.setOnepayAccountMasked(maskOnePayTail(profile.getOnepayAccount()));
+			// 收益页直接返回完整 OnePay 账号，不做脱敏
+			account.setOnepayAccountMasked(profile.getOnepayAccount().trim());
 			account.setBindTime(CreatorBizUtils.formatDateTime(profile.getOnepayBindTime()));
 		}
 		return account;
-	}
-
-	/** 展示用尾号脱敏：****0011 */
-	static String maskOnePayTail(String account) {
-		if (StringUtils.isEmpty(account)) {
-			return null;
-		}
-		String trimmed = account.trim();
-		if (trimmed.length() <= 4) {
-			return "****" + trimmed;
-		}
-		return "****" + trimmed.substring(trimmed.length() - 4);
 	}
 }

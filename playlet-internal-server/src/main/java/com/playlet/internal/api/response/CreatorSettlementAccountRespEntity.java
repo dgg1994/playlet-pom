@@ -14,7 +14,7 @@ public class CreatorSettlementAccountRespEntity {
 	@ApiModelProperty("OnePay 绑定 0未绑定 1已绑定")
 	private Integer bindStatus;
 
-	@ApiModelProperty("脱敏 OnePay 账号，如 ****0011")
+	@ApiModelProperty("OnePay 账号")
 	private String onepayAccountMasked;
 
 	@ApiModelProperty("绑定成功时间 yyyy-MM-dd HH:mm:ss")

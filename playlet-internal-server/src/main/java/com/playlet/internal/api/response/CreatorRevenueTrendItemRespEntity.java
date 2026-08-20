@@ -4,8 +4,6 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
-import java.math.BigDecimal;
-
 /**
  * 作家收益趋势单日数据点。
  */
@@ -16,6 +14,6 @@ public class CreatorRevenueTrendItemRespEntity {
 	@ApiModelProperty("日期 yyyy-MM-dd")
 	private String date;
 
-	@ApiModelProperty("当日收益（元）")
-	private BigDecimal incomeYuan;
+	@ApiModelProperty("当日收益（金币）")
+	private Long incomeCoin;
 }

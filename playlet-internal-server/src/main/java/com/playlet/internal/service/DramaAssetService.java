@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import com.playlet.internal.base.ResponseBase;
-import com.playlet.internal.query.drama.AddDramaAssetQuery;
+import com.playlet.internal.query.drama.BatchDramaAssetReleaseQuery;
 import com.playlet.internal.query.drama.DramaVideoUploadTokenQuery;
 import com.playlet.internal.query.drama.UpdateDramaAssetQuery;
 
@@ -25,14 +25,15 @@ public interface DramaAssetService {
 	ResponseBase uploadToken(DramaVideoUploadTokenQuery query);
 	
 	/**
-	 * 前端直传成功后登记剧集（纯 JSON，不再接收 MultipartFile）。
+	 * 登记/同步剧集（纯 JSON）：支持批量；历史集 assetId+setNum，新上传 setNum+key。
 	 */
 	@PostMapping("/release")
-	@ApiOperation(value = "登记剧集视频", notes = "body: {dramaId, setNum, key, videoName?, remarkInfo?}。"
-			+ "校验 key 前缀并确认对象存在后写入 drama_asset。"
-			+ "同剧同集若已驳回则覆盖重传并重置 AI/A/B；审核中或已通过不可重复登记。"
-			+ "上传成功后 AI 默认通过，进入 A/B 审核；过审后需再调作家端 /creator/drama/shelf 上架。")
-	ResponseBase addDrama(AddDramaAssetQuery entity);
+	@ApiOperation(value = "登记/同步剧集", notes = "body: {dramaId, episodes:[{assetId?, setNum, key?, videoName?, remarkInfo?}]}。"
+			+ "历史集：assetId+setNum，key 可不传，仅更新集序/备注，不改 video_url。"
+			+ "新集：setNum+key，校验七牛对象后登记并进审。"
+			+ "驳回重传：assetId+key（可改 setNum）。"
+			+ "同批 setNum 不可重复；集序批量调整时后端两阶段写入避免冲突。")
+	ResponseBase addDrama(BatchDramaAssetReleaseQuery query);
 
 	/**
 	 * 修改已登记剧集（纯 JSON，不再接收 MultipartFile）。

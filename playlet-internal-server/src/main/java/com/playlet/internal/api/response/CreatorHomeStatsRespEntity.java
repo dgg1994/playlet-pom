@@ -10,19 +10,19 @@ import java.math.BigDecimal;
  * 创作者首页顶部数据概览。
  */
 @Data
-@ApiModel(value = "创作者首页概览", description = "收益/余额/播放/在播；金额单位元")
+@ApiModel(value = "创作者首页概览", description = "收益/余额/播放/在播；金额字段存金币数值")
 public class CreatorHomeStatsRespEntity {
 
-	@ApiModelProperty("今日收益（元）")
+	@ApiModelProperty("今日收益（金币）")
 	private BigDecimal todayIncomeYuan;
 
-	@ApiModelProperty("昨日收益（元）")
+	@ApiModelProperty("昨日收益（金币）")
 	private BigDecimal yesterdayIncomeYuan;
 
-	@ApiModelProperty("当前可用余额（元）= (coin_balance - frozen) / 100")
+	@ApiModelProperty("当前可用余额（金币）= coin_balance - frozen")
 	private BigDecimal balanceYuan;
 
-	@ApiModelProperty("累计收益（元）")
+	@ApiModelProperty("累计收益（金币）")
 	private BigDecimal totalIncomeYuan;
 
 	@ApiModelProperty("今日播放量（所属剧 play_pv 合计）")

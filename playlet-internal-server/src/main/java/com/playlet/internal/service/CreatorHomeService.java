@@ -18,7 +18,7 @@ import javax.servlet.http.HttpServletRequest;
 public interface CreatorHomeService {
 
 	@GetMapping("/stats")
-	@ApiOperation(value = "顶部数据概览", notes = "今日/昨日收益、余额、累计、播放、在播")
+	@ApiOperation(value = "顶部数据概览", notes = "今日/昨日收益、余额、累计（金币）、播放、在播")
 	ResponseBase stats(HttpServletRequest request);
 
 	@GetMapping("/feed")

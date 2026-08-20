@@ -20,7 +20,7 @@ import javax.servlet.http.HttpServletRequest;
 public interface CreatorWithdrawService {
 
 	@GetMapping("/revenue/summary")
-	@ApiOperation(value = "收益概览", notes = "今日/累计/待结算收益（元）、近7日 incomeTrend、OnePay 结算账户；需作家登录")
+	@ApiOperation(value = "收益概览", notes = "今日/累计/待结算收益（金币）、近7日 incomeTrend、OnePay 结算账户；需作家登录")
 	ResponseBase revenueSummary(HttpServletRequest request);
 
 	@GetMapping("/withdraw/home")
