@@ -160,10 +160,9 @@ public class CreatorCommentServiceImpl extends BaseApiService implements Creator
 						CreatorConstants.COMMENT_PIN_ON, CreatorConstants.COMMENT_PIN_OFF,
 						DeleteStateEnum.NORMAL.getIndex());
 			}
-			comment.setPinFlag(query.getPinFlag());
-			comment.setPinTime(pinOn ? new Date() : null);
-			GenericityUtil.updateDate(comment);
-			dramaVideoCommentDao.updateById(comment);
+			// 显式 SQL 写 pin_time，取消置顶时必须清 null（updateById 会忽略 null）
+			Date pinTime = pinOn ? new Date() : null;
+			dramaVideoCommentDao.updatePinState(comment.getId(), query.getPinFlag(), pinTime);
 		} catch (BaseException e) {
 			log.error("creator comment pin biz error creatorId={} commentId={}", account.getId(),
 					query.getCommentId(), e);

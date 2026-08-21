@@ -1,5 +1,6 @@
 package com.playlet.internal.dao.drama;
 
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -35,7 +36,8 @@ public interface DramaVideoCommentDao extends BaseMapper<DramaVideoCommentEntity
 			+ "and delete_state = #{deleteState} "
 			+ "and parent_id = #{parentId} "
 			+ "and (comment_type is null or comment_type = 1) "
-			+ "order by ifnull(dvc.pin_flag, 0) desc, dvc.pin_time desc, setTime desc")
+			+ "order by ifnull(dvc.pin_flag, 0) desc, "
+			+ "case when ifnull(dvc.pin_flag, 0) = 1 then dvc.pin_time end desc, setTime desc")
 	List<DramaVideoCommentEntity> getList(QueryCommentVideoQuery entity);
 
 	@Select("select dvc.id, dvc.drama_id, dvc.video_id, dvc.comment_type, dvc.user_id, "
@@ -158,4 +160,13 @@ public interface DramaVideoCommentDao extends BaseMapper<DramaVideoCommentEntity
 			@Param("pinOn") Integer pinOn,
 			@Param("pinOff") Integer pinOff,
 			@Param("deleteState") Integer deleteState);
+
+	/**
+	 * 更新置顶状态；取消时 pinTime 传 null，显式写库避免 MyBatis-Plus 忽略 null。
+	 */
+	@Update("update drama_video_comment set pin_flag = #{pinFlag}, pin_time = #{pinTime}, gmtModified = now() "
+			+ "where id = #{id}")
+	int updatePinState(@Param("id") Integer id,
+			@Param("pinFlag") Integer pinFlag,
+			@Param("pinTime") Date pinTime);
 }
