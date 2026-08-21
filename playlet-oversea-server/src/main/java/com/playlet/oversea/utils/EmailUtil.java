@@ -193,7 +193,7 @@ public class EmailUtil {
         // EMAIL_PORT = "465";
         // USERNAME = "support@1token.me";
         // PASSWORD = "Aasd147258!@#$";
-        // SENDENAME = "OneToken";
+        // SENDENAME = "BerryV";
         
         String to = "csz15621349306@gmail.com,1299681745@qq.com";
         String title = "充值订单审核通知";
@@ -207,6 +207,6 @@ public class EmailUtil {
         sendEmail(to, title, content);
         
         // 方式2：临时使用自定义发件人名称
-        // sendEmail(to, title, content, "OneToken系统通知");
+        // sendEmail(to, title, content, "BerryV系统通知");
     }*/
 }

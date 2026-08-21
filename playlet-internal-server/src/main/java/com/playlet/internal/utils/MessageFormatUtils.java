@@ -46,7 +46,7 @@ public class MessageFormatUtils {
           .append("<meta charset=\"UTF-8\">")
           .append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">")
           .append("<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">")
-          .append("<title>OneToken</title>")
+          .append("<title>BerryV</title>")
           .append("<style>")
           .append("body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; background-color: #e8f3ff; margin: 0; padding: 0; }")
           .append(".container { max-width: 600px; background-color: #ffffff; margin: 40px auto; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); padding: 30px; }")
@@ -60,7 +60,7 @@ public class MessageFormatUtils {
           .append("<p><img src=\"https://digitalsheild.s3.eu-west-3.amazonaws.com/richtext/1774928297596.png\"></p>")
           .append(htmlContent == null ? "" : htmlContent) // 这里替换动态内容
           .append("</div>")
-          .append("<div class=\"footer\">OneToken</div>")
+          .append("<div class=\"footer\">BerryV</div>")
           .append("</div>")
           .append("</body>")
           .append("</html>");
@@ -76,7 +76,7 @@ public class MessageFormatUtils {
         
         StringBuilder telegramMessage = new StringBuilder();
         // 添加标题装饰
-        telegramMessage.append("🔔 <b>OneToken 通知</b>\n\n");
+        telegramMessage.append("🔔 <b>BerryV 通知</b>\n\n");
         // 处理 HTML 内容
         String processed = htmlContent;
         // 处理 <strong> 标签 -> 转换为 <b>
@@ -110,7 +110,7 @@ public class MessageFormatUtils {
         telegramMessage.append(processed);
         // 5. 添加页脚
         telegramMessage.append("\n\n---\n");
-        telegramMessage.append("<i>OneToken 团队</i>");
+        telegramMessage.append("<i>BerryV 团队</i>");
         
         return telegramMessage.toString();
     }

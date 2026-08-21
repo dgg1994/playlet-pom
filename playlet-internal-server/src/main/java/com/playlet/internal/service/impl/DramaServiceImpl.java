@@ -227,7 +227,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			if (VerifyStateEnums.AVAILABLE_NOW.getIndex().equals(verifyStatus)) {
 				// 整剧上架：剧须已过审，且至少一集已过审；批量上架已过审集后推导剧状态
 				if (!DramaAssetAuditStatusEnums.isApproved(entity.getAuditStatus())) {
-					return setResultError(I18nUtil.getMessage("base_error"));
+					return setResultError(I18nUtil.getMessage("creator.shelf.drama_not_approved"));
 				}
 				Integer approvedCount = dramaAssetDao.countApprovedByDramaId(id);
 				if (approvedCount == null || approvedCount < 1) {

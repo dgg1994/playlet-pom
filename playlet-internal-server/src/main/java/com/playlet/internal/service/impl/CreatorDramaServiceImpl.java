@@ -379,8 +379,13 @@ public class CreatorDramaServiceImpl extends BaseApiService implements CreatorDr
 		}
 		Date now = new Date();
 		if (shelfOn) {
-			if (!isApproved(asset.getAuditStatus()) || !isApproved(drama.getAuditStatus())) {
-				result.errorMsg = I18nUtil.getMessage("base_error");
+			// 过审才可上架：区分剧/集未通过，给明确提示
+			if (!isApproved(drama.getAuditStatus())) {
+				result.errorMsg = I18nUtil.getMessage("creator.shelf.drama_not_approved");
+				return result;
+			}
+			if (!isApproved(asset.getAuditStatus())) {
+				result.errorMsg = I18nUtil.getMessage("creator.shelf.episode_not_approved");
 				return result;
 			}
 			// 已上架：幂等成功

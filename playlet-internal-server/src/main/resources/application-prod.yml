@@ -64,7 +64,7 @@ yunmail:
   port: 465              # 或尝试 587（如果465不行）
   username: support@1token.me #账号
   password: "Aasd147258!@#$"  # 用引号包裹
-  sendeName: Playlet #发件人名称
+  sendeName: BerryV #发件人名称
   # 可选：添加以下配置
   auth: true
   ssl:
