@@ -22,4 +22,12 @@ public final class WithdrawConstants {
 	public static final String ORDER_NO_PREFIX_APP = "W";
 	/** 作家提现单号前缀 */
 	public static final String ORDER_NO_PREFIX_CREATOR = "CW";
+
+	/** 管理端页签：未处理（待处理+打款中） */
+	public static final int PROCESS_FLAG_UNPROCESSED = 0;
+	/** 管理端页签：已处理（成功+失败+已退回） */
+	public static final int PROCESS_FLAG_PROCESSED = 1;
+
+	/** 管理端列表：OnePay 支付方式展示文案 */
+	public static final String PAY_METHOD_ONEPAY_LABEL = "OnePay";
 }
