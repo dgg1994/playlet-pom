@@ -1,14 +1,9 @@
 package com.playlet.internal.service.impl;
 
 import com.playlet.internal.api.response.CreatorHomeFeedRespEntity;
-import com.playlet.internal.api.response.CreatorHomeHotDramaRespEntity;
-import com.playlet.internal.api.response.CreatorHomeHotTagAggRow;
-import com.playlet.internal.api.response.CreatorHomeHotTagRespEntity;
 import com.playlet.internal.api.response.CreatorHomeNoticeRespEntity;
-import com.playlet.internal.api.response.CreatorHomeRankAggRow;
 import com.playlet.internal.api.response.CreatorHomeRankItemRespEntity;
 import com.playlet.internal.api.response.CreatorHomeStatsRespEntity;
-import com.playlet.internal.api.response.DramaRankAggRow;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
@@ -16,7 +11,6 @@ import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.CreatorConstants;
 import com.playlet.internal.dao.creator.CreatorCoinLedgerDao;
 import com.playlet.internal.dao.creator.CreatorHomeDao;
-import com.playlet.internal.dao.drama.DramaRankStatDailyDao;
 import com.playlet.internal.dao.message.SystemMessagePublishDao;
 import com.playlet.internal.dao.message.SystemMessagePublishI18nDao;
 import com.playlet.internal.entity.creator.CreatorAccountEntity;
@@ -25,8 +19,8 @@ import com.playlet.internal.entity.message.SystemMessagePublishI18nEntity;
 import com.playlet.internal.enums.CreatorHomeRankTypeEnums;
 import com.playlet.internal.enums.LanguageEnums;
 import com.playlet.internal.service.CreatorHomeService;
-import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.utils.CreatorBizUtils;
+import com.playlet.internal.utils.CreatorHomeFeedHelper;
 import com.playlet.internal.utils.CreatorTokenUtil;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.StringUtils;
@@ -58,13 +52,11 @@ public class CreatorHomeServiceImpl extends BaseApiService implements CreatorHom
 	@Autowired
 	private CreatorCoinLedgerDao creatorCoinLedgerDao;
 	@Autowired
-	private DramaRankStatDailyDao dramaRankStatDailyDao;
-	@Autowired
 	private SystemMessagePublishDao systemMessagePublishDao;
 	@Autowired
 	private SystemMessagePublishI18nDao systemMessagePublishI18nDao;
 	@Autowired
-	private MediaUrlService mediaUrlService;
+	private CreatorHomeFeedHelper creatorHomeFeedHelper;
 
 	@Override
 	public ResponseBase stats(HttpServletRequest request) {
@@ -83,9 +75,7 @@ public class CreatorHomeServiceImpl extends BaseApiService implements CreatorHom
 		if (account == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
-		CreatorHomeFeedRespEntity resp = new CreatorHomeFeedRespEntity();
-		resp.setHotDramas(buildHotDramas());
-		resp.setHotTags(buildHotTags());
+		CreatorHomeFeedRespEntity resp = creatorHomeFeedHelper.buildFeed();
 		log.info("creator home feed creatorId={} dramas={} tags={}", account.getId(),
 				resp.getHotDramas().size(), resp.getHotTags().size());
 		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
@@ -113,7 +103,7 @@ public class CreatorHomeServiceImpl extends BaseApiService implements CreatorHom
 		if (rankType == null) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
-		List<CreatorHomeRankItemRespEntity> list = buildRank(rankType);
+		List<CreatorHomeRankItemRespEntity> list = creatorHomeFeedHelper.buildRank(rankType);
 		Map<String, Object> data = new HashMap<>(4);
 		data.put("rankType", rankType.getCode());
 		data.put("rankList", list);
@@ -152,46 +142,6 @@ public class CreatorHomeServiceImpl extends BaseApiService implements CreatorHom
 		return stats;
 	}
 
-	/** 全站近期热点剧（与 C 端热播同源） */
-	private List<CreatorHomeHotDramaRespEntity> buildHotDramas() {
-		String fromDate = windowFromDate(CreatorConstants.INFLUENCE_WINDOW_DAYS);
-		List<DramaRankAggRow> rows = dramaRankStatDailyDao.findHotPlayCandidates(fromDate, null,
-				CreatorConstants.HOME_HOT_DRAMA_LIMIT);
-		if (rows == null || rows.isEmpty()) {
-			return Collections.emptyList();
-		}
-		List<CreatorHomeHotDramaRespEntity> list = new ArrayList<>(rows.size());
-		for (DramaRankAggRow row : rows) {
-			CreatorHomeHotDramaRespEntity item = new CreatorHomeHotDramaRespEntity();
-			item.setDramaId(row.getDramaId());
-			item.setDramaTitle(row.getDramaTitle());
-			item.setCoverUrl(mediaUrlService.sign(row.getCoverUrl()));
-			list.add(item);
-		}
-		return list;
-	}
-
-	/** 近窗有播放剧的标签气泡；命中数达阈值打火 */
-	private List<CreatorHomeHotTagRespEntity> buildHotTags() {
-		String langue = resolveLangue();
-		String fromDate = windowFromDate(CreatorConstants.INFLUENCE_WINDOW_DAYS);
-		List<CreatorHomeHotTagAggRow> rows = creatorHomeDao.findHotTags(fromDate, langue,
-				CreatorConstants.HOME_HOT_TAG_LIMIT);
-		if (rows == null || rows.isEmpty()) {
-			return Collections.emptyList();
-		}
-		List<CreatorHomeHotTagRespEntity> list = new ArrayList<>(rows.size());
-		for (CreatorHomeHotTagAggRow row : rows) {
-			CreatorHomeHotTagRespEntity item = new CreatorHomeHotTagRespEntity();
-			item.setGroupId(row.getGroupId());
-			item.setTagName(row.getTagName());
-			long hit = row.getHitCnt() == null ? 0L : row.getHitCnt();
-			item.setHotFlag(hit >= CreatorConstants.HOT_TAG_FIRE_MIN_CNT ? 1 : 0);
-			list.add(item);
-		}
-		return list;
-	}
-
 	/** 已发布广播公告摘要（一期复用 C 端 system_message） */
 	private List<CreatorHomeNoticeRespEntity> buildNotices() {
 		List<SystemMessagePublishEntity> publishes = systemMessagePublishDao.findActiveBroadcastList();
@@ -214,41 +164,6 @@ public class CreatorHomeServiceImpl extends BaseApiService implements CreatorHom
 			list.add(item);
 		}
 		return list;
-	}
-
-	private List<CreatorHomeRankItemRespEntity> buildRank(CreatorHomeRankTypeEnums rankType) {
-		List<CreatorHomeRankAggRow> rows;
-		if (CreatorHomeRankTypeEnums.GROWTH.equals(rankType)) {
-			rows = queryGrowthRows();
-		} else {
-			String fromDate = windowFromDate(CreatorConstants.INFLUENCE_WINDOW_DAYS);
-			rows = creatorHomeDao.findInfluenceRank(fromDate, CreatorConstants.HOME_RANK_LIMIT);
-		}
-		if (rows == null || rows.isEmpty()) {
-			return Collections.emptyList();
-		}
-		List<CreatorHomeRankItemRespEntity> list = new ArrayList<>(rows.size());
-		int rankNo = 1;
-		for (CreatorHomeRankAggRow row : rows) {
-			CreatorHomeRankItemRespEntity item = new CreatorHomeRankItemRespEntity();
-			item.setRankNo(rankNo++);
-			item.setCreatorId(row.getCreatorId());
-			item.setNickname(row.getNickname());
-			item.setScore(row.getScore() == null ? 0L : row.getScore());
-			list.add(item);
-		}
-		return list;
-	}
-
-	private List<CreatorHomeRankAggRow> queryGrowthRows() {
-		LocalDate today = CreatorBizUtils.today();
-		int window = CreatorConstants.GROWTH_WINDOW_DAYS;
-		String todayStr = CreatorBizUtils.formatDate(today);
-		String recentFrom = CreatorBizUtils.formatDate(today.minusDays(window - 1L));
-		String prevTo = CreatorBizUtils.formatDate(today.minusDays(window));
-		String prevFrom = CreatorBizUtils.formatDate(today.minusDays(window * 2L - 1L));
-		return creatorHomeDao.findGrowthRank(todayStr, recentFrom, prevFrom, prevTo,
-				CreatorConstants.GROWTH_MIN_RECENT_SECONDS, CreatorConstants.HOME_RANK_LIMIT);
 	}
 
 	private Map<Long, SystemMessagePublishI18nEntity> loadNoticeI18n(List<Long> publishIds) {
@@ -283,10 +198,6 @@ public class CreatorHomeServiceImpl extends BaseApiService implements CreatorHom
 			return pub.getTitle();
 		}
 		return "";
-	}
-
-	private static String windowFromDate(int windowDays) {
-		return CreatorBizUtils.formatDate(CreatorBizUtils.today().minusDays(Math.max(windowDays - 1, 0)));
 	}
 
 	private static String resolveLangue() {
