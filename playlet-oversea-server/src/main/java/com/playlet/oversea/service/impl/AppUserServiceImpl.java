@@ -1,5 +1,6 @@
 package com.playlet.oversea.service.impl;
 import com.playlet.oversea.aop.SysLogAnnotation;
+import com.playlet.oversea.api.request.OnePayBindVerifyRequest;
 import com.playlet.oversea.api.request.UserRegisterEntity;
 import com.playlet.oversea.base.BaseApiService;
 import com.playlet.oversea.base.ResponseBase;
@@ -24,6 +25,10 @@ import com.playlet.oversea.query.account.PushSwitchQuery;
 import com.playlet.oversea.query.account.UpdatePwdEntity;
 import com.playlet.oversea.service.AppUserService;
 import com.playlet.oversea.service.MediaUrlService;
+import com.playlet.oversea.service.support.AppOnePayBindOps;
+import com.playlet.oversea.service.support.OnePayBindService;
+import com.playlet.oversea.service.support.UserActiveStatService;
+import com.playlet.oversea.service.support.UserOnlineHeartbeatService;
 import com.playlet.oversea.utils.*;
 import com.playlet.oversea.utils.oidc.OidcIdTokenPayload;
 import com.playlet.oversea.utils.oidc.OidcTokenVerifier;
@@ -79,6 +84,18 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 
 	@Autowired
 	private UserDramaLikeDao UserDramaLikeDao;
+
+	@Autowired
+	private OnePayBindService onePayBindService;
+
+	@Autowired
+	private AppOnePayBindOps appOnePayBindOps;
+
+	@Autowired
+	private UserOnlineHeartbeatService userOnlineHeartbeatService;
+
+	@Autowired
+	private UserActiveStatService userActiveStatService;
 
 	@SuppressWarnings("deprecation")
 	@Override
@@ -176,6 +193,16 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 					}
 					appAccountDao.updateById(appUserEntity);
 					upsertPushBind(appUserEntity.getId(), registrationId, deviceName);
+				}
+				// 在线按请求头设备 ID；无则回退极光 ID
+				String deviceId = UserOnlineHeartbeatService.resolveFromRequest(req);
+				if (deviceId == null) {
+					deviceId = registrationId;
+				}
+				if (deviceId != null) {
+					userOnlineHeartbeatService.heartbeat(deviceId, appUserEntity.getId());
+				} else {
+					userActiveStatService.markActive(appUserEntity.getId());
 				}
 				return setResultSuccess(Constants.AUTH_HEADER_START_WITH + token, I18nUtil.getMessage("base_success"));
 			} else {
@@ -305,6 +332,15 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			upsertPushBind(account.getId(), registrationId, deviceName);
 		}
 
+		String deviceId = UserOnlineHeartbeatService.resolveFromRequest(request);
+		if (deviceId == null) {
+			deviceId = registrationId;
+		}
+		if (deviceId != null) {
+			userOnlineHeartbeatService.heartbeat(deviceId, account.getId());
+		} else {
+			userActiveStatService.markActive(account.getId());
+		}
 		return setResultSuccess(Constants.AUTH_HEADER_START_WITH + token, I18nUtil.getMessage("base_success"));
 	}
 
@@ -317,7 +353,10 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			entity.setUserState(UserStateEnums.NORMAL.getIndex());
 			//添加注册来源 1：一键注册用户 2:正常注册用户
 			entity.setRegisterSource(source);
-			entity.setInvitationCode(RandomSuffixInviteCodeUtil.generateUniqueCode(Long.parseLong(entity.getId().toString()), 4, 6));
+			String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMddHHmmss"));
+			int randomNum = ThreadLocalRandom.current().nextInt(100, 999);
+			entity.setNickname("user_" + timestamp + randomNum);
+			//entity.setInvitationCode(RandomSuffixInviteCodeUtil.generateUniqueCode(Long.parseLong(entity.getId().toString()), 4, 6));
 			GenericityUtil.setDate(entity);
 			appAccountDao.insert(entity);
 		} catch (Exception e) {
@@ -473,6 +512,34 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
+	@Override
+	public ResponseBase bindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
+		}
+		AppAccountEntity account = appAccountDao.findByUid(uid);
+		if (account == null) {
+			return setResultError(I18nUtil.getMessage("user.not_null"));
+		}
+		return onePayBindService.bind(uid, query, resolveLoginEmail(account),
+				RedisKeyConstants.EMAIL_CODE_KEY, account.getOnepayBindStatus(), appOnePayBindOps);
+	}
+
+	@Override
+	public ResponseBase unBindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
+		}
+		AppAccountEntity account = appAccountDao.findByUid(uid);
+		if (account == null) {
+			return setResultError(I18nUtil.getMessage("user.not_null"));
+		}
+		return onePayBindService.unbind(uid, query, resolveLoginEmail(account),
+				RedisKeyConstants.EMAIL_CODE_KEY, account.getOnepayBindStatus(),
+				account.getOnepayAccount(), appOnePayBindOps);
+	}
 
 	@Override
 	public ResponseBase bindPush(@RequestBody BindPushQuery entity, HttpServletRequest request) {
@@ -613,6 +680,17 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	}
 
 	@Override
+	public ResponseBase heartbeat(HttpServletRequest request) {
+		String deviceId = UserOnlineHeartbeatService.resolveFromRequest(request);
+		if (deviceId == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		Integer uid = AppTokenUtil.resolveUid(request);
+		userOnlineHeartbeatService.heartbeat(deviceId, uid);
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
 	public ResponseBase forgetPasswrod(@RequestBody UpdatePwdEntity entity) {
 		if (entity == null || StringUtils.isEmpty(entity.getEmail())
 				|| StringUtils.isEmpty(entity.getNewPassword())) {
@@ -671,6 +749,17 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		}
 		Object cache = redisUtil.get(RedisKeyConstants.EMAIL_CODE_KEY + email);
 		return cache != null && cache.toString().equals(code);
+	}
+
+	/** 登录邮箱：优先 user_email */
+	private static String resolveLoginEmail(AppAccountEntity account) {
+		if (account == null) {
+			return "";
+		}
+		if (!StringUtils.isEmpty(account.getUserEmail())) {
+			return account.getUserEmail();
+		}
+		return account.getUserAccount() == null ? "" : account.getUserAccount();
 	}
 
 }

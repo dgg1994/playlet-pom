@@ -1,9 +1,14 @@
 package com.playlet.oversea.service.impl;
 
 
+import com.playlet.oversea.api.request.SensitiveRecordEntity;
+import com.playlet.oversea.enums.*;
+import com.playlet.oversea.security.sensitive.SensitiveDecision;
+import com.playlet.oversea.service.*;
 import lombok.extern.slf4j.Slf4j;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Date;
 import java.util.Map;
 
 import javax.validation.Valid;
@@ -25,17 +30,9 @@ import com.playlet.oversea.entity.drama.DramaCommentLikeEntity;
 import com.playlet.oversea.entity.drama.DramaEntity;
 import com.playlet.oversea.entity.drama.DramaVideoCommentEntity;
 import com.playlet.oversea.entity.drama.UserInteractMessageEntity;
-import com.playlet.oversea.enums.CommentTypeEnums;
-import com.playlet.oversea.enums.DeleteStateEnum;
-import com.playlet.oversea.enums.InteractMessageTypeEnums;
-import com.playlet.oversea.enums.PublicEnums;
-import com.playlet.oversea.enums.WelfareActionTypeEnums;
 import com.playlet.oversea.query.drama.AddDramaCommentQuery;
 import com.playlet.oversea.query.drama.CommentGiveLikeQuery;
 import com.playlet.oversea.query.drama.ReplyDramaCommentQuery;
-import com.playlet.oversea.service.DramaCommentService;
-import com.playlet.oversea.service.MedalProgressService;
-import com.playlet.oversea.service.PushNotifyService;
 import com.playlet.oversea.utils.GenericityUtil;
 import com.playlet.oversea.utils.HtmlSanitizeUtils;
 import com.playlet.oversea.utils.I18nUtil;
@@ -61,6 +58,10 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 	private UserInteractMessageDao userInteractMessageDao;
 	@Autowired
 	private PushNotifyService pushNotifyService;
+	@Autowired
+	private SensitiveWordService sensitiveWordService;
+	@Autowired
+	private SensitiveRecordService sensitiveRecordService;
 
 	@Override
 	public ResponseBase publish(@Valid @RequestBody AddDramaCommentQuery createPay) {
@@ -72,29 +73,58 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 			if (drama == null) {
 				return setResultError(I18nUtil.getMessage("drama_null"));
 			}
+			String sanitized = HtmlSanitizeUtils.plain(createPay.getCommentInfo());
+			SensitiveDecision decision = sensitiveWordService.decide(sanitized);
+			if (decision.isReject()) {
+				sensitiveRecordService.saveRecord(new SensitiveRecordEntity(
+						null, createPay.getUserId(), createPay.getDramaId(), 0,
+						sanitized, SensitiveSourceEnums.DRAMA_COMMENT.getCode()), decision.getCheck());
+				return setResultError(I18nUtil.getMessage("sensitive_forbidden"));
+			}
 			// 一用户一剧一条一级评论：已存在则更新评分与内容
 			DramaVideoCommentEntity exist = dramaVideoCommentDao.findUserDramaComment(
 					createPay.getDramaId(), createPay.getUserId(), DeleteStateEnum.NORMAL.getIndex());
 			if (exist != null) {
 				exist.setScore(createPay.getScore());
-				exist.setCommentInfo(HtmlSanitizeUtils.plain(createPay.getCommentInfo()));
-				GenericityUtil.updateDate(exist);
+				exist.setCommentInfo(decision.getContent());
+				if (decision.isHidden()) {
+					exist.setDeleteState(DeleteStateEnum.DELETE.getIndex());
+				}
+				exist.setGmtModified(new Date());
 				dramaVideoCommentDao.updateById(exist);
-				refreshDramaScoreNum(createPay.getDramaId());
-				return setResultSuccess(I18nUtil.getMessage("base_success"));
+				if (decision.shouldRecord()) {
+					sensitiveRecordService.saveRecord(new SensitiveRecordEntity(
+							exist.getId(), exist.getUserId(), exist.getDramaId(), 0,
+							exist.getCommentInfo(), SensitiveSourceEnums.DRAMA_COMMENT.getCode()), decision.getCheck());
+				}
+				if (!decision.isHidden()) {
+					refreshDramaScoreNum(createPay.getDramaId());
+				}
+				return setResultSuccess(I18nUtil.getMessage(
+						decision.isHidden() ? "sensitive_under_review" : "base_success"));
 			}
 			DramaVideoCommentEntity entity = new DramaVideoCommentEntity();
 			BeanUtils.copyProperties(createPay, entity);
-			entity.setCommentInfo(HtmlSanitizeUtils.plain(entity.getCommentInfo()));
+			entity.setCommentInfo(decision.getContent());
 			entity.setUserName(null);
 			entity.setCommentType(CommentTypeEnums.DRAMA.getCode());
 			entity.setVideoId(0);
 			entity.setParentId(PublicEnums.ZERO.getIndex());
-			entity.setDeleteState(DeleteStateEnum.NORMAL.getIndex());
+			entity.setDeleteState(decision.isHidden()
+					? DeleteStateEnum.DELETE.getIndex() : DeleteStateEnum.NORMAL.getIndex());
 			entity.setLikeCount(0);
 			entity.setReplyCount(0);
 			GenericityUtil.setDate(entity);
 			dramaVideoCommentDao.insert(entity);
+			if (decision.shouldRecord()) {
+				sensitiveRecordService.saveRecord(new SensitiveRecordEntity(
+						entity.getId(), entity.getUserId(), entity.getDramaId(), 0,
+						entity.getCommentInfo(), SensitiveSourceEnums.DRAMA_COMMENT.getCode()), decision.getCheck());
+			}
+			if (decision.isHidden()) {
+				return setResultSuccess(I18nUtil.getMessage("sensitive_under_review"));
+			}
+
 			addDiscussScore(entity);
 			pushInteractMessage(
 					createPay.getUserId(),
@@ -126,21 +156,41 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 			if (parent == null || !CommentTypeEnums.isDrama(parent.getCommentType())) {
 				return setResultError(I18nUtil.getMessage("base_data_null"));
 			}
+			String sanitized = HtmlSanitizeUtils.plain(createPay.getCommentInfo());
+			SensitiveDecision decision = sensitiveWordService.decide(sanitized);
+			if (decision.isReject()) {
+				sensitiveRecordService.saveRecord(new SensitiveRecordEntity(
+						null, createPay.getUserId(), createPay.getDramaId(), 0,
+						sanitized, SensitiveSourceEnums.DRAMA_COMMENT.getCode()), decision.getCheck());
+				return setResultError(I18nUtil.getMessage("sensitive_forbidden"));
+			}
 			DramaVideoCommentEntity entity = new DramaVideoCommentEntity();
 			BeanUtils.copyProperties(createPay, entity);
-			entity.setCommentInfo(HtmlSanitizeUtils.plain(entity.getCommentInfo()));
+			entity.setCommentInfo(decision.getContent());
 			entity.setUserName(null);
 			entity.setReplyToUserName(null);
 			entity.setCommentType(CommentTypeEnums.DRAMA.getCode());
 			entity.setVideoId(0);
-			entity.setScore(null); // 回复人不能评分
-			entity.setDeleteState(DeleteStateEnum.NORMAL.getIndex());
+			entity.setScore(null);
+			entity.setDeleteState(decision.isHidden()
+					? DeleteStateEnum.DELETE.getIndex() : DeleteStateEnum.NORMAL.getIndex());
 			entity.setLikeCount(0);
 			entity.setReplyCount(0);
 			GenericityUtil.setDate(entity);
 			dramaVideoCommentDao.insert(entity);
-			parent.setReplyCount((parent.getReplyCount() == null ? 0 : parent.getReplyCount()) + 1);
-			dramaVideoCommentDao.updateById(parent);
+			if (!decision.isHidden()) {
+				parent.setReplyCount((parent.getReplyCount() == null ? 0 : parent.getReplyCount()) + 1);
+				dramaVideoCommentDao.updateById(parent);
+			}
+			if (decision.shouldRecord()) {
+				sensitiveRecordService.saveRecord(new SensitiveRecordEntity(
+						entity.getId(), entity.getUserId(), entity.getDramaId(), 0,
+						entity.getCommentInfo(), SensitiveSourceEnums.DRAMA_COMMENT.getCode()), decision.getCheck());
+			}
+			if (decision.isHidden()) {
+				return setResultSuccess(I18nUtil.getMessage("sensitive_under_review"));
+			}
+
 			addDiscussScore(entity);
 			pushInteractMessage(
 					createPay.getUserId(),

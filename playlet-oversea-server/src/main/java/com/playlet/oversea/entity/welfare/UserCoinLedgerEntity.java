@@ -38,6 +38,14 @@ public class UserCoinLedgerEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "balanceAfter", value = "变动后余额", dataType = "Long")
 	private Long balanceAfter;
 
+	@TableField("frozen_before")
+	@ApiModelProperty(name = "frozenBefore", value = "变动前冻结", dataType = "Long")
+	private Long frozenBefore;
+
+	@TableField("frozen_after")
+	@ApiModelProperty(name = "frozenAfter", value = "变动后冻结", dataType = "Long")
+	private Long frozenAfter;
+
 	@TableField("biz_type")
 	@ApiModelProperty(name = "bizType", value = "业务类型", dataType = "String")
 	private String bizType;

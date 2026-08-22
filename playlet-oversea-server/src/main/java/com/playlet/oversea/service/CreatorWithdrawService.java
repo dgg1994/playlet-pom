@@ -1,0 +1,41 @@
+package com.playlet.oversea.service;
+
+import com.playlet.oversea.api.request.WithdrawReqEntity;
+import com.playlet.oversea.base.ResponseBase;
+import com.playlet.oversea.query.pub.PageQueryHelperEntity;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+import javax.servlet.http.HttpServletRequest;
+
+/**
+ * 作家端钱包提现：网关 /china/admin/api/creator/wallet/** 或 /entrance/api/creator/wallet/**
+ */
+@RequestMapping("/creator/wallet")
+@Api(value = "作家端钱包提现", tags = "作家端钱包提现")
+public interface CreatorWithdrawService {
+
+	@GetMapping("/revenue/summary")
+	@ApiOperation(value = "收益概览", notes = "今日/累计/待结算收益（金币）、近7日 incomeTrend、OnePay 结算账户；需作家登录")
+	ResponseBase revenueSummary(HttpServletRequest request);
+
+	@GetMapping("/withdraw/home")
+	@ApiOperation(value = "提现首页", notes = "可用金币 + 可提现资产列表；需作家登录")
+	ResponseBase withdrawHome(HttpServletRequest request);
+
+	@PostMapping("/withdraw")
+	@ApiOperation(value = "提现", notes = "需登录且已绑定 OnePay。提交后冻结金币，OnePay 确认到账后再扣减。")
+	ResponseBase withdraw(@RequestBody WithdrawReqEntity query, HttpServletRequest request);
+
+	@GetMapping("/withdraw/records")
+	@ApiOperation(value = "提现记录", notes = "分页；地址脱敏；需作家登录")
+	ResponseBase withdrawRecords(PageQueryHelperEntity page, HttpServletRequest request);
+
+	@GetMapping("/fund/records")
+	@ApiOperation(value = "资金流水", notes = "分页查询 creator_coin_ledger；按时间倒序；需作家登录")
+	ResponseBase fundRecords(PageQueryHelperEntity page, HttpServletRequest request);
+}

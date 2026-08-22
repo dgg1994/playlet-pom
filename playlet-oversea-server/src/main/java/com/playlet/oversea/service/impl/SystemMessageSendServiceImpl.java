@@ -20,7 +20,7 @@ import java.util.Map;
 @Service
 public class SystemMessageSendServiceImpl implements SystemMessageSendService {
 
-	private static final String FALLBACK_LANGUE = "zh-cn";
+	private static final String FALLBACK_LANGUE = "en";
 
 	@Autowired
 	private UserSystemMessageDao userSystemMessageDao;

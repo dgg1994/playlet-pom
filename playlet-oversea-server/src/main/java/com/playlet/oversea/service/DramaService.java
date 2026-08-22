@@ -37,7 +37,6 @@ public interface DramaService {
 	/**
 	 * @category 短剧基础信息列表
 	 * @param entity
-	 * @param file
 	 * @return
 	 */
 	@PostMapping("/findList")

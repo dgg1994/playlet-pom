@@ -17,6 +17,7 @@ import com.playlet.oversea.enums.RecommendedCarouselEnums;
 import com.playlet.oversea.enums.VerifyStateEnums;
 import com.playlet.oversea.enums.WelfareActionTypeEnums;
 import com.playlet.oversea.service.*;
+import com.playlet.oversea.service.support.UserActiveStatService;
 import com.playlet.oversea.utils.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +62,10 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 	private MedalProgressService medalProgressService;
 	@Autowired
 	private TheaterHomeCacheHelper theaterHomeCacheHelper;
+	@Autowired
+	private DramaAssetPlayStatService dramaAssetPlayStatService;
+	@Autowired
+	private UserActiveStatService userActiveStatService;
 
 	@Override
 	public ResponseBase home() {
@@ -181,16 +186,6 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 		if (StringUtils.isNotEmpty(entity.getDramaTitle())) {
 			entity.setDramaTitle(entity.getDramaTitle().trim());
 		}
-		// 关联表存的是 tag_group_id，前端常传标签主键 tagId，先解析成 groupId
-		if (StringUtils.isEmpty(entity.getTagGroupId()) && entity.getTagId() != null) {
-			TagEntity tag = tagDao.selectById(entity.getTagId());
-			if (tag == null || StringUtils.isEmpty(tag.getGroupId())) {
-				PageInfo<TheaterSearchItemEntity> empty = new PageInfo<>(new ArrayList<>());
-				empty.setTotal(0);
-				return setResultSuccess(empty, I18nUtil.getMessage("base_success"));
-			}
-			entity.setTagGroupId(tag.getGroupId());
-		}
 		// SQL 层分页，避免 GenericityUtil.Page 导致 hasNextPage/pages 元数据不准确
 		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
 		List<DramaEntity> dramaEntities = dramaDao.searchOnline(entity);
@@ -267,6 +262,15 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 			}
 			// 每次上报记 1 次 pv；有效秒数用裁剪后的 delta
 			pushRankWatchStat(dramaId, deltaSec);
+			// 作家端剧集曝光/完播（Redis 去重后异步落库）
+			dramaAssetPlayStatService.onWatchReport(uid, row.getEpisodeId(), row.getWatchProgress(),
+					entity.getEpisodeProgress());
+			// 日活/播放时长（在线人数由 /api/appUser/heartbeat 单独维护）
+			if (deltaSec > 0) {
+				userActiveStatService.addPlaySeconds(uid, deltaSec);
+			} else {
+				userActiveStatService.markActive(uid);
+			}
 
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {

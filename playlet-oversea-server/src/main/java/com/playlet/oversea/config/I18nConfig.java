@@ -17,7 +17,6 @@ public class I18nConfig {
         ReloadableResourceBundleMessageSource messageSource = new ReloadableResourceBundleMessageSource();
         messageSource.setBasename("classpath:i18n/messages"); // 不带语言后缀
         messageSource.setDefaultEncoding("UTF-8");
-        messageSource.setDefaultLocale(java.util.Locale.ENGLISH);
         return messageSource;
     }
 

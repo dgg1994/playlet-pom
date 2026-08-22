@@ -33,7 +33,7 @@ import java.util.List;
 @Service
 public class MedalProgressServiceImpl implements MedalProgressService {
 
-	private static final String FALLBACK_LANGUE = "zh-cn";
+	private static final String FALLBACK_LANGUE = "en";
 	private static final String MEDAL_REWARD_BIZ_PREFIX = "MEDAL:";
 
 	@Autowired

@@ -29,6 +29,18 @@ public final class TheaterConstants {
 	/** 首页推荐轮播条数上限 */
 	public static final int HOME_CAROUSEL_LIMIT = 5;
 
+	/**
+	 * 完播判定：观看进度占单集时长的百分比阈值（含）。
+	 * 例：90 表示 progress >= duration * 90%
+	 */
+	public static final int COMPLETE_PROGRESS_PERCENT = 90;
+
+	/** 同一用户同一集：曝光去重 TTL（秒），按自然日近似用 1 天 */
+	public static final long PLAY_EXPOSE_DEDUP_TTL_SEC = 24L * 60 * 60;
+
+	/** 同一用户同一集：完播去重 TTL（秒） */
+	public static final long PLAY_COMPLETE_DEDUP_TTL_SEC = 90L * 24 * 60 * 60;
+
 	private TheaterConstants() {
 	}
 }

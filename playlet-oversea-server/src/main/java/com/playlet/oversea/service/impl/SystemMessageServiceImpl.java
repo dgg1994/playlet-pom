@@ -33,7 +33,7 @@ import java.util.Map;
 @CrossOrigin
 public class SystemMessageServiceImpl extends BaseApiService implements SystemMessageService {
 
-	private static final String FALLBACK_LANGUE = "zh-cn";
+	private static final String FALLBACK_LANGUE = "en";
 
 	@Autowired
 	private SystemMessagePublishDao systemMessagePublishDao;

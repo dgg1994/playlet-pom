@@ -1,6 +1,7 @@
 package com.playlet.oversea.service;
 
 
+import com.playlet.oversea.api.request.OnePayBindVerifyRequest;
 import com.playlet.oversea.base.ResponseBase;
 import com.playlet.oversea.entity.account.AppAccountEntity;
 import com.playlet.oversea.query.account.BindPushQuery;
@@ -12,6 +13,7 @@ import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -63,7 +65,16 @@ public interface AppUserService {
 			response = ResponseBase.class)
     ResponseBase update(AppAccountEntity entity, HttpServletRequest request);
 
-	
+	@PostMapping("/bindOnePay")
+	@ApiOperation(value = "绑定OnePay帐号", notes = "需登录。verificationCode 为登录邮箱验证码（先调 sendEmailCode）；"
+			+ "account 为 OnePay 账号，提交三方校验。已绑定需先解绑。")
+	ResponseBase bindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request);
+
+	@PostMapping("/unBindOnePay")
+	@ApiOperation(value = "解除绑定OnePay帐号", notes = "需登录。verificationCode 为登录邮箱验证码；"
+			+ "account 须与当前绑定账号一致。有进行中提现时不可解绑。")
+	ResponseBase unBindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request);
+
     @PostMapping("/bindPush")
     @ApiOperation(value = "绑定极光推送", notes = "无需登录。App 启动后上报 cid 或 registrationId；可选 deviceName。"
 			+ "已登录时会同时写入账号 registration_id，并从请求头 language 写入 push_langue，便于互动/勋章/系统消息按接收人语言推送。", response = ResponseBase.class)
@@ -83,6 +94,13 @@ public interface AppUserService {
 	@GetMapping("/signOut")
 	@ApiOperation(value = "退出登录",notes="退出登录",response=ResponseBase.class)
     ResponseBase signOut(HttpServletRequest request);
+
+	@PostMapping("/heartbeat")
+	@ApiOperation(value = "在线心跳", notes = "无需登录。设备 ID 从请求头 x-playlet-deviceid 读取；"
+			+ "按设备写入 Redis，管理端统计含游客的在线设备数。前台建议 60～120 秒一次；"
+			+ "已登录（带 x-playlet-token）时顺带记 uid 日活。",
+			response = ResponseBase.class)
+	ResponseBase heartbeat(HttpServletRequest request);
 	
 	@PostMapping("/forgetPassword")
 	@ApiOperation(value = "忘记密码",notes="忘记密码",response=ResponseBase.class)

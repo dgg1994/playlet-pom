@@ -65,10 +65,54 @@ public class DramaAssetEntity extends PageQueryHelperEntity {
 	@TableField("video_height")
 	@ApiModelProperty(name = "videoHeight",value = "高",required = false,dataType = "Integer")
 	private Integer videoHeight;
+
+	@TableField("duration_seconds")
+	@ApiModelProperty(name = "durationSeconds", value = "视频时长（秒）", required = false, dataType = "Integer")
+	private Integer durationSeconds;
+
+	@TableField("exposure_count")
+	@ApiModelProperty(name = "exposureCount", value = "曝光量", required = false, dataType = "Long")
+	private Long exposureCount;
+
+	@TableField("complete_count")
+	@ApiModelProperty(name = "completeCount", value = "完播量", required = false, dataType = "Long")
+	private Long completeCount;
 	
 	@TableField("video_status")
 	@ApiModelProperty(name = "videoStatus",value = "可用状态 1是0否",required = false,dataType = "Integer")
 	private Integer videoStatus;
+
+	@TableField("audit_status")
+	@ApiModelProperty(name = "auditStatus", value = "审核状态 0待审 1审核中 2通过 3驳回 4申诉中", required = false, dataType = "Integer")
+	private Integer auditStatus;
+
+	@TableField("shelf_status")
+	@ApiModelProperty(name = "shelfStatus", value = "上架状态 0未上架 1已上架", required = false, dataType = "Integer")
+	private Integer shelfStatus;
+
+	@TableField("audit_reject_reason")
+	@ApiModelProperty(name = "auditRejectReason", value = "驳回原因", required = false, dataType = "String")
+	private String auditRejectReason;
+
+	@TableField("audit_pass_time")
+	@ApiModelProperty(name = "auditPassTime", value = "审核通过时间", required = false, dataType = "Date")
+	private Date auditPassTime;
+
+	@TableField("appeal_status")
+	@ApiModelProperty(name = "appealStatus", value = "申诉状态 0无 1申诉中 2申诉通过 3申诉驳回", required = false, dataType = "Integer")
+	private Integer appealStatus;
+
+	@TableField("appeal_reason")
+	@ApiModelProperty(name = "appealReason", value = "申诉理由", required = false, dataType = "String")
+	private String appealReason;
+
+	@TableField("appeal_time")
+	@ApiModelProperty(name = "appealTime", value = "申诉时间", required = false, dataType = "Date")
+	private Date appealTime;
+
+	@TableField("shelf_time")
+	@ApiModelProperty(name = "shelfTime", value = "上架时间", required = false, dataType = "Date")
+	private Date shelfTime;
 
 	@TableField("delete_state")
 	@ApiModelProperty(name = "deleteState",value = "删除状态 1是0否",required = false,dataType = "Integer")

@@ -1,10 +1,12 @@
 package com.playlet.oversea.dao.drama;
 
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 import org.springframework.stereotype.Repository;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
@@ -20,27 +22,36 @@ public interface DramaVideoCommentDao extends BaseMapper<DramaVideoCommentEntity
 	 */
 	@Select("select dvc.id, dvc.drama_id, dvc.video_id, dvc.comment_type, dvc.user_id, "
 			+ "dvc.comment_info, dvc.score, dvc.like_count, dvc.reply_count, dvc.parent_id, "
-			+ "dvc.reply_to_user_id, dvc.delete_state, dvc.setTime, dvc.gmtModified, "
-			+ "aa.avatar as avatar, aa.nickname as user_name, "
+			+ "dvc.reply_to_user_id, dvc.from_creator_id, dvc.pin_flag, dvc.pin_time, "
+			+ "dvc.delete_state, dvc.setTime, dvc.gmtModified, "
+			+ "case when dvc.from_creator_id is not null then ca.avatar else aa.avatar end as avatar, "
+			+ "case when dvc.from_creator_id is not null "
+			+ "  then ifnull(nullif(ca.nickname, ''), ca.user_account) else aa.nickname end as user_name, "
 			+ "ra.nickname as reply_to_user_name "
 			+ "from drama_video_comment dvc "
 			+ "left join app_account aa on dvc.user_id = aa.id "
 			+ "left join app_account ra on dvc.reply_to_user_id = ra.id "
+			+ "left join creator_account ca on dvc.from_creator_id = ca.id "
 			+ "where video_id = #{voideId} "
 			+ "and delete_state = #{deleteState} "
 			+ "and parent_id = #{parentId} "
 			+ "and (comment_type is null or comment_type = 1) "
-			+ "order by setTime desc")
+			+ "order by ifnull(dvc.pin_flag, 0) desc, "
+			+ "case when ifnull(dvc.pin_flag, 0) = 1 then dvc.pin_time end desc, setTime desc")
 	List<DramaVideoCommentEntity> getList(QueryCommentVideoQuery entity);
 
 	@Select("select dvc.id, dvc.drama_id, dvc.video_id, dvc.comment_type, dvc.user_id, "
 			+ "dvc.comment_info, dvc.score, dvc.like_count, dvc.reply_count, dvc.parent_id, "
-			+ "dvc.reply_to_user_id, dvc.delete_state, dvc.setTime, dvc.gmtModified, "
-			+ "aa.avatar as avatar, aa.nickname as user_name, "
+			+ "dvc.reply_to_user_id, dvc.from_creator_id, dvc.pin_flag, dvc.pin_time, "
+			+ "dvc.delete_state, dvc.setTime, dvc.gmtModified, "
+			+ "case when dvc.from_creator_id is not null then ca.avatar else aa.avatar end as avatar, "
+			+ "case when dvc.from_creator_id is not null "
+			+ "  then ifnull(nullif(ca.nickname, ''), ca.user_account) else aa.nickname end as user_name, "
 			+ "ra.nickname as reply_to_user_name "
 			+ "from drama_video_comment dvc "
 			+ "left join app_account aa on dvc.user_id = aa.id "
 			+ "left join app_account ra on dvc.reply_to_user_id = ra.id "
+			+ "left join creator_account ca on dvc.from_creator_id = ca.id "
 			+ "where drama_id = #{dramaId} "
 			+ "and comment_type = 2 "
 			+ "and delete_state = #{deleteState} "
@@ -50,12 +61,16 @@ public interface DramaVideoCommentDao extends BaseMapper<DramaVideoCommentEntity
 
 	@Select("select dvc.id, dvc.drama_id, dvc.video_id, dvc.comment_type, dvc.user_id, "
 			+ "dvc.comment_info, dvc.score, dvc.like_count, dvc.reply_count, dvc.parent_id, "
-			+ "dvc.reply_to_user_id, dvc.delete_state, dvc.setTime, dvc.gmtModified, "
-			+ "aa.avatar as avatar, aa.nickname as user_name, "
+			+ "dvc.reply_to_user_id, dvc.from_creator_id, dvc.pin_flag, dvc.pin_time, "
+			+ "dvc.delete_state, dvc.setTime, dvc.gmtModified, "
+			+ "case when dvc.from_creator_id is not null then ca.avatar else aa.avatar end as avatar, "
+			+ "case when dvc.from_creator_id is not null "
+			+ "  then ifnull(nullif(ca.nickname, ''), ca.user_account) else aa.nickname end as user_name, "
 			+ "ra.nickname as reply_to_user_name "
 			+ "from drama_video_comment dvc "
 			+ "left join app_account aa on dvc.user_id = aa.id "
 			+ "left join app_account ra on dvc.reply_to_user_id = ra.id "
+			+ "left join creator_account ca on dvc.from_creator_id = ca.id "
 			+ "where parent_id = #{parentId} "
 			+ "and delete_state = #{deleteState} "
 			+ "order by setTime desc")
@@ -81,12 +96,16 @@ public interface DramaVideoCommentDao extends BaseMapper<DramaVideoCommentEntity
 
 	@Select("select dvc.id, dvc.drama_id, dvc.video_id, dvc.comment_type, dvc.user_id, "
 			+ "dvc.comment_info, dvc.score, dvc.like_count, dvc.reply_count, dvc.parent_id, "
-			+ "dvc.reply_to_user_id, dvc.delete_state, dvc.setTime, dvc.gmtModified, "
-			+ "aa.avatar as avatar, aa.nickname as user_name, "
+			+ "dvc.reply_to_user_id, dvc.from_creator_id, dvc.pin_flag, dvc.pin_time, "
+			+ "dvc.delete_state, dvc.setTime, dvc.gmtModified, "
+			+ "case when dvc.from_creator_id is not null then ca.avatar else aa.avatar end as avatar, "
+			+ "case when dvc.from_creator_id is not null "
+			+ "  then ifnull(nullif(ca.nickname, ''), ca.user_account) else aa.nickname end as user_name, "
 			+ "ra.nickname as reply_to_user_name "
 			+ "from drama_video_comment dvc "
 			+ "left join app_account aa on dvc.user_id = aa.id "
 			+ "left join app_account ra on dvc.reply_to_user_id = ra.id "
+			+ "left join creator_account ca on dvc.from_creator_id = ca.id "
 			+ "where dvc.id = #{id}")
 	DramaVideoCommentEntity findByIdWithAvatar(@Param("id") Integer id);
 
@@ -129,4 +148,25 @@ public interface DramaVideoCommentDao extends BaseMapper<DramaVideoCommentEntity
 			@Param("deleteState") Integer deleteState,
 			@Param("setTime") java.util.Date setTime,
 			@Param("id") Integer id);
+
+	/**
+	 * 取消同剧其它置顶，保证每剧仅一条。
+	 */
+	@Update("update drama_video_comment set pin_flag = #{pinOff}, pin_time = null, gmtModified = now() "
+			+ "where drama_id = #{dramaId} and id != #{keepCommentId} "
+			+ "and ifnull(pin_flag, 0) = #{pinOn} and delete_state = #{deleteState}")
+	int unpinOthersOnDrama(@Param("dramaId") Integer dramaId,
+			@Param("keepCommentId") Integer keepCommentId,
+			@Param("pinOn") Integer pinOn,
+			@Param("pinOff") Integer pinOff,
+			@Param("deleteState") Integer deleteState);
+
+	/**
+	 * 更新置顶状态；取消时 pinTime 传 null，显式写库避免 MyBatis-Plus 忽略 null。
+	 */
+	@Update("update drama_video_comment set pin_flag = #{pinFlag}, pin_time = #{pinTime}, gmtModified = now() "
+			+ "where id = #{id}")
+	int updatePinState(@Param("id") Integer id,
+			@Param("pinFlag") Integer pinFlag,
+			@Param("pinTime") Date pinTime);
 }

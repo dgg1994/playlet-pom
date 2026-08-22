@@ -75,3 +75,10 @@ sms:
   url: http://api2.santo.cc/submit
   account: D4fHZloE
   password: LpQaKN8a
+
+# OnePay 绑定校验
+onepay:
+  bind-verify-url: ""
+  withdraw-url: ""
+  connect-timeout-ms: 5000
+  read-timeout-ms: 10000

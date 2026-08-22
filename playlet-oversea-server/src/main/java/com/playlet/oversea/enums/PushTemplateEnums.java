@@ -47,7 +47,7 @@ public enum PushTemplateEnums {
 	}
 
 	/**
-	 * 按语言取模板并格式化。未知语言回退 zh-cn。
+	 * 按语言取模板并格式化。未知语言回退 en。
 	 */
 	public String format(String langue, Object... args) {
 		String pattern = text(langue);
@@ -68,7 +68,7 @@ public enum PushTemplateEnums {
 		if (v != null) {
 			return v;
 		}
-		v = texts.get(LanguageEnums.ZH_CN);
+		v = texts.get(LanguageEnums.EN_US);
 		return v == null ? name() : v;
 	}
 

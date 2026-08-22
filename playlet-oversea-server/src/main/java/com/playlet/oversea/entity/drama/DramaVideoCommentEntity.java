@@ -74,6 +74,18 @@ public class DramaVideoCommentEntity extends PageQueryHelperEntity{
 	@TableField(exist = false)
 	@ApiModelProperty(name = "replyToUserName",value = "回复目标用户昵称",required = false,dataType = "String")
 	private String replyToUserName;
+
+	@TableField("pin_flag")
+	@ApiModelProperty(name = "pinFlag", value = "作家置顶 0否 1是")
+	private Integer pinFlag;
+
+	@TableField("pin_time")
+	@ApiModelProperty(name = "pinTime", value = "置顶时间")
+	private Date pinTime;
+
+	@TableField("from_creator_id")
+	@ApiModelProperty(name = "fromCreatorId", value = "作家身份回复时 creator_account.id")
+	private Integer fromCreatorId;
 	
 	@TableField("delete_state")
 	@ApiModelProperty(name = "deleteState",value = "删除状态 1是0否",required = true,dataType = "String")

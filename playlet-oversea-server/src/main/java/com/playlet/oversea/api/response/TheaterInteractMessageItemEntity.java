@@ -25,6 +25,9 @@ public class TheaterInteractMessageItemEntity {
 	@ApiModelProperty("触发人uid")
 	private Integer fromUid;
 
+	@ApiModelProperty("触发人作家ID；作家回复时有值，观众触发为空")
+	private Integer fromCreatorId;
+
 	@ApiModelProperty("触发人昵称")
 	private String fromNickname;
 

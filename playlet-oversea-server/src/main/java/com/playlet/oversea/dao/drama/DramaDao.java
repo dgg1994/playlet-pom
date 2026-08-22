@@ -1,10 +1,12 @@
 package com.playlet.oversea.dao.drama;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.playlet.oversea.api.response.DramaAnalyticsRespEntity;
 import com.playlet.oversea.entity.drama.DramaEntity;
+import com.playlet.oversea.query.creator.CreatorDramaAnalyticsQuery;
 import com.playlet.oversea.query.drama.QueryDramaQuery;
 import com.playlet.oversea.query.drama.RecommendDramaQuery;
-import com.playlet.oversea.response.drama.RecommendDramaRes;
+import com.playlet.oversea.api.response.RecommendDramaRespEntity;
 
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -90,7 +92,7 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 			+ "   select drama_id from drama_tag_rel where tag_group_id = #{groupId}"
 			+ " )"
 			+ "</if>"
-        + "<if test='tagGroupIdList != null and tagGroupIdList.size() > 0'>"
+	        + "<if test='tagGroupIdList != null and tagGroupIdList.size() > 0'>"
 	        + " and id in ("
 	        + "   select drama_id from drama_tag_rel where tag_group_id in "
 	        + "   <foreach collection='tagGroupIdList' item='tagId' open='(' separator=',' close=')'>"
@@ -119,7 +121,7 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 
 	@Select("SELECT * FROM drama WHERE delete_state = #{deleteState} AND verify_status = #{verifyStatus} "
 			+ "ORDER BY CRC32(CONCAT(id, #{seed})), id")
-	List<RecommendDramaRes> recommendList(RecommendDramaQuery entity);
+	List<RecommendDramaRespEntity> recommendList(RecommendDramaQuery entity);
 
 	@Select("SELECT * from drama where id = (SELECT drama_id from drama_asset where id = #{id})")
 	DramaEntity findByVideoId(@Param("id") Integer id);
@@ -142,10 +144,10 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 	        + "        )"
 	        + "  ) "
 	        + "LIMIT 20")
-	List<RecommendDramaRes> relatedWork(@Param("id") Integer id,@Param("deleteState") Integer deleteState,@Param("verifyStatus") Integer verifyStatus);
+	List<RecommendDramaRespEntity> relatedWork(@Param("id") Integer id,@Param("deleteState") Integer deleteState,@Param("verifyStatus") Integer verifyStatus);
 
 	@Select("select * from drama where id = #{id}")
-	RecommendDramaRes findById(@Param("id") Integer id);
+	RecommendDramaRespEntity findById(@Param("id") Integer id);
 
 	@Select("select d.* from drama d "
 			+ "inner join rank_list rl on d.id = rl.drama_id "
@@ -155,4 +157,47 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 	List<DramaEntity> selectListDramas(@Param("groupId") String groupId,
 			@Param("verifyStatus") Integer verifyStatus,
 			@Param("deleteState") Integer deleteState);
+
+	/**
+	 * 作家数据分析列表：外层无 GROUP BY，避免 PageHelper count 失真。
+	 */
+	@Select("<script>"
+			+ "select d.id as id, d.drama_title as dramaTitle, d.cover_url as coverUrl, "
+			+ "  d.total_episodes as totalEpisodes, d.hot_score as hotScore, d.setTime as setTime, "
+			+ "  ifnull(a.exposure, 0) as exposure, "
+			+ "  ifnull(a.completeCnt, 0) as complete, "
+			+ "  ifnull(s.playPv, 0) as playPv, "
+			+ "  ifnull(sc.avgScore, 0) as scoreNum "
+			+ "from drama d "
+			+ "left join ( "
+			+ "  select drama_id, sum(ifnull(exposure_count,0)) as exposure, "
+			+ "    sum(ifnull(complete_count,0)) as completeCnt "
+			+ "  from drama_asset where ifnull(delete_state,0)=0 group by drama_id "
+			+ ") a on a.drama_id = d.id "
+			+ "left join ( "
+			+ "  select drama_id, sum(play_pv) as playPv "
+			+ "  from drama_rank_stat_daily group by drama_id "
+			+ ") s on s.drama_id = d.id "
+			+ "left join ( "
+			+ "  select drama_id, avg(score) as avgScore "
+			+ "  from drama_video_comment "
+			+ "  where comment_type = 2 and parent_id = 0 "
+			+ "    and ifnull(delete_state,0)=0 and score is not null "
+			+ "  group by drama_id "
+			+ ") sc on sc.drama_id = d.id "
+			+ "where d.belong_user = #{belongUser} and ifnull(d.delete_state,0)=0 "
+			+ "<if test='q.dramaTitle != null and q.dramaTitle != \"\"'> "
+			+ "  and d.drama_title like concat('%', #{q.dramaTitle}, '%') "
+			+ "</if>"
+			+ "<choose>"
+			+ "  <when test='q.sortType != null and q.sortType == 2'> "
+			+ "    order by d.setTime desc, d.id desc "
+			+ "  </when>"
+			+ "  <otherwise>"
+			+ "    order by ifnull(d.hot_score,0) desc, d.id desc "
+			+ "  </otherwise>"
+			+ "</choose>"
+			+ "</script>")
+	List<DramaAnalyticsRespEntity> analyticsList(@Param("q") CreatorDramaAnalyticsQuery q,
+			@Param("belongUser") Integer belongUser);
 }

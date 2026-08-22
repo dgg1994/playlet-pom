@@ -44,7 +44,7 @@ import static com.playlet.oversea.base.BaseApiService.setResultSuccess;
 @Transactional(rollbackFor = Exception.class)
 public class MedalApiServiceImpl implements MedalApiService {
 
-	private static final String FALLBACK_LANGUE = "zh-cn";
+	private static final String FALLBACK_LANGUE = "en";
 
 	@Autowired
 	private MedalConfigDao medalConfigDao;

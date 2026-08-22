@@ -9,7 +9,7 @@ public final class AppVersionConstants {
 	public static final String DEFAULT_CHANNEL = "default";
 
 	/** 文案语言回退 */
-	public static final String FALLBACK_LANGUE = "zh-cn";
+	public static final String FALLBACK_LANGUE = "en";
 
 	public static final Integer STATUS_DISABLE = 0;
 

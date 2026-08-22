@@ -129,6 +129,24 @@ public final class RedisUtil {
         }
     }
 
+    /**
+     * 仅当 key 不存在时写入并设置过期；用于去重计数。
+     * @return true 表示首次写入成功；false 表示已存在或异常
+     */
+    public boolean setIfAbsent(String key, Object value, long time) {
+        try {
+            if (time > 0) {
+                Boolean ok = redisTemplate.opsForValue().setIfAbsent(key, value, time, TimeUnit.SECONDS);
+                return Boolean.TRUE.equals(ok);
+            }
+            Boolean ok = redisTemplate.opsForValue().setIfAbsent(key, value);
+            return Boolean.TRUE.equals(ok);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
 
     /**
      * 递增
@@ -593,6 +611,60 @@ public final class RedisUtil {
             redisTemplate.opsForList().trim(key, start, end);
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    // ============================ZSet=============================
+
+    /**
+     * ZSet 写入/更新成员分数（存在则覆盖 score）。
+     */
+    public boolean zAdd(String key, Object member, double score) {
+        try {
+            redisTemplate.opsForZSet().add(key, member, score);
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * 统计 score 落在 [min, max] 的成员数。
+     */
+    public long zCount(String key, double min, double max) {
+        try {
+            Long n = redisTemplate.opsForZSet().count(key, min, max);
+            return n == null ? 0L : n;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 0L;
+        }
+    }
+
+    /**
+     * 删除 score 落在 [min, max] 的成员。
+     */
+    public long zRemoveRangeByScore(String key, double min, double max) {
+        try {
+            Long n = redisTemplate.opsForZSet().removeRangeByScore(key, min, max);
+            return n == null ? 0L : n;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 0L;
+        }
+    }
+
+    /**
+     * 删除指定成员。
+     */
+    public long zRemove(String key, Object... members) {
+        try {
+            Long n = redisTemplate.opsForZSet().remove(key, members);
+            return n == null ? 0L : n;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 0L;
         }
     }
 

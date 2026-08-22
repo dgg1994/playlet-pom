@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 import org.springframework.stereotype.Repository;
 
+import java.util.Date;
 import java.util.List;
 
 @Repository
@@ -46,6 +47,13 @@ public interface AppAccountDao extends BaseMapper<AppAccountEntity> {
 			+ "where id = #{uid} and ifnull(frozen_coin_balance,0) >= #{amt}")
 	int unfreezeCoinBalance(@Param("uid") Integer uid, @Param("amt") int amt);
 
+	/** 提现成功：冻结转扣减，coin_balance 与 frozen 同时减少 */
+	@Update("update app_account set coin_balance = ifnull(coin_balance,0) - #{amt}, "
+			+ "frozen_coin_balance = ifnull(frozen_coin_balance,0) - #{amt}, gmtModified = now() "
+			+ "where id = #{uid} and ifnull(frozen_coin_balance,0) >= #{amt} "
+			+ "and ifnull(coin_balance,0) >= #{amt}")
+	int settleFrozenCoin(@Param("uid") Integer uid, @Param("amt") int amt);
+
 	@Update("update app_account set registration_id = #{registrationId}, device_name = #{deviceName}, "
 			+ "gmtModified = now() where id = #{uid}")
 	int updatePushBind(@Param("uid") Integer uid,
@@ -65,4 +73,18 @@ public interface AppAccountDao extends BaseMapper<AppAccountEntity> {
 
 	@Update("update app_account set push_langue = #{langue}, gmtModified = now() where id = #{uid}")
 	int updatePushLangue(@Param("uid") Integer uid, @Param("langue") String langue);
+
+	/** 绑定 OnePay：写入账号、openId、状态、时间 */
+	@Update("update app_account set onepay_account = #{onepayAccount}, onepay_open_id = #{onepayOpenId}, "
+			+ "onepay_bind_status = #{bindStatus}, onepay_bind_time = #{bindTime}, gmtModified = now() "
+			+ "where id = #{uid}")
+	int updateOnePayBind(@Param("uid") Integer uid, @Param("onepayAccount") String onepayAccount,
+			@Param("onepayOpenId") String onepayOpenId, @Param("bindStatus") Integer bindStatus,
+			@Param("bindTime") Date bindTime);
+
+	/** 解绑：清空 OnePay 字段（updateById 不会写 null） */
+	@Update("update app_account set onepay_account = null, onepay_open_id = null, "
+			+ "onepay_bind_status = #{bindStatus}, onepay_bind_time = null, gmtModified = now() "
+			+ "where id = #{uid}")
+	int clearOnePayBind(@Param("uid") Integer uid, @Param("bindStatus") Integer bindStatus);
 }

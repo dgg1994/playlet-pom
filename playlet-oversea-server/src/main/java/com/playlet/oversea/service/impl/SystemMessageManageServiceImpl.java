@@ -51,7 +51,7 @@ import static com.playlet.oversea.base.BaseApiService.setResultSuccess;
 @Transactional(rollbackFor = Exception.class)
 public class SystemMessageManageServiceImpl implements SystemMessageManageService {
 
-	private static final String FALLBACK_LANGUE = "zh-cn";
+	private static final String FALLBACK_LANGUE = "en";
 
 	@Autowired
 	private SystemMessagePublishDao systemMessagePublishDao;

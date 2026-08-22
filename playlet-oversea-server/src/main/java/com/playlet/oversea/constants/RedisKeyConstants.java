@@ -39,8 +39,8 @@ public class RedisKeyConstants {
     public static final String SHARE_CD_UID_DRAMA = PROJECT_PREFIX + "theater:share:cd:uid:";
     public static final long SHARE_CD_SEC = 30L;
 
-    /** 提现提交防重：uid */
-    public static final String WITHDRAW_SUBMIT_LOCK = PROJECT_PREFIX + "wallet:withdraw:lock:uid:";
+    /** 提现提交防重：后缀 userType:uid */
+    public static final String WITHDRAW_SUBMIT_LOCK = PROJECT_PREFIX + "wallet:withdraw:lock:";
     public static final long WITHDRAW_SUBMIT_LOCK_SEC = 5L;
 
     /** 七牛对象存在性缓存：key 后缀为对象 key */
@@ -55,10 +55,28 @@ public class RedisKeyConstants {
 
     /** 邮箱验证码：后缀为 email */
     public static final String EMAIL_CODE_KEY = PROJECT_PREFIX + "email:code:";
+    /** 作家端邮箱验证码：后缀为登录邮箱 */
+    public static final String CREATOR_EMAIL_CODE_KEY = PROJECT_PREFIX + "creator:email:code:";
     /** 接口幂等：后缀为 requestId */
     public static final String IDEMPOTENT_KEY = PROJECT_PREFIX + "idempotent:";
     /** 访问限流：后缀为 ip+url */
     public static final String ACCESS_LIMIT_KEY = PROJECT_PREFIX + "req_limit:";
     /** 后台登录谷歌验证码暂存：后缀为 username */
     public static final String GOOGLE_CODE_KEY = PROJECT_PREFIX + "googleCode:";
+
+    /** 剧集曝光去重：后缀 uid:assetId */
+    public static final String PLAY_EXPOSE_DEDUP = PROJECT_PREFIX + "theater:play:expose:";
+    /** 剧集完播去重：后缀 uid:assetId */
+    public static final String PLAY_COMPLETE_DEDUP = PROJECT_PREFIX + "theater:play:complete:";
+
+    /**
+     * C 端在线心跳 ZSet：member=deviceId（含未登录设备），score=最近心跳毫秒时间戳。
+     * 查询时按 score 过滤最近 ONLINE_WINDOW_SEC 内成员。
+     */
+    public static final String ONLINE_DEVICE_ZSET = PROJECT_PREFIX + "ops:online:device:zset";
+    /** @deprecated 旧 uid 维度 key，已废弃，保留避免误用 */
+    @Deprecated
+    public static final String ONLINE_ZSET = ONLINE_DEVICE_ZSET;
+    /** 在线判定窗口（秒）：窗口内有心跳视为在线 */
+    public static final long ONLINE_WINDOW_SEC = 300L;
 }

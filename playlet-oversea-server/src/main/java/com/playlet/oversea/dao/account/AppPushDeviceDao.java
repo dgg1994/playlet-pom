@@ -37,7 +37,7 @@ public interface AppPushDeviceDao extends BaseMapper<AppPushDeviceEntity> {
 	 * registrationId/pushLangue 映射到 AppAccountEntity 同名属性。
 	 */
 	@Select("select d.registration_id as registrationId, "
-			+ "ifnull(nullif(a.push_langue,''), 'zh-cn') as pushLangue "
+			+ "ifnull(nullif(a.push_langue,''), 'en') as pushLangue "
 			+ "from app_push_device d "
 			+ "left join app_account a on a.id = d.uid "
 			+ "where ifnull(d.push_enabled,1) = 1 "

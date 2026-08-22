@@ -26,6 +26,9 @@ public class WithdrawSubmitRespEntity {
 	@ApiModelProperty("实到金额")
 	private String actualAmt;
 
-	@ApiModelProperty("扣减后余额")
+	@ApiModelProperty("冻结后可用金币")
 	private Long coinBalance;
+
+	@ApiModelProperty("冻结金币")
+	private Long frozenCoinBalance;
 }

@@ -125,11 +125,11 @@ public enum LanguageEnums {
 		return list;
 	}
 
-	/** 默认语言 en（海外） */
+	/** 国际版默认语言 en */
 	public static final String DEFAULT_LANGUE = EN_US.getName();
 
 	/**
-	 * 按项目语言码解析，未知/空回退英文（海外默认）。
+	 * 按项目语言码解析，未知/空回退 {@link #EN_US}。
 	 * 兼容偶发 zh_CN / zh-CN / ZH-CN。
 	 */
 	public static LanguageEnums of(String langue) {

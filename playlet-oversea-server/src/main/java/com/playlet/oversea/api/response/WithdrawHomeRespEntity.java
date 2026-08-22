@@ -12,8 +12,14 @@ import java.util.List;
 @ApiModel("提现首页")
 public class WithdrawHomeRespEntity {
 
-	@ApiModelProperty("可用积分（coin_balance）")
+	@ApiModelProperty("可用金币（coin_balance - frozen_coin_balance）")
 	private Long coinBalance;
+
+	@ApiModelProperty("冻结金币")
+	private Long frozenCoinBalance;
+
+	@ApiModelProperty("OnePay 绑定 0未绑定 1已绑定")
+	private Integer onepayBindStatus;
 
 	@ApiModelProperty("是否有可用提现资产")
 	private Boolean withdrawEnabled;

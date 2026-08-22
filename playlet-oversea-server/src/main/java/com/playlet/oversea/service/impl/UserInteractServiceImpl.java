@@ -8,7 +8,9 @@ import com.playlet.oversea.api.response.TheaterLikeItemEntity;
 import com.playlet.oversea.base.BaseApiService;
 import com.playlet.oversea.base.ResponseBase;
 import com.playlet.oversea.constants.Constants;
+import com.playlet.oversea.constants.CreatorConstants;
 import com.playlet.oversea.dao.account.AppAccountDao;
+import com.playlet.oversea.dao.creator.CreatorAccountDao;
 import com.playlet.oversea.dao.drama.DramaAssetDao;
 import com.playlet.oversea.dao.drama.DramaCommentLikeDao;
 import com.playlet.oversea.dao.drama.DramaDao;
@@ -17,6 +19,7 @@ import com.playlet.oversea.dao.drama.UserInteractMessageDao;
 import com.playlet.oversea.dao.drama.UserDramaCollectDao;
 import com.playlet.oversea.dao.drama.UserDramaLikeDao;
 import com.playlet.oversea.entity.account.AppAccountEntity;
+import com.playlet.oversea.entity.creator.CreatorAccountEntity;
 import com.playlet.oversea.entity.drama.DramaAssetEntity;
 import com.playlet.oversea.entity.drama.DramaEntity;
 import com.playlet.oversea.entity.drama.DramaVideoCommentEntity;
@@ -75,6 +78,8 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	private UserDramaLikeDao userDramaLikeDao;
 	@Autowired
 	private AppAccountDao appAccountDao;
+	@Autowired
+	private CreatorAccountDao creatorAccountDao;
 	@Autowired
 	private DramaDao dramaDao;
 	@Autowired
@@ -270,14 +275,15 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		PageHelper.clearPage();
 		// 4. 批量加载「我对这批评论是否已赞」+ 账号/剧/评论（避免 N+1）
 		Set<Integer> likedCommentIds = loadLikedCommentIds(uid, rows);
-		Map<Integer, AppAccountEntity> accountMap = loadAccountMap(rows);
-		Map<Integer, DramaEntity> dramaMap = loadInteractDramaMap(rows);
 		Map<Integer, DramaVideoCommentEntity> commentMap = loadCommentMap(rows);
+		Map<Integer, AppAccountEntity> accountMap = loadAccountMap(rows);
+		Map<Integer, CreatorAccountEntity> creatorMap = loadCreatorMap(rows, commentMap);
+		Map<Integer, DramaEntity> dramaMap = loadInteractDramaMap(rows);
 		// 5. 组装 C 端展示结构
 		List<TheaterInteractMessageItemEntity> items = new ArrayList<>();
 		for (UserInteractMessageEntity row : rows) {
 			TheaterInteractMessageItemEntity item = toInteractMessageItem(row, likedCommentIds,
-					accountMap, dramaMap, commentMap);
+					accountMap, creatorMap, dramaMap, commentMap);
 			if (item != null) {
 				items.add(item);
 			}
@@ -716,7 +722,8 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		}
 		List<Integer> uids = new ArrayList<>();
 		for (UserInteractMessageEntity row : rows) {
-			if (row != null && row.getFromUid() != null) {
+			// 作家占位 uid=0 不查 app_account
+			if (row != null && row.getFromUid() != null && !isCreatorPlaceholderUid(row.getFromUid())) {
 				uids.add(row.getFromUid());
 			}
 		}
@@ -735,6 +742,57 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 			}
 		}
 		return map;
+	}
+
+	/**
+	 * from_uid 为作家占位时，从评论 from_creator_id 批量加载作家账号。
+	 */
+	private Map<Integer, CreatorAccountEntity> loadCreatorMap(List<UserInteractMessageEntity> rows,
+			Map<Integer, DramaVideoCommentEntity> commentMap) {
+		if (rows == null || rows.isEmpty() || commentMap == null || commentMap.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		Set<Integer> creatorIds = new HashSet<>();
+		for (UserInteractMessageEntity row : rows) {
+			if (row == null || !isCreatorPlaceholderUid(row.getFromUid())) {
+				continue;
+			}
+			Integer creatorId = resolveCreatorIdFromComment(row.getCommentId(), commentMap);
+			if (creatorId != null) {
+				creatorIds.add(creatorId);
+			}
+		}
+		if (creatorIds.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		List<CreatorAccountEntity> list = creatorAccountDao.findByIds(new ArrayList<>(creatorIds));
+		if (list == null || list.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		Map<Integer, CreatorAccountEntity> map = new HashMap<>(list.size());
+		for (CreatorAccountEntity c : list) {
+			if (c != null && c.getId() != null) {
+				map.put(c.getId(), c);
+			}
+		}
+		return map;
+	}
+
+	private static Integer resolveCreatorIdFromComment(Integer commentId,
+			Map<Integer, DramaVideoCommentEntity> commentMap) {
+		if (commentId == null || commentMap == null) {
+			return null;
+		}
+		DramaVideoCommentEntity comment = commentMap.get(commentId);
+		if (comment == null || comment.getFromCreatorId() == null) {
+			return null;
+		}
+		return comment.getFromCreatorId();
+	}
+
+	/** 作家评论/回复互动消息使用的占位 from_uid */
+	private static boolean isCreatorPlaceholderUid(Integer fromUid) {
+		return fromUid == null || fromUid.equals(CreatorConstants.COMMENT_CREATOR_USER_ID_PLACEHOLDER);
 	}
 
 	/**
@@ -825,7 +883,8 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	 */
 	private TheaterInteractMessageItemEntity toInteractMessageItem(UserInteractMessageEntity row,
 			Set<Integer> likedCommentIds, Map<Integer, AppAccountEntity> accountMap,
-			Map<Integer, DramaEntity> dramaMap, Map<Integer, DramaVideoCommentEntity> commentMap) {
+			Map<Integer, CreatorAccountEntity> creatorMap, Map<Integer, DramaEntity> dramaMap,
+			Map<Integer, DramaVideoCommentEntity> commentMap) {
 		if (row == null) {
 			return null;
 		}
@@ -854,17 +913,8 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 			item.setIsLiked(PublicEnums.ZERO.getIndex());
 		}
 
-		// 3. 触发人资料
-		if (row.getFromUid() != null) {
-			AppAccountEntity account = accountMap == null ? null : accountMap.get(row.getFromUid());
-			if (account != null) {
-				item.setFromNickname(StringUtils.isEmpty(account.getNickname())
-						? account.getUserAccount() : account.getNickname());
-				if (StringUtils.isNotEmpty(account.getAvatar())) {
-					item.setFromAvatar(mediaUrlService.sign(account.getAvatar()));
-				}
-			}
-		}
+		// 3. 触发人资料：观众查 app_account；作家占位 from_uid=0 时用评论 from_creator_id
+		fillFromUserProfile(item, row, accountMap, creatorMap, commentMap);
 
 		// 4. 关联短剧展示信息
 		if (row.getDramaId() != null) {
@@ -904,6 +954,40 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 		// 6. 列表主文案（如「回复你：xxx」）
 		item.setDisplayContent(buildDisplayContent(item.getActionText(), item.getContent(), type));
 		return item;
+	}
+
+	/** 填充触发人昵称/头像；作家占位 uid 走 creator_account。 */
+	private void fillFromUserProfile(TheaterInteractMessageItemEntity item, UserInteractMessageEntity row,
+			Map<Integer, AppAccountEntity> accountMap, Map<Integer, CreatorAccountEntity> creatorMap,
+			Map<Integer, DramaVideoCommentEntity> commentMap) {
+		if (!isCreatorPlaceholderUid(row.getFromUid())) {
+			AppAccountEntity account = accountMap == null ? null : accountMap.get(row.getFromUid());
+			if (account != null) {
+				item.setFromNickname(StringUtils.isEmpty(account.getNickname())
+						? account.getUserAccount() : account.getNickname());
+				if (StringUtils.isNotEmpty(account.getAvatar())) {
+					item.setFromAvatar(mediaUrlService.sign(account.getAvatar()));
+				}
+			}
+			return;
+		}
+		Integer creatorId = resolveCreatorIdFromComment(row.getCommentId(), commentMap);
+		if (creatorId == null) {
+			return;
+		}
+		item.setFromCreatorId(creatorId);
+		CreatorAccountEntity creator = creatorMap == null ? null : creatorMap.get(creatorId);
+		if (creator == null) {
+			return;
+		}
+		if (StringUtils.isNotEmpty(creator.getNickname())) {
+			item.setFromNickname(creator.getNickname());
+		} else if (StringUtils.isNotEmpty(creator.getUserAccount())) {
+			item.setFromNickname(creator.getUserAccount());
+		}
+		if (StringUtils.isNotEmpty(creator.getAvatar())) {
+			item.setFromAvatar(mediaUrlService.sign(creator.getAvatar()));
+		}
 	}
 
 	/** 优先取评论表正文，保证返回文案而不是 id */

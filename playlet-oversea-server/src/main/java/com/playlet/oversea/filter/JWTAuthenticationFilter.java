@@ -10,6 +10,7 @@ import org.springframework.security.web.authentication.www.BasicAuthenticationFi
 import com.playlet.oversea.base.JsonData;
 import com.playlet.oversea.config.heard.AppVersionContext;
 import com.playlet.oversea.config.heard.CurrencyContext;
+import com.playlet.oversea.config.heard.DeviceIdContext;
 import com.playlet.oversea.config.heard.DeviceTypeContext;
 import com.playlet.oversea.config.heard.LanguageContext;
 import com.playlet.oversea.constants.Constants;
@@ -58,10 +59,9 @@ public class JWTAuthenticationFilter extends BasicAuthenticationFilter {
 	        String language = request.getHeader(Constants.HEADER_LANGUAGE);
 	        List<String> languageList = LanguageEnums.getAll();
 	        if (language == null || language.trim().isEmpty()) {
-	            language = LanguageEnums.ZH_CN.getName(); // 默认语言
+	            language = LanguageEnums.DEFAULT_LANGUE;
 	        } else if (!languageList.contains(language)) {
-	            // 如果语言不在支持列表中，也使用默认语言
-	            language = LanguageEnums.ZH_CN.getName();
+	            language = LanguageEnums.DEFAULT_LANGUE;
 	        }
 	        LanguageContext.setLanguage(language);
 	        // 读取请求头 currency（币种）
@@ -73,6 +73,8 @@ public class JWTAuthenticationFilter extends BasicAuthenticationFilter {
 	        //读取请求头 deviceType（设备类型）
 	        String deviceType = request.getHeader(Constants.HEADER_DEVICETYPE);
 	        DeviceTypeContext.setDeviceType(deviceType);
+	        // 读取请求头 deviceId（设备唯一 ID，在线统计）
+	        DeviceIdContext.setDeviceId(request.getHeader(Constants.HEADER_DEVICE_ID));
 	        //读取请求头 appVersion（应用版本号）
 	        String appVersion = request.getHeader(Constants.HEADER_VERSION);
 	        AppVersionContext.setAppVersion(appVersion);
@@ -116,6 +118,7 @@ public class JWTAuthenticationFilter extends BasicAuthenticationFilter {
 		}finally {
 	        // 防止内存泄露，必须清理
 	        LanguageContext.clear();
+	        DeviceIdContext.clear();
 	    }
 
 	}
