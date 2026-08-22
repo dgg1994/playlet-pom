@@ -38,9 +38,6 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 	@Override
 	public ResponseBase withdrawHome(HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
-		if (uid == null) {
-			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
-		}
 		return withdrawBizService.home(uid, WithdrawUserTypeEnums.APP);
 	}
 

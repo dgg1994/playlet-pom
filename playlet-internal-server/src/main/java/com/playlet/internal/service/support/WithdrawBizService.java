@@ -65,20 +65,28 @@ public class WithdrawBizService extends BaseApiService {
 	@Autowired
 	private WithdrawPayoutService withdrawPayoutService;
 
-	/** 提现首页：可用余额、绑定状态、今日已用、资产配置 */
+	/** 提现首页：可用余额、绑定状态、今日已用、资产配置；uid 为空时金币等为 0 */
 	public ResponseBase home(Integer uid, WithdrawUserTypeEnums userType) {
-		WithdrawWalletHandler handler = walletHandlerRegistry.of(userType.getCode());
-		WithdrawWalletSnapshot snap = handler.load(uid);
 		WithdrawHomeRespEntity resp = new WithdrawHomeRespEntity();
-		// 可提 = 总余额 - 冻结
-		resp.setCoinBalance(snap.getCoinBalance() - snap.getFrozenCoinBalance());
-		resp.setFrozenCoinBalance(snap.getFrozenCoinBalance());
-		resp.setOnepayBindStatus(nvlInt(snap.getOnepayBindStatus()));
-		Integer allUsed = userWithdrawOrderDao.sumPointsToday(uid, userType.getCode(), todayStart());
-		resp.setTodayUsedPoints(allUsed == null ? 0 : allUsed);
-		UserWithdrawOrderEntity latestAny = userWithdrawOrderDao.findLatestByUid(uid, userType.getCode());
-		if (latestAny != null && !StringUtils.isEmpty(latestAny.getOnepayAccount())) {
-			resp.setLastWalletAddress(latestAny.getOnepayAccount());
+		if (uid != null) {
+			WithdrawWalletHandler handler = walletHandlerRegistry.of(userType.getCode());
+			WithdrawWalletSnapshot snap = handler.load(uid);
+			// 可提 = 总余额 - 冻结
+			resp.setCoinBalance(snap.getCoinBalance() - snap.getFrozenCoinBalance());
+			resp.setFrozenCoinBalance(snap.getFrozenCoinBalance());
+			resp.setOnepayBindStatus(nvlInt(snap.getOnepayBindStatus()));
+			Integer allUsed = userWithdrawOrderDao.sumPointsToday(uid, userType.getCode(), todayStart());
+			resp.setTodayUsedPoints(allUsed == null ? 0 : allUsed);
+			UserWithdrawOrderEntity latestAny = userWithdrawOrderDao.findLatestByUid(uid, userType.getCode());
+			if (latestAny != null && !StringUtils.isEmpty(latestAny.getOnepayAccount())) {
+				resp.setLastWalletAddress(latestAny.getOnepayAccount());
+			}
+		} else {
+			// 未登录：仅展示资产配置，用户金币/绑定/今日已用均为 0
+			resp.setCoinBalance(0L);
+			resp.setFrozenCoinBalance(0L);
+			resp.setOnepayBindStatus(0);
+			resp.setTodayUsedPoints(0);
 		}
 
 		List<WithdrawConfigEntity> cfgs = withdrawConfigDao.findActiveList();
@@ -96,13 +104,17 @@ public class WithdrawBizService extends BaseApiService {
 			item.setServiceFee(scale(cfg.getServiceFee()));
 			item.setMinWithdrawPoints(cfg.getMinWithdrawPoints());
 			item.setMaxWithdrawPointsDay(cfg.getMaxWithdrawPointsDay() == null ? 0 : cfg.getMaxWithdrawPointsDay());
-			Integer used = userWithdrawOrderDao.sumPointsTodayByAsset(uid, userType.getCode(), cfg.getAssetCode(),
-					cfg.getNetwork(), todayStart());
-			item.setTodayUsedPoints(used == null ? 0 : used);
-			UserWithdrawOrderEntity latest = userWithdrawOrderDao.findLatestByUidAndAsset(uid, userType.getCode(),
-					cfg.getAssetCode(), cfg.getNetwork());
-			if (latest != null && !StringUtils.isEmpty(latest.getOnepayAccount())) {
-				item.setLastWalletAddress(latest.getOnepayAccount());
+			if (uid != null) {
+				Integer used = userWithdrawOrderDao.sumPointsTodayByAsset(uid, userType.getCode(), cfg.getAssetCode(),
+						cfg.getNetwork(), todayStart());
+				item.setTodayUsedPoints(used == null ? 0 : used);
+				UserWithdrawOrderEntity latest = userWithdrawOrderDao.findLatestByUidAndAsset(uid, userType.getCode(),
+						cfg.getAssetCode(), cfg.getNetwork());
+				if (latest != null && !StringUtils.isEmpty(latest.getOnepayAccount())) {
+					item.setLastWalletAddress(latest.getOnepayAccount());
+				}
+			} else {
+				item.setTodayUsedPoints(0);
 			}
 			assets.add(item);
 		}

@@ -21,7 +21,7 @@ import javax.servlet.http.HttpServletRequest;
 public interface WithdrawService {
 
 	@GetMapping("/withdraw/home")
-	@ApiOperation(value = "提现首页", notes = "可用金币 + 可提现资产列表；需登录")
+	@ApiOperation(value = "提现首页", notes = "可用金币 + 可提现资产列表；未登录时金币等为 0，仍返回资产配置")
 	ResponseBase withdrawHome(HttpServletRequest request);
 
 	@PostMapping("/withdraw")
