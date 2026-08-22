@@ -138,7 +138,7 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         account.setMobilePrefix(trimToNull(query.getMobilePrefix()));
         account.setMobileNumber(trimToNull(query.getMobileNumber()));
         // 注册昵称与 C 端一致：user_ + yyMMddHHmmss + 3 位随机数
-        account.setNickname(generateAutoNickname());
+        account.setNickname(query.getNickname());
         account.setUserState(UserStateEnums.NORMAL.getIndex());
         account.setCoinBalance(0L);
         account.setFrozenCoinBalance(0L);

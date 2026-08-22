@@ -54,4 +54,7 @@ public class CreatorSignUpQuery {
 
 	@ApiModelProperty(name = "orgLicense", value = "营业执照图")
 	private String orgLicense;
+
+	@ApiModelProperty(name = "nickname",value = "昵称")
+	private String nickname;
 }
