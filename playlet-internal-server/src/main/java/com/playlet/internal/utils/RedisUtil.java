@@ -3,9 +3,7 @@ package com.playlet.internal.utils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
-import org.springframework.util.CollectionUtils;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -63,16 +61,16 @@ public final class RedisUtil {
 
 
     /**
-     * 删除缓存
-     * @param key 可以传一个值 或多个
+     * 删除缓存（集群模式下多 key 需逐个删，避免 CROSSSLOT）
+     * @param key 可以传一个值或多个
      */
-    @SuppressWarnings("unchecked")
     public void del(String... key) {
-        if (key != null && key.length > 0) {
-            if (key.length == 1) {
-                redisTemplate.delete(key[0]);
-            } else {
-                redisTemplate.delete((Collection<String>) CollectionUtils.arrayToList(key));
+        if (key == null || key.length == 0) {
+            return;
+        }
+        for (String k : key) {
+            if (k != null) {
+                redisTemplate.delete(k);
             }
         }
     }
