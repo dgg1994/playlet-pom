@@ -68,4 +68,15 @@ public class RedisKeyConstants {
     public static final String PLAY_EXPOSE_DEDUP = PROJECT_PREFIX + "theater:play:expose:";
     /** 剧集完播去重：后缀 uid:assetId */
     public static final String PLAY_COMPLETE_DEDUP = PROJECT_PREFIX + "theater:play:complete:";
+
+    /**
+     * C 端在线心跳 ZSet：member=deviceId（含未登录设备），score=最近心跳毫秒时间戳。
+     * 查询时按 score 过滤最近 ONLINE_WINDOW_SEC 内成员。
+     */
+    public static final String ONLINE_DEVICE_ZSET = PROJECT_PREFIX + "ops:online:device:zset";
+    /** @deprecated 旧 uid 维度 key，已废弃，保留避免误用 */
+    @Deprecated
+    public static final String ONLINE_ZSET = ONLINE_DEVICE_ZSET;
+    /** 在线判定窗口（秒）：窗口内有心跳视为在线 */
+    public static final long ONLINE_WINDOW_SEC = 300L;
 }

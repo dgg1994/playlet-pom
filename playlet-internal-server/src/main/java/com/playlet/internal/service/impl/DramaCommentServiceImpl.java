@@ -8,6 +8,7 @@ import com.playlet.internal.service.*;
 import lombok.extern.slf4j.Slf4j;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Date;
 import java.util.Map;
 
 import javax.validation.Valid;
@@ -89,7 +90,7 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 				if (decision.isHidden()) {
 					exist.setDeleteState(DeleteStateEnum.DELETE.getIndex());
 				}
-				GenericityUtil.updateDate(exist);
+				exist.setGmtModified(new Date());
 				dramaVideoCommentDao.updateById(exist);
 				if (decision.shouldRecord()) {
 					sensitiveRecordService.saveRecord(new SensitiveRecordEntity(

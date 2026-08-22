@@ -94,6 +94,13 @@ public interface AppUserService {
 	@GetMapping("/signOut")
 	@ApiOperation(value = "退出登录",notes="退出登录",response=ResponseBase.class)
     ResponseBase signOut(HttpServletRequest request);
+
+	@PostMapping("/heartbeat")
+	@ApiOperation(value = "在线心跳", notes = "无需登录。设备 ID 从请求头 x-playlet-deviceid 读取；"
+			+ "按设备写入 Redis，管理端统计含游客的在线设备数。前台建议 60～120 秒一次；"
+			+ "已登录（带 x-playlet-token）时顺带记 uid 日活。",
+			response = ResponseBase.class)
+	ResponseBase heartbeat(HttpServletRequest request);
 	
 	@PostMapping("/forgetPassword")
 	@ApiOperation(value = "忘记密码",notes="忘记密码",response=ResponseBase.class)

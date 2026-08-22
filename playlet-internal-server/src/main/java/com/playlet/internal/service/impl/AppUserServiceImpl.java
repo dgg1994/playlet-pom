@@ -27,6 +27,8 @@ import com.playlet.internal.service.AppUserService;
 import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.service.support.AppOnePayBindOps;
 import com.playlet.internal.service.support.OnePayBindService;
+import com.playlet.internal.service.support.UserActiveStatService;
+import com.playlet.internal.service.support.UserOnlineHeartbeatService;
 import com.playlet.internal.utils.*;
 import com.playlet.internal.utils.oidc.OidcIdTokenPayload;
 import com.playlet.internal.utils.oidc.OidcTokenVerifier;
@@ -88,6 +90,12 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 
 	@Autowired
 	private AppOnePayBindOps appOnePayBindOps;
+
+	@Autowired
+	private UserOnlineHeartbeatService userOnlineHeartbeatService;
+
+	@Autowired
+	private UserActiveStatService userActiveStatService;
 
 	@SuppressWarnings("deprecation")
 	@Override
@@ -185,6 +193,16 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 					}
 					appAccountDao.updateById(appUserEntity);
 					upsertPushBind(appUserEntity.getId(), registrationId, deviceName);
+				}
+				// 在线按请求头设备 ID；无则回退极光 ID
+				String deviceId = UserOnlineHeartbeatService.resolveFromRequest(req);
+				if (deviceId == null) {
+					deviceId = registrationId;
+				}
+				if (deviceId != null) {
+					userOnlineHeartbeatService.heartbeat(deviceId, appUserEntity.getId());
+				} else {
+					userActiveStatService.markActive(appUserEntity.getId());
 				}
 				return setResultSuccess(Constants.AUTH_HEADER_START_WITH + token, I18nUtil.getMessage("base_success"));
 			} else {
@@ -314,6 +332,15 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			upsertPushBind(account.getId(), registrationId, deviceName);
 		}
 
+		String deviceId = UserOnlineHeartbeatService.resolveFromRequest(request);
+		if (deviceId == null) {
+			deviceId = registrationId;
+		}
+		if (deviceId != null) {
+			userOnlineHeartbeatService.heartbeat(deviceId, account.getId());
+		} else {
+			userActiveStatService.markActive(account.getId());
+		}
 		return setResultSuccess(Constants.AUTH_HEADER_START_WITH + token, I18nUtil.getMessage("base_success"));
 	}
 
@@ -650,6 +677,17 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			log.error("service error", e);
 			throw new RuntimeException(e);
 		}
+	}
+
+	@Override
+	public ResponseBase heartbeat(HttpServletRequest request) {
+		String deviceId = UserOnlineHeartbeatService.resolveFromRequest(request);
+		if (deviceId == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		Integer uid = AppTokenUtil.resolveUid(request);
+		userOnlineHeartbeatService.heartbeat(deviceId, uid);
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
 	@Override

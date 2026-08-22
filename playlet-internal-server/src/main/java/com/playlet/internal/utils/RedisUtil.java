@@ -614,4 +614,58 @@ public final class RedisUtil {
         }
     }
 
+    // ============================ZSet=============================
+
+    /**
+     * ZSet 写入/更新成员分数（存在则覆盖 score）。
+     */
+    public boolean zAdd(String key, Object member, double score) {
+        try {
+            redisTemplate.opsForZSet().add(key, member, score);
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * 统计 score 落在 [min, max] 的成员数。
+     */
+    public long zCount(String key, double min, double max) {
+        try {
+            Long n = redisTemplate.opsForZSet().count(key, min, max);
+            return n == null ? 0L : n;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 0L;
+        }
+    }
+
+    /**
+     * 删除 score 落在 [min, max] 的成员。
+     */
+    public long zRemoveRangeByScore(String key, double min, double max) {
+        try {
+            Long n = redisTemplate.opsForZSet().removeRangeByScore(key, min, max);
+            return n == null ? 0L : n;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 0L;
+        }
+    }
+
+    /**
+     * 删除指定成员。
+     */
+    public long zRemove(String key, Object... members) {
+        try {
+            Long n = redisTemplate.opsForZSet().remove(key, members);
+            return n == null ? 0L : n;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 0L;
+        }
+    }
+
 }

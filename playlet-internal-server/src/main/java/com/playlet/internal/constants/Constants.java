@@ -79,7 +79,10 @@ public interface Constants {
     public static final String HEADER_CURRENCY = "x-playlet-currency";
     
     public static final String HEADER_DEVICETYPE = "x-playlet-devicetype";
-    
+
+    /** C 端设备唯一 ID（在线心跳 / 未登录统计） */
+    public static final String HEADER_DEVICE_ID = "x-playlet-deviceid";
+
     public static final String HEADER_VERSION = "x-playlet-version";
     
     public static final String HEADER_LANGUAGE = "x-playlet-language";

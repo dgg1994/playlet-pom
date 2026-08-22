@@ -17,6 +17,7 @@ import com.playlet.internal.enums.RecommendedCarouselEnums;
 import com.playlet.internal.enums.VerifyStateEnums;
 import com.playlet.internal.enums.WelfareActionTypeEnums;
 import com.playlet.internal.service.*;
+import com.playlet.internal.service.support.UserActiveStatService;
 import com.playlet.internal.utils.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,6 +64,8 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 	private TheaterHomeCacheHelper theaterHomeCacheHelper;
 	@Autowired
 	private DramaAssetPlayStatService dramaAssetPlayStatService;
+	@Autowired
+	private UserActiveStatService userActiveStatService;
 
 	@Override
 	public ResponseBase home() {
@@ -262,6 +265,12 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 			// 作家端剧集曝光/完播（Redis 去重后异步落库）
 			dramaAssetPlayStatService.onWatchReport(uid, row.getEpisodeId(), row.getWatchProgress(),
 					entity.getEpisodeProgress());
+			// 日活/播放时长（在线人数由 /api/appUser/heartbeat 单独维护）
+			if (deltaSec > 0) {
+				userActiveStatService.addPlaySeconds(uid, deltaSec);
+			} else {
+				userActiveStatService.markActive(uid);
+			}
 
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {

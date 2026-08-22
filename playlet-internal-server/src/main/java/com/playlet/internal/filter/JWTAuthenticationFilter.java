@@ -10,6 +10,7 @@ import org.springframework.security.web.authentication.www.BasicAuthenticationFi
 import com.playlet.internal.base.JsonData;
 import com.playlet.internal.config.heard.AppVersionContext;
 import com.playlet.internal.config.heard.CurrencyContext;
+import com.playlet.internal.config.heard.DeviceIdContext;
 import com.playlet.internal.config.heard.DeviceTypeContext;
 import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.constants.Constants;
@@ -73,6 +74,8 @@ public class JWTAuthenticationFilter extends BasicAuthenticationFilter {
 	        //读取请求头 deviceType（设备类型）
 	        String deviceType = request.getHeader(Constants.HEADER_DEVICETYPE);
 	        DeviceTypeContext.setDeviceType(deviceType);
+	        // 读取请求头 deviceId（设备唯一 ID，在线统计）
+	        DeviceIdContext.setDeviceId(request.getHeader(Constants.HEADER_DEVICE_ID));
 	        //读取请求头 appVersion（应用版本号）
 	        String appVersion = request.getHeader(Constants.HEADER_VERSION);
 	        AppVersionContext.setAppVersion(appVersion);
@@ -116,6 +119,7 @@ public class JWTAuthenticationFilter extends BasicAuthenticationFilter {
 		}finally {
 	        // 防止内存泄露，必须清理
 	        LanguageContext.clear();
+	        DeviceIdContext.clear();
 	    }
 
 	}
