@@ -3,18 +3,27 @@ server:
 spring:
   application:
     name: gateway-server
+  # 大文件/封面 multipart 经网关转发时，避免 body buffering/内存限制导致上游读不到完整流
+  codec:
+    max-in-memory-size: 100MB
   cloud:
     nacos:
       discovery:
-        server-addr: http://127.0.0.1:8848
+        # 本地 Docker Nacos 2.x 需同时映射 8848/9848/9849，地址不要带 http://
+        server-addr: 127.0.0.1:8848
         namespace: 6ed7d1da-d7db-4007-b4cb-6fe448c775e4
-        password: qwerdf
     gateway:
       discovery:
         locator:
           enabled: false
-      weightcalculator:
-        enabled: false
+      httpclient:
+        connect-timeout: 60000
+        # 给 multipart 上传足够的转发读取时间，避免上游连接提前关闭导致 EOFException
+        response-timeout: 300s
+      # 关闭权重过滤器：Nacos 刷新路由时 WeightCalculatorWebFilter 会在 epoll 线程 block()，请求直接 500
+      filter:
+        weight-calculator:
+          enabled: false
       # 管理端跨域（OPTIONS 由网关响应；去重避免后端 @CrossOrigin 重复头）
       globalcors:
         add-to-simple-url-handler-mapping: true
@@ -22,7 +31,7 @@ spring:
           '[/**]':
             allowedOrigins:
               - "https://manager.yingchuanmedia.com"
-              - "http://localhost:3006"
+              - "https://author.yingchuanmedia.com"
             allowedMethods: "*"
             allowedHeaders: "*"
             exposedHeaders:
@@ -60,7 +69,7 @@ spring:
 # 路由模式: 1=固定国内(推荐本地/联调), 2=固定海外, 3=按客户端IP走 ip-api.com 判国内外
 playlet:
   gateway:
-    route-mode: 3
+    route-mode: 1
 
 management:
   endpoints:

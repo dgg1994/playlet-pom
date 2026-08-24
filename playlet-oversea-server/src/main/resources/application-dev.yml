@@ -4,7 +4,6 @@ spring:
       discovery:
         server-addr: http://127.0.0.1:8848
         namespace: 6ed7d1da-d7db-4007-b4cb-6fe448c775e4
-        password: qwerdf
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver

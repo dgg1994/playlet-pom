@@ -1,11 +1,13 @@
 server:
   port: 8081
   max-http-header-size: 2MB
-  tomcat.max-http-form-post-size: 50MB
+  tomcat.max-http-form-post-size: 800MB
+  # multipart 上传过程中，避免读 body 超时导致客户端提前断开/EOFException
+  tomcat.connection-timeout: 300s
 
 spring:
   profiles:
-    active: dev
+    active: prod
   application:
     name: playlet-internal-server
   mvc:
