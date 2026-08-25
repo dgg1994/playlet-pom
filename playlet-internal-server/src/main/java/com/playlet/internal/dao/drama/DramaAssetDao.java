@@ -65,6 +65,11 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 	@Select("select * from drama_asset where drama_id = #{dramaId} and delete_state = 0 order by set_num")
 	List<DramaAssetRespEntity> findByDramaId(@Param("dramaId") Integer dramaId);
 
+	/** C 端选集：仅已上架且未删除 */
+	@Select("select * from drama_asset where drama_id = #{dramaId} and ifnull(delete_state, 0) = 0 "
+			+ "and shelf_status = 1 and video_status = 1 order by set_num")
+	List<DramaAssetRespEntity> findOnShelfByDramaId(@Param("dramaId") Integer dramaId);
+
 	/** 作家详情：该剧全部未删除集（含审核中/驳回，不限上架） */
 	@Select("select * from drama_asset where drama_id = #{dramaId} and ifnull(delete_state, 0) = 0 "
 			+ "order by set_num, id")
@@ -74,15 +79,16 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 			+ "and video_status = 1 and shelf_status = 1 order by set_num limit 1")
 	RecommendVidoeRespEntity findDramaIdOne(@Param("dramaId") Integer dramaId,@Param("deleteState") Integer deleteState);
 
-	/** 批量取每部剧 set_num 最小的一集（推荐流装配，避免 N+1） */
+	/** 批量取每部剧已上架集中 set_num 最小的一集（推荐流装配，避免 N+1） */
 	@Select("<script>"
 			+ "SELECT a.* FROM drama_asset a "
 			+ "INNER JOIN ("
 			+ "  SELECT drama_id, MIN(set_num) AS min_set FROM drama_asset "
-			+ "  WHERE delete_state = #{deleteState} AND drama_id IN "
+			+ "  WHERE delete_state = #{deleteState} AND shelf_status = 1 AND video_status = 1 AND drama_id IN "
 			+ "  <foreach collection='dramaIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
 			+ "  GROUP BY drama_id"
-			+ ") t ON a.drama_id = t.drama_id AND a.set_num = t.min_set AND a.delete_state = #{deleteState}"
+			+ ") t ON a.drama_id = t.drama_id AND a.set_num = t.min_set AND a.delete_state = #{deleteState} "
+			+ "AND a.shelf_status = 1 AND a.video_status = 1"
 			+ "</script>")
 	List<DramaAssetEntity> findFirstAssetsByDramaIds(@Param("dramaIds") List<Integer> dramaIds,
 			@Param("deleteState") Integer deleteState);
@@ -105,12 +111,21 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 	@Update("update drama_asset set complete_count = ifnull(complete_count,0) + 1, gmtModified = now() where id = #{id}")
 	int incrCompleteCount(@Param("id") Integer id);
 
-	@Select("select video_url from drama_asset where id = #{id}")
+	/** C 端播放：仅已上架集返回地址 */
+	@Select("select video_url from drama_asset where id = #{id} "
+			+ "and ifnull(delete_state, 0) = 0 and shelf_status = 1 and video_status = 1")
 	String findVideoUrl(@Param("id") Integer id);
 
+	/** C 端按 id 查已上架集（详情） */
+	@Select("select * from drama_asset where id = #{id} "
+			+ "and ifnull(delete_state, 0) = 0 and shelf_status = 1 and video_status = 1 limit 1")
+	DramaAssetEntity findOnShelfById(@Param("id") Integer id);
+
+	/** C 端下载：仅已上架集 */
 	@Select("<script>"
 			+ "select id, video_url as videoUrl from drama_asset where id in "
 			+ "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
+			+ " and ifnull(delete_state, 0) = 0 and shelf_status = 1 and video_status = 1"
 			+ "</script>")
 	List<DramaAssetEntity> findIdAndVideoUrlByIds(@Param("ids") List<Integer> ids);
 

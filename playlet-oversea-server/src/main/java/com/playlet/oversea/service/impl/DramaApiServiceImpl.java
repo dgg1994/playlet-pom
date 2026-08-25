@@ -205,7 +205,8 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
     public ResponseBase selections(Integer id, HttpServletRequest request) {
         try {
             Integer uid = AppTokenUtil.resolveUid(request);
-            List<DramaAssetRespEntity> list = dramaAssetDao.findByDramaId(id);
+            // C 端只返回已上架集
+            List<DramaAssetRespEntity> list = dramaAssetDao.findOnShelfByDramaId(id);
             if (list == null || list.isEmpty()) {
                 return setResultSuccess(list, I18nUtil.getMessage("base_success"));
             }
@@ -248,7 +249,8 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             }
             String keyOrUrl = dramaAssetDao.findVideoUrl(id);
             if (StringUtils.isEmpty(keyOrUrl)) {
-                return setResultError(I18nUtil.getMessage("base_data_null"));
+                // 无数据或未上架，均不返回播放地址
+                return setResultError(I18nUtil.getMessage("video_not_up"));
             }
             return setResultSuccess(buildMultiRatePlayUrl(id, keyOrUrl), I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
@@ -299,7 +301,7 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
                 }
             }
             if (result.isEmpty()) {
-                return setResultError(I18nUtil.getMessage("base_data_null"));
+                return setResultError(I18nUtil.getMessage("video_not_up"));
             }
             return setResultSuccess(result, I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
@@ -502,30 +504,32 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
     @Override
     public ResponseBase getVideoInfo(Integer id, HttpServletRequest request) {
         try {
-            DramaAssetEntity vidoeRes = dramaAssetDao.selectById(id);
-            if (vidoeRes != null) {
-                DramaEntity dramaEntity = dramaDao.findByVideoId(id);
-                if (dramaEntity != null) {
-                    vidoeRes.setCollectScore(dramaEntity.getCollectScore());
-                    vidoeRes.setShareScore(dramaEntity.getShareScore());
-                    vidoeRes.setVideoUrl(null);
-                    Integer uid = AppTokenUtil.resolveUid(request);
-                    if (uid != null) {
-                        UserDramaLikeEntity userDramaLikeEntity = userDramaLikeDao.selectOne(new QueryWrapper<UserDramaLikeEntity>()
-                                .eq("uid", uid)
-                                .eq("drama_id", dramaEntity.getId())
-                                .eq("episode_id", id));
-                        //是否点赞
-                        vidoeRes.setIsLike(userDramaLikeEntity == null ? PublicEnums.ZERO.getIndex() : PublicEnums.ONE.getIndex());
-                        //是否收藏
-                        UserDramaCollectEntity userDramaCollectEntity = userDramaCollectDao.selectOne(new QueryWrapper<UserDramaCollectEntity>()
-                                .eq("uid", uid)
-                                .eq("drama_id", dramaEntity.getId()));
-                        vidoeRes.setIsCollect(userDramaCollectEntity == null ? PublicEnums.ZERO.getIndex() : PublicEnums.ONE.getIndex());
-                    } else {
-                        vidoeRes.setIsLike(PublicEnums.ZERO.getIndex());
-                        vidoeRes.setIsCollect(PublicEnums.ZERO.getIndex());
-                    }
+            // C 端详情仅允许已上架集
+            DramaAssetEntity vidoeRes = dramaAssetDao.findOnShelfById(id);
+            if (vidoeRes == null) {
+                return setResultError(I18nUtil.getMessage("video_not_up"));
+            }
+            DramaEntity dramaEntity = dramaDao.findByVideoId(id);
+            if (dramaEntity != null) {
+                vidoeRes.setCollectScore(dramaEntity.getCollectScore());
+                vidoeRes.setShareScore(dramaEntity.getShareScore());
+                vidoeRes.setVideoUrl(null);
+                Integer uid = AppTokenUtil.resolveUid(request);
+                if (uid != null) {
+                    UserDramaLikeEntity userDramaLikeEntity = userDramaLikeDao.selectOne(new QueryWrapper<UserDramaLikeEntity>()
+                            .eq("uid", uid)
+                            .eq("drama_id", dramaEntity.getId())
+                            .eq("episode_id", id));
+                    //是否点赞
+                    vidoeRes.setIsLike(userDramaLikeEntity == null ? PublicEnums.ZERO.getIndex() : PublicEnums.ONE.getIndex());
+                    //是否收藏
+                    UserDramaCollectEntity userDramaCollectEntity = userDramaCollectDao.selectOne(new QueryWrapper<UserDramaCollectEntity>()
+                            .eq("uid", uid)
+                            .eq("drama_id", dramaEntity.getId()));
+                    vidoeRes.setIsCollect(userDramaCollectEntity == null ? PublicEnums.ZERO.getIndex() : PublicEnums.ONE.getIndex());
+                } else {
+                    vidoeRes.setIsLike(PublicEnums.ZERO.getIndex());
+                    vidoeRes.setIsCollect(PublicEnums.ZERO.getIndex());
                 }
             }
             return setResultSuccess(vidoeRes, I18nUtil.getMessage("base_success"));
