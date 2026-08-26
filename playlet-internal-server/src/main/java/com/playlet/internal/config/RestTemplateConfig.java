@@ -12,7 +12,7 @@ import java.time.Duration;
  * HTTP 客户端：超时取自 onepay.* yml。
  */
 @Configuration
-@EnableConfigurationProperties(OnePayProperties.class)
+@EnableConfigurationProperties({OnePayProperties.class, ThirdPartyProperties.class})
 public class RestTemplateConfig {
 
 	@Bean
