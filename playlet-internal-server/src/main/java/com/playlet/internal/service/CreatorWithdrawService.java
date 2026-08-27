@@ -1,5 +1,6 @@
 package com.playlet.internal.service;
 
+import com.playlet.internal.api.request.WalletApplyCardRequest;
 import com.playlet.internal.api.request.WalletBindPayPwdRequest;
 import com.playlet.internal.api.request.WithdrawReqEntity;
 import com.playlet.internal.base.ResponseBase;
@@ -47,6 +48,14 @@ public interface CreatorWithdrawService {
 	@GetMapping("/card/list")
 	@ApiOperation(value = "卡片列表", notes = "默认卡优先；首页切换与卡片列表页复用；需作家登录")
 	ResponseBase cardList(HttpServletRequest request);
+
+	@GetMapping("/card/product/list")
+	@ApiOperation(value = "可用卡产品列表", notes = "商户可申请的卡产品，申请开卡前选品；需作家登录")
+	ResponseBase cardProductList(HttpServletRequest request);
+
+	@PostMapping("/card/apply")
+	@ApiOperation(value = "申请卡片", notes = "需登录且 KYC 已通过；productId 来自产品列表；实体卡可传 deliveryAddressId")
+	ResponseBase applyCard(@RequestBody WalletApplyCardRequest query, HttpServletRequest request);
 
 	@GetMapping("/transaction/list")
 	@ApiOperation(value = "交易记录", notes = "分页；首页可用较小 pageSize，点全部继续翻页；需作家登录")

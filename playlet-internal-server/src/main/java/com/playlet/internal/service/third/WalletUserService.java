@@ -2,8 +2,14 @@ package com.playlet.internal.service.third;
 
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
+import com.playlet.internal.api.request.BankcardApplyRequest;
+import com.playlet.internal.api.request.WalletApplyCardRequest;
 import com.playlet.internal.api.request.WalletBindPayPwdRequest;
+import com.playlet.internal.api.response.ThirdBankcardApplyResp;
+import com.playlet.internal.api.response.ThirdBankcardProductResp;
+import com.playlet.internal.api.response.WalletApplyCardResp;
 import com.playlet.internal.api.response.WalletCardItemResp;
+import com.playlet.internal.api.response.WalletCardProductItemResp;
 import com.playlet.internal.api.response.WalletTransactionItemResp;
 import com.playlet.internal.api.response.WalletUserInfoResp;
 import com.playlet.internal.base.BaseApiService;
@@ -11,12 +17,16 @@ import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.WalletConstants;
 import com.playlet.internal.dao.wallet.WalletAccountDao;
 import com.playlet.internal.dao.wallet.WalletBankcardDao;
+import com.playlet.internal.dao.wallet.WalletCardApplyDao;
 import com.playlet.internal.dao.wallet.WalletCardTransactionDao;
 import com.playlet.internal.dao.wallet.WalletUserDao;
 import com.playlet.internal.entity.wallet.WalletAccountEntity;
 import com.playlet.internal.entity.wallet.WalletBankcardEntity;
+import com.playlet.internal.entity.wallet.WalletCardApplyEntity;
 import com.playlet.internal.entity.wallet.WalletCardTransactionEntity;
 import com.playlet.internal.entity.wallet.WalletUserEntity;
+import com.playlet.internal.enums.WalletCardApplyStateEnums;
+import com.playlet.internal.enums.WalletCardStatusEnums;
 import com.playlet.internal.enums.WalletKycStateEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
@@ -27,6 +37,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -54,6 +65,8 @@ public class WalletUserService extends BaseApiService {
 	private WalletAccountDao walletAccountDao;
 	@Autowired
 	private WalletBankcardDao walletBankcardDao;
+	@Autowired
+	private WalletCardApplyDao walletCardApplyDao;
 	@Autowired
 	private WalletCardTransactionDao walletCardTransactionDao;
 
@@ -183,6 +196,150 @@ public class WalletUserService extends BaseApiService {
 			items.add(toCardItem(row));
 		}
 		return setResultSuccess(items, I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * 商户可用卡产品列表：拉三方实时数据，供申请开卡选品。
+	 */
+	public ResponseBase listCardProducts() {
+		List<ThirdBankcardProductResp> thirdList;
+		try {
+			thirdList = thirdService.listCardProducts();
+		} catch (Exception e) {
+			log.error("wallet list card products failed", e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		if (thirdList == null || thirdList.isEmpty()) {
+			return setResultSuccess(Collections.emptyList(), I18nUtil.getMessage("base_success"));
+		}
+		List<WalletCardProductItemResp> items = new ArrayList<>(thirdList.size());
+		for (ThirdBankcardProductResp row : thirdList) {
+			items.add(toProductItem(row));
+		}
+		log.info("wallet card product list size={}", items.size());
+		return setResultSuccess(items, I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * 申请开卡：调三方 apply → 落 wallet_card_apply / wallet_bankcard。
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	public ResponseBase applyCard(Integer userType, Integer localUid, WalletApplyCardRequest query) {
+		if (query == null || query.getProductId() == null) {
+			return setResultError(I18nUtil.getMessage("wallet.apply_product_required"));
+		}
+		WalletUserEntity user = walletUserDao.findByLocal(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		WalletAccountEntity account = walletAccountDao.findByWalletUserId(user.getId());
+		if (account == null
+				|| account.getKycState() == null
+				|| account.getKycState() != WalletKycStateEnums.SUCCESS_APPROVE.getCode()) {
+			return setResultError(I18nUtil.getMessage("wallet.kyc_required"));
+		}
+
+		BankcardApplyRequest thirdReq = new BankcardApplyRequest();
+		thirdReq.setProductId(query.getProductId());
+		thirdReq.setDeliveryAddressId(query.getDeliveryAddressId());
+		ThirdBankcardApplyResp third;
+		try {
+			third = thirdService.applyBankcard(user.getWalletUid(), thirdReq);
+		} catch (BaseException e) {
+			log.error("wallet apply card third failed walletUid={} productId={}",
+					user.getWalletUid(), query.getProductId(), e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("wallet apply card third error walletUid={} productId={}",
+					user.getWalletUid(), query.getProductId(), e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+
+		Date now = new Date();
+		WalletCardApplyEntity apply = new WalletCardApplyEntity();
+		apply.setWalletUserId(user.getId());
+		apply.setWalletUid(user.getWalletUid());
+		apply.setCardProductId(query.getProductId());
+		apply.setApplyState(WalletCardApplyStateEnums.ISSUED.getCode());
+		apply.setApplyStateName(WalletCardApplyStateEnums.ISSUED.getLabel());
+		apply.setKycState(account.getKycState());
+		apply.setRequestOrderId(third.getOrderNo());
+		apply.setSetTime(now);
+		apply.setGmtModified(now);
+		try {
+			walletCardApplyDao.insert(apply);
+		} catch (DuplicateKeyException e) {
+			// 幂等：同 orderNo 已落库
+			log.warn("wallet apply card duplicate orderNo={}", third.getOrderNo(), e);
+			WalletCardApplyEntity existed = walletCardApplyDao.findByRequestOrderId(third.getOrderNo());
+			if (existed != null) {
+				apply = existed;
+			} else {
+				throw new BaseException(I18nUtil.getMessage("base_error"), e);
+			}
+		} catch (Exception e) {
+			log.error("wallet apply card insert apply failed orderNo={}", third.getOrderNo(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+
+		Long walletBankcardId = null;
+		if (third.getUserBankcardId() != null) {
+			WalletBankcardEntity existedCard = walletBankcardDao.findByUserBankcardId(third.getUserBankcardId());
+			if (existedCard != null) {
+				walletBankcardId = existedCard.getId();
+			} else {
+				walletBankcardId = insertAppliedBankcard(user, apply.getId(), query.getProductId(), third, now);
+			}
+			// 账户侧标记已开卡（首次）
+			walletAccountDao.markActivated(user.getId());
+		}
+
+		WalletApplyCardResp resp = new WalletApplyCardResp();
+		resp.setApplyId(apply.getId());
+		resp.setOrderNo(third.getOrderNo());
+		resp.setUserBankcardId(third.getUserBankcardId());
+		resp.setCardNo(third.getCardNo());
+		resp.setWalletBankcardId(walletBankcardId);
+		log.info("wallet apply card success walletUserId={} productId={} orderNo={} userBankcardId={}",
+				user.getId(), query.getProductId(), third.getOrderNo(), third.getUserBankcardId());
+		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
+	}
+
+	/** 申请成功后写入本地卡记录 */
+	private Long insertAppliedBankcard(WalletUserEntity user, Long applyId, Integer productId,
+			ThirdBankcardApplyResp third, Date now) {
+		WalletBankcardEntity card = new WalletBankcardEntity();
+		card.setWalletUserId(user.getId());
+		card.setWalletUid(user.getWalletUid());
+		card.setCardApplyId(applyId);
+		card.setCardProductId(productId);
+		card.setUserBankcardId(third.getUserBankcardId());
+		card.setCardNo(third.getCardNo());
+		card.setCurrency(WalletConstants.DEFAULT_CURRENCY);
+		// 申请刚成功：待激活
+		card.setCardStatus(WalletCardStatusEnums.WAIT_ACTIVE.getCode());
+		card.setCardStatusName(WalletCardStatusEnums.WAIT_ACTIVE.getLabel());
+		card.setBalance(BigDecimal.ZERO);
+		card.setPinSet(0);
+		card.setIsDefault(WalletConstants.CARD_DEFAULT_NO);
+		card.setApplyOrderNo(third.getOrderNo());
+		card.setSetTime(now);
+		card.setGmtModified(now);
+		// 若尚无默认卡，设为默认
+		if (walletBankcardDao.findDefaultByWalletUserId(user.getId()) == null) {
+			card.setIsDefault(WalletConstants.CARD_DEFAULT_YES);
+		}
+		try {
+			walletBankcardDao.insert(card);
+			return card.getId();
+		} catch (DuplicateKeyException e) {
+			log.warn("wallet bankcard duplicate userBankcardId={}", third.getUserBankcardId(), e);
+			WalletBankcardEntity again = walletBankcardDao.findByUserBankcardId(third.getUserBankcardId());
+			return again == null ? null : again.getId();
+		} catch (Exception e) {
+			log.error("wallet bankcard insert failed userBankcardId={}", third.getUserBankcardId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
 	}
 
 	/**
@@ -329,6 +486,23 @@ public class WalletUserService extends BaseApiService {
 		item.setPinSet(row.getPinSet());
 		item.setTagName(row.getTagName());
 		item.setSetTime(row.getSetTime());
+		return item;
+	}
+
+	private static WalletCardProductItemResp toProductItem(ThirdBankcardProductResp row) {
+		WalletCardProductItemResp item = new WalletCardProductItemResp();
+		item.setProductId(row.getId());
+		item.setCardTitle(row.getCardTitle());
+		item.setCardBin(row.getCardBin());
+		item.setBankCardNature(row.getBankCardNature());
+		item.setCardBrand(row.getCardBrand());
+		item.setCardMode(row.getCardMode());
+		item.setCurrency(StringUtils.isEmpty(row.getCcy()) ? WalletConstants.DEFAULT_CURRENCY : row.getCcy());
+		item.setApplyFee(row.getApplyFee());
+		item.setRechargeFee(row.getRechargeFee());
+		item.setBankcardRegion(row.getBankcardRegion());
+		item.setActiveMinLimit(row.getActiveMinLimit());
+		item.setRechargeMinLimit(row.getRechargeMinLimit());
 		return item;
 	}
 

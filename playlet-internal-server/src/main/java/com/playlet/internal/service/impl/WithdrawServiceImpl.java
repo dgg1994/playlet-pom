@@ -1,6 +1,7 @@
 package com.playlet.internal.service.impl;
 
 import com.playlet.internal.api.request.OnePayWithdrawCallbackRequest;
+import com.playlet.internal.api.request.WalletApplyCardRequest;
 import com.playlet.internal.api.request.WalletBindPayPwdRequest;
 import com.playlet.internal.api.request.WithdrawReqEntity;
 import com.playlet.internal.base.BaseApiService;
@@ -93,6 +94,24 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
 		return walletUserService.listCards(WithdrawUserTypeEnums.APP.getCode(), uid);
+	}
+
+	@Override
+	public ResponseBase cardProductList(HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.listCardProducts();
+	}
+
+	@Override
+	public ResponseBase applyCard(@RequestBody WalletApplyCardRequest query, HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.applyCard(WithdrawUserTypeEnums.APP.getCode(), uid, query);
 	}
 
 	@Override

@@ -1,5 +1,6 @@
 package com.playlet.internal.service.impl;
 
+import com.playlet.internal.api.request.WalletApplyCardRequest;
 import com.playlet.internal.api.request.WalletBindPayPwdRequest;
 import com.playlet.internal.api.request.WithdrawReqEntity;
 import com.playlet.internal.base.BaseApiService;
@@ -96,6 +97,24 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
 		return walletUserService.listCards(WithdrawUserTypeEnums.CREATOR.getCode(), uid);
+	}
+
+	@Override
+	public ResponseBase cardProductList(HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.listCardProducts();
+	}
+
+	@Override
+	public ResponseBase applyCard(@RequestBody WalletApplyCardRequest query, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.applyCard(WithdrawUserTypeEnums.CREATOR.getCode(), uid, query);
 	}
 
 	@Override
