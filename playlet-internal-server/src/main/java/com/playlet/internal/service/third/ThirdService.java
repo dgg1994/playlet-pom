@@ -3,11 +3,27 @@ package com.playlet.internal.service.third;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.playlet.internal.api.request.BankcardActiveRequest;
+import com.playlet.internal.api.request.BankcardApplyRequest;
+import com.playlet.internal.api.request.BankcardCanActiveRequest;
+import com.playlet.internal.api.request.BankcardRechargeRequest;
+import com.playlet.internal.api.request.BankcardSetPinRequest;
+import com.playlet.internal.api.request.BankcardUpdateEmailRequest;
+import com.playlet.internal.api.request.BankcardUpdateStatusRequest;
+import com.playlet.internal.api.request.BankcardUserIdRequest;
 import com.playlet.internal.api.request.KycApplyRequest;
 import com.playlet.internal.api.request.KycCountryListRequest;
 import com.playlet.internal.api.request.RegisterRequest;
 import com.playlet.internal.api.response.KycCountryResp;
 import com.playlet.internal.api.response.KycStatusResp;
+import com.playlet.internal.api.response.ThirdBankcardActiveResp;
+import com.playlet.internal.api.response.ThirdBankcardApplyResp;
+import com.playlet.internal.api.response.ThirdBankcardBalanceResp;
+import com.playlet.internal.api.response.ThirdBankcardCanActiveResp;
+import com.playlet.internal.api.response.ThirdBankcardInfoResp;
+import com.playlet.internal.api.response.ThirdBankcardPinResp;
+import com.playlet.internal.api.response.ThirdBankcardProductResp;
+import com.playlet.internal.api.response.ThirdUserBankcardResp;
 import com.playlet.internal.api.response.ThirdUserRegisterResp;
 import com.playlet.internal.config.ThirdPartyProperties;
 import com.playlet.internal.constants.Constants;
@@ -142,6 +158,190 @@ public class ThirdService {
 		log.info("third party kyc apply success uid={}", uid);
 	}
 
+	/**
+	 * 商户可用卡产品列表。文档：GET /api/bankcard/merchant/card/list
+	 */
+	public List<ThirdBankcardProductResp> listCardProducts() {
+		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_PRODUCT_LIST_PATH;
+		log.info("third party card product list start");
+		JsonNode data = exchange(HttpMethod.GET, url, null, null, "卡产品列表");
+		return parseList(data, ThirdBankcardProductResp.class);
+	}
+
+	/**
+	 * 用户卡列表。文档：GET /api/bankcard/user/card/list，uid 放 Header。
+	 *
+	 */
+	public List<ThirdUserBankcardResp> listUserCards(Long uid) {
+		requireUid(uid);
+		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_USER_LIST_PATH;
+		log.info("third party user card list start uid={}", uid);
+		JsonNode data = exchange(HttpMethod.GET, url, null, String.valueOf(uid), "用户卡列表");
+		List<ThirdUserBankcardResp> list = parseList(data, ThirdUserBankcardResp.class);
+		log.info("third party user card list success uid={} size={}", uid, list.size());
+		return list;
+	}
+
+	/**
+	 * 申请银行卡。文档：POST /api/bankcard/apply，uid 放 Header。
+	 */
+	public ThirdBankcardApplyResp applyBankcard(Long uid, BankcardApplyRequest body) {
+		requireUid(uid);
+		if (body == null || body.getProductId() == null) {
+			throw new BaseException("productId不能为空");
+		}
+		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_APPLY_PATH;
+		log.info("third party card apply start uid={} productId={}", uid, body.getProductId());
+		JsonNode data = exchange(HttpMethod.POST, url, body, String.valueOf(uid), "申请银行卡");
+		ThirdBankcardApplyResp resp = treeToValue(data, ThirdBankcardApplyResp.class, "申请银行卡");
+		if (resp.getUserBankcardId() == null) {
+			throw new BaseException("申请银行卡响应缺少 userBankcardId");
+		}
+		log.info("third party card apply success uid={} userBankcardId={} orderNo={}",
+				uid, resp.getUserBankcardId(), resp.getOrderNo());
+		return resp;
+	}
+
+	/**
+	 * 银行卡是否可激活。文档：POST /api/bankcard/get/canActive
+	 */
+	public ThirdBankcardCanActiveResp canActiveBankcard(Long uid, BankcardCanActiveRequest body) {
+		requireUid(uid);
+		if (body == null || StringUtils.isEmpty(body.getCardNo()) || StringUtils.isEmpty(body.getVerifyCode())) {
+			throw new BaseException("cardNo/verifyCode不能为空");
+		}
+		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_CAN_ACTIVE_PATH;
+		log.info("third party card canActive start uid={}", uid);
+		JsonNode data = exchange(HttpMethod.POST, url, body, String.valueOf(uid), "银行卡是否可激活");
+		return treeToValue(data, ThirdBankcardCanActiveResp.class, "银行卡是否可激活");
+	}
+
+	/**
+	 * 银行卡激活。文档：POST /api/bankcard/active
+	 */
+	public ThirdBankcardActiveResp activeBankcard(Long uid, BankcardActiveRequest body) {
+		requireUid(uid);
+		validateActive(body);
+		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_ACTIVE_PATH;
+		log.info("third party card active start uid={} productId={}", uid, body.getProductId());
+		JsonNode data = exchange(HttpMethod.POST, url, body, String.valueOf(uid), "银行卡激活");
+		ThirdBankcardActiveResp resp = treeToValue(data, ThirdBankcardActiveResp.class, "银行卡激活");
+		log.info("third party card active success uid={} userBankcardId={}", uid, resp.getUserBankcardId());
+		return resp;
+	}
+
+	/**
+	 * 设置 Pin。文档：POST /api/bankcard/setPin（不打印 pin）
+	 */
+	public void setBankcardPin(Long uid, BankcardSetPinRequest body) {
+		requireUid(uid);
+		if (body == null || body.getUserBankcardId() == null || StringUtils.isEmpty(body.getPin())) {
+			throw new BaseException("userBankcardId/pin不能为空");
+		}
+		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_SET_PIN_PATH;
+		log.info("third party card setPin start uid={} userBankcardId={}", uid, body.getUserBankcardId());
+		exchange(HttpMethod.POST, url, body, String.valueOf(uid), "设置Pin");
+		log.info("third party card setPin success uid={} userBankcardId={}", uid, body.getUserBankcardId());
+	}
+
+	/**
+	 * 查询银行卡余额。文档：POST /api/bankcard/getBalance
+	 */
+	public ThirdBankcardBalanceResp getBankcardBalance(Long uid, Long userBankcardId) {
+		requireUid(uid);
+		BankcardUserIdRequest body = requireUserBankcardId(userBankcardId);
+		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_GET_BALANCE_PATH;
+		log.info("third party card balance start uid={} userBankcardId={}", uid, userBankcardId);
+		JsonNode data = exchange(HttpMethod.POST, url, body, String.valueOf(uid), "查询银行卡余额");
+		return treeToValue(data, ThirdBankcardBalanceResp.class, "查询银行卡余额");
+	}
+
+	/**
+	 * 银行卡充值。文档：POST /api/bankcard/recharge
+	 */
+	public void rechargeBankcard(Long uid, BankcardRechargeRequest body) {
+		requireUid(uid);
+		if (body == null || body.getUserBankcardId() == null || body.getAmount() == null
+				|| StringUtils.isEmpty(body.getRequestOrderId())) {
+			throw new BaseException("userBankcardId/amount/requestOrderId不能为空");
+		}
+		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_RECHARGE_PATH;
+		log.info("third party card recharge start uid={} userBankcardId={} amount={} requestOrderId={}",
+				uid, body.getUserBankcardId(), body.getAmount(), body.getRequestOrderId());
+		exchange(HttpMethod.POST, url, body, String.valueOf(uid), "银行卡充值");
+		log.info("third party card recharge success uid={} requestOrderId={}", uid, body.getRequestOrderId());
+	}
+
+	/**
+	 * 更新银行卡状态（冻结/解冻）。文档：POST /api/bankcard/update/status
+	 */
+	public void updateBankcardStatus(Long uid, BankcardUpdateStatusRequest body) {
+		requireUid(uid);
+		if (body == null || body.getUserBankcardId() == null || body.getEnable() == null) {
+			throw new BaseException("userBankcardId/enable不能为空");
+		}
+		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_UPDATE_STATUS_PATH;
+		log.info("third party card updateStatus start uid={} userBankcardId={} enable={}",
+				uid, body.getUserBankcardId(), body.getEnable());
+		exchange(HttpMethod.POST, url, body, String.valueOf(uid), "更新银行卡状态");
+		log.info("third party card updateStatus success uid={} userBankcardId={}", uid, body.getUserBankcardId());
+	}
+
+	/**
+	 * 注销银行卡。文档：POST /api/bankcard/close
+	 */
+	public void closeBankcard(Long uid, Long userBankcardId) {
+		requireUid(uid);
+		BankcardUserIdRequest body = requireUserBankcardId(userBankcardId);
+		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_CLOSE_PATH;
+		log.info("third party card close start uid={} userBankcardId={}", uid, userBankcardId);
+		exchange(HttpMethod.POST, url, body, String.valueOf(uid), "注销银行卡");
+		log.info("third party card close success uid={} userBankcardId={}", uid, userBankcardId);
+	}
+
+	/**
+	 * 查询银行卡信息。文档：POST /api/bankcard/info（不打印 cvv）
+	 */
+	public ThirdBankcardInfoResp getBankcardInfo(Long uid, Long userBankcardId) {
+		requireUid(uid);
+		BankcardUserIdRequest body = requireUserBankcardId(userBankcardId);
+		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_INFO_PATH;
+		log.info("third party card info start uid={} userBankcardId={}", uid, userBankcardId);
+		JsonNode data = exchange(HttpMethod.POST, url, body, String.valueOf(uid), "查询银行卡信息");
+		ThirdBankcardInfoResp resp = treeToValue(data, ThirdBankcardInfoResp.class, "查询银行卡信息");
+		log.info("third party card info success uid={} userBankcardId={} infoType={} status={}",
+				uid, userBankcardId, resp.getInfoType(), resp.getStatus());
+		return resp;
+	}
+
+	/**
+	 * 更新银行卡邮箱。文档：POST /api/bankcard/update/email
+	 */
+	public void updateBankcardEmail(Long uid, BankcardUpdateEmailRequest body) {
+		requireUid(uid);
+		if (body == null || body.getUserBankcardId() == null || StringUtils.isEmpty(body.getEmail())) {
+			throw new BaseException("userBankcardId/email不能为空");
+		}
+		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_UPDATE_EMAIL_PATH;
+		log.info("third party card updateEmail start uid={} userBankcardId={}", uid, body.getUserBankcardId());
+		exchange(HttpMethod.POST, url, body, String.valueOf(uid), "更新银行卡邮箱");
+		log.info("third party card updateEmail success uid={} userBankcardId={}", uid, body.getUserBankcardId());
+	}
+
+	/**
+	 * 查询 Pin。文档：POST /api/bankcard/queryPin（不打印 pin）
+	 */
+	public ThirdBankcardPinResp queryBankcardPin(Long uid, Long userBankcardId) {
+		requireUid(uid);
+		BankcardUserIdRequest body = requireUserBankcardId(userBankcardId);
+		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_QUERY_PIN_PATH;
+		log.info("third party card queryPin start uid={} userBankcardId={}", uid, userBankcardId);
+		JsonNode data = exchange(HttpMethod.POST, url, body, String.valueOf(uid), "查询Pin");
+		ThirdBankcardPinResp resp = treeToValue(data, ThirdBankcardPinResp.class, "查询Pin");
+		log.info("third party card queryPin success uid={} userBankcardId={}", uid, userBankcardId);
+		return resp;
+	}
+
 	/** 校验 KYC 必填字段（与文档 required 对齐） */
 	private void validateKycApply(KycApplyRequest body) {
 		if (StringUtils.isEmpty(body.getFirstName())
@@ -156,6 +356,49 @@ public class ThirdService {
 				|| StringUtils.isEmpty(body.getAreaCode())
 				|| StringUtils.isEmpty(body.getPhone())) {
 			throw new BaseException("KYC必填字段不完整");
+		}
+	}
+
+	private void validateActive(BankcardActiveRequest body) {
+		if (body == null
+				|| body.getProductId() == null
+				|| StringUtils.isEmpty(body.getCardNo())
+				|| StringUtils.isEmpty(body.getMobilePrefix())
+				|| StringUtils.isEmpty(body.getMobile())
+				|| StringUtils.isEmpty(body.getCountryCode())
+				|| StringUtils.isEmpty(body.getAddress())
+				|| StringUtils.isEmpty(body.getCity())
+				|| StringUtils.isEmpty(body.getState())
+				|| StringUtils.isEmpty(body.getPostCode())) {
+			throw new BaseException("银行卡激活必填字段不完整");
+		}
+	}
+
+	private static void requireUid(Long uid) {
+		if (uid == null) {
+			throw new BaseException("uid不能为空");
+		}
+	}
+
+	private static BankcardUserIdRequest requireUserBankcardId(Long userBankcardId) {
+		if (userBankcardId == null) {
+			throw new BaseException("userBankcardId不能为空");
+		}
+		BankcardUserIdRequest body = new BankcardUserIdRequest();
+		body.setUserBankcardId(userBankcardId);
+		return body;
+	}
+
+	private <T> List<T> parseList(JsonNode data, Class<T> elementType) {
+		if (data == null || data.isNull()) {
+			return Collections.emptyList();
+		}
+		try {
+			return objectMapper.convertValue(data,
+					objectMapper.getTypeFactory().constructCollectionType(List.class, elementType));
+		} catch (Exception e) {
+			log.error("third party parse list failed type={}", elementType.getSimpleName(), e);
+			throw new BaseException("三方响应解析失败", e);
 		}
 	}
 
@@ -180,7 +423,12 @@ public class ThirdService {
 		try {
 			// 先打签名原文，便于核对是否含 timestamp&email 拼接
 			String signContent = RsaSignUtil.buildSignContent(appId, nonce, timestamp, body);
-			log.info("third party {} signContent={}", bizName, signContent);
+			// pin/cvv 等敏感字段不落签名原文日志
+			if (containsSensitiveSignField(signContent)) {
+				log.info("third party {} signContent=[redacted]", bizName);
+			} else {
+				log.info("third party {} signContent={}", bizName, signContent);
+			}
 			String sign = RsaSignUtil.generateSign(appId, nonce, timestamp, body,
 					thirdPartyProperties.getPrivateKey());
 			HttpHeaders headers = new HttpHeaders();
@@ -246,5 +494,13 @@ public class ThirdService {
 			return "*" + domain;
 		}
 		return name.charAt(0) + "***" + domain;
+	}
+
+	private static boolean containsSensitiveSignField(String signContent) {
+		if (StringUtils.isEmpty(signContent)) {
+			return false;
+		}
+		String lower = signContent.toLowerCase();
+		return lower.contains("pin=") || lower.contains("cvv=") || lower.contains("verifycode=");
 	}
 }

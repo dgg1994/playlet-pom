@@ -1,9 +1,14 @@
 package com.playlet.internal.service.third;
 
 import com.playlet.internal.PlayletInternalServerApplication;
+import com.playlet.internal.api.request.BankcardApplyRequest;
+import com.playlet.internal.api.request.BankcardRechargeRequest;
 import com.playlet.internal.api.request.KycApplyRequest;
 import com.playlet.internal.api.response.KycCountryResp;
 import com.playlet.internal.api.response.KycStatusResp;
+import com.playlet.internal.api.response.ThirdBankcardBalanceResp;
+import com.playlet.internal.api.response.ThirdBankcardProductResp;
+import com.playlet.internal.api.response.ThirdUserBankcardResp;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -49,5 +54,39 @@ class ThirdServiceTest {
 		body.setAreaCode("86");
 		body.setPhone("15611230048");
 		thirdService.applyKyc(102430L, body);
+	}
+
+	@Test
+	void listCardProducts() {
+		List<ThirdBankcardProductResp> list = thirdService.listCardProducts();
+		System.out.println(list);
+	}
+
+	@Test
+	void listUserCards() {
+		List<ThirdUserBankcardResp> list = thirdService.listUserCards(102430L);
+		System.out.println(list);
+	}
+
+	@Test
+	void applyBankcard() {
+		BankcardApplyRequest body = new BankcardApplyRequest();
+		body.setProductId(1000);
+		System.out.println(thirdService.applyBankcard(102430L, body));
+	}
+
+	@Test
+	void getBankcardBalance() {
+		ThirdBankcardBalanceResp balance = thirdService.getBankcardBalance(102430L, 101934L);
+		System.out.println(balance);
+	}
+
+	@Test
+	void rechargeBankcard() {
+		BankcardRechargeRequest body = new BankcardRechargeRequest();
+		body.setUserBankcardId(101934L);
+		body.setAmount(10);
+		body.setRequestOrderId("TEST-RC-" + System.currentTimeMillis());
+		thirdService.rechargeBankcard(102430L, body);
 	}
 }

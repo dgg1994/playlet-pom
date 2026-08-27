@@ -39,6 +39,9 @@ public class WebLogAspect {
 		SENSITIVE_KEYS.add("formerpassword");
 		SENSITIVE_KEYS.add("newpassword");
 		SENSITIVE_KEYS.add("oldpassword");
+		SENSITIVE_KEYS.add("pin");
+		SENSITIVE_KEYS.add("cvv");
+		SENSITIVE_KEYS.add("verifycode");
 		SENSITIVE_KEYS.add("googlecode");
 		SENSITIVE_KEYS.add("googlesecretkey");
 		SENSITIVE_KEYS.add("emailcode");
