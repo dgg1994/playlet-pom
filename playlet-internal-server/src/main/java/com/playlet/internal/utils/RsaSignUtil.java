@@ -38,31 +38,28 @@ public final class RsaSignUtil {
 
     /**
      * 构建签名原文，规则与 pay_demo 保持一致。
+     * 格式：appId=..&nonce=..&timestamp=..&{bodyKey}={bodyValue}...
      */
     public static String buildSignContent(String appId, String nonce, String timestamp, Object body)
             throws Exception {
         StringBuilder sb = new StringBuilder();
-        sb.append("appId=").append(appId).append("&");
-        sb.append("nonce=").append(nonce).append("&");
-        sb.append("timestamp=").append(timestamp);
+        sb.append("appId=").append(nullToEmpty(appId));
+        sb.append("&nonce=").append(nullToEmpty(nonce));
+        sb.append("&timestamp=").append(nullToEmpty(timestamp));
 
         if (body != null) {
             Map<String, Object> bodyMap = OBJECT_MAPPER.convertValue(body, Map.class);
             TreeMap<String, Object> sortedMap = sortAndFilterMap(bodyMap);
-
-            if (!sortedMap.isEmpty()) {
-                sb.append("&");
-                int index = 0;
-                for (Map.Entry<String, Object> entry : sortedMap.entrySet()) {
-                    if (index > 0) {
-                        sb.append("&");
-                    }
-                    sb.append(entry.getKey()).append("=").append(entry.getValue());
-                    index++;
-                }
+            // 每个 body 参数前都加 &，避免 timestamp 与首个字段粘连
+            for (Map.Entry<String, Object> entry : sortedMap.entrySet()) {
+                sb.append('&').append(entry.getKey()).append('=').append(entry.getValue());
             }
         }
         return sb.toString();
+    }
+
+    private static String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     @SuppressWarnings("unchecked")

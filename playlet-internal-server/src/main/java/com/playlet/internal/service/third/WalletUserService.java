@@ -1,0 +1,411 @@
+package com.playlet.internal.service.third;
+
+import com.github.pagehelper.PageHelper;
+import com.github.pagehelper.PageInfo;
+import com.playlet.internal.api.request.WalletBindPayPwdRequest;
+import com.playlet.internal.api.response.WalletCardItemResp;
+import com.playlet.internal.api.response.WalletTransactionItemResp;
+import com.playlet.internal.api.response.WalletUserInfoResp;
+import com.playlet.internal.base.BaseApiService;
+import com.playlet.internal.base.ResponseBase;
+import com.playlet.internal.constants.WalletConstants;
+import com.playlet.internal.dao.wallet.WalletAccountDao;
+import com.playlet.internal.dao.wallet.WalletBankcardDao;
+import com.playlet.internal.dao.wallet.WalletCardTransactionDao;
+import com.playlet.internal.dao.wallet.WalletUserDao;
+import com.playlet.internal.entity.wallet.WalletAccountEntity;
+import com.playlet.internal.entity.wallet.WalletBankcardEntity;
+import com.playlet.internal.entity.wallet.WalletCardTransactionEntity;
+import com.playlet.internal.entity.wallet.WalletUserEntity;
+import com.playlet.internal.enums.WalletKycStateEnums;
+import com.playlet.internal.exception.BaseException;
+import com.playlet.internal.query.pub.PageQueryHelperEntity;
+import com.playlet.internal.utils.I18nUtil;
+import com.playlet.internal.utils.PasswordHashUtils;
+import com.playlet.internal.utils.StringUtils;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.regex.Pattern;
+
+/**
+ * 钱包用户：注册编排 + 首页读接口（概要 / 卡列表 / 交易）。
+ */
+@Slf4j
+@Service
+public class WalletUserService extends BaseApiService {
+
+	private static final int STATUS_NORMAL = 1;
+	private static final int ACTIVATION_NOT_YET = 0;
+	private static final Pattern PAY_PASSWORD_PATTERN = Pattern.compile(WalletConstants.PAY_PASSWORD_REGEX);
+
+	@Autowired
+	private ThirdService thirdService;
+	@Autowired
+	private WalletUserDao walletUserDao;
+	@Autowired
+	private WalletAccountDao walletAccountDao;
+	@Autowired
+	private WalletBankcardDao walletBankcardDao;
+	@Autowired
+	private WalletCardTransactionDao walletCardTransactionDao;
+
+	/**
+	 * 本地账号注册成功后调用：开通 U 卡三方用户并写入 P0 表。
+	 *
+	 * @param userType     主体类型：1=C端 2=作家
+	 * @param localUid     本地 app_account.id / creator_account.id
+	 * @param email        注册邮箱
+	 * @param mobilePrefix 区号（可空）
+	 * @param mobileNumber 手机号（可空）
+	 * @return wallet_user
+	 */
+	public WalletUserEntity registerOnSignUp(Integer userType, Integer localUid, String email,
+			String mobilePrefix, String mobileNumber) {
+		if (userType == null || localUid == null) {
+			throw new BaseException("钱包注册参数不完整");
+		}
+		if (StringUtils.isEmpty(email)) {
+			throw new BaseException("email不能为空");
+		}
+		// 幂等：已映射则直接返回
+		WalletUserEntity existed = walletUserDao.findByLocal(userType, localUid);
+		if (existed != null) {
+			log.info("wallet user already exists userType={} localUid={} walletUid={}",
+					userType, localUid, existed.getWalletUid());
+			ensureWalletAccount(existed);
+			return existed;
+		}
+
+		String tel = buildTel(mobilePrefix, mobileNumber);
+		Long walletUid = thirdService.registerUser(email.trim(), tel);
+		Date now = new Date();
+		WalletUserEntity user = new WalletUserEntity();
+		user.setUserType(userType);
+		user.setLocalUid(localUid);
+		user.setWalletUid(walletUid);
+		user.setEmail(email.trim());
+		user.setMobilePrefix(trimToNull(mobilePrefix));
+		user.setMobileNumber(trimToNull(mobileNumber));
+		user.setStatus(STATUS_NORMAL);
+		user.setSetTime(now);
+		user.setGmtModified(now);
+		try {
+			walletUserDao.insert(user);
+		} catch (DuplicateKeyException e) {
+			// 并发下已插入，回读
+			log.warn("wallet user duplicate userType={} localUid={} walletUid={}",
+					userType, localUid, walletUid, e);
+			WalletUserEntity again = walletUserDao.findByLocal(userType, localUid);
+			if (again == null) {
+				throw new BaseException("钱包用户写入失败", e);
+			}
+			ensureWalletAccount(again);
+			return again;
+		}
+		insertWalletAccount(user.getId(), walletUid, now);
+		log.info("wallet register success userType={} localUid={} walletUid={}",
+				userType, localUid, walletUid);
+		return user;
+	}
+
+	/**
+	 * 查询当前主体的钱包信息（不含支付密码）。
+	 */
+	public ResponseBase findInfo(Integer userType, Integer localUid) {
+		WalletUserInfoResp resp = getInfoOrNull(userType, localUid);
+		if (resp == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * 组装钱包概要；未开通返回 null（供 findToken 等嵌套，不打断主流程）。
+	 */
+	public WalletUserInfoResp getInfoOrNull(Integer userType, Integer localUid) {
+		WalletUserEntity user = walletUserDao.findByLocal(userType, localUid);
+		if (user == null) {
+			return null;
+		}
+		WalletAccountEntity account = walletAccountDao.findByWalletUserId(user.getId());
+		WalletUserInfoResp resp = new WalletUserInfoResp();
+		resp.setWalletUserId(user.getId());
+		resp.setWalletUid(user.getWalletUid());
+		resp.setUserType(user.getUserType());
+		resp.setEmail(user.getEmail());
+		resp.setStatus(user.getStatus());
+		resp.setSetTime(user.getSetTime());
+		if (account != null) {
+			// 账户余额缓存：首页顶部可用余额；权威以三方同步为准
+			resp.setAvailableBalance(nvlBalance(account.getAvailableBalance()));
+			resp.setFreezeBalance(nvlBalance(account.getFreezeBalance()));
+			resp.setOpenFreezeBalance(nvlBalance(account.getOpenFreezeBalance()));
+			resp.setCurrency(StringUtils.isEmpty(account.getCurrency())
+					? WalletConstants.DEFAULT_CURRENCY : account.getCurrency());
+			resp.setBalanceSyncTime(account.getBalanceSyncTime());
+			resp.setKycState(account.getKycState());
+			resp.setKycStateName(account.getKycStateName());
+			resp.setKycApiStatus(account.getKycApiStatus());
+			resp.setActivationState(account.getActivationState());
+			resp.setPayPasswordSet(!StringUtils.isEmpty(account.getPayPassword()));
+		} else {
+			resp.setAvailableBalance(BigDecimal.ZERO);
+			resp.setFreezeBalance(BigDecimal.ZERO);
+			resp.setOpenFreezeBalance(BigDecimal.ZERO);
+			resp.setCurrency(WalletConstants.DEFAULT_CURRENCY);
+			resp.setPayPasswordSet(false);
+		}
+		return resp;
+	}
+
+	/**
+	 * 卡片列表：默认卡优先，供首页切换与卡片列表页复用。
+	 */
+	public ResponseBase listCards(Integer userType, Integer localUid) {
+		WalletUserEntity user = walletUserDao.findByLocal(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		List<WalletBankcardEntity> rows = walletBankcardDao.findByWalletUserId(user.getId());
+		if (rows == null || rows.isEmpty()) {
+			return setResultSuccess(Collections.emptyList(), I18nUtil.getMessage("base_success"));
+		}
+		List<WalletCardItemResp> items = new ArrayList<>(rows.size());
+		for (WalletBankcardEntity row : rows) {
+			items.add(toCardItem(row));
+		}
+		return setResultSuccess(items, I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * 交易记录分页：首页传较小 pageSize，点「全部」继续翻页。
+	 */
+	public ResponseBase listTransactions(Integer userType, Integer localUid, PageQueryHelperEntity page) {
+		WalletUserEntity user = walletUserDao.findByLocal(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		if (page == null) {
+			page = new PageQueryHelperEntity();
+		}
+		PageHelper.startPage(page.getPageNumber(), page.getPageSize());
+		List<WalletCardTransactionEntity> rows = walletCardTransactionDao.findByWalletUserId(user.getId());
+		if (rows == null) {
+			rows = new ArrayList<>();
+		}
+		PageInfo<WalletCardTransactionEntity> basePage = new PageInfo<>(rows);
+		List<WalletTransactionItemResp> items = new ArrayList<>(rows.size());
+		for (WalletCardTransactionEntity row : rows) {
+			items.add(toTransactionItem(row));
+		}
+		PageInfo<WalletTransactionItemResp> pageInfo = new PageInfo<>(items);
+		pageInfo.setTotal(basePage.getTotal());
+		pageInfo.setPages(basePage.getPages());
+		pageInfo.setPageNum(basePage.getPageNum());
+		pageInfo.setPageSize(basePage.getPageSize());
+		return setResultSuccess(pageInfo, I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * 首次绑定支付密码。
+	 */
+	public ResponseBase bindPayPassword(Integer userType, Integer localUid, WalletBindPayPwdRequest query) {
+		if (query == null || StringUtils.isEmpty(query.getPayPassword())
+				|| StringUtils.isEmpty(query.getConfirmPayPassword())) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		if (!query.getPayPassword().equals(query.getConfirmPayPassword())) {
+			return setResultError(I18nUtil.getMessage("creator.password_not_match"));
+		}
+		if (!PAY_PASSWORD_PATTERN.matcher(query.getPayPassword()).matches()) {
+			return setResultError(I18nUtil.getMessage("wallet.pay_password_invalid"));
+		}
+		WalletUserEntity user = walletUserDao.findByLocal(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		WalletAccountEntity account = walletAccountDao.findByWalletUserId(user.getId());
+		if (account == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		if (!StringUtils.isEmpty(account.getPayPassword())) {
+			return setResultError(I18nUtil.getMessage("wallet.pay_password_already_set"));
+		}
+		String hashed = PasswordHashUtils.encode(query.getPayPassword());
+		int rows;
+		try {
+			rows = walletAccountDao.bindPayPassword(account.getId(), hashed);
+		} catch (Exception e) {
+			log.error("wallet bind pay password failed walletUserId={} localUid={}", user.getId(), localUid, e);
+			throw new BaseException("操作失败", e);
+		}
+		if (rows <= 0) {
+			return setResultError(I18nUtil.getMessage("wallet.pay_password_already_set"));
+		}
+		log.info("wallet pay password bound walletUserId={} localUid={} userType={}",
+				user.getId(), localUid, userType);
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	/** 若缺 wallet_account 则补建（幂等保护） */
+	private void ensureWalletAccount(WalletUserEntity user) {
+		if (walletAccountDao.findByWalletUserId(user.getId()) != null) {
+			return;
+		}
+		insertWalletAccount(user.getId(), user.getWalletUid(), new Date());
+	}
+
+	private void insertWalletAccount(Long walletUserId, Long walletUid, Date now) {
+		WalletAccountEntity account = new WalletAccountEntity();
+		account.setWalletUserId(walletUserId);
+		account.setWalletUid(walletUid);
+		account.setKycState(WalletKycStateEnums.WAIT_APPROVE.getCode());
+		account.setKycStateName(WalletKycStateEnums.WAIT_APPROVE.getLabel());
+		account.setKycApiStatus("uncommitted");
+		account.setActivationState(ACTIVATION_NOT_YET);
+		// 账户余额初始为 0，后续由三方同步刷新
+		account.setAvailableBalance(BigDecimal.ZERO);
+		account.setFreezeBalance(BigDecimal.ZERO);
+		account.setOpenFreezeBalance(BigDecimal.ZERO);
+		account.setCurrency(WalletConstants.DEFAULT_CURRENCY);
+		account.setSetTime(now);
+		account.setGmtModified(now);
+		try {
+			walletAccountDao.insert(account);
+		} catch (DuplicateKeyException e) {
+			log.warn("wallet account already exists walletUserId={} walletUid={}", walletUserId, walletUid);
+		}
+	}
+
+	private static String buildTel(String mobilePrefix, String mobileNumber) {
+		if (StringUtils.isEmpty(mobileNumber)) {
+			return null;
+		}
+		String number = mobileNumber.trim();
+		if (StringUtils.isEmpty(mobilePrefix)) {
+			return number;
+		}
+		String prefix = mobilePrefix.trim();
+		if (prefix.startsWith("+")) {
+			return prefix + number;
+		}
+		return "+" + prefix + number;
+	}
+
+	private static String trimToNull(String value) {
+		if (StringUtils.isEmpty(value)) {
+			return null;
+		}
+		String trimmed = value.trim();
+		return trimmed.isEmpty() ? null : trimmed;
+	}
+
+	private static BigDecimal nvlBalance(BigDecimal value) {
+		return value == null ? BigDecimal.ZERO : value;
+	}
+
+	private static WalletCardItemResp toCardItem(WalletBankcardEntity row) {
+		WalletCardItemResp item = new WalletCardItemResp();
+		item.setId(row.getId());
+		item.setUserBankcardId(row.getUserBankcardId());
+		item.setDisplayName(buildCardDisplayName(row));
+		item.setCardNo(row.getCardNo());
+		item.setCardBrand(row.getCardBrand());
+		item.setBankcardNature(row.getBankcardNature());
+		item.setCurrency(StringUtils.isEmpty(row.getCurrency())
+				? WalletConstants.DEFAULT_CURRENCY : row.getCurrency());
+		item.setCardStatus(row.getCardStatus());
+		item.setCardStatusName(row.getCardStatusName());
+		item.setBalance(nvlBalance(row.getBalance()));
+		item.setIsDefault(row.getIsDefault() == null ? WalletConstants.CARD_DEFAULT_NO : row.getIsDefault());
+		item.setPinSet(row.getPinSet());
+		item.setTagName(row.getTagName());
+		item.setSetTime(row.getSetTime());
+		return item;
+	}
+
+	/** 优先自定义标签，否则 品牌-尾号 */
+	private static String buildCardDisplayName(WalletBankcardEntity row) {
+		if (!StringUtils.isEmpty(row.getTagName())) {
+			return row.getTagName();
+		}
+		String brand = StringUtils.isEmpty(row.getCardBrand()) ? "Card" : row.getCardBrand();
+		String tail = last4(row.getCardNo());
+		if (StringUtils.isEmpty(tail)) {
+			return brand;
+		}
+		return brand + "-" + tail;
+	}
+
+	private static String last4(String cardNo) {
+		if (StringUtils.isEmpty(cardNo)) {
+			return "";
+		}
+		String digits = cardNo.replaceAll("\\D", "");
+		if (digits.length() >= 4) {
+			return digits.substring(digits.length() - 4);
+		}
+		String trimmed = cardNo.trim();
+		if (trimmed.length() >= 4) {
+			return trimmed.substring(trimmed.length() - 4);
+		}
+		return trimmed;
+	}
+
+	private static WalletTransactionItemResp toTransactionItem(WalletCardTransactionEntity row) {
+		WalletTransactionItemResp item = new WalletTransactionItemResp();
+		item.setId(row.getId());
+		item.setWalletBankcardId(row.getWalletBankcardId());
+		item.setTitle(StringUtils.isEmpty(row.getTitle()) ? row.getBizType() : row.getTitle());
+		item.setBizType(row.getBizType());
+		item.setTransType(row.getTransType());
+		item.setOrderState(row.getOrderState());
+		item.setOrderStateName(row.getOrderStateName());
+		item.setAmount(toDisplayAmount(row));
+		item.setCurrency(resolveTxnCurrency(row));
+		item.setCardNo(row.getCardNo());
+		item.setSetTime(row.getSetTime());
+		return item;
+	}
+
+	/** 展示金额：优先交易币金额，支出类取负 */
+	private static BigDecimal toDisplayAmount(WalletCardTransactionEntity row) {
+		BigDecimal raw = row.getTransCurrencyAmt() != null ? row.getTransCurrencyAmt() : row.getLocalCurrencyAmt();
+		if (raw == null) {
+			return BigDecimal.ZERO;
+		}
+		BigDecimal abs = raw.abs();
+		if (isExpenseBiz(row.getBizType())) {
+			return abs.negate();
+		}
+		return abs;
+	}
+
+	private static boolean isExpenseBiz(String bizType) {
+		if (StringUtils.isEmpty(bizType)) {
+			return false;
+		}
+		return WalletConstants.BIZ_WITHDRAW.equalsIgnoreCase(bizType)
+				|| WalletConstants.BIZ_AUTH.equalsIgnoreCase(bizType)
+				|| WalletConstants.BIZ_CLOSE.equalsIgnoreCase(bizType)
+				|| WalletConstants.BIZ_APPLY.equalsIgnoreCase(bizType);
+	}
+
+	private static String resolveTxnCurrency(WalletCardTransactionEntity row) {
+		if (!StringUtils.isEmpty(row.getTransCurrency())) {
+			return row.getTransCurrency();
+		}
+		if (!StringUtils.isEmpty(row.getLocalCurrency())) {
+			return row.getLocalCurrency();
+		}
+		return WalletConstants.DEFAULT_CURRENCY;
+	}
+}

@@ -1,0 +1,50 @@
+package com.playlet.internal.dao.wallet;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.playlet.internal.entity.wallet.WalletAccountEntity;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
+import org.springframework.stereotype.Repository;
+
+import java.math.BigDecimal;
+
+/**
+ * 钱包账户（KYC / 开卡 / 余额缓存）。
+ */
+@Repository
+public interface WalletAccountDao extends BaseMapper<WalletAccountEntity> {
+
+	@Select("select * from wallet_account where wallet_user_id = #{walletUserId} limit 1")
+	WalletAccountEntity findByWalletUserId(@Param("walletUserId") Long walletUserId);
+
+	@Select("select * from wallet_account where wallet_uid = #{walletUid} limit 1")
+	WalletAccountEntity findByWalletUid(@Param("walletUid") Long walletUid);
+
+	/** 更新 KYC 状态 */
+	@Update("update wallet_account set kyc_state = #{kycState}, kyc_state_name = #{kycStateName}, "
+			+ "kyc_api_status = #{kycApiStatus}, kyc_audit_result = #{kycAuditResult}, gmtModified = now() "
+			+ "where wallet_user_id = #{walletUserId}")
+	int updateKycStatus(@Param("walletUserId") Long walletUserId, @Param("kycState") Integer kycState,
+			@Param("kycStateName") String kycStateName, @Param("kycApiStatus") String kycApiStatus,
+			@Param("kycAuditResult") String kycAuditResult);
+
+	/** 标记已开卡激活 */
+	@Update("update wallet_account set activation_state = 1, activation_time = now(), gmtModified = now() "
+			+ "where wallet_user_id = #{walletUserId} and activation_state = 0")
+	int markActivated(@Param("walletUserId") Long walletUserId);
+
+	/** 首次绑定支付密码（仅未设置时） */
+	@Update("update wallet_account set pay_password = #{payPassword}, pay_password_set_time = now(), "
+			+ "gmtModified = now() where id = #{id} and pay_password is null")
+	int bindPayPassword(@Param("id") Long id, @Param("payPassword") String payPassword);
+
+	/** 同步账户余额缓存（三方查询/回调后写入） */
+	@Update("update wallet_account set available_balance = #{availableBalance}, freeze_balance = #{freezeBalance}, "
+			+ "open_freeze_balance = #{openFreezeBalance}, currency = #{currency}, "
+			+ "balance_sync_time = now(), gmtModified = now() where id = #{id}")
+	int syncBalance(@Param("id") Long id, @Param("availableBalance") BigDecimal availableBalance,
+			@Param("freezeBalance") BigDecimal freezeBalance,
+			@Param("openFreezeBalance") BigDecimal openFreezeBalance,
+			@Param("currency") String currency);
+}

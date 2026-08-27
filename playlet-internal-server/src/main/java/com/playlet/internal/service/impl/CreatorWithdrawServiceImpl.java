@@ -1,5 +1,6 @@
 package com.playlet.internal.service.impl;
 
+import com.playlet.internal.api.request.WalletBindPayPwdRequest;
 import com.playlet.internal.api.request.WithdrawReqEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
@@ -9,6 +10,7 @@ import com.playlet.internal.query.pub.PageQueryHelperEntity;
 import com.playlet.internal.service.CreatorWithdrawService;
 import com.playlet.internal.service.support.CreatorRevenueBizService;
 import com.playlet.internal.service.support.WithdrawBizService;
+import com.playlet.internal.service.third.WalletUserService;
 import com.playlet.internal.utils.CreatorTokenUtil;
 import com.playlet.internal.utils.I18nUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +31,8 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 	private WithdrawBizService withdrawBizService;
 	@Autowired
 	private CreatorRevenueBizService creatorRevenueBizService;
+	@Autowired
+	private WalletUserService walletUserService;
 
 	@Override
 	public ResponseBase revenueSummary(HttpServletRequest request) {
@@ -74,5 +78,32 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
 		return setResultSuccess(creatorRevenueBizService.fundRecords(uid, page), I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	public ResponseBase bindPayPwd(@RequestBody WalletBindPayPwdRequest query, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.bindPayPassword(WithdrawUserTypeEnums.CREATOR.getCode(), uid, query);
+	}
+
+	@Override
+	public ResponseBase cardList(HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.listCards(WithdrawUserTypeEnums.CREATOR.getCode(), uid);
+	}
+
+	@Override
+	public ResponseBase transactionList(PageQueryHelperEntity page, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.listTransactions(WithdrawUserTypeEnums.CREATOR.getCode(), uid, page);
 	}
 }

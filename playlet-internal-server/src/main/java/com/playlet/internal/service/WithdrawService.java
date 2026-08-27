@@ -1,6 +1,7 @@
 package com.playlet.internal.service;
 
 import com.playlet.internal.api.request.OnePayWithdrawCallbackRequest;
+import com.playlet.internal.api.request.WalletBindPayPwdRequest;
 import com.playlet.internal.api.request.WithdrawReqEntity;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
@@ -35,4 +36,16 @@ public interface WithdrawService {
 	@GetMapping("/withdraw/records")
 	@ApiOperation(value = "提现记录", notes = "分页；地址脱敏；需登录")
 	ResponseBase withdrawRecords(PageQueryHelperEntity page, HttpServletRequest request);
+
+	@PostMapping("/user/bindPayPwd")
+	@ApiOperation(value = "绑定支付密码", notes = "首次设置，6位数字；需登录。已设置不可重复绑定。")
+	ResponseBase bindPayPwd(@RequestBody WalletBindPayPwdRequest query, HttpServletRequest request);
+
+	@GetMapping("/card/list")
+	@ApiOperation(value = "卡片列表", notes = "默认卡优先；首页切换与卡片列表页复用；需登录")
+	ResponseBase cardList(HttpServletRequest request);
+
+	@GetMapping("/transaction/list")
+	@ApiOperation(value = "交易记录", notes = "分页；首页可用较小 pageSize，点全部继续翻页；需登录")
+	ResponseBase transactionList(PageQueryHelperEntity page, HttpServletRequest request);
 }

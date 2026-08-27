@@ -17,6 +17,9 @@ public interface UserWithdrawOrderDao extends BaseMapper<UserWithdrawOrderEntity
 	@Select("select * from user_withdraw_order where order_no = #{orderNo} limit 1")
 	UserWithdrawOrderEntity findByOrderNo(@Param("orderNo") String orderNo);
 
+	@Select("select * from user_withdraw_order where request_order_id = #{requestOrderId} limit 1")
+	UserWithdrawOrderEntity findByRequestOrderId(@Param("requestOrderId") String requestOrderId);
+
 	@Select("select * from user_withdraw_order where uid = #{uid} and user_type = #{userType} "
 			+ "order by setTime desc, id desc")
 	List<UserWithdrawOrderEntity> findByUid(@Param("uid") Integer uid, @Param("userType") Integer userType);

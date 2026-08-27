@@ -19,6 +19,7 @@ import com.playlet.internal.entity.account.AppOauthAccountEntity;
 import com.playlet.internal.entity.account.AppPushDeviceEntity;
 import com.playlet.internal.entity.template.EmailTemplateEntity;
 import com.playlet.internal.enums.*;
+import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.filter.JWTAuthenticationFilter;
 import com.playlet.internal.query.account.BindPushQuery;
 import com.playlet.internal.query.account.PushSwitchQuery;
@@ -29,11 +30,13 @@ import com.playlet.internal.service.support.AppOnePayBindOps;
 import com.playlet.internal.service.support.OnePayBindService;
 import com.playlet.internal.service.support.UserActiveStatService;
 import com.playlet.internal.service.support.UserOnlineHeartbeatService;
+import com.playlet.internal.service.third.WalletUserService;
 import com.playlet.internal.utils.*;
 import com.playlet.internal.utils.oidc.OidcIdTokenPayload;
 import com.playlet.internal.utils.oidc.OidcTokenVerifier;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.InvalidKeyException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -97,57 +100,67 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	@Autowired
 	private UserActiveStatService userActiveStatService;
 
+	@Autowired
+	private WalletUserService walletUserService;
+
 	@SuppressWarnings("deprecation")
 	@Override
 	public ResponseBase signUp(@RequestBody AppAccountEntity entity) {
-		if (entity == null || StringUtils.isEmpty(entity.getUserEmail())
-				|| StringUtils.isEmpty(entity.getUserPassword())) {
-			return setResultError(I18nUtil.getMessage("base_error"));
-		}
-		// 校验邮箱验证码
-		if (!verifyCode(entity.getUserEmail(), entity.getEmailCode())) {
-			return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
-		}
-		// 邮箱唯一性校验
-		if (appAccountDao.findByEmail(entity.getUserEmail()) != null) {
-			return setResultError(I18nUtil.getMessage("user.account_exist"));
-		}
-		AppAccountEntity account = new AppAccountEntity();
-		account.setUserAccount(entity.getUserEmail());
-		account.setUserEmail(entity.getUserEmail());
-		account.setUserPassword(PasswordHashUtils.encode(entity.getUserPassword()));
-		account.setMobileNumber(entity.getMobileNumber());
-		account.setMobilePrefix(entity.getMobilePrefix());
-		Long seed = Long.parseLong(
-				System.currentTimeMillis() +
-						String.format("%04d", ThreadLocalRandom.current().nextInt(1000, 9999))
-		);
-		account.setInvitationCode(RandomSuffixInviteCodeUtil.generateUniqueCode(seed, 4, 6));
-		account.setRegisterSource(2);
-		account.setRegistrationId(resolveRegistrationId(entity.getRegistrationId(), entity.getCid()));
-		if (!StringUtils.isEmpty(entity.getDeviceName())) {
-			account.setDeviceName(entity.getDeviceName().trim());
-		}
-		account.setUserState(UserStateEnums.NORMAL.getIndex());
-		String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMddHHmmss"));
-		int randomNum = ThreadLocalRandom.current().nextInt(100, 999);
-		account.setNickname("user_" + timestamp + randomNum);
-		account.setSetTime(new Date());
-		account.setGmtModified(new Date());
-		appAccountDao.insert(account);
-		upsertPushBind(account.getId(), account.getRegistrationId(), account.getDeviceName());
-		String token = Jwts.builder()
-				// 设置主题
-				.setSubject(entity.getUserAccount())
-				// 设置到期时间
-				.setExpiration(new Date(System.currentTimeMillis() + Constants.USER_JWT_EXPIRE_TIME))
-				// 选择 加密算法和私钥
-				.signWith(SignatureAlgorithm.HS512, Constants.SIGNING_KEY).compact();
-		redisUtil.set(Constants.APP_PACKAGE_NAME + entity.getUserAccount(),
-				Constants.AUTH_HEADER_START_WITH + token, Constants.USER_REDIS_EXPIRE_TIME / 1000);
-		return setResultSuccess(Constants.AUTH_HEADER_START_WITH + token,
-				I18nUtil.getMessage("base_success"));
-	}
+        try {
+            if (entity == null || StringUtils.isEmpty(entity.getUserEmail())
+                    || StringUtils.isEmpty(entity.getUserPassword())) {
+                return setResultError(I18nUtil.getMessage("base_error"));
+            }
+            // 校验邮箱验证码
+            if (!verifyCode(entity.getUserEmail(), entity.getEmailCode())) {
+                return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
+            }
+            // 邮箱唯一性校验
+            if (appAccountDao.findByEmail(entity.getUserEmail()) != null) {
+                return setResultError(I18nUtil.getMessage("user.account_exist"));
+            }
+            AppAccountEntity account = new AppAccountEntity();
+            account.setUserAccount(entity.getUserEmail());
+            account.setUserEmail(entity.getUserEmail());
+            account.setUserPassword(PasswordHashUtils.encode(entity.getUserPassword()));
+            account.setMobileNumber(entity.getMobileNumber());
+            account.setMobilePrefix(entity.getMobilePrefix());
+            Long seed = Long.parseLong(
+                    System.currentTimeMillis() +
+                            String.format("%04d", ThreadLocalRandom.current().nextInt(1000, 9999))
+            );
+            account.setInvitationCode(RandomSuffixInviteCodeUtil.generateUniqueCode(seed, 4, 6));
+            account.setRegisterSource(2);
+            account.setRegistrationId(resolveRegistrationId(entity.getRegistrationId(), entity.getCid()));
+            if (!StringUtils.isEmpty(entity.getDeviceName())) {
+                account.setDeviceName(entity.getDeviceName().trim());
+            }
+            account.setUserState(UserStateEnums.NORMAL.getIndex());
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMddHHmmss"));
+            int randomNum = ThreadLocalRandom.current().nextInt(100, 999);
+            account.setNickname("user_" + timestamp + randomNum);
+            account.setSetTime(new Date());
+            account.setGmtModified(new Date());
+            appAccountDao.insert(account);
+            // 本地账号落库后开通钱包三方用户（P0：wallet_user / wallet_account）
+            walletUserService.registerOnSignUp(WithdrawUserTypeEnums.APP.getCode(), account.getId(),
+                    account.getUserEmail(), account.getMobilePrefix(), account.getMobileNumber());
+            upsertPushBind(account.getId(), account.getRegistrationId(), account.getDeviceName());
+            String token = Jwts.builder()
+                    // 设置主题
+                    .setSubject(entity.getUserAccount())
+                    // 设置到期时间
+                    .setExpiration(new Date(System.currentTimeMillis() + Constants.USER_JWT_EXPIRE_TIME))
+                    // 选择 加密算法和私钥
+                    .signWith(SignatureAlgorithm.HS512, Constants.SIGNING_KEY).compact();
+            redisUtil.set(Constants.APP_PACKAGE_NAME + entity.getUserAccount(),
+                    Constants.AUTH_HEADER_START_WITH + token, Constants.USER_REDIS_EXPIRE_TIME / 1000);
+            return setResultSuccess(Constants.AUTH_HEADER_START_WITH + token,
+                    I18nUtil.getMessage("base_success"));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 
 	@SuppressWarnings("deprecation")
 	@Override
@@ -359,6 +372,9 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			//entity.setInvitationCode(RandomSuffixInviteCodeUtil.generateUniqueCode(Long.parseLong(entity.getId().toString()), 4, 6));
 			GenericityUtil.setDate(entity);
 			appAccountDao.insert(entity);
+			// 一键登录新建账号同样开通钱包
+			walletUserService.registerOnSignUp(WithdrawUserTypeEnums.APP.getCode(), entity.getId(),
+					entity.getUserEmail(), entity.getMobilePrefix(), entity.getMobileNumber());
 		} catch (Exception e) {
 			log.error("service error", e);
 			throw new RuntimeException(e);
@@ -394,6 +410,9 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			}
 			String avatar = entity.getAvatar();
 			entity.setAvatar(mediaUrlService.sign(avatar));
+			// C 端钱包概要并入 findToken，未开通则为 null
+			entity.setWalletInfo(walletUserService.getInfoOrNull(
+					WithdrawUserTypeEnums.APP.getCode(), entity.getId()));
 			return setResultSuccess(entity);
 		} catch (Exception e) {
 			log.error("service error", e);

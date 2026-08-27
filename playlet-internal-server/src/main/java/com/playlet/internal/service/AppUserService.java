@@ -37,7 +37,7 @@ public interface AppUserService {
     ResponseBase oneClickLogin(AppAccountEntity entity, HttpServletRequest req);
 	    
 	@GetMapping("/findToken")
-	@ApiOperation(value = "根据token获取用户信息", notes = "根据token获取用户信息", response = ResponseBase.class)
+	@ApiOperation(value = "根据token获取用户信息", notes = "含关注/粉丝/获赞，以及钱包概要 walletInfo（未开通为 null）", response = ResponseBase.class)
 	ResponseBase findToken(HttpServletRequest request);
 
     @GetMapping("/sendEmailCode")
