@@ -11,7 +11,7 @@ import java.util.List;
  * 作家收益管理首页概览。
  */
 @Data
-@ApiModel(value = "作家收益概览", description = "今日/累计/待结算金币及 OnePay 结算账户")
+@ApiModel(value = "作家收益概览", description = "今日/累计/待结算金币及 U 卡结算账户")
 public class CreatorRevenueSummaryRespEntity {
 
 	@ApiModelProperty("今日收益（金币）")

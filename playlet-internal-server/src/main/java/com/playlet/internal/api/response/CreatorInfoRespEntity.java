@@ -49,12 +49,6 @@ public class CreatorInfoRespEntity {
 	@ApiModelProperty("身份 1个人 2机构")
 	private Integer identityType;
 
-	@ApiModelProperty("OnePay 账号")
-	private String onepayAccount;
-
-	@ApiModelProperty("OnePay 0未绑定 1已绑定")
-	private Integer onepayBindStatus;
-
 	@ApiModelProperty("账单地址")
 	private String billAddress;
 

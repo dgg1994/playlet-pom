@@ -1,7 +1,6 @@
 package com.playlet.internal.service;
 
 
-import com.playlet.internal.api.request.OnePayBindVerifyRequest;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.entity.account.AppAccountEntity;
 import com.playlet.internal.query.account.BindPushQuery;
@@ -64,16 +63,6 @@ public interface AppUserService {
 			+ "可传 nickname、avatar、gender（0未知/1男/2女）、birthMonth（yyyy-MM）。",
 			response = ResponseBase.class)
     ResponseBase update(AppAccountEntity entity, HttpServletRequest request);
-
-	@PostMapping("/bindOnePay")
-	@ApiOperation(value = "绑定OnePay帐号", notes = "需登录。verificationCode 为登录邮箱验证码（先调 sendEmailCode）；"
-			+ "account 为 OnePay 账号，提交三方校验。已绑定需先解绑。")
-	ResponseBase bindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request);
-
-	@PostMapping("/unBindOnePay")
-	@ApiOperation(value = "解除绑定OnePay帐号", notes = "需登录。verificationCode 为登录邮箱验证码；"
-			+ "account 须与当前绑定账号一致。有进行中提现时不可解绑。")
-	ResponseBase unBindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request);
 
     @PostMapping("/bindPush")
     @ApiOperation(value = "绑定极光推送", notes = "无需登录。App 启动后上报 cid 或 registrationId；可选 deviceName。"

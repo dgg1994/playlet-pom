@@ -9,7 +9,6 @@ import com.playlet.internal.api.request.BankcardUpdateStatusRequest;
 import com.playlet.internal.api.request.BankcardUserIdRequest;
 import com.playlet.internal.api.request.KycApplyRequest;
 import com.playlet.internal.api.request.KycCountryListRequest;
-import com.playlet.internal.api.request.OnePayWithdrawCallbackRequest;
 import com.playlet.internal.api.request.WalletApplyCardRequest;
 import com.playlet.internal.api.request.WalletBindPayPwdRequest;
 import com.playlet.internal.api.request.WithdrawReqEntity;
@@ -36,12 +35,8 @@ public interface WithdrawService {
 	ResponseBase withdrawHome(HttpServletRequest request);
 
 	@PostMapping("/withdraw")
-	@ApiOperation(value = "提现", notes = "需登录且已绑定 OnePay。提交后冻结金币，OnePay 确认到账后再扣减。")
+	@ApiOperation(value = "提现", notes = "需登录且 U 卡就绪（KYC 通过 + 可用卡）。提交后冻结金币，充值到账后扣减。")
 	ResponseBase withdraw(@RequestBody WithdrawReqEntity query, HttpServletRequest request);
-
-	@PostMapping("/onepay/callback")
-	@ApiOperation(value = "OnePay 提现回调", notes = "无需登录；success=1 解冻并扣减，success=0 仅解冻")
-	ResponseBase onepayCallback(@RequestBody OnePayWithdrawCallbackRequest query);
 
 	@GetMapping("/withdraw/records")
 	@ApiOperation(value = "提现记录", notes = "分页；地址脱敏；需登录")

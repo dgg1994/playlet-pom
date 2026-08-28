@@ -43,9 +43,6 @@ public class CreatorSignUpQuery {
 	@ApiModelProperty(name = "idCardBack", value = "证件背面图")
 	private String idCardBack;
 
-	@ApiModelProperty(name = "onepayAccount", value = "已废弃：请调用 bindOnePay")
-	private String onepayAccount;
-
 	@ApiModelProperty(name = "billAddress", value = "账单寄送地址")
 	private String billAddress;
 

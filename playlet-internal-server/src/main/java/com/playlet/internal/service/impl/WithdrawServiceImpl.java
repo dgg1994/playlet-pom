@@ -9,17 +9,14 @@ import com.playlet.internal.api.request.BankcardUpdateStatusRequest;
 import com.playlet.internal.api.request.BankcardUserIdRequest;
 import com.playlet.internal.api.request.KycApplyRequest;
 import com.playlet.internal.api.request.KycCountryListRequest;
-import com.playlet.internal.api.request.OnePayWithdrawCallbackRequest;
 import com.playlet.internal.api.request.WalletApplyCardRequest;
 import com.playlet.internal.api.request.WalletBindPayPwdRequest;
 import com.playlet.internal.api.request.WithdrawReqEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
-import com.playlet.internal.constants.WithdrawConstants;
 import com.playlet.internal.enums.WithdrawUserTypeEnums;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
-import com.playlet.internal.service.WithdrawPayoutService;
 import com.playlet.internal.service.WithdrawService;
 import com.playlet.internal.service.support.WithdrawBizService;
 import com.playlet.internal.service.third.WalletUserService;
@@ -45,8 +42,6 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 	@Autowired
 	private WithdrawBizService withdrawBizService;
 	@Autowired
-	private WithdrawPayoutService withdrawPayoutService;
-	@Autowired
 	private WalletUserService walletUserService;
 
 	@Override
@@ -63,19 +58,6 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 		}
 		Integer points = query == null ? null : query.getPoints();
 		return withdrawBizService.submit(uid, points, WithdrawUserTypeEnums.APP);
-	}
-
-	@Override
-	public ResponseBase onepayCallback(@RequestBody OnePayWithdrawCallbackRequest query) {
-		if (query == null || StringUtils.isEmpty(query.getOrderNo())
-				|| query.getSuccess() == null) {
-			return setResultError(I18nUtil.getMessage("base_error"));
-		}
-		boolean success = query.getSuccess() == WithdrawConstants.CALLBACK_SUCCESS;
-		log.info("onepay withdraw callback orderNo={} success={}", query.getOrderNo(), query.getSuccess());
-		withdrawPayoutService.handleCallback(query.getOrderNo(), success,
-				query.getThirdOrderNo(), query.getFailReason());
-		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
 	@Override

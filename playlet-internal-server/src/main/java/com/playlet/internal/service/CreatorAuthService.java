@@ -1,6 +1,5 @@
 package com.playlet.internal.service;
 
-import com.playlet.internal.api.request.OnePayBindVerifyRequest;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.query.creator.CreatorForgetPwdQuery;
 import com.playlet.internal.query.creator.CreatorLoginQuery;
@@ -29,7 +28,7 @@ public interface CreatorAuthService {
 	@GetMapping("/sendEmailCode")
 	@ApiImplicitParams({
 			@ApiImplicitParam(name = "userAccount", value = "登录邮箱", required = true, dataType = "String", paramType = "query"),
-			@ApiImplicitParam(name = "scene", value = "场景：1注册 2找回密码 3绑定/解绑OnePay，默认1", required = false, dataType = "Integer", paramType = "query")
+			@ApiImplicitParam(name = "scene", value = "场景：1注册 2找回密码，默认1", required = false, dataType = "Integer", paramType = "query")
 	})
 	@ApiOperation("发送邮箱验证码")
 	ResponseBase sendEmailCode(@RequestParam("userAccount") String userAccount,
@@ -62,14 +61,4 @@ public interface CreatorAuthService {
 	@GetMapping("/signOut")
 	@ApiOperation("退出登录")
 	ResponseBase signOut(HttpServletRequest request);
-
-	@PostMapping("/bindOnePay")
-	@ApiOperation(value = "绑定OnePay帐号", notes = "需登录。verificationCode 为登录邮箱验证码（先调 sendEmailCode scene=3）；"
-			+ "account 为 OnePay 账号，提交三方校验。已绑定需先解绑。")
-	ResponseBase bindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request);
-
-	@PostMapping("/unBindOnePay")
-	@ApiOperation(value = "解除绑定OnePay帐号", notes = "需登录。verificationCode 为登录邮箱验证码；"
-			+ "account 须与当前绑定账号一致。有进行中提现时不可解绑。")
-	ResponseBase unBindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request);
 }

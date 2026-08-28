@@ -27,7 +27,7 @@ import com.playlet.internal.api.response.ThirdUserBankcardResp;
 import com.playlet.internal.api.response.ThirdUserRegisterResp;
 import com.playlet.internal.config.ThirdPartyProperties;
 import com.playlet.internal.constants.Constants;
-import com.playlet.internal.constants.OnePayApiPaths;
+import com.playlet.internal.constants.WalletApiPaths;
 import com.playlet.internal.constants.WalletConstants;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.utils.RsaSignUtil;
@@ -85,7 +85,7 @@ public class ThirdService {
 		if (!StringUtils.isEmpty(tel)) {
 			body.setTel(tel.trim());
 		}
-		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.REGISTER_PATH;
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.REGISTER_PATH;
 		log.info("third party register start email={}", maskEmail(email));
 		JsonNode data = exchange(HttpMethod.POST, url, body, null, "三方用户注册");
 		ThirdUserRegisterResp resp = treeToValue(data, ThirdUserRegisterResp.class, "三方用户注册");
@@ -107,7 +107,7 @@ public class ThirdService {
 		if (!StringUtils.isEmpty(name)) {
 			body.setName(name.trim());
 		}
-		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.COUNTRY_PATH;
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.COUNTRY_PATH;
 		log.info("third party kyc country list start name={}", StringUtils.isEmpty(name) ? "ALL" : name.trim());
 		JsonNode data = exchange(HttpMethod.POST, url, body, null, "KYC国家列表");
 		if (data == null || data.isNull()) {
@@ -128,7 +128,7 @@ public class ThirdService {
 		if (uid == null) {
 			throw new BaseException("uid不能为空");
 		}
-		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.KYC_STATUS_PATH;
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.KYC_STATUS_PATH;
 		log.info("third party kyc status start uid={}", uid);
 		// GET 无 body，签名仅含 appId/nonce/timestamp
 		JsonNode data = exchange(HttpMethod.GET, url, null, String.valueOf(uid), "查询KYC状态");
@@ -154,7 +154,7 @@ public class ThirdService {
 			throw new BaseException("KYC提交参数不能为空");
 		}
 		validateKycApply(body);
-		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.KYC_APPLY_PATH;
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.KYC_APPLY_PATH;
 		log.info("third party kyc apply start uid={} nationCode={} countryCode={}",
 				uid, body.getNationCode(), body.getCountryCode());
 		exchange(HttpMethod.POST, url, body, String.valueOf(uid), "提交KYC信息");
@@ -165,7 +165,7 @@ public class ThirdService {
 	 * 商户可用卡产品列表。文档：GET /api/bankcard/merchant/card/list
 	 */
 	public List<ThirdBankcardProductResp> listCardProducts() {
-		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_PRODUCT_LIST_PATH;
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.CARD_PRODUCT_LIST_PATH;
 		log.info("third party card product list start");
 		JsonNode data = exchange(HttpMethod.GET, url, null, null, "卡产品列表");
 		return parseList(data, ThirdBankcardProductResp.class);
@@ -177,7 +177,7 @@ public class ThirdService {
 	 */
 	public List<ThirdUserBankcardResp> listUserCards(Long uid) {
 		requireUid(uid);
-		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_USER_LIST_PATH;
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.CARD_USER_LIST_PATH;
 		log.info("third party user card list start uid={}", uid);
 		JsonNode data = exchange(HttpMethod.GET, url, null, String.valueOf(uid), "用户卡列表");
 		List<ThirdUserBankcardResp> list = parseList(data, ThirdUserBankcardResp.class);
@@ -193,7 +193,7 @@ public class ThirdService {
 		if (body == null || body.getProductId() == null) {
 			throw new BaseException("productId不能为空");
 		}
-		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_APPLY_PATH;
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.CARD_APPLY_PATH;
 		log.info("third party card apply start uid={} productId={}", uid, body.getProductId());
 		JsonNode data = exchange(HttpMethod.POST, url, body, String.valueOf(uid), "申请银行卡");
 		ThirdBankcardApplyResp resp = treeToValue(data, ThirdBankcardApplyResp.class, "申请银行卡");
@@ -213,7 +213,7 @@ public class ThirdService {
 		if (body == null || StringUtils.isEmpty(body.getCardNo()) || StringUtils.isEmpty(body.getVerifyCode())) {
 			throw new BaseException("cardNo/verifyCode不能为空");
 		}
-		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_CAN_ACTIVE_PATH;
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.CARD_CAN_ACTIVE_PATH;
 		log.info("third party card canActive start uid={}", uid);
 		JsonNode data = exchange(HttpMethod.POST, url, body, String.valueOf(uid), "银行卡是否可激活");
 		return treeToValue(data, ThirdBankcardCanActiveResp.class, "银行卡是否可激活");
@@ -225,7 +225,7 @@ public class ThirdService {
 	public ThirdBankcardActiveResp activeBankcard(Long uid, BankcardActiveRequest body) {
 		requireUid(uid);
 		validateActive(body);
-		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_ACTIVE_PATH;
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.CARD_ACTIVE_PATH;
 		log.info("third party card active start uid={} productId={}", uid, body.getProductId());
 		JsonNode data = exchange(HttpMethod.POST, url, body, String.valueOf(uid), "银行卡激活");
 		ThirdBankcardActiveResp resp = treeToValue(data, ThirdBankcardActiveResp.class, "银行卡激活");
@@ -241,7 +241,7 @@ public class ThirdService {
 		if (body == null || body.getUserBankcardId() == null || StringUtils.isEmpty(body.getPin())) {
 			throw new BaseException("userBankcardId/pin不能为空");
 		}
-		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_SET_PIN_PATH;
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.CARD_SET_PIN_PATH;
 		log.info("third party card setPin start uid={} userBankcardId={}", uid, body.getUserBankcardId());
 		// BankcardSetPinRequest.pin 为 WRITE_ONLY，不能直接作为出站 body 序列化
 		Map<String, Object> thirdBody = new LinkedHashMap<>();
@@ -257,7 +257,7 @@ public class ThirdService {
 	public ThirdBankcardBalanceResp getBankcardBalance(Long uid, Long userBankcardId) {
 		requireUid(uid);
 		BankcardUserIdRequest body = requireUserBankcardId(userBankcardId);
-		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_GET_BALANCE_PATH;
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.CARD_GET_BALANCE_PATH;
 		log.info("third party card balance start uid={} userBankcardId={}", uid, userBankcardId);
 		JsonNode data = exchange(HttpMethod.POST, url, body, String.valueOf(uid), "查询银行卡余额");
 		return treeToValue(data, ThirdBankcardBalanceResp.class, "查询银行卡余额");
@@ -272,7 +272,7 @@ public class ThirdService {
 				|| StringUtils.isEmpty(body.getRequestOrderId())) {
 			throw new BaseException("userBankcardId/amount/requestOrderId不能为空");
 		}
-		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_RECHARGE_PATH;
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.CARD_RECHARGE_PATH;
 		log.info("third party card recharge start uid={} userBankcardId={} amount={} requestOrderId={}",
 				uid, body.getUserBankcardId(), body.getAmount(), body.getRequestOrderId());
 		exchange(HttpMethod.POST, url, body, String.valueOf(uid), "银行卡充值");
@@ -287,7 +287,7 @@ public class ThirdService {
 		if (body == null || body.getUserBankcardId() == null || body.getEnable() == null) {
 			throw new BaseException("userBankcardId/enable不能为空");
 		}
-		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_UPDATE_STATUS_PATH;
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.CARD_UPDATE_STATUS_PATH;
 		log.info("third party card updateStatus start uid={} userBankcardId={} enable={}",
 				uid, body.getUserBankcardId(), body.getEnable());
 		exchange(HttpMethod.POST, url, body, String.valueOf(uid), "更新银行卡状态");
@@ -300,7 +300,7 @@ public class ThirdService {
 	public void closeBankcard(Long uid, Long userBankcardId) {
 		requireUid(uid);
 		BankcardUserIdRequest body = requireUserBankcardId(userBankcardId);
-		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_CLOSE_PATH;
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.CARD_CLOSE_PATH;
 		log.info("third party card close start uid={} userBankcardId={}", uid, userBankcardId);
 		exchange(HttpMethod.POST, url, body, String.valueOf(uid), "注销银行卡");
 		log.info("third party card close success uid={} userBankcardId={}", uid, userBankcardId);
@@ -312,7 +312,7 @@ public class ThirdService {
 	public ThirdBankcardInfoResp getBankcardInfo(Long uid, Long userBankcardId) {
 		requireUid(uid);
 		BankcardUserIdRequest body = requireUserBankcardId(userBankcardId);
-		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_INFO_PATH;
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.CARD_INFO_PATH;
 		log.info("third party card info start uid={} userBankcardId={}", uid, userBankcardId);
 		JsonNode data = exchange(HttpMethod.POST, url, body, String.valueOf(uid), "查询银行卡信息");
 		ThirdBankcardInfoResp resp = treeToValue(data, ThirdBankcardInfoResp.class, "查询银行卡信息");
@@ -329,7 +329,7 @@ public class ThirdService {
 		if (body == null || body.getUserBankcardId() == null || StringUtils.isEmpty(body.getEmail())) {
 			throw new BaseException("userBankcardId/email不能为空");
 		}
-		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_UPDATE_EMAIL_PATH;
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.CARD_UPDATE_EMAIL_PATH;
 		log.info("third party card updateEmail start uid={} userBankcardId={}", uid, body.getUserBankcardId());
 		exchange(HttpMethod.POST, url, body, String.valueOf(uid), "更新银行卡邮箱");
 		log.info("third party card updateEmail success uid={} userBankcardId={}", uid, body.getUserBankcardId());
@@ -341,7 +341,7 @@ public class ThirdService {
 	public ThirdBankcardPinResp queryBankcardPin(Long uid, Long userBankcardId) {
 		requireUid(uid);
 		BankcardUserIdRequest body = requireUserBankcardId(userBankcardId);
-		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_QUERY_PIN_PATH;
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.CARD_QUERY_PIN_PATH;
 		log.info("third party card queryPin start uid={} userBankcardId={}", uid, userBankcardId);
 		JsonNode data = exchange(HttpMethod.POST, url, body, String.valueOf(uid), "查询Pin");
 		ThirdBankcardPinResp resp = treeToValue(data, ThirdBankcardPinResp.class, "查询Pin");

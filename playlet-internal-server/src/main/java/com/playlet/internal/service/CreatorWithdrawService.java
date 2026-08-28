@@ -31,7 +31,7 @@ import javax.servlet.http.HttpServletRequest;
 public interface CreatorWithdrawService {
 
 	@GetMapping("/revenue/summary")
-	@ApiOperation(value = "收益概览", notes = "今日/累计/待结算收益（金币）、近7日 incomeTrend、OnePay 结算账户；需作家登录")
+	@ApiOperation(value = "收益概览", notes = "今日/累计/待结算收益（金币）、近7日 incomeTrend、U 卡结算账户；需作家登录")
 	ResponseBase revenueSummary(HttpServletRequest request);
 
 	@GetMapping("/withdraw/home")
@@ -39,7 +39,7 @@ public interface CreatorWithdrawService {
 	ResponseBase withdrawHome(HttpServletRequest request);
 
 	@PostMapping("/withdraw")
-	@ApiOperation(value = "提现", notes = "需登录且已绑定 OnePay。提交后冻结金币，OnePay 确认到账后再扣减。")
+	@ApiOperation(value = "提现", notes = "需登录且 U 卡就绪（KYC 通过 + 可用卡）。提交后冻结金币，充值到账后扣减。")
 	ResponseBase withdraw(@RequestBody WithdrawReqEntity query, HttpServletRequest request);
 
 	@GetMapping("/withdraw/records")

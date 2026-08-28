@@ -1,14 +1,11 @@
 package com.playlet.internal.constants;
 
 /**
- * 类描述：三方接口地址
- *
- * @author GeminiSun
- * @date 2026/08/26 14:20
+ * worldPay 三方接口路径。
  */
-public final class OnePayApiPaths {
+public final class WalletApiPaths {
 
-	private OnePayApiPaths() {
+	private WalletApiPaths() {
 	}
 
 	//---------------------------------------------用户注册---------------------------------------------------------------
@@ -48,6 +45,4 @@ public final class OnePayApiPaths {
 	public static final String CARD_UPDATE_EMAIL_PATH = "/api/bankcard/update/email";
 	/** 查询 Pin */
 	public static final String CARD_QUERY_PIN_PATH = "/api/bankcard/queryPin";
-
-	//-----------------------------------------------------------------------------------------------------------------
 }

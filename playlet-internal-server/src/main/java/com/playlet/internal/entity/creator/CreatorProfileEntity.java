@@ -11,7 +11,7 @@ import lombok.Data;
 import java.util.Date;
 
 /**
- * 作家入驻资料（KYC / OnePay 结算）。
+ * 作家入驻资料（KYC / 结算）。
  */
 @Data
 @TableName("creator_profile")
@@ -53,22 +53,6 @@ public class CreatorProfileEntity {
 	@TableField("id_card_back")
 	@ApiModelProperty(name = "idCardBack", value = "证件背面图")
 	private String idCardBack;
-
-	@TableField("onepay_account")
-	@ApiModelProperty(name = "onepayAccount", value = "OnePay 账号")
-	private String onepayAccount;
-
-	@TableField("onepay_open_id")
-	@ApiModelProperty(name = "onepayOpenId", value = "OnePay 侧用户ID")
-	private String onepayOpenId;
-
-	@TableField("onepay_bind_status")
-	@ApiModelProperty(name = "onepayBindStatus", value = "0未绑定 1已绑定")
-	private Integer onepayBindStatus;
-
-	@TableField("onepay_bind_time")
-	@ApiModelProperty(name = "onepayBindTime", value = "绑定时间")
-	private Date onepayBindTime;
 
 	@TableField("bill_address")
 	@ApiModelProperty(name = "billAddress", value = "账单寄送地址")

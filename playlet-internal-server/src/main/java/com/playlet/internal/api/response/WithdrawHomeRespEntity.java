@@ -18,8 +18,8 @@ public class WithdrawHomeRespEntity {
 	@ApiModelProperty("冻结金币")
 	private Long frozenCoinBalance;
 
-	@ApiModelProperty("OnePay 绑定 0未绑定 1已绑定")
-	private Integer onepayBindStatus;
+	@ApiModelProperty("U 卡提现就绪 0未就绪 1可提现")
+	private Integer walletWithdrawReady;
 
 	@ApiModelProperty("是否有可用提现资产")
 	private Boolean withdrawEnabled;

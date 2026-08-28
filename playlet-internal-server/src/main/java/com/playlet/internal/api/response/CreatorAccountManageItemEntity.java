@@ -49,9 +49,6 @@ public class CreatorAccountManageItemEntity {
 	@ApiModelProperty("入驻审核文案")
 	private String auditStatusLabel;
 
-	@ApiModelProperty("OnePay 绑定 0未绑定 1已绑定")
-	private Integer onepayBindStatus;
-
 	@ApiModelProperty("可用金币（总余额-冻结）")
 	private Long availableCoin;
 

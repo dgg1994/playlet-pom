@@ -27,4 +27,10 @@ public class ThirdPartyProperties {
 	/** 是否校验 WebHook 签名（未配置公钥时可关闭） */
 	private boolean webhookSignVerifyEnabled = false;
 
+	/** HTTP 连接超时（毫秒） */
+	private Integer connectTimeoutMs = 5000;
+
+	/** HTTP 读超时（毫秒） */
+	private Integer readTimeoutMs = 10000;
+
 }

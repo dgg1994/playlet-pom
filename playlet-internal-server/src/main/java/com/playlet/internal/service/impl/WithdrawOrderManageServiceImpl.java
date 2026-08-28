@@ -90,10 +90,10 @@ public class WithdrawOrderManageServiceImpl implements WithdrawOrderManageServic
 
 	private static String resolvePayMethod(String assetCode) {
 		if (StringUtils.isEmpty(assetCode)) {
-			return WithdrawConstants.PAY_METHOD_ONEPAY_LABEL;
+			return WithdrawConstants.PAY_METHOD_WALLET_LABEL;
 		}
-		if (WithdrawConstants.ASSET_ONEPAY.equalsIgnoreCase(assetCode)) {
-			return WithdrawConstants.PAY_METHOD_ONEPAY_LABEL;
+		if (WithdrawConstants.ASSET_WALLET.equalsIgnoreCase(assetCode)) {
+			return WithdrawConstants.PAY_METHOD_WALLET_LABEL;
 		}
 		return assetCode;
 	}

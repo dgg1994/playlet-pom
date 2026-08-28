@@ -7,14 +7,11 @@ import com.playlet.internal.api.response.CreatorSettlementAccountRespEntity;
 import com.playlet.internal.constants.CreatorConstants;
 import com.playlet.internal.dao.creator.CreatorAccountDao;
 import com.playlet.internal.dao.creator.CreatorCoinLedgerDao;
-import com.playlet.internal.dao.creator.CreatorProfileDao;
 import com.playlet.internal.entity.creator.CreatorAccountEntity;
 import com.playlet.internal.entity.creator.CreatorCoinLedgerEntity;
-import com.playlet.internal.entity.creator.CreatorProfileEntity;
-import com.playlet.internal.enums.OnePayBindStatusEnums;
+import com.playlet.internal.enums.WithdrawUserTypeEnums;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
 import com.playlet.internal.utils.CreatorBizUtils;
-import com.playlet.internal.utils.StringUtils;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 作家收益概览：今日/累计/待结算 + OnePay 结算账户。
+ * 作家收益概览：今日/累计/待结算 + U 卡结算账户。
  */
 @Service
 public class CreatorRevenueBizService {
@@ -37,7 +34,7 @@ public class CreatorRevenueBizService {
 	@Autowired
 	private CreatorCoinLedgerDao creatorCoinLedgerDao;
 	@Autowired
-	private CreatorProfileDao creatorProfileDao;
+	private WithdrawWalletSupport withdrawWalletSupport;
 
 	public CreatorRevenueSummaryRespEntity buildSummary(Integer creatorId) {
 		CreatorRevenueSummaryRespEntity resp = new CreatorRevenueSummaryRespEntity();
@@ -46,7 +43,7 @@ public class CreatorRevenueBizService {
 			resp.setTodayIncomeCoin(0L);
 			resp.setTotalIncomeCoin(0L);
 			resp.setPendingSettleCoin(0L);
-			resp.setSettlementAccount(buildSettlementAccount(null));
+			resp.setSettlementAccount(buildSettlementAccount(creatorId));
 			resp.setIncomeTrend(buildIncomeTrend(creatorId));
 			return resp;
 		}
@@ -58,7 +55,7 @@ public class CreatorRevenueBizService {
 		resp.setTotalIncomeCoin(account.getTotalIncomeCoin() == null ? 0L : account.getTotalIncomeCoin());
 		// 待结算日结未上线前固定 0；后续接 pending_settle_coin
 		resp.setPendingSettleCoin(0L);
-		resp.setSettlementAccount(buildSettlementAccount(creatorProfileDao.findByCreatorId(creatorId)));
+		resp.setSettlementAccount(buildSettlementAccount(creatorId));
 		resp.setIncomeTrend(buildIncomeTrend(creatorId));
 		return resp;
 	}
@@ -106,22 +103,16 @@ public class CreatorRevenueBizService {
 		return trend;
 	}
 
-	private CreatorSettlementAccountRespEntity buildSettlementAccount(CreatorProfileEntity profile) {
+	private CreatorSettlementAccountRespEntity buildSettlementAccount(Integer creatorId) {
 		CreatorSettlementAccountRespEntity account = new CreatorSettlementAccountRespEntity();
-		if (profile == null) {
-			account.setBindStatus(OnePayBindStatusEnums.UNBOUND.getCode());
+		account.setWalletWithdrawReady(0);
+		if (creatorId == null) {
 			return account;
 		}
-		Integer bindStatus = profile.getOnepayBindStatus();
-		account.setBindStatus(bindStatus == null ? OnePayBindStatusEnums.UNBOUND.getCode() : bindStatus);
-		boolean bound = account.getBindStatus() != null
-				&& account.getBindStatus() == OnePayBindStatusEnums.BOUND.getCode()
-				&& StringUtils.isNotEmpty(profile.getOnepayAccount());
-		if (bound) {
-			// 收益页直接返回完整 OnePay 账号，不做脱敏
-			account.setOnepayAccountMasked(profile.getOnepayAccount().trim());
-			account.setBindTime(CreatorBizUtils.formatDateTime(profile.getOnepayBindTime()));
-		}
+		WithdrawWalletSnapshot snap = new WithdrawWalletSnapshot();
+		withdrawWalletSupport.enrich(WithdrawUserTypeEnums.CREATOR.getCode(), creatorId, snap);
+		account.setWalletWithdrawReady(snap.getWalletWithdrawReady() == null ? 0 : snap.getWalletWithdrawReady());
+		account.setDefaultCardMasked(snap.getPayoutTargetMasked());
 		return account;
 	}
 }

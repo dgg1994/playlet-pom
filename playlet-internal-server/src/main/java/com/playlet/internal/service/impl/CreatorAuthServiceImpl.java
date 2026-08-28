@@ -1,6 +1,5 @@
 package com.playlet.internal.service.impl;
 
-import com.playlet.internal.api.request.OnePayBindVerifyRequest;
 import com.playlet.internal.api.response.CreatorInfoRespEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
@@ -19,8 +18,6 @@ import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.query.creator.*;
 import com.playlet.internal.service.CreatorAuthService;
 import com.playlet.internal.service.MediaUrlService;
-import com.playlet.internal.service.support.CreatorOnePayBindOps;
-import com.playlet.internal.service.support.OnePayBindService;
 import com.playlet.internal.service.third.WalletUserService;
 import com.playlet.internal.utils.*;
 import io.jsonwebtoken.Jwts;
@@ -64,10 +61,6 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
     @Autowired
     private MediaUrlService mediaUrlService;
     @Autowired
-    private OnePayBindService onePayBindService;
-    @Autowired
-    private CreatorOnePayBindOps creatorOnePayBindOps;
-    @Autowired
     private WalletUserService walletUserService;
 
     @Override
@@ -86,9 +79,6 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
             return setResultError(I18nUtil.getMessage("user.account_exist"));
         }
         if (sceneEnum == CreatorEmailCodeSceneEnums.RESET_PWD && exist == null) {
-            return setResultError(I18nUtil.getMessage("user.account_error"));
-        }
-        if (sceneEnum == CreatorEmailCodeSceneEnums.BIND_ONEPAY && exist == null) {
             return setResultError(I18nUtil.getMessage("user.account_error"));
         }
         try {
@@ -333,31 +323,6 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         return setResultSuccess(I18nUtil.getMessage("base_success"));
     }
 
-    @Override
-    public ResponseBase bindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request) {
-        CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
-        if (account == null) {
-            return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
-        }
-        CreatorProfileEntity profile = creatorProfileDao.findByCreatorId(account.getId());
-        Integer bindStatus = profile == null ? OnePayBindStatusEnums.UNBOUND.getCode() : profile.getOnepayBindStatus();
-        return onePayBindService.bind(account.getId(), query, account.getUserAccount(),
-                RedisKeyConstants.CREATOR_EMAIL_CODE_KEY, bindStatus, creatorOnePayBindOps);
-    }
-
-    @Override
-    public ResponseBase unBindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request) {
-        CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
-        if (account == null) {
-            return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
-        }
-        CreatorProfileEntity profile = creatorProfileDao.findByCreatorId(account.getId());
-        Integer bindStatus = profile == null ? OnePayBindStatusEnums.UNBOUND.getCode() : profile.getOnepayBindStatus();
-        String onepayAccount = profile == null ? null : profile.getOnepayAccount();
-        return onePayBindService.unbind(account.getId(), query, account.getUserAccount(),
-                RedisKeyConstants.CREATOR_EMAIL_CODE_KEY, bindStatus, onepayAccount, creatorOnePayBindOps);
-    }
-
     @SuppressWarnings("deprecation")
     private String issueToken(String email) {
         String token = Jwts.builder()
@@ -399,7 +364,6 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         CreatorProfileEntity profile = new CreatorProfileEntity();
         profile.setCreatorId(creatorId);
         profile.setIdentityType(CreatorIdentityTypeEnums.PERSONAL.getCode());
-        profile.setOnepayBindStatus(OnePayBindStatusEnums.UNBOUND.getCode());
         profile.setAuditStatus(CreatorProfileAuditStatusEnums.PENDING.getCode());
         profile.setSetTime(now);
         profile.setGmtModified(now);
@@ -445,8 +409,6 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         resp.setSetTime(account.getSetTime());
         if (profile != null) {
             resp.setIdentityType(profile.getIdentityType());
-            resp.setOnepayAccount(profile.getOnepayAccount());
-            resp.setOnepayBindStatus(profile.getOnepayBindStatus());
             resp.setBillAddress(profile.getBillAddress());
             resp.setAuditStatus(profile.getAuditStatus());
             resp.setAuditRejectReason(profile.getAuditRejectReason());

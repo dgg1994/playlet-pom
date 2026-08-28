@@ -3,7 +3,7 @@ package com.playlet.internal.service.support;
 import com.playlet.internal.enums.WithdrawUserTypeEnums;
 
 /**
- * C 端 / 作家端提现钱包操作（余额、冻结、OnePay 标识、流水）。
+ * C 端 / 作家端提现钱包操作（余额、冻结、流水）。
  */
 public interface WithdrawWalletHandler {
 
@@ -13,7 +13,7 @@ public interface WithdrawWalletHandler {
 	WithdrawUserTypeEnums userType();
 
 	/**
-	 * 加载提现钱包快照。
+	 * 加载提现钱包快照（仅余额，U 卡就绪由 WithdrawWalletSupport 补充）。
 	 */
 	WithdrawWalletSnapshot load(Integer uid);
 
@@ -31,11 +31,6 @@ public interface WithdrawWalletHandler {
 	 * 解冻提现钱包。
 	 */
 	int unfreeze(Integer uid, int amt);
-
-	/**
-	 * 查询提现钱包的 OnePay 账号。
-	 */
-	String findOpenId(Integer uid);
 
 	/**
 	 * 写入提现冻结流水。

@@ -39,8 +39,6 @@ public class AppWithdrawWalletHandler implements WithdrawWalletHandler {
 		}
 		snap.setCoinBalance(nvl(account.getCoinBalance()));
 		snap.setFrozenCoinBalance(nvl(account.getFrozenCoinBalance()));
-		snap.setOnepayBindStatus(account.getOnepayBindStatus());
-		snap.setOnepayAccount(account.getOnepayAccount());
 		return snap;
 	}
 
@@ -57,12 +55,6 @@ public class AppWithdrawWalletHandler implements WithdrawWalletHandler {
 	@Override
 	public int unfreeze(Integer uid, int amt) {
 		return appAccountDao.unfreezeCoinBalance(uid, amt);
-	}
-
-	@Override
-	public String findOpenId(Integer uid) {
-		AppAccountEntity account = appAccountDao.findByUid(uid);
-		return account == null ? null : account.getOnepayOpenId();
 	}
 
 	@Override

@@ -2,10 +2,8 @@ package com.playlet.internal.service.support;
 
 import com.playlet.internal.dao.creator.CreatorAccountDao;
 import com.playlet.internal.dao.creator.CreatorCoinLedgerDao;
-import com.playlet.internal.dao.creator.CreatorProfileDao;
 import com.playlet.internal.entity.creator.CreatorAccountEntity;
 import com.playlet.internal.entity.creator.CreatorCoinLedgerEntity;
-import com.playlet.internal.entity.creator.CreatorProfileEntity;
 import com.playlet.internal.enums.CoinBizTypeEnums;
 import com.playlet.internal.enums.WithdrawUserTypeEnums;
 import com.playlet.internal.exception.BaseException;
@@ -16,7 +14,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 
 /**
- * 作家提现：扣 creator_account，记 creator_coin_ledger，OnePay 在 creator_profile。
+ * 作家提现：扣 creator_account，记 creator_coin_ledger。
  */
 @Slf4j
 @Component
@@ -24,8 +22,6 @@ public class CreatorWithdrawWalletHandler implements WithdrawWalletHandler {
 
 	@Autowired
 	private CreatorAccountDao creatorAccountDao;
-	@Autowired
-	private CreatorProfileDao creatorProfileDao;
 	@Autowired
 	private CreatorCoinLedgerDao creatorCoinLedgerDao;
 
@@ -43,11 +39,6 @@ public class CreatorWithdrawWalletHandler implements WithdrawWalletHandler {
 		}
 		snap.setCoinBalance(nvl(account.getCoinBalance()));
 		snap.setFrozenCoinBalance(nvl(account.getFrozenCoinBalance()));
-		CreatorProfileEntity profile = creatorProfileDao.findByCreatorId(uid);
-		if (profile != null) {
-			snap.setOnepayBindStatus(profile.getOnepayBindStatus());
-			snap.setOnepayAccount(profile.getOnepayAccount());
-		}
 		return snap;
 	}
 
@@ -64,12 +55,6 @@ public class CreatorWithdrawWalletHandler implements WithdrawWalletHandler {
 	@Override
 	public int unfreeze(Integer uid, int amt) {
 		return creatorAccountDao.unfreezeCoinBalance(uid, amt);
-	}
-
-	@Override
-	public String findOpenId(Integer uid) {
-		CreatorProfileEntity profile = creatorProfileDao.findByCreatorId(uid);
-		return profile == null ? null : profile.getOnepayOpenId();
 	}
 
 	@Override
