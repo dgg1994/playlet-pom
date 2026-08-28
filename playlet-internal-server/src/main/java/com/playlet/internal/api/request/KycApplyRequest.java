@@ -28,13 +28,13 @@ public class KycApplyRequest {
 	@ApiModelProperty(value = "国籍 ISO Alpha-3，如 SGP", required = true)
 	private String nationCode;
 
-	@ApiModelProperty(value = "证件类型：1身份证 2护照 3驾照", required = true)
+	@ApiModelProperty(value = "证件类型：1身份证(正反面) 2护照(正面) 3驾照(正反面)", required = true)
 	private Integer certType;
 
 	@ApiModelProperty(value = "证件照正面 url", required = true)
 	private String idUrl;
 
-	@ApiModelProperty(value = "证件照反面 url")
+	@ApiModelProperty(value = "证件照反面 url（身份证/驾照必填）")
 	private String idBackUrl;
 
 	@ApiModelProperty(value = "生日", required = true)

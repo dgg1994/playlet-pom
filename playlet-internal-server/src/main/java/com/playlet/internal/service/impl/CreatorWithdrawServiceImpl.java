@@ -1,5 +1,7 @@
 package com.playlet.internal.service.impl;
 
+import com.playlet.internal.api.request.KycApplyRequest;
+import com.playlet.internal.api.request.KycCountryListRequest;
 import com.playlet.internal.api.request.WalletApplyCardRequest;
 import com.playlet.internal.api.request.WalletBindPayPwdRequest;
 import com.playlet.internal.api.request.WithdrawReqEntity;
@@ -88,6 +90,35 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
 		return walletUserService.bindPayPassword(WithdrawUserTypeEnums.CREATOR.getCode(), uid, query);
+	}
+
+	@Override
+	public ResponseBase kycCountryList(@RequestBody(required = false) KycCountryListRequest query,
+			HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		String name = query == null ? null : query.getName();
+		return walletUserService.listKycCountries(name);
+	}
+
+	@Override
+	public ResponseBase kycStatus(HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.getKycStatus(WithdrawUserTypeEnums.CREATOR.getCode(), uid);
+	}
+
+	@Override
+	public ResponseBase kycApply(@RequestBody KycApplyRequest query, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.applyKyc(WithdrawUserTypeEnums.CREATOR.getCode(), uid, query);
 	}
 
 	@Override

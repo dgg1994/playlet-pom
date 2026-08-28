@@ -1,5 +1,7 @@
 package com.playlet.internal.service;
 
+import com.playlet.internal.api.request.KycApplyRequest;
+import com.playlet.internal.api.request.KycCountryListRequest;
 import com.playlet.internal.api.request.OnePayWithdrawCallbackRequest;
 import com.playlet.internal.api.request.WalletApplyCardRequest;
 import com.playlet.internal.api.request.WalletBindPayPwdRequest;
@@ -41,6 +43,19 @@ public interface WithdrawService {
 	@PostMapping("/user/bindPayPwd")
 	@ApiOperation(value = "绑定支付密码", notes = "首次设置，6位数字；需登录。已设置不可重复绑定。")
 	ResponseBase bindPayPwd(@RequestBody WalletBindPayPwdRequest query, HttpServletRequest request);
+
+	@PostMapping("/kyc/country/list")
+	@ApiOperation(value = "KYC国家列表", notes = "透传三方；name 不填返回全部；需登录")
+	ResponseBase kycCountryList(@RequestBody(required = false) KycCountryListRequest query,
+			HttpServletRequest request);
+
+	@GetMapping("/kyc/status")
+	@ApiOperation(value = "查询KYC状态", notes = "拉三方并回写本地；需登录")
+	ResponseBase kycStatus(HttpServletRequest request);
+
+	@PostMapping("/kyc/apply")
+	@ApiOperation(value = "提交KYC信息", notes = "需登录；证件照已上传拿到 url 后提交；审核中/已通过不可重复提交")
+	ResponseBase kycApply(@RequestBody KycApplyRequest query, HttpServletRequest request);
 
 	@GetMapping("/card/list")
 	@ApiOperation(value = "卡片列表", notes = "默认卡优先；首页切换与卡片列表页复用；需登录")

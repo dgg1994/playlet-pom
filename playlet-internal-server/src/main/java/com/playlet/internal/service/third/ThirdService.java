@@ -28,6 +28,7 @@ import com.playlet.internal.api.response.ThirdUserRegisterResp;
 import com.playlet.internal.config.ThirdPartyProperties;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.OnePayApiPaths;
+import com.playlet.internal.constants.WalletConstants;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.utils.RsaSignUtil;
 import com.playlet.internal.utils.StringUtils;
@@ -342,7 +343,7 @@ public class ThirdService {
 		return resp;
 	}
 
-	/** 校验 KYC 必填字段（与文档 required 对齐） */
+	/** 校验 KYC 必填字段（与文档 required 对齐；身份证/驾照需反面照） */
 	private void validateKycApply(KycApplyRequest body) {
 		if (StringUtils.isEmpty(body.getFirstName())
 				|| StringUtils.isEmpty(body.getLastName())
@@ -356,6 +357,12 @@ public class ThirdService {
 				|| StringUtils.isEmpty(body.getAreaCode())
 				|| StringUtils.isEmpty(body.getPhone())) {
 			throw new BaseException("KYC必填字段不完整");
+		}
+		// 1身份证 / 3驾照：文档要求正面+背面
+		boolean needBack = body.getCertType() == WalletConstants.KYC_CERT_ID_CARD
+				|| body.getCertType() == WalletConstants.KYC_CERT_DRIVER_LICENSE;
+		if (needBack && StringUtils.isEmpty(body.getIdBackUrl())) {
+			throw new BaseException("KYC证件反面照不能为空");
 		}
 	}
 

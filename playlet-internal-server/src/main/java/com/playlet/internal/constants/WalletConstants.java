@@ -32,4 +32,11 @@ public final class WalletConstants {
 	/** 默认卡标记 */
 	public static final int CARD_DEFAULT_YES = 1;
 	public static final int CARD_DEFAULT_NO = 0;
+
+	/** 证件类型：身份证（需正反面） */
+	public static final int KYC_CERT_ID_CARD = 1;
+	/** 证件类型：护照（仅正面） */
+	public static final int KYC_CERT_PASSPORT = 2;
+	/** 证件类型：驾照（需正反面） */
+	public static final int KYC_CERT_DRIVER_LICENSE = 3;
 }

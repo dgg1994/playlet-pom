@@ -36,4 +36,28 @@ public enum WalletKycStateEnums {
 		}
 		return WAIT_APPROVE;
 	}
+
+	/**
+	 * 将三方 status 映射为本地 KYC 状态。
+	 *
+	 * @param apiStatus uncommitted/waiting/success/fail/wait_confirm/wait_audit
+	 */
+	public static WalletKycStateEnums fromApiStatus(String apiStatus) {
+		if (apiStatus == null || apiStatus.isEmpty()) {
+			return WAIT_APPROVE;
+		}
+		switch (apiStatus) {
+			case "success":
+				return SUCCESS_APPROVE;
+			case "fail":
+				return ERROR_APPROVE;
+			case "waiting":
+			case "wait_confirm":
+			case "wait_audit":
+				return PROCESS_APPROVE;
+			case "uncommitted":
+			default:
+				return WAIT_APPROVE;
+		}
+	}
 }

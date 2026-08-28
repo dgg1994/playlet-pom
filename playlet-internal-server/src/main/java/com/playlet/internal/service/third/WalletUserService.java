@@ -2,28 +2,36 @@ package com.playlet.internal.service.third;
 
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
+import cn.hutool.crypto.digest.DigestUtil;
 import com.playlet.internal.api.request.BankcardApplyRequest;
+import com.playlet.internal.api.request.KycApplyRequest;
 import com.playlet.internal.api.request.WalletApplyCardRequest;
 import com.playlet.internal.api.request.WalletBindPayPwdRequest;
+import com.playlet.internal.api.response.KycCountryResp;
+import com.playlet.internal.api.response.KycStatusResp;
 import com.playlet.internal.api.response.ThirdBankcardApplyResp;
 import com.playlet.internal.api.response.ThirdBankcardProductResp;
 import com.playlet.internal.api.response.WalletApplyCardResp;
 import com.playlet.internal.api.response.WalletCardItemResp;
 import com.playlet.internal.api.response.WalletCardProductItemResp;
+import com.playlet.internal.api.response.WalletKycStatusResp;
 import com.playlet.internal.api.response.WalletTransactionItemResp;
 import com.playlet.internal.api.response.WalletUserInfoResp;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.WalletConstants;
+import com.playlet.internal.constants.WalletKycApiStatus;
 import com.playlet.internal.dao.wallet.WalletAccountDao;
 import com.playlet.internal.dao.wallet.WalletBankcardDao;
 import com.playlet.internal.dao.wallet.WalletCardApplyDao;
 import com.playlet.internal.dao.wallet.WalletCardTransactionDao;
+import com.playlet.internal.dao.wallet.WalletKycApplyDao;
 import com.playlet.internal.dao.wallet.WalletUserDao;
 import com.playlet.internal.entity.wallet.WalletAccountEntity;
 import com.playlet.internal.entity.wallet.WalletBankcardEntity;
 import com.playlet.internal.entity.wallet.WalletCardApplyEntity;
 import com.playlet.internal.entity.wallet.WalletCardTransactionEntity;
+import com.playlet.internal.entity.wallet.WalletKycApplyEntity;
 import com.playlet.internal.entity.wallet.WalletUserEntity;
 import com.playlet.internal.enums.WalletCardApplyStateEnums;
 import com.playlet.internal.enums.WalletCardStatusEnums;
@@ -69,6 +77,8 @@ public class WalletUserService extends BaseApiService {
 	private WalletCardApplyDao walletCardApplyDao;
 	@Autowired
 	private WalletCardTransactionDao walletCardTransactionDao;
+	@Autowired
+	private WalletKycApplyDao walletKycApplyDao;
 
 	/**
 	 * 本地账号注册成功后调用：开通 U 卡三方用户并写入 P0 表。
@@ -294,15 +304,7 @@ public class WalletUserService extends BaseApiService {
 			walletAccountDao.markActivated(user.getId());
 		}
 
-		WalletApplyCardResp resp = new WalletApplyCardResp();
-		resp.setApplyId(apply.getId());
-		resp.setOrderNo(third.getOrderNo());
-		resp.setUserBankcardId(third.getUserBankcardId());
-		resp.setCardNo(third.getCardNo());
-		resp.setWalletBankcardId(walletBankcardId);
-		log.info("wallet apply card success walletUserId={} productId={} orderNo={} userBankcardId={}",
-				user.getId(), query.getProductId(), third.getOrderNo(), third.getUserBankcardId());
-		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
 	/** 申请成功后写入本地卡记录 */
@@ -372,6 +374,159 @@ public class WalletUserService extends BaseApiService {
 	}
 
 	/**
+	 * KYC 国家列表：透传三方 POST /api/user/kyc/country/list；name 空则返回全部。
+	 */
+	public ResponseBase listKycCountries(String name) {
+		List<KycCountryResp> list;
+		try {
+			list = thirdService.listKycCountries(name);
+		} catch (BaseException e) {
+			log.error("wallet kyc country list failed name={}", name, e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("wallet kyc country list error name={}", name, e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		if (list == null) {
+			list = Collections.emptyList();
+		}
+		log.info("wallet kyc country list size={} name={}", list.size(),
+				StringUtils.isEmpty(name) ? "ALL" : name.trim());
+		return setResultSuccess(list, I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * 查询 KYC 状态：拉三方并回写 wallet_account / 最近申请单。
+	 */
+	public ResponseBase getKycStatus(Integer userType, Integer localUid) {
+		WalletUserEntity user = walletUserDao.findByLocal(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		ensureWalletAccount(user);
+		KycStatusResp third;
+		try {
+			third = thirdService.getKycStatus(user.getWalletUid());
+		} catch (BaseException e) {
+			log.error("wallet kyc status third failed walletUid={}", user.getWalletUid(), e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("wallet kyc status third error walletUid={}", user.getWalletUid(), e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		WalletKycStateEnums localState = WalletKycStateEnums.fromApiStatus(third.getStatus());
+		String failedReason = third.getFailedReason();
+		try {
+			syncKycLocal(user.getId(), third.getStatus(), localState, failedReason);
+		} catch (Exception e) {
+			log.error("wallet kyc status sync failed walletUserId={} status={}",
+					user.getId(), third.getStatus(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+		WalletKycStatusResp resp = new WalletKycStatusResp();
+		resp.setStatus(third.getStatus());
+		resp.setFailedReason(failedReason);
+		resp.setKycState(localState.getCode());
+		resp.setKycStateName(localState.getLabel());
+		log.info("wallet kyc status walletUserId={} status={} kycState={}",
+				user.getId(), third.getStatus(), localState.getCode());
+		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * 提交 KYC：调三方 apply → 落 wallet_kyc_apply → 账户置为认证中。
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	public ResponseBase applyKyc(Integer userType, Integer localUid, KycApplyRequest query) {
+		if (query == null) {
+			return setResultError(I18nUtil.getMessage("wallet.kyc_param_required"));
+		}
+		WalletUserEntity user = walletUserDao.findByLocal(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		ensureWalletAccount(user);
+		WalletAccountEntity account = walletAccountDao.findByWalletUserId(user.getId());
+		if (account == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		// 已成功不可重复提交
+		if (account.getKycState() != null
+				&& account.getKycState() == WalletKycStateEnums.SUCCESS_APPROVE.getCode()) {
+			return setResultError(I18nUtil.getMessage("wallet.kyc_already_success"));
+		}
+		// 审核中不可重复提交
+		if (account.getKycState() != null
+				&& account.getKycState() == WalletKycStateEnums.PROCESS_APPROVE.getCode()) {
+			return setResultError(I18nUtil.getMessage("wallet.kyc_processing"));
+		}
+
+		try {
+			thirdService.applyKyc(user.getWalletUid(), query);
+		} catch (BaseException e) {
+			log.error("wallet kyc apply third failed walletUid={} nationCode={}",
+					user.getWalletUid(), query.getNationCode(), e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("wallet kyc apply third error walletUid={}", user.getWalletUid(), e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+
+		Date now = new Date();
+		WalletKycApplyEntity apply = buildKycApply(user, query, now);
+		try {
+			walletKycApplyDao.insert(apply);
+			syncKycLocal(user.getId(), WalletKycApiStatus.WAITING,
+					WalletKycStateEnums.PROCESS_APPROVE, null);
+		} catch (Exception e) {
+			log.error("wallet kyc apply persist failed walletUserId={}", user.getId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	/** 回写账户 KYC，并刷新最近一条申请单状态 */
+	private void syncKycLocal(Long walletUserId, String apiStatus, WalletKycStateEnums localState,
+			String failedReason) {
+		walletAccountDao.updateKycStatus(walletUserId, localState.getCode(), localState.getLabel(),
+				apiStatus, failedReason);
+		WalletKycApplyEntity latest = walletKycApplyDao.findLatestByWalletUserId(walletUserId);
+		if (latest != null) {
+			walletKycApplyDao.updateStatus(latest.getId(), apiStatus, localState.getCode(), failedReason);
+		}
+	}
+
+	/** 组装 KYC 申请流水（证件号仅存 hash，不明文） */
+	private WalletKycApplyEntity buildKycApply(WalletUserEntity user, KycApplyRequest query, Date now) {
+		WalletKycApplyEntity apply = new WalletKycApplyEntity();
+		apply.setWalletUserId(user.getId());
+		apply.setWalletUid(user.getWalletUid());
+		apply.setFirstName(query.getFirstName().trim());
+		apply.setLastName(query.getLastName().trim());
+		apply.setIdNoHash(DigestUtil.sha256Hex(query.getIdNo().trim()));
+		apply.setEmail(query.getEmail().trim());
+		apply.setNationCode(query.getNationCode().trim());
+		apply.setCertType(query.getCertType());
+		apply.setIdUrl(query.getIdUrl().trim());
+		apply.setIdBackUrl(StringUtils.isEmpty(query.getIdBackUrl()) ? null : query.getIdBackUrl().trim());
+		apply.setBirthday(query.getBirthday().trim());
+		apply.setCountryCode(query.getCountryCode().trim());
+		apply.setAreaCode(query.getAreaCode().trim());
+		apply.setPhone(query.getPhone().trim());
+		apply.setFileType(query.getFileType());
+		apply.setFileUrl(query.getFileUrl());
+		apply.setFaceUrl(query.getFaceUrl());
+		apply.setReferenceId(query.getReferenceId());
+		apply.setReferenceType(query.getReferenceType());
+		apply.setSelfieUrl(query.getSelfieUrl());
+		apply.setApplyStatus(WalletKycApiStatus.WAITING);
+		apply.setKycState(WalletKycStateEnums.PROCESS_APPROVE.getCode());
+		apply.setSetTime(now);
+		apply.setGmtModified(now);
+		return apply;
+	}
+
+	/**
 	 * 首次绑定支付密码。
 	 */
 	public ResponseBase bindPayPassword(Integer userType, Integer localUid, WalletBindPayPwdRequest query) {
@@ -426,7 +581,7 @@ public class WalletUserService extends BaseApiService {
 		account.setWalletUid(walletUid);
 		account.setKycState(WalletKycStateEnums.WAIT_APPROVE.getCode());
 		account.setKycStateName(WalletKycStateEnums.WAIT_APPROVE.getLabel());
-		account.setKycApiStatus("uncommitted");
+		account.setKycApiStatus(WalletKycApiStatus.UNCOMMITTED);
 		account.setActivationState(ACTIVATION_NOT_YET);
 		// 账户余额初始为 0，后续由三方同步刷新
 		account.setAvailableBalance(BigDecimal.ZERO);
