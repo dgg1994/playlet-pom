@@ -1,5 +1,6 @@
 package com.playlet.internal.api.response;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -28,6 +29,9 @@ public class WalletCardItemResp {
 
 	@ApiModelProperty("卡品牌 MASTER/VISA")
 	private String cardBrand;
+
+	@ApiModelProperty(name = "cardProductId", value = "卡产品 id")
+	private Integer cardProductId;
 
 	@ApiModelProperty("PHYSICAL / VIRTUAL")
 	private String bankcardNature;

@@ -43,4 +43,39 @@ public enum WalletCardStatusEnums {
 		}
 		return String.valueOf(code);
 	}
+
+	/**
+	 * WebHook status 映射（cardActive / ACTIVE / 正常 等）。
+	 */
+	public static WalletCardStatusEnums fromWebhookStatus(String status) {
+		if (status == null || status.trim().isEmpty()) {
+			return null;
+		}
+		String normalized = status.trim();
+		if ("cardActive".equalsIgnoreCase(normalized) || "ACTIVE".equalsIgnoreCase(normalized)
+				|| ACTIVE.label.equals(normalized)) {
+			return ACTIVE;
+		}
+		if ("cardFreeze".equalsIgnoreCase(normalized) || "FREEZE".equalsIgnoreCase(normalized)
+				|| FREEZE.label.equals(normalized)) {
+			return FREEZE;
+		}
+		if ("cardClose".equalsIgnoreCase(normalized) || "CANCELLATION".equalsIgnoreCase(normalized)
+				|| CLOSED.label.equals(normalized)) {
+			return CLOSED;
+		}
+		if ("TBA".equalsIgnoreCase(normalized) || WAIT_ACTIVE.label.equals(normalized)) {
+			return WAIT_ACTIVE;
+		}
+		if ("ACTIVE_PROCESSING".equalsIgnoreCase(normalized) || ACTIVATING.label.equals(normalized)) {
+			return ACTIVATING;
+		}
+		if ("EXPIRED".equalsIgnoreCase(normalized) || EXPIRED.label.equals(normalized)) {
+			return EXPIRED;
+		}
+		if ("PAUSE".equalsIgnoreCase(normalized) || SUSPEND.label.equals(normalized)) {
+			return SUSPEND;
+		}
+		return null;
+	}
 }

@@ -810,6 +810,41 @@ public class WalletUserService extends BaseApiService {
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
+	/**
+	 * WebHook：KYC 状态变更回写本地。
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	public void syncKycFromWebhook(Long walletUid, String apiStatus, String failedReason) {
+		if (walletUid == null) {
+			throw new BaseException("walletUid empty");
+		}
+		WalletUserEntity user = walletUserDao.findByWalletUid(walletUid);
+		if (user == null) {
+			log.warn("wallet webhook kyc user not found walletUid={}", walletUid);
+			return;
+		}
+		WalletKycStateEnums localState = WalletKycStateEnums.fromApiStatus(apiStatus);
+		try {
+			syncKycLocal(user.getId(), apiStatus, localState, failedReason);
+		} catch (Exception e) {
+			log.error("wallet webhook kyc sync failed walletUserId={} status={}", user.getId(), apiStatus, e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+	}
+
+	/** WebHook：卡激活后标记账户已激活 */
+	public void markAccountActivated(Long walletUserId) {
+		if (walletUserId == null) {
+			return;
+		}
+		try {
+			walletAccountDao.markActivated(walletUserId);
+		} catch (Exception e) {
+			log.error("wallet webhook mark activated failed walletUserId={}", walletUserId, e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+	}
+
 	/** 回写账户 KYC，并刷新最近一条申请单状态 */
 	private void syncKycLocal(Long walletUserId, String apiStatus, WalletKycStateEnums localState,
 			String failedReason) {
@@ -1040,6 +1075,7 @@ public class WalletUserService extends BaseApiService {
 		item.setDisplayName(buildCardDisplayName(row));
 		item.setCardNo(row.getCardNo());
 		item.setCardBrand(row.getCardBrand());
+		item.setCardProductId(row.getCardProductId());
 		item.setBankcardNature(row.getBankcardNature());
 		item.setCurrency(StringUtils.isEmpty(row.getCurrency())
 				? WalletConstants.DEFAULT_CURRENCY : row.getCurrency());

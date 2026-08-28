@@ -18,6 +18,13 @@ public interface WalletCardTransactionDao extends BaseMapper<WalletCardTransacti
 	@Select("select * from wallet_card_transaction where request_order_id = #{requestOrderId} limit 1")
 	WalletCardTransactionEntity findByRequestOrderId(@Param("requestOrderId") String requestOrderId);
 
+	@Select("select * from wallet_card_transaction where third_order_num = #{thirdOrderNum} limit 1")
+	WalletCardTransactionEntity findByThirdOrderNum(@Param("thirdOrderNum") String thirdOrderNum);
+
+	@Select("select * from wallet_card_transaction where user_bankcard_id = #{userBankcardId} "
+			+ "and biz_type = 'RECHARGE' order by setTime desc, id desc limit 1")
+	WalletCardTransactionEntity findLatestRechargeByUserBankcardId(@Param("userBankcardId") Long userBankcardId);
+
 	@Select("select * from wallet_card_transaction where withdraw_order_id = #{withdrawOrderId} limit 1")
 	WalletCardTransactionEntity findByWithdrawOrderId(@Param("withdrawOrderId") Long withdrawOrderId);
 

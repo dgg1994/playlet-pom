@@ -21,4 +21,10 @@ public class ThirdPartyProperties {
 	/** RSA 私钥（PKCS8 / PKCS1 Base64） */
 	private String privateKey = "";
 
+	/** RSA 公钥（验 WebHook 签名） */
+	private String publicKey = "";
+
+	/** 是否校验 WebHook 签名（未配置公钥时可关闭） */
+	private boolean webhookSignVerifyEnabled = false;
+
 }

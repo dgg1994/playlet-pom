@@ -40,6 +40,14 @@ public final class WalletConstants {
 	public static final int ORDER_STATE_PENDING = 0;
 	public static final String ORDER_STATE_PENDING_NAME = "处理中";
 
+	/** 充值/交易流水：成功 */
+	public static final int ORDER_STATE_SUCCESS = 1;
+	public static final String ORDER_STATE_SUCCESS_NAME = "成功";
+
+	/** 充值/交易流水：失败 */
+	public static final int ORDER_STATE_FAILED = 2;
+	public static final String ORDER_STATE_FAILED_NAME = "失败";
+
 	/** 证件类型：身份证（需正反面） */
 	public static final int KYC_CERT_ID_CARD = 1;
 	/** 证件类型：护照（仅正面） */
