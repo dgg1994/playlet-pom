@@ -33,6 +33,13 @@ public final class WalletConstants {
 	public static final int CARD_DEFAULT_YES = 1;
 	public static final int CARD_DEFAULT_NO = 0;
 
+	/** 交易类型：充值 */
+	public static final String TRANS_TOPUP = "TOPUP";
+
+	/** 充值流水：处理中 */
+	public static final int ORDER_STATE_PENDING = 0;
+	public static final String ORDER_STATE_PENDING_NAME = "处理中";
+
 	/** 证件类型：身份证（需正反面） */
 	public static final int KYC_CERT_ID_CARD = 1;
 	/** 证件类型：护照（仅正面） */

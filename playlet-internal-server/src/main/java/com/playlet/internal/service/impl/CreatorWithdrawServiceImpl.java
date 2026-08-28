@@ -1,5 +1,12 @@
 package com.playlet.internal.service.impl;
 
+import com.playlet.internal.api.request.BankcardActiveRequest;
+import com.playlet.internal.api.request.BankcardCanActiveRequest;
+import com.playlet.internal.api.request.BankcardRechargeRequest;
+import com.playlet.internal.api.request.BankcardSetPinRequest;
+import com.playlet.internal.api.request.BankcardUpdateEmailRequest;
+import com.playlet.internal.api.request.BankcardUpdateStatusRequest;
+import com.playlet.internal.api.request.BankcardUserIdRequest;
 import com.playlet.internal.api.request.KycApplyRequest;
 import com.playlet.internal.api.request.KycCountryListRequest;
 import com.playlet.internal.api.request.WalletApplyCardRequest;
@@ -146,6 +153,96 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
 		return walletUserService.applyCard(WithdrawUserTypeEnums.CREATOR.getCode(), uid, query);
+	}
+
+	@Override
+	public ResponseBase cardCanActive(@RequestBody BankcardCanActiveRequest query, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.canActiveCard(WithdrawUserTypeEnums.CREATOR.getCode(), uid, query);
+	}
+
+	@Override
+	public ResponseBase cardActive(@RequestBody BankcardActiveRequest query, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.activeCard(WithdrawUserTypeEnums.CREATOR.getCode(), uid, query);
+	}
+
+	@Override
+	public ResponseBase cardSetPin(@RequestBody BankcardSetPinRequest query, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.setCardPin(WithdrawUserTypeEnums.CREATOR.getCode(), uid, query);
+	}
+
+	@Override
+	public ResponseBase cardBalance(@RequestBody BankcardUserIdRequest query, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.getCardBalance(WithdrawUserTypeEnums.CREATOR.getCode(), uid, query);
+	}
+
+	@Override
+	public ResponseBase cardRecharge(@RequestBody BankcardRechargeRequest query, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.rechargeCard(WithdrawUserTypeEnums.CREATOR.getCode(), uid, query);
+	}
+
+	@Override
+	public ResponseBase cardUpdateStatus(@RequestBody BankcardUpdateStatusRequest query, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.updateCardStatus(WithdrawUserTypeEnums.CREATOR.getCode(), uid, query);
+	}
+
+	@Override
+	public ResponseBase cardClose(@RequestBody BankcardUserIdRequest query, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.closeCard(WithdrawUserTypeEnums.CREATOR.getCode(), uid, query);
+	}
+
+	@Override
+	public ResponseBase cardInfo(@RequestBody BankcardUserIdRequest query, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.getCardInfo(WithdrawUserTypeEnums.CREATOR.getCode(), uid, query);
+	}
+
+	@Override
+	public ResponseBase cardUpdateEmail(@RequestBody BankcardUpdateEmailRequest query, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.updateCardEmail(WithdrawUserTypeEnums.CREATOR.getCode(), uid, query);
+	}
+
+	@Override
+	public ResponseBase cardQueryPin(@RequestBody BankcardUserIdRequest query, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.queryCardPin(WithdrawUserTypeEnums.CREATOR.getCode(), uid, query);
 	}
 
 	@Override

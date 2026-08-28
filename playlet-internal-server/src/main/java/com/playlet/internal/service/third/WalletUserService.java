@@ -3,13 +3,25 @@ package com.playlet.internal.service.third;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import cn.hutool.crypto.digest.DigestUtil;
+import com.playlet.internal.api.request.BankcardActiveRequest;
 import com.playlet.internal.api.request.BankcardApplyRequest;
+import com.playlet.internal.api.request.BankcardCanActiveRequest;
+import com.playlet.internal.api.request.BankcardRechargeRequest;
+import com.playlet.internal.api.request.BankcardSetPinRequest;
+import com.playlet.internal.api.request.BankcardUpdateEmailRequest;
+import com.playlet.internal.api.request.BankcardUpdateStatusRequest;
+import com.playlet.internal.api.request.BankcardUserIdRequest;
 import com.playlet.internal.api.request.KycApplyRequest;
 import com.playlet.internal.api.request.WalletApplyCardRequest;
 import com.playlet.internal.api.request.WalletBindPayPwdRequest;
 import com.playlet.internal.api.response.KycCountryResp;
 import com.playlet.internal.api.response.KycStatusResp;
+import com.playlet.internal.api.response.ThirdBankcardActiveResp;
 import com.playlet.internal.api.response.ThirdBankcardApplyResp;
+import com.playlet.internal.api.response.ThirdBankcardBalanceResp;
+import com.playlet.internal.api.response.ThirdBankcardCanActiveResp;
+import com.playlet.internal.api.response.ThirdBankcardInfoResp;
+import com.playlet.internal.api.response.ThirdBankcardPinResp;
 import com.playlet.internal.api.response.ThirdBankcardProductResp;
 import com.playlet.internal.api.response.WalletApplyCardResp;
 import com.playlet.internal.api.response.WalletCardItemResp;
@@ -305,6 +317,319 @@ public class WalletUserService extends BaseApiService {
 		}
 
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * 银行卡是否可激活。
+	 */
+	public ResponseBase canActiveCard(Integer userType, Integer localUid, BankcardCanActiveRequest query) {
+		WalletUserEntity user = findWalletUser(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		if (query == null || StringUtils.isEmpty(query.getCardNo()) || StringUtils.isEmpty(query.getVerifyCode())) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		try {
+			ThirdBankcardCanActiveResp resp = thirdService.canActiveBankcard(user.getWalletUid(), query);
+			return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
+		} catch (BaseException e) {
+			log.error("wallet card canActive failed walletUid={}", user.getWalletUid(), e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("wallet card canActive error walletUid={}", user.getWalletUid(), e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+	}
+
+	/**
+	 * 银行卡激活：成功后回写本地卡号与状态。
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	public ResponseBase activeCard(Integer userType, Integer localUid, BankcardActiveRequest query) {
+		WalletUserEntity user = findWalletUser(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		if (query == null || query.getProductId() == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		ThirdBankcardActiveResp third;
+		try {
+			third = thirdService.activeBankcard(user.getWalletUid(), query);
+		} catch (BaseException e) {
+			log.error("wallet card active failed walletUid={} productId={}", user.getWalletUid(),
+					query.getProductId(), e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("wallet card active error walletUid={}", user.getWalletUid(), e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		syncCardAfterActive(user, third, query.getCardNo());
+		log.info("wallet card active success walletUserId={} userBankcardId={}",
+				user.getId(), third.getUserBankcardId());
+		return setResultSuccess(third, I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * 设置 ATM Pin。
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	public ResponseBase setCardPin(Integer userType, Integer localUid, BankcardSetPinRequest query) {
+		WalletUserEntity user = findWalletUser(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		if (query == null || query.getUserBankcardId() == null || StringUtils.isEmpty(query.getPin())) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		WalletBankcardEntity card = findOwnedCard(user, query.getUserBankcardId());
+		if (card == null) {
+			return setResultError(I18nUtil.getMessage("wallet.card_not_found"));
+		}
+		try {
+			thirdService.setBankcardPin(user.getWalletUid(), query);
+			walletBankcardDao.updatePinSet(card.getId(), 1);
+		} catch (BaseException e) {
+			log.error("wallet card setPin failed walletUid={} userBankcardId={}",
+					user.getWalletUid(), query.getUserBankcardId(), e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("wallet card setPin error walletUid={} userBankcardId={}",
+					user.getWalletUid(), query.getUserBankcardId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+		log.info("wallet card setPin success walletUserId={} userBankcardId={}",
+				user.getId(), query.getUserBankcardId());
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * 查询银行卡余额并同步本地缓存。
+	 */
+	public ResponseBase getCardBalance(Integer userType, Integer localUid, BankcardUserIdRequest query) {
+		WalletUserEntity user = findWalletUser(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		if (query == null || query.getUserBankcardId() == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		WalletBankcardEntity card = findOwnedCard(user, query.getUserBankcardId());
+		if (card == null) {
+			return setResultError(I18nUtil.getMessage("wallet.card_not_found"));
+		}
+		ThirdBankcardBalanceResp resp;
+		try {
+			resp = thirdService.getBankcardBalance(user.getWalletUid(), query.getUserBankcardId());
+		} catch (BaseException e) {
+			log.error("wallet card balance failed walletUid={} userBankcardId={}",
+					user.getWalletUid(), query.getUserBankcardId(), e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("wallet card balance error walletUid={} userBankcardId={}",
+					user.getWalletUid(), query.getUserBankcardId(), e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		BigDecimal balance = parseBalance(resp == null ? null : resp.getBalance());
+		if (balance != null) {
+			try {
+				walletBankcardDao.updateBalance(card.getId(), balance);
+			} catch (Exception e) {
+				log.error("wallet card balance cache failed cardId={}", card.getId(), e);
+			}
+		}
+		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * 银行卡充值：落本地充值流水（处理中），结果由 Webhook 回写。
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	public ResponseBase rechargeCard(Integer userType, Integer localUid, BankcardRechargeRequest query) {
+		WalletUserEntity user = findWalletUser(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		if (query == null || query.getUserBankcardId() == null || query.getAmount() == null
+				|| StringUtils.isEmpty(query.getRequestOrderId())) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		WalletBankcardEntity card = findOwnedCard(user, query.getUserBankcardId());
+		if (card == null) {
+			return setResultError(I18nUtil.getMessage("wallet.card_not_found"));
+		}
+		try {
+			thirdService.rechargeBankcard(user.getWalletUid(), query);
+		} catch (BaseException e) {
+			log.error("wallet card recharge failed walletUid={} requestOrderId={}",
+					user.getWalletUid(), query.getRequestOrderId(), e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("wallet card recharge error walletUid={} requestOrderId={}",
+					user.getWalletUid(), query.getRequestOrderId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+		insertRechargeTransaction(user, card, query);
+		log.info("wallet card recharge submitted walletUserId={} userBankcardId={} requestOrderId={}",
+				user.getId(), query.getUserBankcardId(), query.getRequestOrderId());
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * 更新银行卡状态（冻结/解冻）。
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	public ResponseBase updateCardStatus(Integer userType, Integer localUid, BankcardUpdateStatusRequest query) {
+		WalletUserEntity user = findWalletUser(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		if (query == null || query.getUserBankcardId() == null || query.getEnable() == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		WalletBankcardEntity card = findOwnedCard(user, query.getUserBankcardId());
+		if (card == null) {
+			return setResultError(I18nUtil.getMessage("wallet.card_not_found"));
+		}
+		try {
+			thirdService.updateBankcardStatus(user.getWalletUid(), query);
+		} catch (BaseException e) {
+			log.error("wallet card updateStatus failed walletUid={} userBankcardId={}",
+					user.getWalletUid(), query.getUserBankcardId(), e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("wallet card updateStatus error walletUid={} userBankcardId={}",
+					user.getWalletUid(), query.getUserBankcardId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+		WalletCardStatusEnums status = Boolean.TRUE.equals(query.getEnable())
+				? WalletCardStatusEnums.ACTIVE : WalletCardStatusEnums.FREEZE;
+		walletBankcardDao.updateCardStatus(card.getId(), status.getCode(), status.getLabel());
+		log.info("wallet card updateStatus success walletUserId={} userBankcardId={} enable={}",
+				user.getId(), query.getUserBankcardId(), query.getEnable());
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * 注销银行卡。
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	public ResponseBase closeCard(Integer userType, Integer localUid, BankcardUserIdRequest query) {
+		WalletUserEntity user = findWalletUser(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		if (query == null || query.getUserBankcardId() == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		WalletBankcardEntity card = findOwnedCard(user, query.getUserBankcardId());
+		if (card == null) {
+			return setResultError(I18nUtil.getMessage("wallet.card_not_found"));
+		}
+		try {
+			thirdService.closeBankcard(user.getWalletUid(), query.getUserBankcardId());
+		} catch (BaseException e) {
+			log.error("wallet card close failed walletUid={} userBankcardId={}",
+					user.getWalletUid(), query.getUserBankcardId(), e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("wallet card close error walletUid={} userBankcardId={}",
+					user.getWalletUid(), query.getUserBankcardId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+		walletBankcardDao.updateCardStatus(card.getId(),
+				WalletCardStatusEnums.CLOSED.getCode(), WalletCardStatusEnums.CLOSED.getLabel());
+		log.info("wallet card close success walletUserId={} userBankcardId={}",
+				user.getId(), query.getUserBankcardId());
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * 查询银行卡信息（含 cvv/明文卡号等敏感信息，按需展示）。
+	 */
+	public ResponseBase getCardInfo(Integer userType, Integer localUid, BankcardUserIdRequest query) {
+		WalletUserEntity user = findWalletUser(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		if (query == null || query.getUserBankcardId() == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		WalletBankcardEntity card = findOwnedCard(user, query.getUserBankcardId());
+		if (card == null) {
+			return setResultError(I18nUtil.getMessage("wallet.card_not_found"));
+		}
+		try {
+			ThirdBankcardInfoResp resp = thirdService.getBankcardInfo(user.getWalletUid(), query.getUserBankcardId());
+			return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
+		} catch (BaseException e) {
+			log.error("wallet card info failed walletUid={} userBankcardId={}",
+					user.getWalletUid(), query.getUserBankcardId(), e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("wallet card info error walletUid={} userBankcardId={}",
+					user.getWalletUid(), query.getUserBankcardId(), e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+	}
+
+	/**
+	 * 更新银行卡邮箱。
+	 */
+	public ResponseBase updateCardEmail(Integer userType, Integer localUid, BankcardUpdateEmailRequest query) {
+		WalletUserEntity user = findWalletUser(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		if (query == null || query.getUserBankcardId() == null || StringUtils.isEmpty(query.getEmail())) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		WalletBankcardEntity card = findOwnedCard(user, query.getUserBankcardId());
+		if (card == null) {
+			return setResultError(I18nUtil.getMessage("wallet.card_not_found"));
+		}
+		try {
+			thirdService.updateBankcardEmail(user.getWalletUid(), query);
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		} catch (BaseException e) {
+			log.error("wallet card updateEmail failed walletUid={} userBankcardId={}",
+					user.getWalletUid(), query.getUserBankcardId(), e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("wallet card updateEmail error walletUid={} userBankcardId={}",
+					user.getWalletUid(), query.getUserBankcardId(), e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+	}
+
+	/**
+	 * 查询 Pin（三方返回 AES 密文）。
+	 */
+	public ResponseBase queryCardPin(Integer userType, Integer localUid, BankcardUserIdRequest query) {
+		WalletUserEntity user = findWalletUser(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		if (query == null || query.getUserBankcardId() == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		WalletBankcardEntity card = findOwnedCard(user, query.getUserBankcardId());
+		if (card == null) {
+			return setResultError(I18nUtil.getMessage("wallet.card_not_found"));
+		}
+		try {
+			ThirdBankcardPinResp resp = thirdService.queryBankcardPin(user.getWalletUid(), query.getUserBankcardId());
+			return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
+		} catch (BaseException e) {
+			log.error("wallet card queryPin failed walletUid={} userBankcardId={}",
+					user.getWalletUid(), query.getUserBankcardId(), e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("wallet card queryPin error walletUid={} userBankcardId={}",
+					user.getWalletUid(), query.getUserBankcardId(), e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
 	}
 
 	/** 申请成功后写入本地卡记录 */
@@ -622,6 +947,90 @@ public class WalletUserService extends BaseApiService {
 
 	private static BigDecimal nvlBalance(BigDecimal value) {
 		return value == null ? BigDecimal.ZERO : value;
+	}
+
+	/** 激活成功后回写本地卡记录 */
+	private void syncCardAfterActive(WalletUserEntity user, ThirdBankcardActiveResp third, String requestCardNo) {
+		if (third == null || third.getUserBankcardId() == null) {
+			return;
+		}
+		WalletBankcardEntity card = findOwnedCard(user, third.getUserBankcardId());
+		if (card == null) {
+			log.warn("wallet card active local missing walletUserId={} userBankcardId={}",
+					user.getId(), third.getUserBankcardId());
+			return;
+		}
+		String cardNo = StringUtils.isEmpty(third.getCardNo()) ? requestCardNo : third.getCardNo();
+		if (!StringUtils.isEmpty(cardNo)) {
+			walletBankcardDao.updateCardNo(card.getId(), cardNo);
+		}
+		walletBankcardDao.updateCardStatus(card.getId(),
+				WalletCardStatusEnums.ACTIVE.getCode(), WalletCardStatusEnums.ACTIVE.getLabel());
+		walletAccountDao.markActivated(user.getId());
+	}
+
+	/** 充值提交后落本地流水 */
+	private void insertRechargeTransaction(WalletUserEntity user, WalletBankcardEntity card,
+			BankcardRechargeRequest query) {
+		Date now = new Date();
+		BigDecimal amount = new BigDecimal(query.getAmount());
+		String currency = StringUtils.isEmpty(card.getCurrency())
+				? WalletConstants.DEFAULT_CURRENCY : card.getCurrency();
+		WalletCardTransactionEntity txn = new WalletCardTransactionEntity();
+		txn.setWalletUserId(user.getId());
+		txn.setWalletUid(user.getWalletUid());
+		txn.setWalletBankcardId(card.getId());
+		txn.setUserBankcardId(card.getUserBankcardId());
+		txn.setCardProductId(card.getCardProductId());
+		txn.setCardUuid(card.getCardUuid());
+		txn.setCardNo(card.getCardNo());
+		txn.setRequestOrderId(query.getRequestOrderId());
+		txn.setBizType(WalletConstants.BIZ_RECHARGE);
+		txn.setTransType(WalletConstants.TRANS_TOPUP);
+		txn.setOrderState(WalletConstants.ORDER_STATE_PENDING);
+		txn.setOrderStateName(WalletConstants.ORDER_STATE_PENDING_NAME);
+		txn.setLocalCurrency(currency);
+		txn.setLocalCurrencyAmt(amount);
+		txn.setTransCurrency(currency);
+		txn.setTransCurrencyAmt(amount);
+		txn.setTitle("卡充值");
+		txn.setSetTime(now);
+		txn.setGmtModified(now);
+		try {
+			walletCardTransactionDao.insert(txn);
+		} catch (DuplicateKeyException e) {
+			log.warn("wallet recharge txn duplicate requestOrderId={}", query.getRequestOrderId(), e);
+		} catch (Exception e) {
+			log.error("wallet recharge txn insert failed requestOrderId={}", query.getRequestOrderId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+	}
+
+	private WalletUserEntity findWalletUser(Integer userType, Integer localUid) {
+		return walletUserDao.findByLocal(userType, localUid);
+	}
+
+	/** 校验卡归属当前钱包用户 */
+	private WalletBankcardEntity findOwnedCard(WalletUserEntity user, Long userBankcardId) {
+		if (user == null || userBankcardId == null) {
+			return null;
+		}
+		WalletBankcardEntity card = walletBankcardDao.findByUserBankcardId(userBankcardId);
+		if (card == null || !user.getId().equals(card.getWalletUserId())) {
+			return null;
+		}
+		return card;
+	}
+
+	private static BigDecimal parseBalance(String balance) {
+		if (StringUtils.isEmpty(balance)) {
+			return null;
+		}
+		try {
+			return new BigDecimal(balance.trim());
+		} catch (Exception e) {
+			return null;
+		}
 	}
 
 	private static WalletCardItemResp toCardItem(WalletBankcardEntity row) {

@@ -15,6 +15,7 @@ public class BankcardSetPinRequest {
 	@ApiModelProperty(value = "用户银行卡id", required = true)
 	private Long userBankcardId;
 
+	// 仅接收、不回显；出站调三方时在 ThirdService 单独组装 body
 	@ApiModelProperty(value = "pin码", required = true)
 	@JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
 	private String pin;

@@ -44,7 +44,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -241,7 +243,11 @@ public class ThirdService {
 		}
 		String url = thirdPartyProperties.getBaseUrl() + OnePayApiPaths.CARD_SET_PIN_PATH;
 		log.info("third party card setPin start uid={} userBankcardId={}", uid, body.getUserBankcardId());
-		exchange(HttpMethod.POST, url, body, String.valueOf(uid), "设置Pin");
+		// BankcardSetPinRequest.pin 为 WRITE_ONLY，不能直接作为出站 body 序列化
+		Map<String, Object> thirdBody = new LinkedHashMap<>();
+		thirdBody.put("userBankcardId", body.getUserBankcardId());
+		thirdBody.put("pin", body.getPin());
+		exchange(HttpMethod.POST, url, thirdBody, String.valueOf(uid), "设置Pin");
 		log.info("third party card setPin success uid={} userBankcardId={}", uid, body.getUserBankcardId());
 	}
 
