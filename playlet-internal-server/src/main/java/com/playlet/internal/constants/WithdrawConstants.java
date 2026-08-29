@@ -8,10 +8,13 @@ public final class WithdrawConstants {
 	private WithdrawConstants() {
 	}
 
-	/** U 卡提现资产编码（写入订单快照） */
+	/** 历史 U 卡提现资产编码（旧订单快照） */
 	public static final String ASSET_WALLET = "USD";
-	/** U 卡提现网络编码 */
+	/** 历史 U 卡提现网络编码（旧订单快照） */
 	public static final String NETWORK_WALLET = "UCARD";
+
+	/** 提现打款网关：入账钱包 available_balance */
+	public static final String GATEWAY_BALANCE = "BALANCE";
 
 	/** C 端提现单号前缀 */
 	public static final String ORDER_NO_PREFIX_APP = "W";
@@ -25,4 +28,8 @@ public final class WithdrawConstants {
 
 	/** 管理端列表：U 卡支付方式展示文案 */
 	public static final String PAY_METHOD_WALLET_LABEL = "U卡";
+	/** 管理端列表：钱包余额支付方式展示文案 */
+	public static final String PAY_METHOD_BALANCE_LABEL = "钱包余额";
+	/** 提现记录：到账目标展示文案 */
+	public static final String PAYOUT_TARGET_BALANCE_LABEL = "钱包余额";
 }

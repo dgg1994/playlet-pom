@@ -23,6 +23,7 @@ import com.playlet.internal.api.response.ThirdBankcardCanActiveResp;
 import com.playlet.internal.api.response.ThirdBankcardInfoResp;
 import com.playlet.internal.api.response.ThirdBankcardPinResp;
 import com.playlet.internal.api.response.WalletApplyCardResp;
+import com.playlet.internal.api.response.WalletCardRechargeResp;
 import com.playlet.internal.api.response.WalletCardItemResp;
 import com.playlet.internal.api.response.WalletCardProductItemResp;
 import com.playlet.internal.api.response.WalletKycStatusResp;
@@ -442,7 +443,7 @@ public class WalletUserService extends BaseApiService {
 	}
 
 	/**
-	 * 银行卡充值：落本地充值流水（处理中），结果由 Webhook 回写。
+	 * 银行卡充值：从 wallet_account.available_balance 扣款后调三方充卡，结果由 Webhook 回写。
 	 */
 	@Transactional(rollbackFor = Exception.class)
 	public ResponseBase rechargeCard(Integer userType, Integer localUid, BankcardRechargeRequest query) {
@@ -451,28 +452,64 @@ public class WalletUserService extends BaseApiService {
 			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
 		}
 		if (query == null || query.getUserBankcardId() == null || query.getAmount() == null
-				|| StringUtils.isEmpty(query.getRequestOrderId())) {
+				|| query.getAmount() <= 0 || StringUtils.isEmpty(query.getRequestOrderId())) {
 			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		WalletAccountEntity account = walletAccountDao.findByWalletUserId(user.getId());
+		if (account == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		BigDecimal amount = BigDecimal.valueOf(query.getAmount());
+		// 幂等：同一 requestOrderId 不重复扣款
+		WalletCardTransactionEntity existed = walletCardTransactionDao.findByRequestOrderId(query.getRequestOrderId());
+		if (existed != null) {
+			log.info("wallet card recharge idempotent skip deduct requestOrderId={} walletAccountId={}",
+					query.getRequestOrderId(), account.getId());
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		}
 		WalletBankcardEntity card = findOwnedCard(user, query.getUserBankcardId());
 		if (card == null) {
 			return setResultError(I18nUtil.getMessage("wallet.card_not_found"));
 		}
+		BigDecimal balanceBefore = nvlBalance(account.getAvailableBalance());
+		// 先扣本地钱包可用余额，再调三方充卡
+		int deducted = walletAccountDao.deductAvailableBalance(account.getId(), amount);
+		if (deducted <= 0) {
+			log.warn("wallet card recharge deduct failed walletAccountId={} requestOrderId={} amount={} balanceBefore={}",
+					account.getId(), query.getRequestOrderId(), amount, balanceBefore);
+			return setResultError(I18nUtil.getMessage("wallet.balance_not_enough"));
+		}
+		log.info("wallet card recharge deducted walletAccountId={} requestOrderId={} amount={} balanceBefore={}",
+				account.getId(), query.getRequestOrderId(), amount, balanceBefore);
 		try {
 			thirdService.rechargeBankcard(user.getWalletUid(), query);
 		} catch (BaseException e) {
-			log.error("wallet card recharge failed walletUid={} requestOrderId={}",
+			log.error("wallet card recharge rejected walletUid={} requestOrderId={}",
 					user.getWalletUid(), query.getRequestOrderId(), e);
+			refundAvailableBalance(account.getId(), amount, query.getRequestOrderId());
 			return setResultError(e.getMessage());
 		} catch (Exception e) {
 			log.error("wallet card recharge error walletUid={} requestOrderId={}",
 					user.getWalletUid(), query.getRequestOrderId(), e);
+			refundAvailableBalance(account.getId(), amount, query.getRequestOrderId());
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 		insertRechargeTransaction(user, card, query);
-		log.info("wallet card recharge submitted walletUserId={} userBankcardId={} requestOrderId={}",
-				user.getId(), query.getUserBankcardId(), query.getRequestOrderId());
+		log.info("wallet card recharge submitted walletUserId={} userBankcardId={} requestOrderId={} amount={}",
+				user.getId(), query.getUserBankcardId(), query.getRequestOrderId(), amount);
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	/** 三方充卡失败时退回已扣的 available_balance */
+	private void refundAvailableBalance(Long accountId, BigDecimal amount, String requestOrderId) {
+		int rows = walletAccountDao.addAvailableBalance(accountId, amount);
+		if (rows <= 0) {
+			log.error("wallet card recharge refund failed accountId={} requestOrderId={} amount={}",
+					accountId, requestOrderId, amount);
+			throw new BaseException(I18nUtil.getMessage("base_error"));
+		}
+		log.info("wallet card recharge refunded accountId={} requestOrderId={} amount={}",
+				accountId, requestOrderId, amount);
 	}
 
 	/**

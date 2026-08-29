@@ -72,8 +72,7 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
-		Integer points = query == null ? null : query.getPoints();
-		return withdrawBizService.submit(uid, points, WithdrawUserTypeEnums.APP);
+		return withdrawBizService.submit(uid, query, WithdrawUserTypeEnums.APP);
 	}
 
 	@Override

@@ -57,6 +57,17 @@ public interface WalletAccountDao extends BaseMapper<WalletAccountEntity> {
 			+ "gmtModified = now() where id = #{id}")
 	int updateAvailableBalance(@Param("id") Long id, @Param("availableBalance") BigDecimal availableBalance);
 
+	/** 提现入账：原子增加可用余额 */
+	@Update("update wallet_account set available_balance = ifnull(available_balance, 0) + #{delta}, "
+			+ "balance_sync_time = now(), gmtModified = now() where id = #{id}")
+	int addAvailableBalance(@Param("id") Long id, @Param("delta") BigDecimal delta);
+
+	/** 卡充值扣款：余额充足时原子扣减 */
+	@Update("update wallet_account set available_balance = ifnull(available_balance, 0) - #{delta}, "
+			+ "balance_sync_time = now(), gmtModified = now() "
+			+ "where id = #{id} and ifnull(available_balance, 0) >= #{delta}")
+	int deductAvailableBalance(@Param("id") Long id, @Param("delta") BigDecimal delta);
+
 	@Select("select * from wallet_account where tron_usdt_address = #{address} limit 1")
 	WalletAccountEntity findByTronUsdtAddress(@Param("address") String address);
 }

@@ -63,7 +63,7 @@ public class ThirdService {
 	private static final String HEADER_UID = "uid";
 
 	@Autowired
-	private RestTemplate restTemplate;
+    private RestTemplate restTemplate;
 	@Autowired
 	private ThirdPartyProperties thirdPartyProperties;
 	@Autowired
@@ -444,8 +444,8 @@ public class ThirdService {
 			}
 			String sign = RsaSignUtil.generateSign(appId, nonce, timestamp, body,
 					thirdPartyProperties.getPrivateKey());
-			HttpHeaders headers = new HttpHeaders();
-			headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
 			headers.set(HEADER_APP_ID, appId);
 			headers.set(HEADER_NONCE, nonce);
 			headers.set(HEADER_TIMESTAMP, timestamp);
@@ -490,7 +490,7 @@ public class ThirdService {
 		}
 		try {
 			return objectMapper.treeToValue(data, type);
-		} catch (Exception e) {
+        } catch (Exception e) {
 			log.error("third party {} parse data failed", bizName, e);
 			throw new BaseException(bizName + "响应解析失败", e);
 		}

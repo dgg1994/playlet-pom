@@ -41,6 +41,9 @@ public class WithdrawOrderAdminItemEntity {
 	@ApiModelProperty("资产编码（内部）")
 	private String assetCode;
 
+	@ApiModelProperty("打款网关（内部）")
+	private String gateway;
+
 	@ApiModelProperty("网络（内部）")
 	private String network;
 

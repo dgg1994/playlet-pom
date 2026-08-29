@@ -76,8 +76,7 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
-		Integer points = query == null ? null : query.getPoints();
-		return withdrawBizService.submit(uid, points, WithdrawUserTypeEnums.CREATOR);
+		return withdrawBizService.submit(uid, query, WithdrawUserTypeEnums.CREATOR);
 	}
 
 	@Override

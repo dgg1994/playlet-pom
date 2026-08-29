@@ -8,7 +8,7 @@ import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
 /**
- * 提现入参：金币提现到 U 卡。
+ * 提现入参：金币按 withdraw_config 换算为 U 并入账钱包余额。
  */
 @Data
 @ApiModel("提现请求")
@@ -18,4 +18,10 @@ public class WithdrawReqEntity {
 	@Min(value = 1, message = "提现金币须大于0")
 	@ApiModelProperty(value = "提现金币数量", required = true)
 	private Integer points;
+
+	@ApiModelProperty(value = "币种编码，如 USDT；不传则取启用配置首条")
+	private String assetCode;
+
+	@ApiModelProperty(value = "网络，如 TRC20；不传则取启用配置首条")
+	private String network;
 }
