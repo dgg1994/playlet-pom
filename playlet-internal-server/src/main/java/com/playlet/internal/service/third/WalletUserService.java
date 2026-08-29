@@ -22,7 +22,6 @@ import com.playlet.internal.api.response.ThirdBankcardBalanceResp;
 import com.playlet.internal.api.response.ThirdBankcardCanActiveResp;
 import com.playlet.internal.api.response.ThirdBankcardInfoResp;
 import com.playlet.internal.api.response.ThirdBankcardPinResp;
-import com.playlet.internal.api.response.ThirdBankcardProductResp;
 import com.playlet.internal.api.response.WalletApplyCardResp;
 import com.playlet.internal.api.response.WalletCardItemResp;
 import com.playlet.internal.api.response.WalletCardProductItemResp;
@@ -36,12 +35,14 @@ import com.playlet.internal.constants.WalletKycApiStatus;
 import com.playlet.internal.dao.wallet.WalletAccountDao;
 import com.playlet.internal.dao.wallet.WalletBankcardDao;
 import com.playlet.internal.dao.wallet.WalletCardApplyDao;
+import com.playlet.internal.dao.wallet.WalletCardProductDao;
 import com.playlet.internal.dao.wallet.WalletCardTransactionDao;
 import com.playlet.internal.dao.wallet.WalletKycApplyDao;
 import com.playlet.internal.dao.wallet.WalletUserDao;
 import com.playlet.internal.entity.wallet.WalletAccountEntity;
 import com.playlet.internal.entity.wallet.WalletBankcardEntity;
 import com.playlet.internal.entity.wallet.WalletCardApplyEntity;
+import com.playlet.internal.entity.wallet.WalletCardProductEntity;
 import com.playlet.internal.entity.wallet.WalletCardTransactionEntity;
 import com.playlet.internal.entity.wallet.WalletKycApplyEntity;
 import com.playlet.internal.entity.wallet.WalletUserEntity;
@@ -50,6 +51,7 @@ import com.playlet.internal.enums.WalletCardStatusEnums;
 import com.playlet.internal.enums.WalletKycStateEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
+import com.playlet.internal.service.support.WalletCardProductService;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.PasswordHashUtils;
 import com.playlet.internal.utils.StringUtils;
@@ -63,7 +65,11 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -89,6 +95,10 @@ public class WalletUserService extends BaseApiService {
 	private WalletCardApplyDao walletCardApplyDao;
 	@Autowired
 	private WalletCardTransactionDao walletCardTransactionDao;
+	@Autowired
+	private WalletCardProductDao walletCardProductDao;
+	@Autowired
+	private WalletCardProductService walletCardProductService;
 	@Autowired
 	private WalletKycApplyDao walletKycApplyDao;
 
@@ -191,6 +201,7 @@ public class WalletUserService extends BaseApiService {
 			resp.setKycApiStatus(account.getKycApiStatus());
 			resp.setActivationState(account.getActivationState());
 			resp.setPayPasswordSet(!StringUtils.isEmpty(account.getPayPassword()));
+			resp.setTronUsdtAddress(account.getTronUsdtAddress());
 		} else {
 			resp.setAvailableBalance(BigDecimal.ZERO);
 			resp.setFreezeBalance(BigDecimal.ZERO);
@@ -214,30 +225,18 @@ public class WalletUserService extends BaseApiService {
 			return setResultSuccess(Collections.emptyList(), I18nUtil.getMessage("base_success"));
 		}
 		List<WalletCardItemResp> items = new ArrayList<>(rows.size());
+		Map<Integer, String> cardImgMap = loadCardImgMap(collectCardProductIds(rows));
 		for (WalletBankcardEntity row : rows) {
-			items.add(toCardItem(row));
+			items.add(toCardItem(row, cardImgMap.get(row.getCardProductId())));
 		}
 		return setResultSuccess(items, I18nUtil.getMessage("base_success"));
 	}
 
 	/**
-	 * 商户可用卡产品列表：拉三方实时数据，供申请开卡选品。
+	 * 商户可用卡产品列表：读本地 wallet_card_product，仅 enable=1。
 	 */
 	public ResponseBase listCardProducts() {
-		List<ThirdBankcardProductResp> thirdList;
-		try {
-			thirdList = thirdService.listCardProducts();
-		} catch (Exception e) {
-			log.error("wallet list card products failed", e);
-			return setResultError(I18nUtil.getMessage("base_error"));
-		}
-		if (thirdList == null || thirdList.isEmpty()) {
-			return setResultSuccess(Collections.emptyList(), I18nUtil.getMessage("base_success"));
-		}
-		List<WalletCardProductItemResp> items = new ArrayList<>(thirdList.size());
-		for (ThirdBankcardProductResp row : thirdList) {
-			items.add(toProductItem(row));
-		}
+		List<WalletCardProductItemResp> items = walletCardProductService.listEnabledProducts();
 		log.info("wallet card product list size={}", items.size());
 		return setResultSuccess(items, I18nUtil.getMessage("base_success"));
 	}
@@ -1068,7 +1067,7 @@ public class WalletUserService extends BaseApiService {
 		}
 	}
 
-	private static WalletCardItemResp toCardItem(WalletBankcardEntity row) {
+	private static WalletCardItemResp toCardItem(WalletBankcardEntity row, String cardImg) {
 		WalletCardItemResp item = new WalletCardItemResp();
 		item.setId(row.getId());
 		item.setUserBankcardId(row.getUserBankcardId());
@@ -1085,25 +1084,38 @@ public class WalletUserService extends BaseApiService {
 		item.setIsDefault(row.getIsDefault() == null ? WalletConstants.CARD_DEFAULT_NO : row.getIsDefault());
 		item.setPinSet(row.getPinSet());
 		item.setTagName(row.getTagName());
+		item.setCardImg(cardImg);
 		item.setSetTime(row.getSetTime());
 		return item;
 	}
 
-	private static WalletCardProductItemResp toProductItem(ThirdBankcardProductResp row) {
-		WalletCardProductItemResp item = new WalletCardProductItemResp();
-		item.setProductId(row.getId());
-		item.setCardTitle(row.getCardTitle());
-		item.setCardBin(row.getCardBin());
-		item.setBankCardNature(row.getBankCardNature());
-		item.setCardBrand(row.getCardBrand());
-		item.setCardMode(row.getCardMode());
-		item.setCurrency(StringUtils.isEmpty(row.getCcy()) ? WalletConstants.DEFAULT_CURRENCY : row.getCcy());
-		item.setApplyFee(row.getApplyFee());
-		item.setRechargeFee(row.getRechargeFee());
-		item.setBankcardRegion(row.getBankcardRegion());
-		item.setActiveMinLimit(row.getActiveMinLimit());
-		item.setRechargeMinLimit(row.getRechargeMinLimit());
-		return item;
+	/** 按产品 id 批量加载本地 card_img 缓存 */
+	private Map<Integer, String> loadCardImgMap(Set<Integer> productIds) {
+		if (productIds == null || productIds.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		List<Integer> ids = new ArrayList<>(productIds);
+		List<WalletCardProductEntity> rows = walletCardProductDao.findCardImgByIds(ids);
+		if (rows == null || rows.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		Map<Integer, String> map = new HashMap<>(rows.size());
+		for (WalletCardProductEntity row : rows) {
+			if (row.getId() != null && !StringUtils.isEmpty(row.getCardImg())) {
+				map.put(row.getId(), row.getCardImg());
+			}
+		}
+		return map;
+	}
+
+	private static Set<Integer> collectCardProductIds(List<WalletBankcardEntity> rows) {
+		Set<Integer> ids = new HashSet<>();
+		for (WalletBankcardEntity row : rows) {
+			if (row.getCardProductId() != null) {
+				ids.add(row.getCardProductId());
+			}
+		}
+		return ids;
 	}
 
 	/** 优先自定义标签，否则 品牌-尾号 */

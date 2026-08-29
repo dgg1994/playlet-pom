@@ -57,6 +57,9 @@ public class WalletCardItemResp {
 	@ApiModelProperty("自定义标签")
 	private String tagName;
 
+	@ApiModelProperty("卡片展示图 URL")
+	private String cardImg;
+
 	@ApiModelProperty("开卡时间")
 	private Date setTime;
 }

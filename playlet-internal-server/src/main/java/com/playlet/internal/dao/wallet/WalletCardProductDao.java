@@ -17,6 +17,19 @@ public interface WalletCardProductDao extends BaseMapper<WalletCardProductEntity
 	@Select("select * from wallet_card_product where enable = 1 order by hot desc, id asc")
 	List<WalletCardProductEntity> findEnabledList();
 
+	@Select("<script>"
+			+ "select * from wallet_card_product where 1 = 1 "
+			+ "<if test='enable != null'> and enable = #{enable} </if>"
+			+ "<if test='cardTitle != null and cardTitle != \"\"'> and card_title like concat('%', #{cardTitle}, '%') </if>"
+			+ "order by hot desc, id asc"
+			+ "</script>")
+	List<WalletCardProductEntity> findAdminList(WalletCardProductEntity entity);
+
 	@Select("select * from wallet_card_product where id = #{id} limit 1")
 	WalletCardProductEntity findById(@Param("id") Integer id);
+
+	@Select("<script>select id, card_img from wallet_card_product where id in "
+			+ "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
+			+ "</script>")
+	List<WalletCardProductEntity> findCardImgByIds(@Param("ids") List<Integer> ids);
 }

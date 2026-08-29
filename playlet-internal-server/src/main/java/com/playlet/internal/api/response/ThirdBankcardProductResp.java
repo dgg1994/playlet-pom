@@ -49,4 +49,7 @@ public class ThirdBankcardProductResp {
 
 	@ApiModelProperty("单笔充值最小金额")
 	private Integer rechargeMinLimit;
+
+	@ApiModelProperty("卡片展示图 URL")
+	private String cardImg;
 }
