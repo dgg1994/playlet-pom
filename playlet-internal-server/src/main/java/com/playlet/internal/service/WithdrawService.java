@@ -9,6 +9,7 @@ import com.playlet.internal.api.request.BankcardUpdateStatusRequest;
 import com.playlet.internal.api.request.BankcardUserIdRequest;
 import com.playlet.internal.api.request.KycApplyRequest;
 import com.playlet.internal.api.request.KycCountryListRequest;
+import com.playlet.internal.api.request.UsdtTopinNotifyRequest;
 import com.playlet.internal.api.request.WalletApplyCardRequest;
 import com.playlet.internal.api.request.WalletBindPayPwdRequest;
 import com.playlet.internal.api.request.WithdrawReqEntity;
@@ -37,6 +38,14 @@ public interface WithdrawService {
 	@PostMapping("/withdraw")
 	@ApiOperation(value = "提现", notes = "需登录且 U 卡就绪（KYC 通过 + 可用卡）。提交后冻结金币，充值到账后扣减。")
 	ResponseBase withdraw(@RequestBody WithdrawReqEntity query, HttpServletRequest request);
+
+	@GetMapping("/topinUsdtAddress")
+	@ApiOperation(value = "获取USDT充值的钱包地址", notes = "获取USDT充值的钱包地址", response = ResponseBase.class)
+	ResponseBase topinUsdtAddress(String uid);
+
+	@PostMapping("/topinUsdtNotify")
+	@ApiOperation(value = "USDT充值回调", notes = "网关回调，无需登录；验签后增加钱包可用余额")
+	ResponseBase topinUsdtNotify(@RequestBody UsdtTopinNotifyRequest query, HttpServletRequest request);
 
 	@GetMapping("/withdraw/records")
 	@ApiOperation(value = "提现记录", notes = "分页；地址脱敏；需登录")

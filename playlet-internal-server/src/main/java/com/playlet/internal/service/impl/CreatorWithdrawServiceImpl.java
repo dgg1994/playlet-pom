@@ -19,6 +19,7 @@ import com.playlet.internal.enums.WithdrawUserTypeEnums;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
 import com.playlet.internal.service.CreatorWithdrawService;
 import com.playlet.internal.service.support.CreatorRevenueBizService;
+import com.playlet.internal.service.support.WalletUsdtTopinService;
 import com.playlet.internal.service.support.WithdrawBizService;
 import com.playlet.internal.service.third.WalletUserService;
 import com.playlet.internal.utils.CreatorTokenUtil;
@@ -43,6 +44,13 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 	private CreatorRevenueBizService creatorRevenueBizService;
 	@Autowired
 	private WalletUserService walletUserService;
+	@Autowired
+	private WalletUsdtTopinService walletUsdtTopinService;
+
+	@Override
+	public ResponseBase topinUsdtAddress(String uid) {
+		return walletUsdtTopinService.getTopinAddress(uid);
+	}
 
 	@Override
 	public ResponseBase revenueSummary(HttpServletRequest request) {

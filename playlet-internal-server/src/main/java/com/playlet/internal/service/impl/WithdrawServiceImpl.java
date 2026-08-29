@@ -9,6 +9,7 @@ import com.playlet.internal.api.request.BankcardUpdateStatusRequest;
 import com.playlet.internal.api.request.BankcardUserIdRequest;
 import com.playlet.internal.api.request.KycApplyRequest;
 import com.playlet.internal.api.request.KycCountryListRequest;
+import com.playlet.internal.api.request.UsdtTopinNotifyRequest;
 import com.playlet.internal.api.request.WalletApplyCardRequest;
 import com.playlet.internal.api.request.WalletBindPayPwdRequest;
 import com.playlet.internal.api.request.WithdrawReqEntity;
@@ -18,6 +19,7 @@ import com.playlet.internal.constants.Constants;
 import com.playlet.internal.enums.WithdrawUserTypeEnums;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
 import com.playlet.internal.service.WithdrawService;
+import com.playlet.internal.service.support.WalletUsdtTopinService;
 import com.playlet.internal.service.support.WithdrawBizService;
 import com.playlet.internal.service.third.WalletUserService;
 import com.playlet.internal.utils.AppTokenUtil;
@@ -43,6 +45,20 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 	private WithdrawBizService withdrawBizService;
 	@Autowired
 	private WalletUserService walletUserService;
+	@Autowired
+	private WalletUsdtTopinService walletUsdtTopinService;
+
+	@Override
+	public ResponseBase topinUsdtAddress(String uid) {
+		return walletUsdtTopinService.getTopinAddress(uid);
+	}
+
+	@Override
+	public ResponseBase topinUsdtNotify(@RequestBody UsdtTopinNotifyRequest query, HttpServletRequest request) {
+		log.info("usdt topin callback hash={} uid={}", query == null ? null : query.getHash(),
+				query == null ? null : query.getUid());
+		return walletUsdtTopinService.handleNotify(query, request);
+	}
 
 	@Override
 	public ResponseBase withdrawHome(HttpServletRequest request) {

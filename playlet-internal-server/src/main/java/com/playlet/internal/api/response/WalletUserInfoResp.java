@@ -56,6 +56,9 @@ public class WalletUserInfoResp {
 	@ApiModelProperty("是否已绑定支付密码")
 	private Boolean payPasswordSet;
 
+	@ApiModelProperty("TRON USDT 充值地址")
+	private String tronUsdtAddress;
+
 	@ApiModelProperty("钱包用户状态 1正常 0禁用")
 	private Integer status;
 

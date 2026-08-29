@@ -71,6 +71,10 @@ public class WalletAccountEntity {
 	@ApiModelProperty(name = "currency", value = "币种，默认 USD")
 	private String currency;
 
+	@TableField("tron_usdt_address")
+	@ApiModelProperty(name = "tronUsdtAddress", value = "TRON USDT 充值地址")
+	private String tronUsdtAddress;
+
 	@TableField("balance_sync_time")
 	@ApiModelProperty(name = "balanceSyncTime", value = "最近一次余额同步时间")
 	private Date balanceSyncTime;

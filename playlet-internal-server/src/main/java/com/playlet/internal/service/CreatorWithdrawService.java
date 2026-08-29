@@ -1,17 +1,6 @@
 package com.playlet.internal.service;
 
-import com.playlet.internal.api.request.BankcardActiveRequest;
-import com.playlet.internal.api.request.BankcardCanActiveRequest;
-import com.playlet.internal.api.request.BankcardRechargeRequest;
-import com.playlet.internal.api.request.BankcardSetPinRequest;
-import com.playlet.internal.api.request.BankcardUpdateEmailRequest;
-import com.playlet.internal.api.request.BankcardUpdateStatusRequest;
-import com.playlet.internal.api.request.BankcardUserIdRequest;
-import com.playlet.internal.api.request.KycApplyRequest;
-import com.playlet.internal.api.request.KycCountryListRequest;
-import com.playlet.internal.api.request.WalletApplyCardRequest;
-import com.playlet.internal.api.request.WalletBindPayPwdRequest;
-import com.playlet.internal.api.request.WithdrawReqEntity;
+import com.playlet.internal.api.request.*;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
 import io.swagger.annotations.Api;
@@ -45,6 +34,11 @@ public interface CreatorWithdrawService {
 	@GetMapping("/withdraw/records")
 	@ApiOperation(value = "提现记录", notes = "分页；地址脱敏；需作家登录")
 	ResponseBase withdrawRecords(PageQueryHelperEntity page, HttpServletRequest request);
+
+	@GetMapping("/topinUsdtAddress")
+	@ApiOperation(value = "获取USDT充值的钱包地址", notes = "获取USDT充值的钱包地址；query 参数 uid 为钱包三方 uid", response = ResponseBase.class)
+	ResponseBase topinUsdtAddress(String uid);
+
 
 	@GetMapping("/fund/records")
 	@ApiOperation(value = "资金流水", notes = "分页查询 creator_coin_ledger；按时间倒序；需作家登录")
