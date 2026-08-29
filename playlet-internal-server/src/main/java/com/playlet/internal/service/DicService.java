@@ -13,6 +13,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @Tag(name = "字典",description = "字典")
 public interface DicService {
 
+	@GetMapping("/getCountryCode")
+	@ApiOperation(value = "查询国家地区代码",notes = "查询国家地区代码",response = ResponseBase.class)
+	ResponseBase getCountryCode();
+
+	@GetMapping("/findCountry")
+	@ApiOperation(value = "国家省市级联",notes = "国家省市级联",response = ResponseBase.class)
+	ResponseBase findCountry(Integer parentId);
+
 	@GetMapping("/getLanguage")
 	@Operation(summary = "查询语言列表", description = "查询语言列表")
 	ResponseBase getLanguage();
