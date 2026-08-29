@@ -5,14 +5,32 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 /**
- * 申请开卡结果。
+ * 申请开卡结果（对齐 worldpay 申请开卡 + 自动发卡）。
  */
 @Data
-@ApiModel(value = "申请开卡结果", description = "本地申请单 + 三方卡 id")
+@ApiModel(value = "申请开卡结果", description = "本地申请单 + 三方卡信息")
 public class WalletApplyCardResp {
 
 	@ApiModelProperty("本地申请单 id")
 	private Long applyId;
+
+	@ApiModelProperty("持卡人 id")
+	private Long holderId;
+
+	@ApiModelProperty("商户申请单号")
+	private String requestOrderId;
+
+	@ApiModelProperty("卡产品 id")
+	private Integer productId;
+
+	@ApiModelProperty("VIRTUAL / PHYSICAL")
+	private String cardType;
+
+	@ApiModelProperty("申请状态码")
+	private Integer applyState;
+
+	@ApiModelProperty("申请状态文案")
+	private String applyStateName;
 
 	@ApiModelProperty("三方订单号")
 	private String orderNo;
@@ -25,4 +43,7 @@ public class WalletApplyCardResp {
 
 	@ApiModelProperty("本地 wallet_bankcard.id（已落库时）")
 	private Long walletBankcardId;
+
+	@ApiModelProperty("虚拟卡且 KYC 已通过时是否已自动发起三方开卡")
+	private Boolean autoIssued;
 }

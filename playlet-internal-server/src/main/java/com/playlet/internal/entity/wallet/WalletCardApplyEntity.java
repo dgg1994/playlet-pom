@@ -31,6 +31,10 @@ public class WalletCardApplyEntity {
 	@ApiModelProperty(name = "walletUid", value = "钱包三方 uid")
 	private Long walletUid;
 
+	@TableField("holder_id")
+	@ApiModelProperty(name = "holderId", value = "wallet_user_holder.id")
+	private Long holderId;
+
 	@TableField("card_product_id")
 	@ApiModelProperty(name = "cardProductId", value = "卡产品 id")
 	private Integer cardProductId;
@@ -58,6 +62,14 @@ public class WalletCardApplyEntity {
 	@TableField("kyc_state")
 	@ApiModelProperty(name = "kycState", value = "申请时 KYC 快照")
 	private Integer kycState;
+
+	@TableField("kyc_state_name")
+	@ApiModelProperty(name = "kycStateName", value = "申请时 KYC 状态文案")
+	private String kycStateName;
+
+	@TableField("kyc_audit_result")
+	@ApiModelProperty(name = "kycAuditResult", value = "申请时 KYC 结果描述")
+	private String kycAuditResult;
 
 	@TableField("open_card_cost")
 	@ApiModelProperty(name = "openCardCost", value = "开卡费")

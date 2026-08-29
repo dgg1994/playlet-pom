@@ -77,7 +77,9 @@ public interface WithdrawService {
 	ResponseBase cardProductList(HttpServletRequest request);
 
 	@PostMapping("/card/apply")
-	@ApiOperation(value = "申请卡片", notes = "需登录且 KYC 已通过；productId 来自产品列表；实体卡可传 deliveryAddressId")
+	@ApiOperation(value = "申请卡片", notes = "需登录且 KYC 已通过；传 productId；holderId 或 holderData 必传其一；"
+			+ "实体卡须传 mailingAddress；可选 kycData（不传则从账户 KYC 回填）、deliveryAddressId、requestOrderId；"
+			+ "虚拟卡自动调三方发卡；返回 applyId/holderId/userBankcardId 等")
 	ResponseBase applyCard(@RequestBody WalletApplyCardRequest query, HttpServletRequest request);
 
 	@PostMapping("/card/canActive")

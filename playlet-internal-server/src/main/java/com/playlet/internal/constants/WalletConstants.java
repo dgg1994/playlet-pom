@@ -54,4 +54,26 @@ public final class WalletConstants {
 	public static final int KYC_CERT_PASSPORT = 2;
 	/** 证件类型：驾照（需正反面） */
 	public static final int KYC_CERT_DRIVER_LICENSE = 3;
+
+	/** 卡性质：虚拟卡 */
+	public static final String BANKCARD_NATURE_VIRTUAL = "VIRTUAL";
+	/** 卡性质：实体卡 */
+	public static final String BANKCARD_NATURE_PHYSICAL = "PHYSICAL";
+
+	/** 开卡充值方式：钱包余额 */
+	public static final int TOPUP_TYPE_WALLET = 1;
+	/** 开卡充值方式：银行卡 */
+	public static final int TOPUP_TYPE_BANKCARD = 2;
+
+	/** KYC 证件文件：正面 */
+	public static final int KYC_DOC_FRONT = 1;
+	/** KYC 证件文件：反面 */
+	public static final int KYC_DOC_BACK = 2;
+	/** KYC 证件文件：手持/自拍 */
+	public static final int KYC_DOC_HANDHELD = 3;
+
+	/** 开卡 KYC 证件类型文案：护照 */
+	public static final String PAPERWORK_PASSPORT = "PASSPORT";
+	/** 开卡 KYC 证件类型文案：身份证 */
+	public static final String PAPERWORK_NATIONAL_ID = "NATIONAL_ID";
 }

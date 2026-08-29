@@ -14,6 +14,9 @@ import com.playlet.internal.api.request.BankcardUserIdRequest;
 import com.playlet.internal.api.request.KycApplyRequest;
 import com.playlet.internal.api.request.WalletApplyCardRequest;
 import com.playlet.internal.api.request.WalletBindPayPwdRequest;
+import com.playlet.internal.api.request.WalletCardApplyKycRequest;
+import com.playlet.internal.api.request.WalletCardHolderRequest;
+import com.playlet.internal.api.request.WalletCardMailingAddressRequest;
 import com.playlet.internal.api.response.KycCountryResp;
 import com.playlet.internal.api.response.KycStatusResp;
 import com.playlet.internal.api.response.ThirdBankcardActiveResp;
@@ -36,17 +39,27 @@ import com.playlet.internal.constants.WalletKycApiStatus;
 import com.playlet.internal.dao.wallet.WalletAccountDao;
 import com.playlet.internal.dao.wallet.WalletBankcardDao;
 import com.playlet.internal.dao.wallet.WalletCardApplyDao;
+import com.playlet.internal.dao.wallet.WalletCardApplyKycDao;
+import com.playlet.internal.dao.wallet.WalletCardApplyManDao;
+import com.playlet.internal.dao.wallet.WalletCardApplySendDao;
 import com.playlet.internal.dao.wallet.WalletCardProductDao;
 import com.playlet.internal.dao.wallet.WalletCardTransactionDao;
 import com.playlet.internal.dao.wallet.WalletKycApplyDao;
+import com.playlet.internal.dao.wallet.WalletKycFileDao;
 import com.playlet.internal.dao.wallet.WalletUserDao;
+import com.playlet.internal.dao.wallet.WalletUserHolderDao;
 import com.playlet.internal.entity.wallet.WalletAccountEntity;
 import com.playlet.internal.entity.wallet.WalletBankcardEntity;
 import com.playlet.internal.entity.wallet.WalletCardApplyEntity;
+import com.playlet.internal.entity.wallet.WalletCardApplyKycEntity;
+import com.playlet.internal.entity.wallet.WalletCardApplyManEntity;
+import com.playlet.internal.entity.wallet.WalletCardApplySendEntity;
 import com.playlet.internal.entity.wallet.WalletCardProductEntity;
 import com.playlet.internal.entity.wallet.WalletCardTransactionEntity;
 import com.playlet.internal.entity.wallet.WalletKycApplyEntity;
+import com.playlet.internal.entity.wallet.WalletKycFileEntity;
 import com.playlet.internal.entity.wallet.WalletUserEntity;
+import com.playlet.internal.entity.wallet.WalletUserHolderEntity;
 import com.playlet.internal.enums.WalletCardApplyStateEnums;
 import com.playlet.internal.enums.WalletCardStatusEnums;
 import com.playlet.internal.enums.WalletKycStateEnums;
@@ -54,6 +67,7 @@ import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
 import com.playlet.internal.service.support.WalletCardProductService;
 import com.playlet.internal.utils.I18nUtil;
+import com.playlet.internal.utils.OrderCodeFactory;
 import com.playlet.internal.utils.PasswordHashUtils;
 import com.playlet.internal.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -95,6 +109,14 @@ public class WalletUserService extends BaseApiService {
 	@Autowired
 	private WalletCardApplyDao walletCardApplyDao;
 	@Autowired
+	private WalletCardApplyManDao walletCardApplyManDao;
+	@Autowired
+	private WalletCardApplySendDao walletCardApplySendDao;
+	@Autowired
+	private WalletCardApplyKycDao walletCardApplyKycDao;
+	@Autowired
+	private WalletUserHolderDao walletUserHolderDao;
+	@Autowired
 	private WalletCardTransactionDao walletCardTransactionDao;
 	@Autowired
 	private WalletCardProductDao walletCardProductDao;
@@ -102,6 +124,8 @@ public class WalletUserService extends BaseApiService {
 	private WalletCardProductService walletCardProductService;
 	@Autowired
 	private WalletKycApplyDao walletKycApplyDao;
+	@Autowired
+	private WalletKycFileDao walletKycFileDao;
 
 	/**
 	 * 本地账号注册成功后调用：开通 U 卡三方用户并写入 P0 表。
@@ -243,7 +267,7 @@ public class WalletUserService extends BaseApiService {
 	}
 
 	/**
-	 * 申请开卡：调三方 apply → 落 wallet_card_apply / wallet_bankcard。
+	 * 申请开卡：校验 KYC + 产品 + 持卡人 → 落申请单/持卡人/KYC/邮寄地址 → 虚拟卡调三方发卡（对齐 worldpay openCardApplyV2）。
 	 */
 	@Transactional(rollbackFor = Exception.class)
 	public ResponseBase applyCard(Integer userType, Integer localUid, WalletApplyCardRequest query) {
@@ -260,63 +284,407 @@ public class WalletUserService extends BaseApiService {
 				|| account.getKycState() != WalletKycStateEnums.SUCCESS_APPROVE.getCode()) {
 			return setResultError(I18nUtil.getMessage("wallet.kyc_required"));
 		}
-
-		BankcardApplyRequest thirdReq = new BankcardApplyRequest();
-		thirdReq.setProductId(query.getProductId());
-		thirdReq.setDeliveryAddressId(query.getDeliveryAddressId());
-		ThirdBankcardApplyResp third;
+		WalletCardProductEntity product = walletCardProductDao.findById(query.getProductId());
+		if (product == null) {
+			return setResultError(I18nUtil.getMessage("wallet.product_not_found"));
+		}
+		if (!Integer.valueOf(1).equals(product.getEnable())) {
+			return setResultError(I18nUtil.getMessage("wallet.product_disabled"));
+		}
+		boolean physicalCard = isPhysicalCard(product.getBankcardNature());
+		// 实体卡须传邮寄地址明细（本地落库）；三方 deliveryAddressId 可选
+		if (physicalCard && !isMailingAddressValid(query.getMailingAddress())) {
+			return setResultError(I18nUtil.getMessage("wallet.apply_physical_address_required"));
+		}
+		WalletUserHolderEntity holder;
 		try {
-			third = thirdService.applyBankcard(user.getWalletUid(), thirdReq);
+			holder = resolveOrCreateHolder(user, query);
 		} catch (BaseException e) {
-			log.error("wallet apply card third failed walletUid={} productId={}",
-					user.getWalletUid(), query.getProductId(), e);
 			return setResultError(e.getMessage());
-		} catch (Exception e) {
-			log.error("wallet apply card third error walletUid={} productId={}",
-					user.getWalletUid(), query.getProductId(), e);
-			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		String requestOrderId = resolveApplyRequestOrderId(query.getRequestOrderId(), localUid);
+		// 幂等：同 requestOrderId 直接返回已有申请结果
+		WalletCardApplyEntity existedApply = walletCardApplyDao.findByRequestOrderId(requestOrderId);
+		if (existedApply != null) {
+			WalletBankcardEntity existedCard = walletBankcardDao.findByCardApplyId(existedApply.getId());
+			boolean idempotentAutoIssued = !physicalCard && existedCard != null;
+			log.info("wallet apply card idempotent walletUserId={} requestOrderId={}",
+					user.getId(), requestOrderId);
+			String thirdOrderNo = existedCard == null ? null : existedCard.getApplyOrderNo();
+			return setResultSuccess(buildApplyCardResp(existedApply, existedCard, product, thirdOrderNo,
+					idempotentAutoIssued), I18nUtil.getMessage("base_success"));
 		}
 
+		int topupType = query.getTopupType() == null
+				? WalletConstants.TOPUP_TYPE_WALLET : query.getTopupType();
 		Date now = new Date();
-		WalletCardApplyEntity apply = new WalletCardApplyEntity();
-		apply.setWalletUserId(user.getId());
-		apply.setWalletUid(user.getWalletUid());
-		apply.setCardProductId(query.getProductId());
-		apply.setApplyState(WalletCardApplyStateEnums.ISSUED.getCode());
-		apply.setApplyStateName(WalletCardApplyStateEnums.ISSUED.getLabel());
-		apply.setKycState(account.getKycState());
-		apply.setRequestOrderId(third.getOrderNo());
-		apply.setSetTime(now);
-		apply.setGmtModified(now);
+		// 先落申请单 + 持卡人/KYC/邮寄地址快照（对齐 worldpay addApplyV2）
+		WalletCardApplyEntity apply = buildApplyEntity(user, account, product, query, holder.getId(),
+				requestOrderId, topupType, physicalCard, false, now);
 		try {
 			walletCardApplyDao.insert(apply);
+			persistApplySnapshots(user, apply.getId(), holder, query, now);
 		} catch (DuplicateKeyException e) {
-			// 幂等：同 orderNo 已落库
-			log.warn("wallet apply card duplicate orderNo={}", third.getOrderNo(), e);
-			WalletCardApplyEntity existed = walletCardApplyDao.findByRequestOrderId(third.getOrderNo());
-			if (existed != null) {
-				apply = existed;
-			} else {
-				throw new BaseException(I18nUtil.getMessage("base_error"), e);
+			log.warn("wallet apply card duplicate requestOrderId={}", requestOrderId, e);
+			WalletCardApplyEntity again = walletCardApplyDao.findByRequestOrderId(requestOrderId);
+			if (again != null) {
+				WalletBankcardEntity existedCard = walletBankcardDao.findByCardApplyId(again.getId());
+				String thirdOrderNo = existedCard == null ? null : existedCard.getApplyOrderNo();
+				return setResultSuccess(buildApplyCardResp(again, existedCard, product, thirdOrderNo,
+						!physicalCard && existedCard != null), I18nUtil.getMessage("base_success"));
 			}
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		} catch (BaseException e) {
+			throw e;
 		} catch (Exception e) {
-			log.error("wallet apply card insert apply failed orderNo={}", third.getOrderNo(), e);
+			log.error("wallet apply card insert apply failed requestOrderId={}", requestOrderId, e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 
-		Long walletBankcardId = null;
-		if (third.getUserBankcardId() != null) {
-			WalletBankcardEntity existedCard = walletBankcardDao.findByUserBankcardId(third.getUserBankcardId());
-			if (existedCard != null) {
-				walletBankcardId = existedCard.getId();
-			} else {
-				walletBankcardId = insertAppliedBankcard(user, apply.getId(), query.getProductId(), third, now);
+		// 虚拟卡 + KYC 已通过：自动调三方开卡（对齐 worldpay openCardV2）
+		ThirdBankcardApplyResp third = null;
+		boolean autoIssued = false;
+		if (!physicalCard) {
+			BankcardApplyRequest thirdReq = new BankcardApplyRequest();
+			thirdReq.setProductId(query.getProductId());
+			thirdReq.setDeliveryAddressId(query.getDeliveryAddressId());
+			try {
+				third = thirdService.applyBankcard(user.getWalletUid(), thirdReq);
+			} catch (BaseException e) {
+				log.error("wallet apply card third failed walletUid={} productId={}",
+						user.getWalletUid(), query.getProductId(), e);
+				throw e;
+			} catch (Exception e) {
+				log.error("wallet apply card third error walletUid={} productId={}",
+						user.getWalletUid(), query.getProductId(), e);
+				throw new BaseException(I18nUtil.getMessage("base_error"), e);
 			}
-			// 账户侧标记已开卡（首次）
-			walletAccountDao.markActivated(user.getId());
+			autoIssued = third != null && third.getUserBankcardId() != null;
+			if (autoIssued) {
+				apply.setApplyState(WalletCardApplyStateEnums.ISSUED.getCode());
+				apply.setApplyStateName(WalletCardApplyStateEnums.ISSUED.getLabel());
+				apply.setGmtModified(new Date());
+				try {
+					walletCardApplyDao.updateById(apply);
+				} catch (Exception e) {
+					log.error("wallet apply card update state failed applyId={}", apply.getId(), e);
+					throw new BaseException(I18nUtil.getMessage("base_error"), e);
+				}
+			}
+		} else if (query.getDeliveryAddressId() != null) {
+			// 实体卡若已有三方邮寄地址，同步调三方申请
+			BankcardApplyRequest thirdReq = new BankcardApplyRequest();
+			thirdReq.setProductId(query.getProductId());
+			thirdReq.setDeliveryAddressId(query.getDeliveryAddressId());
+			try {
+				third = thirdService.applyBankcard(user.getWalletUid(), thirdReq);
+			} catch (BaseException e) {
+				log.error("wallet apply physical card third failed walletUid={} productId={}",
+						user.getWalletUid(), query.getProductId(), e);
+				throw e;
+			} catch (Exception e) {
+				log.error("wallet apply physical card third error walletUid={} productId={}",
+						user.getWalletUid(), query.getProductId(), e);
+				throw new BaseException(I18nUtil.getMessage("base_error"), e);
+			}
 		}
 
-		return setResultSuccess(I18nUtil.getMessage("base_success"));
+		WalletBankcardEntity card = null;
+		if (third != null && third.getUserBankcardId() != null) {
+			card = walletBankcardDao.findByUserBankcardId(third.getUserBankcardId());
+			if (card == null) {
+				Long walletBankcardId = insertAppliedBankcard(user, apply.getId(), product, third, now);
+				if (walletBankcardId != null) {
+					card = walletBankcardDao.selectById(walletBankcardId);
+				}
+			}
+			walletAccountDao.markActivated(user.getId());
+		}
+		String thirdOrderNo = third == null ? null : third.getOrderNo();
+		log.info("wallet apply card success walletUserId={} productId={} applyId={} holderId={} userBankcardId={} autoIssued={}",
+				user.getId(), query.getProductId(), apply.getId(), holder.getId(),
+				third == null ? null : third.getUserBankcardId(), autoIssued);
+		return setResultSuccess(buildApplyCardResp(apply, card, product, thirdOrderNo, autoIssued),
+				I18nUtil.getMessage("base_success"));
+	}
+
+	/** 解析已有持卡人或新建持卡人 */
+	private WalletUserHolderEntity resolveOrCreateHolder(WalletUserEntity user, WalletApplyCardRequest query) {
+		if (query.getHolderId() != null) {
+			WalletUserHolderEntity existed = walletUserHolderDao.findOwned(query.getHolderId(), user.getId());
+			if (existed == null) {
+				throw new BaseException(I18nUtil.getMessage("wallet.apply_holder_required"));
+			}
+			return existed;
+		}
+		WalletCardHolderRequest data = query.getHolderData();
+		if (data == null || StringUtils.isEmpty(data.getUserName()) || StringUtils.isEmpty(data.getUserSurname())
+				|| StringUtils.isEmpty(data.getUserTel()) || StringUtils.isEmpty(data.getUserEmail())) {
+			throw new BaseException(I18nUtil.getMessage("wallet.apply_holder_required"));
+		}
+		Date now = new Date();
+		WalletUserHolderEntity holder = new WalletUserHolderEntity();
+		holder.setWalletUserId(user.getId());
+		holder.setWalletUid(user.getWalletUid());
+		holder.setUserName(data.getUserName().trim());
+		holder.setUserSurname(data.getUserSurname().trim());
+		holder.setUserTelDialCode(data.getUserTelDialCode());
+		holder.setUserTelCode(data.getUserTelCode());
+		holder.setUserTel(data.getUserTel().trim());
+		holder.setUserEmail(data.getUserEmail().trim());
+		holder.setUserNumber(data.getUserNumber());
+		holder.setUserSex(data.getUserSex());
+		holder.setUserSexNum(data.getUserSexNum());
+		holder.setUserAddress(data.getUserAddress());
+		holder.setUserBirthday(data.getUserBirthday());
+		holder.setSetTime(now);
+		holder.setGmtModified(now);
+		try {
+			walletUserHolderDao.insert(holder);
+		} catch (Exception e) {
+			log.error("wallet holder insert failed walletUserId={}", user.getId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+		return holder;
+	}
+
+	/** 落申请关联快照：持卡人 / 邮寄地址 / KYC */
+	private void persistApplySnapshots(WalletUserEntity user, Long applyId, WalletUserHolderEntity holder,
+			WalletApplyCardRequest query, Date now) {
+		insertApplyMan(user, applyId, holder, now);
+		if (query.getMailingAddress() != null && isMailingAddressValid(query.getMailingAddress())) {
+			insertApplySend(user, applyId, query.getMailingAddress(), now);
+		}
+		WalletCardApplyKycEntity kycSnapshot = resolveApplyKyc(user, applyId, query.getKycData(), now);
+		if (kycSnapshot != null) {
+			try {
+				walletCardApplyKycDao.insert(kycSnapshot);
+			} catch (Exception e) {
+				log.error("wallet apply kyc insert failed applyId={}", applyId, e);
+				throw new BaseException(I18nUtil.getMessage("base_error"), e);
+			}
+		}
+	}
+
+	private void insertApplyMan(WalletUserEntity user, Long applyId, WalletUserHolderEntity holder, Date now) {
+		WalletCardApplyManEntity man = new WalletCardApplyManEntity();
+		man.setApplyId(applyId);
+		man.setWalletUserId(user.getId());
+		man.setWalletUid(user.getWalletUid());
+		man.setUserName(holder.getUserName());
+		man.setUserSurname(holder.getUserSurname());
+		man.setUserTelDialCode(holder.getUserTelDialCode());
+		man.setUserTelCode(holder.getUserTelCode());
+		man.setUserTel(holder.getUserTel());
+		man.setUserEmail(holder.getUserEmail());
+		man.setUserNumber(holder.getUserNumber());
+		man.setUserSex(holder.getUserSex());
+		man.setUserAddress(holder.getUserAddress());
+		man.setUserBirthday(holder.getUserBirthday());
+		man.setSetTime(now);
+		man.setGmtModified(now);
+		try {
+			walletCardApplyManDao.insert(man);
+		} catch (Exception e) {
+			log.error("wallet apply man insert failed applyId={}", applyId, e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+	}
+
+	private void insertApplySend(WalletUserEntity user, Long applyId,
+			WalletCardMailingAddressRequest mailing, Date now) {
+		WalletCardApplySendEntity send = new WalletCardApplySendEntity();
+		send.setApplyId(applyId);
+		send.setWalletUserId(user.getId());
+		send.setWalletUid(user.getWalletUid());
+		send.setNation(mailing.getNation().trim());
+		send.setProvince(mailing.getProvince());
+		send.setCity(mailing.getCity());
+		send.setAddressInfo(mailing.getAddressInfo().trim());
+		send.setCollectMan(mailing.getCollectMan().trim());
+		send.setCollectTel(mailing.getCollectTel().trim());
+		send.setPostCode(mailing.getPostCode());
+		send.setSetTime(now);
+		send.setGmtModified(now);
+		try {
+			walletCardApplySendDao.insert(send);
+		} catch (Exception e) {
+			log.error("wallet apply send insert failed applyId={}", applyId, e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+	}
+
+	/**
+	 * 解析开卡 KYC 快照：优先入参；否则从账户 KYC / 历史开卡 KYC / 证件文件回填。
+	 */
+	private WalletCardApplyKycEntity resolveApplyKyc(WalletUserEntity user, Long applyId,
+			WalletCardApplyKycRequest kycData, Date now) {
+		if (kycData != null && hasKycContent(kycData)) {
+			WalletCardApplyKycEntity row = new WalletCardApplyKycEntity();
+			row.setApplyId(applyId);
+			row.setWalletUserId(user.getId());
+			row.setWalletUid(user.getWalletUid());
+			row.setPaperworkType(kycData.getPaperworkType());
+			row.setPaperworkNum(kycData.getPaperworkNum());
+			row.setExpirationTime(kycData.getExpirationTime());
+			row.setFrontPhotoId(kycData.getFrontPhotoId());
+			row.setFrontPhotoUrl(kycData.getFrontPhotoUrl());
+			row.setBackPhotoId(kycData.getBackPhotoId());
+			row.setBackPhotoUrl(kycData.getBackPhotoUrl());
+			row.setHandheldPhotoId(kycData.getHandheldPhotoId());
+			row.setHandheldPhotoUrl(kycData.getHandheldPhotoUrl());
+			row.setSetTime(now);
+			row.setGmtModified(now);
+			return row;
+		}
+		WalletCardApplyKycEntity history = walletCardApplyKycDao.findLatestByWalletUserId(user.getId());
+		if (history != null) {
+			history.setId(null);
+			history.setApplyId(applyId);
+			history.setSetTime(now);
+			history.setGmtModified(now);
+			return history;
+		}
+		WalletKycApplyEntity latestKyc = walletKycApplyDao.findLatestByWalletUserId(user.getId());
+		if (latestKyc == null) {
+			return null;
+		}
+		WalletCardApplyKycEntity row = new WalletCardApplyKycEntity();
+		row.setApplyId(applyId);
+		row.setWalletUserId(user.getId());
+		row.setWalletUid(user.getWalletUid());
+		row.setPaperworkType(mapPaperworkType(latestKyc.getCertType()));
+		row.setFrontPhotoUrl(latestKyc.getIdUrl());
+		row.setBackPhotoUrl(latestKyc.getIdBackUrl());
+		row.setHandheldPhotoUrl(latestKyc.getSelfieUrl());
+		WalletKycFileEntity front = walletKycFileDao.findLatestByType(user.getId(), WalletConstants.KYC_DOC_FRONT);
+		WalletKycFileEntity back = walletKycFileDao.findLatestByType(user.getId(), WalletConstants.KYC_DOC_BACK);
+		WalletKycFileEntity handheld = walletKycFileDao.findLatestByType(user.getId(),
+				WalletConstants.KYC_DOC_HANDHELD);
+		if (front != null) {
+			row.setFrontPhotoId(front.getDocumentFileId());
+			if (StringUtils.isEmpty(row.getFrontPhotoUrl())) {
+				row.setFrontPhotoUrl(front.getDocumentFileUrl());
+			}
+		}
+		if (back != null) {
+			row.setBackPhotoId(back.getDocumentFileId());
+			if (StringUtils.isEmpty(row.getBackPhotoUrl())) {
+				row.setBackPhotoUrl(back.getDocumentFileUrl());
+			}
+		}
+		if (handheld != null) {
+			row.setHandheldPhotoId(handheld.getDocumentFileId());
+			if (StringUtils.isEmpty(row.getHandheldPhotoUrl())) {
+				row.setHandheldPhotoUrl(handheld.getDocumentFileUrl());
+			}
+		}
+		row.setSetTime(now);
+		row.setGmtModified(now);
+		return row;
+	}
+
+	private static boolean hasKycContent(WalletCardApplyKycRequest kycData) {
+		return !StringUtils.isEmpty(kycData.getPaperworkType())
+				|| !StringUtils.isEmpty(kycData.getPaperworkNum())
+				|| !StringUtils.isEmpty(kycData.getFrontPhotoUrl())
+				|| !StringUtils.isEmpty(kycData.getFrontPhotoId())
+				|| !StringUtils.isEmpty(kycData.getBackPhotoUrl())
+				|| !StringUtils.isEmpty(kycData.getHandheldPhotoUrl());
+	}
+
+	private static boolean isMailingAddressValid(WalletCardMailingAddressRequest mailing) {
+		return mailing != null
+				&& !StringUtils.isEmpty(mailing.getNation())
+				&& !StringUtils.isEmpty(mailing.getAddressInfo())
+				&& !StringUtils.isEmpty(mailing.getCollectMan())
+				&& !StringUtils.isEmpty(mailing.getCollectTel());
+	}
+
+	private static String mapPaperworkType(Integer certType) {
+		if (certType == null) {
+			return null;
+		}
+		if (certType == WalletConstants.KYC_CERT_PASSPORT) {
+			return WalletConstants.PAPERWORK_PASSPORT;
+		}
+		return WalletConstants.PAPERWORK_NATIONAL_ID;
+	}
+
+	private static WalletCardApplyEntity buildApplyEntity(WalletUserEntity user, WalletAccountEntity account,
+			WalletCardProductEntity product, WalletApplyCardRequest query, Long holderId, String requestOrderId,
+			int topupType, boolean physicalCard, boolean autoIssued, Date now) {
+		WalletCardApplyEntity apply = new WalletCardApplyEntity();
+		apply.setWalletUserId(user.getId());
+		apply.setWalletUid(user.getWalletUid());
+		apply.setHolderId(holderId);
+		apply.setCardProductId(query.getProductId());
+		apply.setCardUuid(product.getProductUuid());
+		apply.setCardType(product.getBankcardNature());
+		apply.setTopupType(topupType);
+		if (autoIssued) {
+			apply.setApplyState(WalletCardApplyStateEnums.ISSUED.getCode());
+			apply.setApplyStateName(WalletCardApplyStateEnums.ISSUED.getLabel());
+		} else {
+			apply.setApplyState(WalletCardApplyStateEnums.APPLYING.getCode());
+			apply.setApplyStateName(WalletCardApplyStateEnums.APPLYING.getLabel());
+		}
+		apply.setKycState(account.getKycState());
+		apply.setKycStateName(account.getKycStateName());
+		apply.setKycAuditResult(account.getKycAuditResult());
+		apply.setRequestOrderId(requestOrderId);
+		// KYC 已通过时实体卡进入待发货
+		if (physicalCard
+				&& account.getKycState() != null
+				&& account.getKycState() == WalletKycStateEnums.SUCCESS_APPROVE.getCode()) {
+			apply.setShippingState(0);
+			apply.setShippingStateName("待发货");
+		}
+		apply.setSetTime(now);
+		apply.setGmtModified(now);
+		return apply;
+	}
+
+	private static WalletApplyCardResp buildApplyCardResp(WalletCardApplyEntity apply, WalletBankcardEntity card,
+			WalletCardProductEntity product, String thirdOrderNo, boolean autoIssued) {
+		WalletApplyCardResp resp = new WalletApplyCardResp();
+		if (apply != null) {
+			resp.setApplyId(apply.getId());
+			resp.setHolderId(apply.getHolderId());
+			resp.setRequestOrderId(apply.getRequestOrderId());
+			resp.setProductId(apply.getCardProductId());
+			resp.setCardType(apply.getCardType());
+			resp.setApplyState(apply.getApplyState());
+			resp.setApplyStateName(apply.getApplyStateName());
+		}
+		if (product != null && resp.getProductId() == null) {
+			resp.setProductId(product.getId());
+			resp.setCardType(product.getBankcardNature());
+		}
+		if (!StringUtils.isEmpty(thirdOrderNo)) {
+			resp.setOrderNo(thirdOrderNo);
+		}
+		if (card != null) {
+			resp.setUserBankcardId(card.getUserBankcardId());
+			resp.setCardNo(card.getCardNo());
+			resp.setWalletBankcardId(card.getId());
+			if (!StringUtils.isEmpty(card.getApplyOrderNo())) {
+				resp.setOrderNo(card.getApplyOrderNo());
+			}
+		}
+		resp.setAutoIssued(autoIssued);
+		return resp;
+	}
+
+	private static String resolveApplyRequestOrderId(String requestOrderId, Integer localUid) {
+		if (!StringUtils.isEmpty(requestOrderId)) {
+			return requestOrderId.trim();
+		}
+		return "CA" + OrderCodeFactory.getOrderCode(localUid.longValue());
+	}
+
+	private static boolean isPhysicalCard(String bankcardNature) {
+		return WalletConstants.BANKCARD_NATURE_PHYSICAL.equalsIgnoreCase(bankcardNature);
 	}
 
 	/**
@@ -669,15 +1037,17 @@ public class WalletUserService extends BaseApiService {
 	}
 
 	/** 申请成功后写入本地卡记录 */
-	private Long insertAppliedBankcard(WalletUserEntity user, Long applyId, Integer productId,
+	private Long insertAppliedBankcard(WalletUserEntity user, Long applyId, WalletCardProductEntity product,
 			ThirdBankcardApplyResp third, Date now) {
 		WalletBankcardEntity card = new WalletBankcardEntity();
 		card.setWalletUserId(user.getId());
 		card.setWalletUid(user.getWalletUid());
 		card.setCardApplyId(applyId);
-		card.setCardProductId(productId);
+		card.setCardProductId(product == null ? null : product.getId());
 		card.setUserBankcardId(third.getUserBankcardId());
 		card.setCardNo(third.getCardNo());
+		card.setBankcardNature(product == null ? null : product.getBankcardNature());
+		card.setCardBrand(product == null ? null : product.getCardBrand());
 		card.setCurrency(WalletConstants.DEFAULT_CURRENCY);
 		// 申请刚成功：待激活
 		card.setCardStatus(WalletCardStatusEnums.WAIT_ACTIVE.getCode());

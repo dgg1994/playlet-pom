@@ -19,6 +19,9 @@ public interface WalletBankcardDao extends BaseMapper<WalletBankcardEntity> {
 	@Select("select * from wallet_bankcard where user_bankcard_id = #{userBankcardId} limit 1")
 	WalletBankcardEntity findByUserBankcardId(@Param("userBankcardId") Long userBankcardId);
 
+	@Select("select * from wallet_bankcard where card_apply_id = #{cardApplyId} limit 1")
+	WalletBankcardEntity findByCardApplyId(@Param("cardApplyId") Long cardApplyId);
+
 	@Select("select * from wallet_bankcard where wallet_user_id = #{walletUserId} "
 			+ "order by is_default desc, id desc")
 	List<WalletBankcardEntity> findByWalletUserId(@Param("walletUserId") Long walletUserId);
