@@ -1,5 +1,6 @@
 package com.playlet.internal.service;
 
+import com.playlet.internal.api.request.WalletCardProductUpdateRequest;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.entity.wallet.WalletCardProductEntity;
 import io.swagger.annotations.Api;
@@ -15,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 public interface WalletCardProductManageService {
 
 	@PostMapping("/findList")
-	@ApiOperation(value = "卡产品分页列表", notes = "查询本地 wallet_card_product，可筛 enable")
+	@ApiOperation(value = "卡产品分页列表", notes = "查询本地 wallet_card_product；返回含 labelList、synopsisData")
 	ResponseBase findList(WalletCardProductEntity entity);
 
 	@PostMapping("/syncFromThird")
@@ -23,6 +24,6 @@ public interface WalletCardProductManageService {
 	ResponseBase syncFromThird();
 
 	@PostMapping("/update")
-	@ApiOperation(value = "维护卡产品", notes = "按 id 更新展示图、上下架、热门、描述等本地字段")
-	ResponseBase update(WalletCardProductEntity entity);
+	@ApiOperation(value = "维护卡产品", notes = "按 id 更新展示图、上下架、热门、卡标签 labelList、卡简介 synopsisData")
+	ResponseBase update(WalletCardProductUpdateRequest entity);
 }

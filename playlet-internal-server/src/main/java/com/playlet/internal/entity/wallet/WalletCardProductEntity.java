@@ -12,6 +12,10 @@ import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
+
+import com.playlet.internal.api.response.WalletCardProductLabelResp;
+import com.playlet.internal.api.response.WalletCardProductSynopsisResp;
 
 /**
  * 钱包 U 卡产品缓存。
@@ -91,11 +95,11 @@ public class WalletCardProductEntity extends PageQueryHelperEntity {
 	private String cardImg;
 
 	@TableField("description1")
-	@ApiModelProperty(name = "description1", value = "描述1")
+	@ApiModelProperty(name = "description1", value = "卡简介正文（映射 synopsisData.content）")
 	private String description1;
 
 	@TableField("description2")
-	@ApiModelProperty(name = "description2", value = "描述2")
+	@ApiModelProperty(name = "description2", value = "卡标签（映射 labelList，多标签用 |/,/，分隔）")
 	private String description2;
 
 	@TableField("enable")
@@ -117,4 +121,14 @@ public class WalletCardProductEntity extends PageQueryHelperEntity {
 	@TableField("gmtModified")
 	@ApiModelProperty(name = "gmtModified", value = "更新时间")
 	private Date gmtModified;
+
+	/** 管理端/C 端展示：卡标签列表（非表字段，由 description2 解析） */
+	@TableField(exist = false)
+	@ApiModelProperty(name = "labelList", value = "卡标签列表")
+	private List<WalletCardProductLabelResp> labelList;
+
+	/** 管理端/C 端展示：卡简介（非表字段，由 description1 + cardTitle 组装） */
+	@TableField(exist = false)
+	@ApiModelProperty(name = "synopsisData", value = "卡简介")
+	private WalletCardProductSynopsisResp synopsisData;
 }

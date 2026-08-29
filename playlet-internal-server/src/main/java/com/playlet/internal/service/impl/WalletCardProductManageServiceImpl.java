@@ -3,6 +3,7 @@ package com.playlet.internal.service.impl;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import com.playlet.internal.aop.SysLogAnnotation;
+import com.playlet.internal.api.request.WalletCardProductUpdateRequest;
 import com.playlet.internal.api.response.WalletCardProductSyncResp;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.dao.wallet.WalletCardProductDao;
@@ -49,6 +50,8 @@ public class WalletCardProductManageServiceImpl implements WalletCardProductMana
 		if (list == null) {
 			list = new ArrayList<>();
 		}
+		// 补齐标签列表、卡简介，供管理端编辑回显
+		walletCardProductService.enrichAdminDisplay(list);
 		return setResultSuccess(new PageInfo<>(list), I18nUtil.getMessage("base_success"));
 	}
 
@@ -69,7 +72,7 @@ public class WalletCardProductManageServiceImpl implements WalletCardProductMana
 
 	@Override
 	@SysLogAnnotation(module = "U卡产品管理", type = "POST", remark = "维护卡产品")
-	public ResponseBase update(@RequestBody WalletCardProductEntity entity) {
+	public ResponseBase update(@RequestBody WalletCardProductUpdateRequest entity) {
 		try {
 			walletCardProductService.updateLocalFields(entity);
 			return setResultSuccess(null, I18nUtil.getMessage("base_success"));

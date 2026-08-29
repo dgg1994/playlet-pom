@@ -1,7 +1,10 @@
 package com.playlet.internal.service.support;
 
+import com.playlet.internal.api.request.WalletCardProductUpdateRequest;
 import com.playlet.internal.api.response.ThirdBankcardProductResp;
 import com.playlet.internal.api.response.WalletCardProductItemResp;
+import com.playlet.internal.api.response.WalletCardProductLabelResp;
+import com.playlet.internal.api.response.WalletCardProductSynopsisResp;
 import com.playlet.internal.api.response.WalletCardProductSyncResp;
 import com.playlet.internal.constants.WalletConstants;
 import com.playlet.internal.dao.wallet.WalletCardProductDao;
@@ -106,9 +109,9 @@ public class WalletCardProductService {
 		return WalletCardProductSyncResp.of(thirdList.size(), inserted, updated);
 	}
 
-	/** 管理端维护本地展示字段 */
+	/** 管理端维护本地展示字段（含标签列表、卡简介） */
 	@Transactional(rollbackFor = Exception.class)
-	public void updateLocalFields(WalletCardProductEntity patch) {
+	public void updateLocalFields(WalletCardProductUpdateRequest patch) {
 		if (patch == null || patch.getId() == null) {
 			throw new BaseException(I18nUtil.getMessage("parameter_error"));
 		}
@@ -125,14 +128,22 @@ public class WalletCardProductService {
 		if (patch.getHot() != null) {
 			existed.setHot(patch.getHot());
 		}
-		if (patch.getDescription1() != null) {
-			existed.setDescription1(patch.getDescription1());
-		}
-		if (patch.getDescription2() != null) {
-			existed.setDescription2(patch.getDescription2());
-		}
 		if (patch.getCardTitle() != null) {
 			existed.setCardTitle(patch.getCardTitle());
+		}
+		// 标签列表：null 不改；空数组清空；有值则用 | 拼接写入 description2
+		if (patch.getLabelList() != null) {
+			existed.setDescription2(joinLabelNames(patch.getLabelList()));
+		}
+		// 简介：null 不改；有对象则更新 content（及可选 title→卡名称）
+		if (patch.getSynopsisData() != null) {
+			WalletCardProductSynopsisResp synopsis = patch.getSynopsisData();
+			if (synopsis.getContent() != null) {
+				existed.setDescription1(synopsis.getContent());
+			}
+			if (synopsis.getTitle() != null && patch.getCardTitle() == null) {
+				existed.setCardTitle(synopsis.getTitle());
+			}
 		}
 		existed.setGmtModified(new Date());
 		try {
@@ -141,8 +152,44 @@ public class WalletCardProductService {
 			log.error("wallet card product update failed productId={}", patch.getId(), e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
-		log.info("wallet card product updated productId={} enable={} hot={}",
-				patch.getId(), existed.getEnable(), existed.getHot());
+		log.info("wallet card product updated productId={} enable={} hot={} labelSize={}",
+				patch.getId(), existed.getEnable(), existed.getHot(),
+				patch.getLabelList() == null ? null : patch.getLabelList().size());
+	}
+
+	/** 管理端列表补齐标签/简介展示字段 */
+	public void enrichAdminDisplay(List<WalletCardProductEntity> rows) {
+		if (rows == null || rows.isEmpty()) {
+			return;
+		}
+		for (WalletCardProductEntity row : rows) {
+			if (row == null) {
+				continue;
+			}
+			row.setLabelList(buildLabelList(row.getDescription2()));
+			row.setSynopsisData(buildSynopsis(row.getCardTitle(), row.getDescription1()));
+		}
+	}
+
+	private static String joinLabelNames(List<WalletCardProductLabelResp> labelList) {
+		if (labelList == null || labelList.isEmpty()) {
+			return "";
+		}
+		StringBuilder sb = new StringBuilder();
+		for (WalletCardProductLabelResp label : labelList) {
+			if (label == null || StringUtils.isEmpty(label.getName())) {
+				continue;
+			}
+			String name = label.getName().trim();
+			if (name.isEmpty()) {
+				continue;
+			}
+			if (sb.length() > 0) {
+				sb.append('|');
+			}
+			sb.append(name);
+		}
+		return sb.toString();
 	}
 
 	public static WalletCardProductItemResp toItemResp(WalletCardProductEntity row) {
@@ -165,7 +212,43 @@ public class WalletCardProductService {
 		item.setActiveMinLimit(row.getActiveMinLimit());
 		item.setRechargeMinLimit(row.getRechargeMinLimit());
 		item.setCardImg(row.getCardImg());
+		// 对齐 worldpay findList：标签列表 + 简介对象（本地暂存于 description1/2）
+		item.setLabelList(buildLabelList(row.getDescription2()));
+		item.setSynopsisData(buildSynopsis(row.getCardTitle(), row.getDescription1()));
 		return item;
+	}
+
+	/** description2 → 卡标签；支持 | / ， / , 分隔多标签 */
+	private static List<WalletCardProductLabelResp> buildLabelList(String description2) {
+		if (StringUtils.isEmpty(description2)) {
+			return Collections.emptyList();
+		}
+		String[] parts = description2.split("[|，,]");
+		List<WalletCardProductLabelResp> list = new ArrayList<>();
+		for (String part : parts) {
+			if (part == null) {
+				continue;
+			}
+			String name = part.trim();
+			if (name.isEmpty()) {
+				continue;
+			}
+			WalletCardProductLabelResp label = new WalletCardProductLabelResp();
+			label.setName(name);
+			list.add(label);
+		}
+		return list;
+	}
+
+	/** description1 → 卡简介 content；title 优先用卡名称 */
+	private static WalletCardProductSynopsisResp buildSynopsis(String cardTitle, String description1) {
+		if (StringUtils.isEmpty(description1) && StringUtils.isEmpty(cardTitle)) {
+			return null;
+		}
+		WalletCardProductSynopsisResp synopsis = new WalletCardProductSynopsisResp();
+		synopsis.setTitle(cardTitle);
+		synopsis.setContent(description1);
+		return synopsis;
 	}
 
 	private static WalletCardProductEntity buildFromThird(ThirdBankcardProductResp third, Date now) {

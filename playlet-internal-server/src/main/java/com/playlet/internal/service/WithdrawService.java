@@ -73,7 +73,7 @@ public interface WithdrawService {
 	ResponseBase cardList(HttpServletRequest request);
 
 	@GetMapping("/card/product/list")
-	@ApiOperation(value = "可用卡产品列表", notes = "商户可申请的卡产品，申请开卡前选品；需登录")
+	@ApiOperation(value = "可用卡产品列表", notes = "商户可申请的卡产品，申请开卡前选品；含卡标签 labelList、卡简介 synopsisData；需登录")
 	ResponseBase cardProductList(HttpServletRequest request);
 
 	@PostMapping("/card/apply")

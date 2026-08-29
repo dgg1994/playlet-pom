@@ -4,6 +4,8 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
+import java.util.List;
+
 /**
  * 商户可用卡产品（申请开卡前选品）。
  */
@@ -49,4 +51,10 @@ public class WalletCardProductItemResp {
 
 	@ApiModelProperty("卡片展示图 URL")
 	private String cardImg;
+
+	@ApiModelProperty("卡标签列表（对齐 worldpay lableList）")
+	private List<WalletCardProductLabelResp> labelList;
+
+	@ApiModelProperty("卡简介（对齐 worldpay synopsisData）")
+	private WalletCardProductSynopsisResp synopsisData;
 }
