@@ -71,6 +71,10 @@ public interface WithdrawService {
 	@ApiOperation(value = "提交KYC信息", notes = "需登录；证件照已上传拿到 url 后提交；审核中/已通过不可重复提交")
 	ResponseBase kycApply(@RequestBody KycApplyRequest query, HttpServletRequest request);
 
+	@GetMapping("/kyc/applyByCardApply")
+	@ApiOperation(value = "按开卡申请提交KYC", notes = "对齐 worldpay GET /kyc/apply；根据申请单持卡人/KYC快照组装并提交三方；需登录且申请单归属当前用户")
+	ResponseBase kycApplyByCardApply(Long applyId, HttpServletRequest request);
+
 	@PostMapping("/file/upload")
 	@ApiOperation(value = "KYC证件上传", notes = "multipart 字段 idCard；透传三方 /api/file/upload；返回 fileUrl；需登录")
 	ResponseBase kycFileUpload(@RequestParam("idCard") MultipartFile idCard,
@@ -91,9 +95,10 @@ public interface WithdrawService {
 	ResponseBase cardProductDetail(Integer productId, HttpServletRequest request);
 
 	@PostMapping("/card/apply")
-	@ApiOperation(value = "申请卡片", notes = "需登录且 KYC 已通过；传 productId；holderId 或 holderData 必传其一；"
-			+ "实体卡须传 mailingAddress；可选 kycData（不传则从账户 KYC 回填）、deliveryAddressId、requestOrderId；"
-			+ "虚拟卡自动调三方发卡；返回 applyId/holderId/userBankcardId 等")
+	@ApiOperation(value = "申请卡片", notes = "需登录；传 productId；holderId 或 holderData 必传其一；"
+			+ "实体卡须传 mailingAddress；须已上传 KYC 证件或在 kycData 中带证件照；"
+			+ "KYC 未通过时先落申请单(申请中)，再调 /wallet/kyc/applyByCardApply 或 /wallet/kyc/apply；"
+			+ "KYC 已通过时虚拟卡自动调三方发卡；返回 applyId/kycState/kycSubmitRequired 等")
 	ResponseBase applyCard(@RequestBody WalletApplyCardRequest query, HttpServletRequest request);
 
 	@PostMapping("/cardholder/add")

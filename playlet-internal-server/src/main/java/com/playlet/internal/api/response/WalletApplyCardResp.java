@@ -46,4 +46,13 @@ public class WalletApplyCardResp {
 
 	@ApiModelProperty("虚拟卡且 KYC 已通过时是否已自动发起三方开卡")
 	private Boolean autoIssued;
+
+	@ApiModelProperty("申请时 KYC 状态码")
+	private Integer kycState;
+
+	@ApiModelProperty("申请时 KYC 状态文案")
+	private String kycStateName;
+
+	@ApiModelProperty("KYC 未通过时为 true，需调用 /wallet/kyc/applyByCardApply 或 /wallet/kyc/apply")
+	private Boolean kycSubmitRequired;
 }

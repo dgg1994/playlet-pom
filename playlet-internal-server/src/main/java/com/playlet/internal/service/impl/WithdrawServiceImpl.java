@@ -128,6 +128,15 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 	}
 
 	@Override
+	public ResponseBase kycApplyByCardApply(Long applyId, HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.applyKycByCardApply(WithdrawUserTypeEnums.APP.getCode(), uid, applyId);
+	}
+
+	@Override
 	public ResponseBase kycFileUpload(MultipartFile idCard,
 			Integer certType, Integer documentType, HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);

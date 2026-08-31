@@ -31,6 +31,15 @@ public interface WalletCardApplyDao extends BaseMapper<WalletCardApplyEntity> {
 	int updateApplyState(@Param("id") Long id, @Param("applyState") Integer applyState,
 			@Param("applyStateName") String applyStateName, @Param("rejectInfo") String rejectInfo);
 
+	@Update("update wallet_card_apply set kyc_state = #{kycState}, kyc_state_name = #{kycStateName}, "
+			+ "kyc_audit_result = #{kycAuditResult}, gmtModified = now() where id = #{id}")
+	int updateKycSnapshot(@Param("id") Long id, @Param("kycState") Integer kycState,
+			@Param("kycStateName") String kycStateName, @Param("kycAuditResult") String kycAuditResult);
+
+	@Select("select * from wallet_card_apply where wallet_user_id = #{walletUserId} "
+			+ "and apply_state = 0 and upper(card_type) = 'VIRTUAL' order by setTime asc, id asc")
+	List<WalletCardApplyEntity> findPendingVirtualByWalletUserId(@Param("walletUserId") Long walletUserId);
+
 	@Select("<script>"
 			+ "select * from wallet_card_apply where 1=1"
 			+ "<if test='walletUid != null'> and wallet_uid = #{walletUid}</if>"

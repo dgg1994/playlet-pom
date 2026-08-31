@@ -141,6 +141,15 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 	}
 
 	@Override
+	public ResponseBase kycApplyByCardApply(Long applyId, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.applyKycByCardApply(WithdrawUserTypeEnums.CREATOR.getCode(), uid, applyId);
+	}
+
+	@Override
 	public ResponseBase kycFileUpload(MultipartFile idCard,
 			Integer certType, Integer documentType, HttpServletRequest request) {
 		Integer uid = CreatorTokenUtil.resolveCreatorId(request);

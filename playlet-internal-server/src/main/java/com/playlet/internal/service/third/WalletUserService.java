@@ -227,7 +227,7 @@ public class WalletUserService extends BaseApiService {
 	}
 
 	/**
-	 * 申请开卡：校验 KYC + 产品 + 持卡人 → 落申请单/持卡人/KYC/邮寄地址 → 虚拟卡调三方发卡（对齐 worldpay openCardApplyV2）。
+	 * 申请开卡：校验产品 + 持卡人 + KYC 资料 → 落申请单 → KYC 已通过时虚拟卡自动三方发卡（对齐 worldpay openCardApply）。
 	 */
 	@Transactional(rollbackFor = Exception.class)
 	public ResponseBase applyCard(Integer userType, Integer localUid, WalletApplyCardRequest query) {
@@ -238,11 +238,14 @@ public class WalletUserService extends BaseApiService {
 		if (user == null) {
 			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
 		}
+		ensureWalletAccount(user);
 		WalletAccountEntity account = walletAccountDao.findByWalletUserId(user.getId());
-		if (account == null
-				|| account.getKycState() == null
-				|| account.getKycState() != WalletKycStateEnums.SUCCESS_APPROVE.getCode()) {
-			return setResultError(I18nUtil.getMessage("wallet.kyc_required"));
+		if (account == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		// 对齐 worldpay：须已有 KYC 证件资料，但不要求 KYC 已通过
+		if (!hasApplyKycMaterial(user, query)) {
+			return setResultError(I18nUtil.getMessage("user_kyc_null"));
 		}
 		WalletCardProductEntity product = walletCardProductDao.findById(query.getProductId());
 		if (product == null) {
@@ -278,7 +281,8 @@ public class WalletUserService extends BaseApiService {
 		int topupType = query.getTopupType() == null
 				? WalletConstants.TOPUP_TYPE_WALLET : query.getTopupType();
 		Date now = new Date();
-		// 先落申请单 + 持卡人/KYC/邮寄地址快照（对齐 worldpay addApplyV2）
+		boolean kycApproved = isKycApproved(account);
+		// 先落申请单 + 持卡人/KYC/邮寄地址快照（对齐 worldpay addApply）
 		WalletCardApplyEntity apply = buildApplyEntity(user, account, product, query, holder.getId(),
 				requestOrderId, topupType, physicalCard, false, now);
 		try {
@@ -294,31 +298,20 @@ public class WalletUserService extends BaseApiService {
 						!physicalCard && existedCard != null), I18nUtil.getMessage("base_success"));
 			}
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
-		} catch (BaseException e) {
-			throw e;
 		} catch (Exception e) {
 			log.error("wallet apply card insert apply failed requestOrderId={}", requestOrderId, e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
+		// 申请单须落 KYC 快照（对齐 worldpay 保存 kyc 信息）
+		if (walletCardApplyKycDao.findByApplyId(apply.getId()) == null) {
+			return setResultError(I18nUtil.getMessage("user_kyc_null"));
+		}
 
-		// 虚拟卡 + KYC 已通过：自动调三方开卡（对齐 worldpay openCardV2）
+		// 虚拟卡 + KYC 已通过：自动调三方开卡；否则保持申请中待补/待审 KYC
 		ThirdBankcardApplyResp third = null;
 		boolean autoIssued = false;
-		if (!physicalCard) {
-			BankcardApplyRequest thirdReq = new BankcardApplyRequest();
-			thirdReq.setProductId(query.getProductId());
-			thirdReq.setDeliveryAddressId(query.getDeliveryAddressId());
-			try {
-				third = thirdService.applyBankcard(user.getWalletUid(), thirdReq);
-			} catch (BaseException e) {
-				log.error("wallet apply card third failed walletUid={} productId={}",
-						user.getWalletUid(), query.getProductId(), e);
-				throw e;
-			} catch (Exception e) {
-				log.error("wallet apply card third error walletUid={} productId={}",
-						user.getWalletUid(), query.getProductId(), e);
-				throw new BaseException(I18nUtil.getMessage("base_error"), e);
-			}
+		if (!physicalCard && kycApproved) {
+			third = issueVirtualCardThird(user, apply, product, query.getDeliveryAddressId());
 			autoIssued = third != null && third.getUserBankcardId() != null;
 			if (autoIssued) {
 				apply.setApplyState(WalletCardApplyStateEnums.ISSUED.getCode());
@@ -331,39 +324,19 @@ public class WalletUserService extends BaseApiService {
 					throw new BaseException(I18nUtil.getMessage("base_error"), e);
 				}
 			}
-		} else if (query.getDeliveryAddressId() != null) {
-			// 实体卡若已有三方邮寄地址，同步调三方申请
-			BankcardApplyRequest thirdReq = new BankcardApplyRequest();
-			thirdReq.setProductId(query.getProductId());
-			thirdReq.setDeliveryAddressId(query.getDeliveryAddressId());
-			try {
-				third = thirdService.applyBankcard(user.getWalletUid(), thirdReq);
-			} catch (BaseException e) {
-				log.error("wallet apply physical card third failed walletUid={} productId={}",
-						user.getWalletUid(), query.getProductId(), e);
-				throw e;
-			} catch (Exception e) {
-				log.error("wallet apply physical card third error walletUid={} productId={}",
-						user.getWalletUid(), query.getProductId(), e);
-				throw new BaseException(I18nUtil.getMessage("base_error"), e);
-			}
+		} else if (physicalCard && kycApproved && query.getDeliveryAddressId() != null) {
+			// 实体卡 KYC 已通过且已有三方邮寄地址时同步调三方申请
+			third = issueVirtualCardThird(user, apply, product, query.getDeliveryAddressId());
 		}
 
-		WalletBankcardEntity card = null;
-		if (third != null && third.getUserBankcardId() != null) {
-			card = walletBankcardDao.findByUserBankcardId(third.getUserBankcardId());
-			if (card == null) {
-				Long walletBankcardId = insertAppliedBankcard(user, apply.getId(), product, third, now);
-				if (walletBankcardId != null) {
-					card = walletBankcardDao.selectById(walletBankcardId);
-				}
-			}
+		WalletBankcardEntity card = persistIssuedBankcard(user, apply, product, third, now);
+		if (card != null) {
 			walletAccountDao.markActivated(user.getId());
 		}
 		String thirdOrderNo = third == null ? null : third.getOrderNo();
-		log.info("wallet apply card success walletUserId={} productId={} applyId={} holderId={} userBankcardId={} autoIssued={}",
+		log.info("wallet apply card success walletUserId={} productId={} applyId={} holderId={} userBankcardId={} autoIssued={} kycApproved={}",
 				user.getId(), query.getProductId(), apply.getId(), holder.getId(),
-				third == null ? null : third.getUserBankcardId(), autoIssued);
+				third == null ? null : third.getUserBankcardId(), autoIssued, kycApproved);
 		return setResultSuccess(buildApplyCardResp(apply, card, product, thirdOrderNo, autoIssued),
 				I18nUtil.getMessage("base_success"));
 	}
@@ -567,6 +540,10 @@ public class WalletUserService extends BaseApiService {
 		apply.setKycState(account.getKycState());
 		apply.setKycStateName(account.getKycStateName());
 		apply.setKycAuditResult(account.getKycAuditResult());
+		if (apply.getKycState() == null) {
+			apply.setKycState(WalletKycStateEnums.WAIT_APPROVE.getCode());
+			apply.setKycStateName(WalletKycStateEnums.WAIT_APPROVE.getLabel());
+		}
 		apply.setRequestOrderId(requestOrderId);
 		// KYC 已通过时实体卡进入待发货
 		if (physicalCard
@@ -591,6 +568,11 @@ public class WalletUserService extends BaseApiService {
 			resp.setCardType(apply.getCardType());
 			resp.setApplyState(apply.getApplyState());
 			resp.setApplyStateName(apply.getApplyStateName());
+			resp.setKycState(apply.getKycState());
+			resp.setKycStateName(apply.getKycStateName());
+			boolean kycApproved = apply.getKycState() != null
+					&& apply.getKycState() == WalletKycStateEnums.SUCCESS_APPROVE.getCode();
+			resp.setKycSubmitRequired(!kycApproved && card == null);
 		}
 		if (product != null && resp.getProductId() == null) {
 			resp.setProductId(product.getId());
@@ -606,9 +588,202 @@ public class WalletUserService extends BaseApiService {
 			if (!StringUtils.isEmpty(card.getApplyOrderNo())) {
 				resp.setOrderNo(card.getApplyOrderNo());
 			}
+			resp.setKycSubmitRequired(false);
 		}
 		resp.setAutoIssued(autoIssued);
 		return resp;
+	}
+
+	/** 账户 KYC 是否已通过 */
+	private static boolean isKycApproved(WalletAccountEntity account) {
+		return account != null
+				&& account.getKycState() != null
+				&& account.getKycState() == WalletKycStateEnums.SUCCESS_APPROVE.getCode();
+	}
+
+	/**
+	 * 是否已有开卡所需 KYC 资料（对齐 worldpay user_kyc_null：须上传证件，不要求已通过）。
+	 */
+	private boolean hasApplyKycMaterial(WalletUserEntity user, WalletApplyCardRequest query) {
+		if (query != null && hasKycContent(query.getKycData())) {
+			return true;
+		}
+		List<WalletKycFileEntity> files = walletKycFileDao.findByWalletUserId(user.getId());
+		if (files != null && !files.isEmpty()) {
+			return true;
+		}
+		WalletKycApplyEntity latestKyc = walletKycApplyDao.findLatestByWalletUserId(user.getId());
+		if (latestKyc != null && !StringUtils.isEmpty(latestKyc.getIdUrl())) {
+			return true;
+		}
+		WalletCardApplyKycEntity history = walletCardApplyKycDao.findLatestByWalletUserId(user.getId());
+		return history != null && !StringUtils.isEmpty(history.getFrontPhotoUrl());
+	}
+
+	/** 调三方虚拟/实体卡开卡申请 */
+	private ThirdBankcardApplyResp issueVirtualCardThird(WalletUserEntity user, WalletCardApplyEntity apply,
+			WalletCardProductEntity product, Integer deliveryAddressId) {
+		BankcardApplyRequest thirdReq = new BankcardApplyRequest();
+		thirdReq.setProductId(product.getId());
+		thirdReq.setDeliveryAddressId(deliveryAddressId);
+		try {
+			return thirdService.applyBankcard(user.getWalletUid(), thirdReq);
+		} catch (BaseException e) {
+			log.error("wallet issue card third failed applyId={} walletUid={} productId={}",
+					apply.getId(), user.getWalletUid(), product.getId(), e);
+			throw e;
+		} catch (Exception e) {
+			log.error("wallet issue card third error applyId={} walletUid={} productId={}",
+					apply.getId(), user.getWalletUid(), product.getId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+	}
+
+	/** 三方开卡成功后落本地卡记录 */
+	private WalletBankcardEntity persistIssuedBankcard(WalletUserEntity user, WalletCardApplyEntity apply,
+			WalletCardProductEntity product, ThirdBankcardApplyResp third, Date now) {
+		if (third == null || third.getUserBankcardId() == null) {
+			return null;
+		}
+		WalletBankcardEntity card = walletBankcardDao.findByUserBankcardId(third.getUserBankcardId());
+		if (card == null) {
+			Long walletBankcardId = insertAppliedBankcard(user, apply.getId(), product, third, now);
+			if (walletBankcardId != null) {
+				card = walletBankcardDao.selectById(walletBankcardId);
+			}
+		}
+		return card;
+	}
+
+	/**
+	 * 按开卡申请单提交 KYC（对齐 worldpay GET /kyc/apply?applyId=）。
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	public ResponseBase applyKycByCardApply(Integer userType, Integer localUid, Long applyId) {
+		if (applyId == null) {
+			return setResultError(I18nUtil.getMessage("base_data_null"));
+		}
+		WalletUserEntity user = walletUserDao.findByLocal(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		WalletCardApplyEntity apply = walletCardApplyDao.selectById(applyId);
+		if (apply == null || !user.getId().equals(apply.getWalletUserId())) {
+			return setResultError(I18nUtil.getMessage("wallet.apply_not_found"));
+		}
+		ensureWalletAccount(user);
+		WalletAccountEntity account = walletAccountDao.findByWalletUserId(user.getId());
+		if (account == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		if (isKycApproved(account)) {
+			return setResultError(I18nUtil.getMessage("wallet.kyc_already_success"));
+		}
+		if (account.getKycState() != null
+				&& account.getKycState() == WalletKycStateEnums.PROCESS_APPROVE.getCode()) {
+			return setResultError(I18nUtil.getMessage("wallet.kyc_processing"));
+		}
+		WalletCardApplyManEntity man = walletCardApplyManDao.findByApplyId(applyId);
+		if (man == null) {
+			return setResultError(I18nUtil.getMessage("holder_null"));
+		}
+		WalletCardApplyKycEntity kyc = walletCardApplyKycDao.findByApplyId(applyId);
+		if (kyc == null) {
+			return setResultError(I18nUtil.getMessage("kyc_info_null"));
+		}
+		KycApplyRequest kycReq = buildKycApplyFromCardApply(user, man, kyc);
+		try {
+			thirdService.applyKyc(user.getWalletUid(), kycReq);
+		} catch (Exception e) {
+			log.error("wallet kyc apply by cardApply third error applyId={} walletUid={}",
+					applyId, user.getWalletUid(), e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		Date now = new Date();
+		try {
+			WalletKycApplyEntity row = buildKycApply(user, kycReq, now);
+			walletKycApplyDao.insert(row);
+			syncKycLocal(user.getId(), WalletKycApiStatus.WAITING,
+					WalletKycStateEnums.PROCESS_APPROVE, null);
+			walletCardApplyDao.updateKycSnapshot(applyId,
+					WalletKycStateEnums.PROCESS_APPROVE.getCode(),
+					WalletKycStateEnums.PROCESS_APPROVE.getLabel(), null);
+		} catch (Exception e) {
+			log.error("wallet kyc apply by cardApply persist failed applyId={}", applyId, e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+		log.info("wallet kyc apply by cardApply success applyId={} walletUserId={}", applyId, user.getId());
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	/** 由开卡申请快照组装三方 KYC 提交参数 */
+	private static KycApplyRequest buildKycApplyFromCardApply(WalletUserEntity user,
+			WalletCardApplyManEntity man, WalletCardApplyKycEntity kyc) {
+		KycApplyRequest req = new KycApplyRequest();
+		req.setFirstName(man.getUserName());
+		req.setLastName(man.getUserSurname());
+		req.setIdNo(StringUtils.isEmpty(kyc.getPaperworkNum()) ? man.getUserNumber() : kyc.getPaperworkNum());
+		req.setEmail(StringUtils.isEmpty(man.getUserEmail()) ? user.getEmail() : man.getUserEmail());
+		req.setNationCode(man.getUserTelCode());
+		req.setCertType(mapPaperworkTypeToCertType(kyc.getPaperworkType()));
+		req.setIdUrl(kyc.getFrontPhotoUrl());
+		req.setIdBackUrl(kyc.getBackPhotoUrl());
+		req.setBirthday(man.getUserBirthday());
+		req.setCountryCode(man.getUserTelCode());
+		req.setAreaCode(man.getUserTelDialCode());
+		req.setPhone(man.getUserTel());
+		req.setSelfieUrl(kyc.getHandheldPhotoUrl());
+		return req;
+	}
+
+	private static Integer mapPaperworkTypeToCertType(String paperworkType) {
+		if (WalletConstants.PAPERWORK_PASSPORT.equalsIgnoreCase(paperworkType)) {
+			return WalletConstants.KYC_CERT_PASSPORT;
+		}
+		return WalletConstants.KYC_CERT_ID_CARD;
+	}
+
+	/** KYC 通过后尝试自动发放待处理的虚拟卡申请 */
+	private void tryAutoIssuePendingVirtualCards(Long walletUserId) {
+		WalletUserEntity user = walletUserDao.selectById(walletUserId);
+		if (user == null) {
+			return;
+		}
+		List<WalletCardApplyEntity> pendingList = walletCardApplyDao.findPendingVirtualByWalletUserId(walletUserId);
+		if (pendingList == null || pendingList.isEmpty()) {
+			return;
+		}
+		for (WalletCardApplyEntity apply : pendingList) {
+			if (walletBankcardDao.findByCardApplyId(apply.getId()) != null) {
+				continue;
+			}
+			WalletCardProductEntity product = walletCardProductDao.findById(apply.getCardProductId());
+			if (product == null) {
+				log.warn("wallet auto issue skip product missing applyId={} productId={}",
+						apply.getId(), apply.getCardProductId());
+				continue;
+			}
+			try {
+				ThirdBankcardApplyResp third = issueVirtualCardThird(user, apply, product, null);
+				if (third == null || third.getUserBankcardId() == null) {
+					continue;
+				}
+				Date now = new Date();
+				persistIssuedBankcard(user, apply, product, third, now);
+				apply.setApplyState(WalletCardApplyStateEnums.ISSUED.getCode());
+				apply.setApplyStateName(WalletCardApplyStateEnums.ISSUED.getLabel());
+				apply.setKycState(WalletKycStateEnums.SUCCESS_APPROVE.getCode());
+				apply.setKycStateName(WalletKycStateEnums.SUCCESS_APPROVE.getLabel());
+				apply.setGmtModified(now);
+				walletCardApplyDao.updateById(apply);
+				walletAccountDao.markActivated(walletUserId);
+				log.info("wallet auto issue virtual card success applyId={} walletUserId={} userBankcardId={}",
+						apply.getId(), walletUserId, third.getUserBankcardId());
+			} catch (Exception e) {
+				log.error("wallet auto issue virtual card failed applyId={} walletUserId={}",
+						apply.getId(), walletUserId, e);
+			}
+		}
 	}
 
 	private static String resolveApplyRequestOrderId(String requestOrderId, Integer localUid) {
@@ -1245,6 +1420,10 @@ public class WalletUserService extends BaseApiService {
 		WalletKycApplyEntity latest = walletKycApplyDao.findLatestByWalletUserId(walletUserId);
 		if (latest != null) {
 			walletKycApplyDao.updateStatus(latest.getId(), apiStatus, localState.getCode(), failedReason);
+		}
+		// KYC 通过后自动发放待处理虚拟卡
+		if (localState == WalletKycStateEnums.SUCCESS_APPROVE) {
+			tryAutoIssuePendingVirtualCards(walletUserId);
 		}
 	}
 
