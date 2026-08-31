@@ -32,6 +32,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -127,6 +128,17 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 	}
 
 	@Override
+	public ResponseBase kycFileUpload(MultipartFile idCard,
+			Integer certType, Integer documentType, HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.uploadKycFile(WithdrawUserTypeEnums.APP.getCode(), uid,
+				idCard, certType, documentType);
+	}
+
+	@Override
 	public ResponseBase cardList(HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
@@ -142,6 +154,15 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
 		return walletUserService.listCardProducts();
+	}
+
+	@Override
+	public ResponseBase cardProductDetail(Integer productId, HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.getCardProductDetail(productId);
 	}
 
 	@Override

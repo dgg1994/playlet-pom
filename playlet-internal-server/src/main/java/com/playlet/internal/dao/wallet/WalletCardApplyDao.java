@@ -30,4 +30,17 @@ public interface WalletCardApplyDao extends BaseMapper<WalletCardApplyEntity> {
 			+ "reject_info = #{rejectInfo}, gmtModified = now() where id = #{id}")
 	int updateApplyState(@Param("id") Long id, @Param("applyState") Integer applyState,
 			@Param("applyStateName") String applyStateName, @Param("rejectInfo") String rejectInfo);
+
+	@Select("<script>"
+			+ "select * from wallet_card_apply where 1=1"
+			+ "<if test='walletUid != null'> and wallet_uid = #{walletUid}</if>"
+			+ "<if test='walletUserId != null'> and wallet_user_id = #{walletUserId}</if>"
+			+ "<if test='cardProductId != null'> and card_product_id = #{cardProductId}</if>"
+			+ "<if test='cardType != null and cardType != \"\"'> and card_type = #{cardType}</if>"
+			+ "<if test='applyState != null'> and apply_state = #{applyState}</if>"
+			+ "<if test='topupType != null'> and topup_type = #{topupType}</if>"
+			+ "<if test='kycState != null'> and kyc_state = #{kycState}</if>"
+			+ " order by setTime desc, id desc"
+			+ "</script>")
+	List<WalletCardApplyEntity> findAdminList(WalletCardApplyEntity entity);
 }

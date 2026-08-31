@@ -1,13 +1,16 @@
 package com.playlet.internal.service.support;
 
 import com.playlet.internal.api.request.WalletCardProductUpdateRequest;
+import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.api.response.ThirdBankcardProductResp;
 import com.playlet.internal.api.response.WalletCardProductItemResp;
 import com.playlet.internal.api.response.WalletCardProductLabelResp;
 import com.playlet.internal.api.response.WalletCardProductSynopsisResp;
 import com.playlet.internal.api.response.WalletCardProductSyncResp;
 import com.playlet.internal.constants.WalletConstants;
+import com.playlet.internal.dao.wallet.WalletCardLabelDao;
 import com.playlet.internal.dao.wallet.WalletCardProductDao;
+import com.playlet.internal.entity.wallet.WalletCardLabelEntity;
 import com.playlet.internal.entity.wallet.WalletCardProductEntity;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.third.ThirdService;
@@ -37,6 +40,8 @@ public class WalletCardProductService {
 	@Autowired
 	private WalletCardProductDao walletCardProductDao;
 	@Autowired
+	private WalletCardLabelDao walletCardLabelDao;
+	@Autowired
 	private ThirdService thirdService;
 
 	/** C 端可申请卡产品列表（仅 enable=1） */
@@ -50,6 +55,59 @@ public class WalletCardProductService {
 			items.add(toItemResp(row));
 		}
 		return items;
+	}
+
+	/** 管理端：按 productId 查询卡产品详情（对齐 onetoken CardService.findById） */
+	public WalletCardProductEntity findByProductId(Integer productId) {
+		if (productId == null) {
+			throw new BaseException(I18nUtil.getMessage("parameter_error"));
+		}
+		WalletCardProductEntity row = walletCardProductDao.findById(productId);
+		if (row == null) {
+			throw new BaseException(I18nUtil.getMessage("wallet.product_not_found"));
+		}
+		enrichAdminDisplay(Collections.singletonList(row));
+		enrichLabelJoin(row, LanguageContext.getLanguage());
+		return row;
+	}
+
+	/** C 端：按 productId 查询可申请卡产品详情（仅 enable=1） */
+	public WalletCardProductItemResp findEnabledItemByProductId(Integer productId) {
+		if (productId == null) {
+			throw new BaseException(I18nUtil.getMessage("parameter_error"));
+		}
+		WalletCardProductEntity row = walletCardProductDao.findById(productId);
+		if (row == null || !Integer.valueOf(ENABLE_YES).equals(row.getEnable())) {
+			throw new BaseException(I18nUtil.getMessage("wallet.product_not_found"));
+		}
+		enrichLabelJoin(row, LanguageContext.getLanguage());
+		return toItemResp(row);
+	}
+
+	/** 关联表标签优先覆盖 description2 解析结果 */
+	private void enrichLabelJoin(WalletCardProductEntity row, String language) {
+		if (row == null || StringUtils.isEmpty(row.getProductUuid())) {
+			return;
+		}
+		String lang = StringUtils.isEmpty(language) ? LanguageContext.getLanguage() : language;
+		List<WalletCardLabelEntity> joinLabels = walletCardLabelDao.findByCardId(row.getProductUuid(), lang);
+		if (joinLabels == null || joinLabels.isEmpty()) {
+			return;
+		}
+		List<WalletCardProductLabelResp> labelList = new ArrayList<>();
+		List<Integer> labelIdList = new ArrayList<>();
+		for (WalletCardLabelEntity label : joinLabels) {
+			if (label == null) {
+				continue;
+			}
+			labelIdList.add(label.getId());
+			WalletCardProductLabelResp item = new WalletCardProductLabelResp();
+			item.setId(label.getId());
+			item.setName(label.getName());
+			labelList.add(item);
+		}
+		row.setLabelList(labelList);
+		row.setLabelIdList(labelIdList);
 	}
 
 	/** 一键拉取三方卡产品并 upsert 到本地表 */
@@ -213,7 +271,8 @@ public class WalletCardProductService {
 		item.setRechargeMinLimit(row.getRechargeMinLimit());
 		item.setCardImg(row.getCardImg());
 		// 对齐 worldpay findList：标签列表 + 简介对象（本地暂存于 description1/2）
-		item.setLabelList(buildLabelList(row.getDescription2()));
+		item.setLabelList(row.getLabelList() != null && !row.getLabelList().isEmpty()
+				? row.getLabelList() : buildLabelList(row.getDescription2()));
 		item.setSynopsisData(buildSynopsis(row.getCardTitle(), row.getDescription1()));
 		return item;
 	}

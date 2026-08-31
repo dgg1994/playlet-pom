@@ -131,4 +131,9 @@ public class WalletCardProductEntity extends PageQueryHelperEntity {
 	@TableField(exist = false)
 	@ApiModelProperty(name = "synopsisData", value = "卡简介")
 	private WalletCardProductSynopsisResp synopsisData;
+
+	/** 管理端编辑回显：关联的标签 id 列表（wallet_card_label_join） */
+	@TableField(exist = false)
+	@ApiModelProperty(name = "labelIdList", value = "关联标签 id 列表")
+	private List<Integer> labelIdList;
 }

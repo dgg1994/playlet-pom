@@ -1,64 +1,16 @@
 package com.playlet.internal.service.third;
 
+import cn.hutool.crypto.digest.DigestUtil;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
-import cn.hutool.crypto.digest.DigestUtil;
-import com.playlet.internal.api.request.BankcardActiveRequest;
-import com.playlet.internal.api.request.BankcardApplyRequest;
-import com.playlet.internal.api.request.BankcardCanActiveRequest;
-import com.playlet.internal.api.request.BankcardRechargeRequest;
-import com.playlet.internal.api.request.BankcardSetPinRequest;
-import com.playlet.internal.api.request.BankcardUpdateEmailRequest;
-import com.playlet.internal.api.request.BankcardUpdateStatusRequest;
-import com.playlet.internal.api.request.BankcardUserIdRequest;
-import com.playlet.internal.api.request.KycApplyRequest;
-import com.playlet.internal.api.request.WalletApplyCardRequest;
-import com.playlet.internal.api.request.WalletBindPayPwdRequest;
-import com.playlet.internal.api.request.WalletCardApplyKycRequest;
-import com.playlet.internal.api.request.WalletCardMailingAddressRequest;
-import com.playlet.internal.api.response.KycCountryResp;
-import com.playlet.internal.api.response.KycStatusResp;
-import com.playlet.internal.api.response.ThirdBankcardActiveResp;
-import com.playlet.internal.api.response.ThirdBankcardApplyResp;
-import com.playlet.internal.api.response.ThirdBankcardBalanceResp;
-import com.playlet.internal.api.response.ThirdBankcardCanActiveResp;
-import com.playlet.internal.api.response.ThirdBankcardInfoResp;
-import com.playlet.internal.api.response.ThirdBankcardPinResp;
-import com.playlet.internal.api.response.WalletApplyCardResp;
-import com.playlet.internal.api.response.WalletCardRechargeResp;
-import com.playlet.internal.api.response.WalletCardItemResp;
-import com.playlet.internal.api.response.WalletCardProductItemResp;
-import com.playlet.internal.api.response.WalletKycStatusResp;
-import com.playlet.internal.api.response.WalletTransactionItemResp;
-import com.playlet.internal.api.response.WalletUserInfoResp;
+import com.playlet.internal.api.request.*;
+import com.playlet.internal.api.response.*;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.WalletConstants;
 import com.playlet.internal.constants.WalletKycApiStatus;
-import com.playlet.internal.dao.wallet.WalletAccountDao;
-import com.playlet.internal.dao.wallet.WalletBankcardDao;
-import com.playlet.internal.dao.wallet.WalletCardApplyDao;
-import com.playlet.internal.dao.wallet.WalletCardApplyKycDao;
-import com.playlet.internal.dao.wallet.WalletCardApplyManDao;
-import com.playlet.internal.dao.wallet.WalletCardApplySendDao;
-import com.playlet.internal.dao.wallet.WalletCardProductDao;
-import com.playlet.internal.dao.wallet.WalletCardTransactionDao;
-import com.playlet.internal.dao.wallet.WalletKycApplyDao;
-import com.playlet.internal.dao.wallet.WalletKycFileDao;
-import com.playlet.internal.dao.wallet.WalletUserDao;
-import com.playlet.internal.dao.wallet.WalletUserHolderDao;
-import com.playlet.internal.entity.wallet.WalletAccountEntity;
-import com.playlet.internal.entity.wallet.WalletBankcardEntity;
-import com.playlet.internal.entity.wallet.WalletCardApplyEntity;
-import com.playlet.internal.entity.wallet.WalletCardApplyKycEntity;
-import com.playlet.internal.entity.wallet.WalletCardApplyManEntity;
-import com.playlet.internal.entity.wallet.WalletCardApplySendEntity;
-import com.playlet.internal.entity.wallet.WalletCardProductEntity;
-import com.playlet.internal.entity.wallet.WalletCardTransactionEntity;
-import com.playlet.internal.entity.wallet.WalletKycApplyEntity;
-import com.playlet.internal.entity.wallet.WalletKycFileEntity;
-import com.playlet.internal.entity.wallet.WalletUserEntity;
-import com.playlet.internal.entity.wallet.WalletUserHolderEntity;
+import com.playlet.internal.dao.wallet.*;
+import com.playlet.internal.entity.wallet.*;
 import com.playlet.internal.enums.WalletCardApplyStateEnums;
 import com.playlet.internal.enums.WalletCardStatusEnums;
 import com.playlet.internal.enums.WalletKycStateEnums;
@@ -75,16 +27,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Pattern;
 
 /**
@@ -266,6 +212,18 @@ public class WalletUserService extends BaseApiService {
 		List<WalletCardProductItemResp> items = walletCardProductService.listEnabledProducts();
 		log.info("wallet card product list size={}", items.size());
 		return setResultSuccess(items, I18nUtil.getMessage("base_success"));
+	}
+
+	/** C 端卡产品详情：按 productId 查询，仅 enable=1 */
+	public ResponseBase getCardProductDetail(Integer productId) {
+		try {
+			WalletCardProductItemResp detail = walletCardProductService.findEnabledItemByProductId(productId);
+			log.info("wallet card product detail productId={}", productId);
+			return setResultSuccess(detail, I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {
+			log.error("wallet card product detail error productId={}", productId, e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
 	}
 
 	/**
@@ -1139,6 +1097,57 @@ public class WalletUserService extends BaseApiService {
 		log.info("wallet kyc status walletUserId={} status={} kycState={}",
 				user.getId(), third.getStatus(), localState.getCode());
 		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * KYC 证件上传：透传三方 POST /api/file/upload，可选落 wallet_kyc_file 留痕。
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	public ResponseBase uploadKycFile(Integer userType, Integer localUid, MultipartFile idCard,
+			Integer certType, Integer documentType) {
+		WalletUserEntity user = walletUserDao.findByLocal(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		if (user.getWalletUid() == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		WalletKycFileUploadResp uploadResp;
+		try {
+			uploadResp = thirdService.uploadKycFile(user.getWalletUid(), idCard);
+		} catch (Exception e) {
+			log.error("wallet kyc file upload third error walletUid={}", user.getWalletUid(), e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		if (certType != null && documentType != null) {
+			persistKycFileRecord(user, certType, documentType, uploadResp.getFileUrl());
+		}
+		log.info("wallet kyc file upload success walletUserId={} walletUid={} documentType={}",
+				user.getId(), user.getWalletUid(), documentType);
+		return setResultSuccess(uploadResp, I18nUtil.getMessage("base_success"));
+	}
+
+	private void persistKycFileRecord(WalletUserEntity user, Integer certType, Integer documentType,
+			String fileUrl) {
+		if (StringUtils.isEmpty(fileUrl)) {
+			return;
+		}
+		Date now = new Date();
+		WalletKycFileEntity row = new WalletKycFileEntity();
+		row.setWalletUserId(user.getId());
+		row.setWalletUid(user.getWalletUid());
+		row.setCertType(certType);
+		row.setDocumentType(documentType);
+		row.setDocumentFileUrl(fileUrl.trim());
+		row.setSetTime(now);
+		row.setGmtModified(now);
+		try {
+			walletKycFileDao.insert(row);
+		} catch (Exception e) {
+			log.error("wallet kyc file persist failed walletUserId={} documentType={}",
+					user.getId(), documentType, e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
 	}
 
 	/**

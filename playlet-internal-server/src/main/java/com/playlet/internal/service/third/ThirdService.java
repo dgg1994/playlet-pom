@@ -16,6 +16,7 @@ import com.playlet.internal.api.request.KycCountryListRequest;
 import com.playlet.internal.api.request.RegisterRequest;
 import com.playlet.internal.api.response.KycCountryResp;
 import com.playlet.internal.api.response.KycStatusResp;
+import com.playlet.internal.api.response.WalletKycFileUploadResp;
 import com.playlet.internal.api.response.ThirdBankcardActiveResp;
 import com.playlet.internal.api.response.ThirdBankcardApplyResp;
 import com.playlet.internal.api.response.ThirdBankcardBalanceResp;
@@ -34,6 +35,7 @@ import com.playlet.internal.utils.RsaSignUtil;
 import com.playlet.internal.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -41,8 +43,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -138,6 +144,38 @@ public class ThirdService {
 		}
 		log.info("third party kyc status success uid={} status={}", uid, resp.getStatus());
 		return resp;
+	}
+
+	/**
+	 * KYC 证件文件上传。文档：POST /api/file/upload，multipart 字段 idCard；签名仅含 appId/nonce/timestamp。
+	 *
+	 * @param uid    worldPay 用户 uid
+	 * @param idCard 证件图片
+	 * @return 文件 url
+	 */
+	public WalletKycFileUploadResp uploadKycFile(Long uid, MultipartFile idCard) {
+		requireUid(uid);
+		validateKycUploadFile(idCard);
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.FILE_UPLOAD_PATH;
+		log.info("third party kyc file upload start uid={} fileName={} size={}",
+				uid, idCard.getOriginalFilename(), idCard.getSize());
+		try {
+			byte[] fileBytes = idCard.getBytes();
+			String originalFilename = idCard.getOriginalFilename();
+			JsonNode data = exchangeMultipart(url, fileBytes, originalFilename,
+					String.valueOf(uid), "KYC文件上传");
+			WalletKycFileUploadResp resp = treeToValue(data, WalletKycFileUploadResp.class, "KYC文件上传");
+			if (resp == null || StringUtils.isEmpty(resp.getFileUrl())) {
+				throw new BaseException("KYC文件上传响应缺少 fileUrl");
+			}
+			log.info("third party kyc file upload success uid={}", uid);
+			return resp;
+		} catch (BaseException e) {
+			throw e;
+		} catch (Exception e) {
+			log.error("third party kyc file upload failed uid={}", uid, e);
+			throw new BaseException("KYC文件上传失败", e);
+		}
 	}
 
 	/**
@@ -349,6 +387,23 @@ public class ThirdService {
 		return resp;
 	}
 
+	/** 校验上传文件：非空 + 后缀白名单（对齐 worldpayPolymeric） */
+	private static void validateKycUploadFile(MultipartFile idCard) {
+		if (idCard == null || idCard.isEmpty()) {
+			throw new BaseException("请上传证件文件");
+		}
+		String fileName = idCard.getOriginalFilename();
+		if (StringUtils.isEmpty(fileName)) {
+			throw new BaseException("文件名不能为空");
+		}
+		String lowerName = fileName.trim().toLowerCase();
+		boolean valid = Arrays.stream(WalletConstants.KYC_UPLOAD_ALLOWED_SUFFIXES)
+				.anyMatch(lowerName::endsWith);
+		if (!valid) {
+			throw new BaseException("仅支持 png/jpg/jpeg/pdf 格式");
+		}
+	}
+
 	/** 校验 KYC 必填字段（与文档 required 对齐；身份证/驾照需反面照） */
 	private void validateKycApply(KycApplyRequest body) {
 		if (StringUtils.isEmpty(body.getFirstName())
@@ -413,6 +468,51 @@ public class ThirdService {
 			log.error("third party parse list failed type={}", elementType.getSimpleName(), e);
 			throw new BaseException("三方响应解析失败", e);
 		}
+	}
+
+	/**
+	 * multipart 上传：签名不含 body 字段。
+	 */
+	private JsonNode exchangeMultipart(String url, byte[] fileBytes, String originalFilename,
+			String uidHeader, String bizName) throws Exception {
+		if (StringUtils.isEmpty(thirdPartyProperties.getBaseUrl())
+				|| StringUtils.isEmpty(thirdPartyProperties.getAppId())
+				|| StringUtils.isEmpty(thirdPartyProperties.getPrivateKey())) {
+			throw new BaseException("third-party 配置未完整");
+		}
+		String appId = thirdPartyProperties.getAppId();
+		String nonce = UUID.randomUUID().toString().replace("-", "");
+		String timestamp = String.valueOf(System.currentTimeMillis());
+		String signContent = RsaSignUtil.buildSignContent(appId, nonce, timestamp, null);
+		log.info("third party {} signContent={}", bizName, signContent);
+		String sign = RsaSignUtil.generateSign(appId, nonce, timestamp, null,
+				thirdPartyProperties.getPrivateKey());
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+		headers.set(HEADER_APP_ID, appId);
+		headers.set(HEADER_NONCE, nonce);
+		headers.set(HEADER_TIMESTAMP, timestamp);
+		headers.set(HEADER_SIGN, sign);
+		if (!StringUtils.isEmpty(uidHeader)) {
+			headers.set(HEADER_UID, uidHeader);
+		}
+
+		ByteArrayResource fileResource = new ByteArrayResource(fileBytes) {
+			@Override
+			public String getFilename() {
+				return originalFilename;
+			}
+		};
+		MultiValueMap<String, Object> multipartBody = new LinkedMultiValueMap<>();
+		multipartBody.add(WalletConstants.KYC_UPLOAD_FIELD_ID_CARD, fileResource);
+		HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(multipartBody, headers);
+		ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+		if (response.getStatusCode() != HttpStatus.OK) {
+			log.error("third party {} http failed status={} url={}", bizName, response.getStatusCode(), url);
+			throw new BaseException(bizName + "失败");
+		}
+		return parseBizData(response.getBody(), bizName);
 	}
 
 	/**

@@ -56,6 +56,21 @@ public class WalletCardProductManageServiceImpl implements WalletCardProductMana
 	}
 
 	@Override
+	@SysLogAnnotation(module = "U卡产品管理", type = "GET", remark = "卡产品详情")
+	public ResponseBase findById(Integer productId) {
+		try {
+			WalletCardProductEntity detail = walletCardProductService.findByProductId(productId);
+			return setResultSuccess(detail, I18nUtil.getMessage("base_success"));
+		} catch (BaseException e) {
+			log.error("wallet card product findById failed productId={}", productId, e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("wallet card product findById error productId={}", productId, e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+	}
+
+	@Override
 	@SysLogAnnotation(module = "U卡产品管理", type = "POST", remark = "同步三方卡产品")
 	public ResponseBase syncFromThird() {
 		try {

@@ -30,6 +30,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -140,6 +141,17 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 	}
 
 	@Override
+	public ResponseBase kycFileUpload(MultipartFile idCard,
+			Integer certType, Integer documentType, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.uploadKycFile(WithdrawUserTypeEnums.CREATOR.getCode(), uid,
+				idCard, certType, documentType);
+	}
+
+	@Override
 	public ResponseBase cardList(HttpServletRequest request) {
 		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
 		if (uid == null) {
@@ -155,6 +167,15 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
 		return walletUserService.listCardProducts();
+	}
+
+	@Override
+	public ResponseBase cardProductDetail(Integer productId, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.getCardProductDetail(productId);
 	}
 
 	@Override

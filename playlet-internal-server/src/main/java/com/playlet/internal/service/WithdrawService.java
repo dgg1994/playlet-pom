@@ -22,6 +22,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -69,6 +71,13 @@ public interface WithdrawService {
 	@ApiOperation(value = "提交KYC信息", notes = "需登录；证件照已上传拿到 url 后提交；审核中/已通过不可重复提交")
 	ResponseBase kycApply(@RequestBody KycApplyRequest query, HttpServletRequest request);
 
+	@PostMapping("/file/upload")
+	@ApiOperation(value = "KYC证件上传", notes = "multipart 字段 idCard；透传三方 /api/file/upload；返回 fileUrl；需登录")
+	ResponseBase kycFileUpload(@RequestParam("idCard") MultipartFile idCard,
+			@RequestParam(value = "certType", required = false) Integer certType,
+			@RequestParam(value = "documentType", required = false) Integer documentType,
+			HttpServletRequest request);
+
 	@GetMapping("/card/list")
 	@ApiOperation(value = "卡片列表", notes = "默认卡优先；首页切换与卡片列表页复用；需登录")
 	ResponseBase cardList(HttpServletRequest request);
@@ -76,6 +85,10 @@ public interface WithdrawService {
 	@GetMapping("/card/product/list")
 	@ApiOperation(value = "可用卡产品列表", notes = "商户可申请的卡产品，申请开卡前选品；含卡标签 labelList、卡简介 synopsisData；需登录")
 	ResponseBase cardProductList(HttpServletRequest request);
+
+	@GetMapping("/card/product/findById")
+	@ApiOperation(value = "卡产品详情", notes = "按 productId 查询可申请卡产品；含 labelList、synopsisData；需登录")
+	ResponseBase cardProductDetail(Integer productId, HttpServletRequest request);
 
 	@PostMapping("/card/apply")
 	@ApiOperation(value = "申请卡片", notes = "需登录且 KYC 已通过；传 productId；holderId 或 holderData 必传其一；"

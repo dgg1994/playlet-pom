@@ -17,6 +17,8 @@ public final class WalletApiPaths {
 	public static final String KYC_STATUS_PATH = "/api/user/kyc/status";
 	/** 提交KYC信息 */
 	public static final String KYC_APPLY_PATH = "/api/user/kyc/apply";
+	/** KYC 证件文件上传 */
+	public static final String FILE_UPLOAD_PATH = "/api/file/upload";
 
 	//---------------------------------------------卡片-------------------------------------------------------------------
 	/** 查询商户可用卡产品列表 */

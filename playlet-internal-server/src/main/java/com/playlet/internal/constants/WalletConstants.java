@@ -76,4 +76,10 @@ public final class WalletConstants {
 	public static final String PAPERWORK_PASSPORT = "PASSPORT";
 	/** 开卡 KYC 证件类型文案：身份证 */
 	public static final String PAPERWORK_NATIONAL_ID = "NATIONAL_ID";
+
+	/** 三方 KYC 文件上传表单字段名 */
+	public static final String KYC_UPLOAD_FIELD_ID_CARD = "idCard";
+
+	/** KYC 上传允许的文件后缀（小写，含点） */
+	public static final String[] KYC_UPLOAD_ALLOWED_SUFFIXES = {".png", ".pdf", ".jpg", ".jpeg"};
 }

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.playlet.internal.query.pub.PageQueryHelperEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -11,13 +12,22 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.util.Date;
 
+import com.playlet.internal.entity.wallet.WalletBankcardEntity;
+import com.playlet.internal.entity.wallet.WalletCardApplyKycEntity;
+import com.playlet.internal.entity.wallet.WalletCardApplyManEntity;
+import com.playlet.internal.entity.wallet.WalletCardApplySendEntity;
+import com.playlet.internal.entity.wallet.WalletCardProductEntity;
+
+import lombok.EqualsAndHashCode;
+
 /**
  * 钱包 U 卡开卡申请。
  */
 @Data
+@EqualsAndHashCode(callSuper = true)
 @TableName("wallet_card_apply")
 @ApiModel(value = "钱包开卡申请", description = "U 卡开卡申请单")
-public class WalletCardApplyEntity {
+public class WalletCardApplyEntity extends PageQueryHelperEntity {
 
 	@TableId(type = IdType.AUTO)
 	@ApiModelProperty(name = "id", value = "主键")
@@ -110,4 +120,29 @@ public class WalletCardApplyEntity {
 	@TableField("gmtModified")
 	@ApiModelProperty(name = "gmtModified", value = "更新时间")
 	private Date gmtModified;
+
+	/** 管理端列表/详情：持卡人快照 */
+	@TableField(exist = false)
+	@ApiModelProperty(name = "applyManData", value = "持卡人快照")
+	private WalletCardApplyManEntity applyManData;
+
+	/** 管理端列表/详情：邮寄地址快照 */
+	@TableField(exist = false)
+	@ApiModelProperty(name = "applySendData", value = "邮寄地址快照")
+	private WalletCardApplySendEntity applySendData;
+
+	/** 管理端列表/详情：卡产品信息 */
+	@TableField(exist = false)
+	@ApiModelProperty(name = "cardData", value = "卡产品信息")
+	private WalletCardProductEntity cardData;
+
+	/** 管理端列表/详情：KYC 快照 */
+	@TableField(exist = false)
+	@ApiModelProperty(name = "kycData", value = "KYC 快照")
+	private WalletCardApplyKycEntity kycData;
+
+	/** 管理端列表/详情：用户已开卡信息 */
+	@TableField(exist = false)
+	@ApiModelProperty(name = "userCardData", value = "用户银行卡")
+	private WalletBankcardEntity userCardData;
 }
