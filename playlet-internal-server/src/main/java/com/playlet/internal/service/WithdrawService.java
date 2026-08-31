@@ -12,6 +12,7 @@ import com.playlet.internal.api.request.KycCountryListRequest;
 import com.playlet.internal.api.request.UsdtTopinNotifyRequest;
 import com.playlet.internal.api.request.WalletApplyCardRequest;
 import com.playlet.internal.api.request.WalletBindPayPwdRequest;
+import com.playlet.internal.api.request.WalletCardholderSaveRequest;
 import com.playlet.internal.api.request.WithdrawReqEntity;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
@@ -81,6 +82,26 @@ public interface WithdrawService {
 			+ "实体卡须传 mailingAddress；可选 kycData（不传则从账户 KYC 回填）、deliveryAddressId、requestOrderId；"
 			+ "虚拟卡自动调三方发卡；返回 applyId/holderId/userBankcardId 等")
 	ResponseBase applyCard(@RequestBody WalletApplyCardRequest query, HttpServletRequest request);
+
+	@PostMapping("/cardholder/add")
+	@ApiOperation(value = "新增持卡人", notes = "需登录且已开通钱包；出生日期须满18岁")
+	ResponseBase cardholderAdd(@RequestBody WalletCardholderSaveRequest query, HttpServletRequest request);
+
+	@PostMapping("/cardholder/update")
+	@ApiOperation(value = "编辑持卡人", notes = "需登录；id 必传且须为本人持卡人")
+	ResponseBase cardholderUpdate(@RequestBody WalletCardholderSaveRequest query, HttpServletRequest request);
+
+	@GetMapping("/cardholder/delete")
+	@ApiOperation(value = "删除持卡人", notes = "需登录；id 为持卡人主键")
+	ResponseBase cardholderDelete(Long id, HttpServletRequest request);
+
+	@GetMapping("/cardholder/findByUid")
+	@ApiOperation(value = "查询持卡人列表", notes = "返回当前登录用户的全部持卡人；需登录")
+	ResponseBase cardholderFindByUid(HttpServletRequest request);
+
+	@GetMapping("/cardholder/findById")
+	@ApiOperation(value = "查询持卡人详情", notes = "需登录；id 为持卡人主键")
+	ResponseBase cardholderFindById(Long id, HttpServletRequest request);
 
 	@PostMapping("/card/canActive")
 	@ApiOperation(value = "银行卡是否可激活", notes = "实体卡激活前校验；需登录")

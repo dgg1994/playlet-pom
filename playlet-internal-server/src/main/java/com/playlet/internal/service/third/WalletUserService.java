@@ -15,7 +15,6 @@ import com.playlet.internal.api.request.KycApplyRequest;
 import com.playlet.internal.api.request.WalletApplyCardRequest;
 import com.playlet.internal.api.request.WalletBindPayPwdRequest;
 import com.playlet.internal.api.request.WalletCardApplyKycRequest;
-import com.playlet.internal.api.request.WalletCardHolderRequest;
 import com.playlet.internal.api.request.WalletCardMailingAddressRequest;
 import com.playlet.internal.api.response.KycCountryResp;
 import com.playlet.internal.api.response.KycStatusResp;
@@ -66,6 +65,7 @@ import com.playlet.internal.enums.WalletKycStateEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
 import com.playlet.internal.service.support.WalletCardProductService;
+import com.playlet.internal.service.support.WalletCardholderService;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.OrderCodeFactory;
 import com.playlet.internal.utils.PasswordHashUtils;
@@ -126,6 +126,8 @@ public class WalletUserService extends BaseApiService {
 	private WalletKycApplyDao walletKycApplyDao;
 	@Autowired
 	private WalletKycFileDao walletKycFileDao;
+	@Autowired
+	private WalletCardholderService walletCardholderService;
 
 	/**
 	 * 本地账号注册成功后调用：开通 U 卡三方用户并写入 P0 表。
@@ -413,39 +415,14 @@ public class WalletUserService extends BaseApiService {
 		if (query.getHolderId() != null) {
 			WalletUserHolderEntity existed = walletUserHolderDao.findOwned(query.getHolderId(), user.getId());
 			if (existed == null) {
-				throw new BaseException(I18nUtil.getMessage("wallet.apply_holder_required"));
+				throw new BaseException(I18nUtil.getMessage("holder_null"));
 			}
 			return existed;
 		}
-		WalletCardHolderRequest data = query.getHolderData();
-		if (data == null || StringUtils.isEmpty(data.getUserName()) || StringUtils.isEmpty(data.getUserSurname())
-				|| StringUtils.isEmpty(data.getUserTel()) || StringUtils.isEmpty(data.getUserEmail())) {
+		if (query.getHolderData() == null) {
 			throw new BaseException(I18nUtil.getMessage("wallet.apply_holder_required"));
 		}
-		Date now = new Date();
-		WalletUserHolderEntity holder = new WalletUserHolderEntity();
-		holder.setWalletUserId(user.getId());
-		holder.setWalletUid(user.getWalletUid());
-		holder.setUserName(data.getUserName().trim());
-		holder.setUserSurname(data.getUserSurname().trim());
-		holder.setUserTelDialCode(data.getUserTelDialCode());
-		holder.setUserTelCode(data.getUserTelCode());
-		holder.setUserTel(data.getUserTel().trim());
-		holder.setUserEmail(data.getUserEmail().trim());
-		holder.setUserNumber(data.getUserNumber());
-		holder.setUserSex(data.getUserSex());
-		holder.setUserSexNum(data.getUserSexNum());
-		holder.setUserAddress(data.getUserAddress());
-		holder.setUserBirthday(data.getUserBirthday());
-		holder.setSetTime(now);
-		holder.setGmtModified(now);
-		try {
-			walletUserHolderDao.insert(holder);
-		} catch (Exception e) {
-			log.error("wallet holder insert failed walletUserId={}", user.getId(), e);
-			throw new BaseException(I18nUtil.getMessage("base_error"), e);
-		}
-		return holder;
+		return walletCardholderService.createForApply(user, query.getHolderData());
 	}
 
 	/** 落申请关联快照：持卡人 / 邮寄地址 / KYC */

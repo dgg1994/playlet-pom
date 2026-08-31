@@ -75,6 +75,26 @@ public interface CreatorWithdrawService {
 			+ "虚拟卡自动调三方发卡；返回 applyId/holderId/userBankcardId 等")
 	ResponseBase applyCard(@RequestBody WalletApplyCardRequest query, HttpServletRequest request);
 
+	@PostMapping("/cardholder/add")
+	@ApiOperation(value = "新增持卡人", notes = "需作家登录且已开通钱包；出生日期须满18岁")
+	ResponseBase cardholderAdd(@RequestBody WalletCardholderSaveRequest query, HttpServletRequest request);
+
+	@PostMapping("/cardholder/update")
+	@ApiOperation(value = "编辑持卡人", notes = "需作家登录；id 必传且须为本人持卡人")
+	ResponseBase cardholderUpdate(@RequestBody WalletCardholderSaveRequest query, HttpServletRequest request);
+
+	@GetMapping("/cardholder/delete")
+	@ApiOperation(value = "删除持卡人", notes = "需作家登录；id 为持卡人主键")
+	ResponseBase cardholderDelete(Long id, HttpServletRequest request);
+
+	@GetMapping("/cardholder/findByUid")
+	@ApiOperation(value = "查询持卡人列表", notes = "返回当前作家的全部持卡人；需作家登录")
+	ResponseBase cardholderFindByUid(HttpServletRequest request);
+
+	@GetMapping("/cardholder/findById")
+	@ApiOperation(value = "查询持卡人详情", notes = "需作家登录；id 为持卡人主键")
+	ResponseBase cardholderFindById(Long id, HttpServletRequest request);
+
 	@PostMapping("/card/canActive")
 	@ApiOperation(value = "银行卡是否可激活", notes = "实体卡激活前校验；需作家登录")
 	ResponseBase cardCanActive(@RequestBody BankcardCanActiveRequest query, HttpServletRequest request);
