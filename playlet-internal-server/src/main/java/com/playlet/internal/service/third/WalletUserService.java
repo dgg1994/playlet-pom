@@ -23,6 +23,7 @@ import com.playlet.internal.service.support.WalletCardholderService;
 import com.playlet.internal.service.support.WalletOpenCardSettlementService;
 import com.playlet.internal.service.support.WalletPhysicalCardFulfillService;
 import com.playlet.internal.utils.I18nUtil;
+import com.playlet.internal.utils.KycFieldNormalizeUtil;
 import com.playlet.internal.utils.OrderCodeFactory;
 import com.playlet.internal.utils.PasswordHashUtils;
 import com.playlet.internal.utils.StringUtils;
@@ -795,6 +796,10 @@ public class WalletUserService extends BaseApiService {
 		KycApplyRequest kycReq = buildKycApplyFromCardApply(user, man, kyc);
 		try {
 			thirdService.applyKyc(user.getWalletUid(), kycReq);
+		} catch (BaseException e) {
+			log.error("wallet kyc apply by cardApply third failed applyId={} walletUid={}",
+					applyId, user.getWalletUid(), e);
+			return setResultError(e.getMessage());
 		} catch (Exception e) {
 			log.error("wallet kyc apply by cardApply third error applyId={} walletUid={}",
 					applyId, user.getWalletUid(), e);
@@ -834,6 +839,7 @@ public class WalletUserService extends BaseApiService {
 		req.setAreaCode(man.getUserTelDialCode());
 		req.setPhone(man.getUserTel());
 		req.setSelfieUrl(kyc.getHandheldPhotoUrl());
+		KycFieldNormalizeUtil.normalizeKycApply(req);
 		return req;
 	}
 

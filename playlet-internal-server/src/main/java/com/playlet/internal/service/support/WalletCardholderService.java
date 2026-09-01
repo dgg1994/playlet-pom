@@ -12,6 +12,7 @@ import com.playlet.internal.enums.WalletSexEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.utils.AgeCheckUtil;
 import com.playlet.internal.utils.I18nUtil;
+import com.playlet.internal.utils.KycFieldNormalizeUtil;
 import com.playlet.internal.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -197,11 +198,12 @@ public class WalletCardholderService extends BaseApiService {
 		if (!StringUtils.isEmpty(query.getUserSurname())) {
 			holder.setUserSurname(query.getUserSurname().trim());
 		}
-		holder.setUserTelDialCode(query.getUserTelDialCode());
-		holder.setUserTelCode(query.getUserTelCode());
-		if (!StringUtils.isEmpty(query.getUserTel())) {
-			holder.setUserTel(query.getUserTel().trim());
-		}
+		KycFieldNormalizeUtil.normalizeHolderTel(query.getUserTelDialCode(), query.getUserTelCode(),
+				query.getUserTel(), (dialCode, telCode, tel) -> {
+					holder.setUserTelDialCode(dialCode);
+					holder.setUserTelCode(telCode);
+					holder.setUserTel(tel);
+				});
 		if (!StringUtils.isEmpty(query.getUserEmail())) {
 			holder.setUserEmail(query.getUserEmail().trim());
 		}

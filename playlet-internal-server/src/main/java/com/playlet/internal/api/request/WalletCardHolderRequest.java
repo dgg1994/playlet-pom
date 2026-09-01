@@ -17,10 +17,10 @@ public class WalletCardHolderRequest {
 	@ApiModelProperty(value = "英文姓", required = true)
 	private String userSurname;
 
-	@ApiModelProperty(value = "手机号区号", required = true)
+	@ApiModelProperty(value = "手机号区号（纯数字，如 852、86，不要带 +）", required = true)
 	private String userTelDialCode;
 
-	@ApiModelProperty(value = "地区编码")
+	@ApiModelProperty(value = "国家/地区 ISO Alpha-3（如 HKG、CHN、SGP）")
 	private String userTelCode;
 
 	@ApiModelProperty(value = "手机号", required = true)

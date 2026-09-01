@@ -31,6 +31,7 @@ import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.WalletApiPaths;
 import com.playlet.internal.constants.WalletConstants;
 import com.playlet.internal.exception.BaseException;
+import com.playlet.internal.utils.KycFieldNormalizeUtil;
 import com.playlet.internal.utils.RsaSignUtil;
 import com.playlet.internal.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -191,6 +192,7 @@ public class ThirdService {
 		if (body == null) {
 			throw new BaseException("KYC提交参数不能为空");
 		}
+		KycFieldNormalizeUtil.normalizeKycApply(body);
 		validateKycApply(body);
 		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.KYC_APPLY_PATH;
 		log.info("third party kyc apply start uid={} nationCode={} countryCode={}",
