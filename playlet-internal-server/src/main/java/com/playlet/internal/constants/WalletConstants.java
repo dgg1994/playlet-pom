@@ -1,5 +1,7 @@
 package com.playlet.internal.constants;
 
+import java.math.BigDecimal;
+
 /**
  * 钱包业务常量。
  */
@@ -15,6 +17,12 @@ public final class WalletConstants {
 
 	/** 钱包默认币种 */
 	public static final String DEFAULT_CURRENCY = "USD";
+
+	/** 内部转账默认费率（未配置时） */
+	public static final BigDecimal ZERO_RATE = BigDecimal.ZERO;
+
+	/** 内部转账订单号前缀 */
+	public static final String TRANSFER_ORDER_PREFIX = "TF";
 
 	/** 业务类型：充值 */
 	public static final String BIZ_RECHARGE = "RECHARGE";

@@ -32,6 +32,7 @@ import com.playlet.internal.service.WalletCardApplyManageService;
 import com.playlet.internal.service.support.WalletOpenCardSettlementService;
 import com.playlet.internal.service.support.WalletPhysicalCardFulfillService;
 import com.playlet.internal.service.third.ThirdService;
+import com.playlet.internal.service.third.WalletUserService;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.IpUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -84,6 +85,8 @@ public class WalletCardApplyManageServiceImpl implements WalletCardApplyManageSe
 	private WalletPhysicalCardFulfillService walletPhysicalCardFulfillService;
 	@Autowired
 	private WalletOpenCardSettlementService walletOpenCardSettlementService;
+	@Autowired
+	private WalletUserService walletUserService;
 	@Autowired
 	private IpUtil ipUtil;
 
@@ -178,17 +181,21 @@ public class WalletCardApplyManageServiceImpl implements WalletCardApplyManageSe
 		insertAppliedBankcard(user, apply.getId(), product, third, now);
 		WalletBankcardEntity card = walletBankcardDao.findByUserBankcardId(third.getUserBankcardId());
 		walletAccountDao.markActivated(user.getId());
-		apply.setApplyState(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getCode());
-		apply.setApplyStateName(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getLabel());
-		apply.setGmtModified(now);
-		try {
-			walletCardApplyDao.updateById(apply);
-		} catch (Exception e) {
-			log.error("admin open card update apply failed applyId={}", id, e);
-			throw new BaseException(I18nUtil.getMessage("base_error"), e);
-		}
-		if (card != null) {
-			walletOpenCardSettlementService.afterVirtualCardIssued(user, apply, card);
+		if (card != null && WalletConstants.BANKCARD_NATURE_VIRTUAL.equalsIgnoreCase(product.getBankcardNature())) {
+			walletUserService.finalizeVirtualCardAfterAutoIssue(user, apply, card, third);
+		} else {
+			apply.setApplyState(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getCode());
+			apply.setApplyStateName(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getLabel());
+			apply.setGmtModified(now);
+			try {
+				walletCardApplyDao.updateById(apply);
+			} catch (Exception e) {
+				log.error("admin open card update apply failed applyId={}", id, e);
+				throw new BaseException(I18nUtil.getMessage("base_error"), e);
+			}
+			if (card != null) {
+				walletOpenCardSettlementService.afterVirtualCardIssued(user, apply, card);
+			}
 		}
 		log.info("admin open card success applyId={} walletUid={} userBankcardId={}",
 				id, user.getWalletUid(), third.getUserBankcardId());
@@ -287,8 +294,14 @@ public class WalletCardApplyManageServiceImpl implements WalletCardApplyManageSe
 		card.setBankcardNature(product == null ? null : product.getBankcardNature());
 		card.setCardBrand(product == null ? null : product.getCardBrand());
 		card.setCurrency(WalletConstants.DEFAULT_CURRENCY);
-		card.setCardStatus(WalletCardStatusEnums.WAIT_ACTIVE.getCode());
-		card.setCardStatusName(WalletCardStatusEnums.WAIT_ACTIVE.getLabel());
+		// 虚拟卡 KYC 已通过开卡：直接正常；实体卡待绑卡
+		if (product != null && WalletConstants.BANKCARD_NATURE_VIRTUAL.equalsIgnoreCase(product.getBankcardNature())) {
+			card.setCardStatus(WalletCardStatusEnums.ACTIVE.getCode());
+			card.setCardStatusName(WalletCardStatusEnums.ACTIVE.getLabel());
+		} else {
+			card.setCardStatus(WalletCardStatusEnums.WAIT_ACTIVE.getCode());
+			card.setCardStatusName(WalletCardStatusEnums.WAIT_ACTIVE.getLabel());
+		}
 		card.setBalance(BigDecimal.ZERO);
 		card.setPinSet(0);
 		card.setIsDefault(WalletConstants.CARD_DEFAULT_NO);

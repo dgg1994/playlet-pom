@@ -21,8 +21,11 @@ public class WalletCardItemResp {
 	@ApiModelProperty("对方 userBankcardId")
 	private Long userBankcardId;
 
-	@ApiModelProperty("展示名称（标签或品牌+尾号）")
+	@ApiModelProperty("展示名称：优先 tagName，其次卡产品 cardTitle，否则品牌+尾号")
 	private String displayName;
+
+	@ApiModelProperty("卡产品名称（wallet_card_product.card_title）")
+	private String cardTitle;
 
 	@ApiModelProperty("卡号掩码")
 	private String cardNo;

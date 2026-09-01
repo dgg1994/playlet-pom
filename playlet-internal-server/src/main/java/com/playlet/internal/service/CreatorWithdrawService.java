@@ -2,6 +2,8 @@ package com.playlet.internal.service;
 
 import com.playlet.internal.api.request.*;
 import com.playlet.internal.base.ResponseBase;
+import com.playlet.internal.entity.wallet.WalletLogEntity;
+import com.playlet.internal.entity.wallet.WalletTransfetListEntity;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -77,6 +79,12 @@ public interface CreatorWithdrawService {
 	@GetMapping("/card/list")
 	@ApiOperation(value = "卡片列表", notes = "默认卡优先；首页切换与卡片列表页复用；需作家登录")
 	ResponseBase cardList(HttpServletRequest request);
+
+	@GetMapping("/card/findUserCardInfo")
+	@ApiOperation(value = "持有银行卡详情", notes = "对齐 onetoken /appUserCard/findUserCardInfo；"
+			+ "id 为本地 wallet_bankcard.id；含持卡人、卡产品、实体卡物流轨迹、"
+			+ "月服务费/USD充值/USDT充值/提现手续费；需作家登录")
+	ResponseBase findUserCardInfo(Long id, HttpServletRequest request);
 
 	@PostMapping("/card/findList")
 	@ApiOperation(value = "银行卡信息列表", notes = "对齐 onetoken /card/findList；可按 bankCardNature 筛选虚拟/实体卡；需作家登录")
@@ -159,4 +167,20 @@ public interface CreatorWithdrawService {
 	@GetMapping("/transaction/list")
 	@ApiOperation(value = "交易记录", notes = "分页；首页可用较小 pageSize，点全部继续翻页；需作家登录")
 	ResponseBase transactionList(PageQueryHelperEntity page, HttpServletRequest request);
+
+	@PostMapping("/transfer")
+	@ApiOperation(value = "钱包内部转账", notes = "需作家登录；recipientEmail 为收款人邮箱；sendMoney 为转出金额；payPassword 必填")
+	ResponseBase transfer(@RequestBody WalletTransfetListEntity query, HttpServletRequest request);
+
+	@GetMapping("/transferReading")
+	@ApiOperation(value = "转账试算", notes = "返回手续费与实际到账；需作家登录")
+	ResponseBase transferReading(Double sendMoney, HttpServletRequest request);
+
+	@GetMapping("/findReading")
+	@ApiOperation(value = "查询转账费率", notes = "需作家登录")
+	ResponseBase findReading(HttpServletRequest request);
+
+	@PostMapping("/walletLog")
+	@ApiOperation(value = "钱包账变记录", notes = "分页；默认当月；需作家登录")
+	ResponseBase walletLog(@RequestBody(required = false) WalletLogEntity query, HttpServletRequest request);
 }

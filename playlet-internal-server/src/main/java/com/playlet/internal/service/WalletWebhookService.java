@@ -18,6 +18,6 @@ import javax.servlet.http.HttpServletRequest;
 public interface WalletWebhookService {
 
 	@PostMapping("/notify")
-	@ApiOperation(value = "worldPay回调通知", notes = "无需登录；验签后按 eventType 分发；成功返回 code=200")
+	@ApiOperation(value = "worldPay回调通知", notes = "无需登录；验签后按 eventType 分发；cardStatusChange 支持 cardActive/cardFreeze/cardClose；成功返回 code=200 msg=Received successfully")
 	WalletWebhookNotifyResponse notify(@RequestBody WalletWebhookNotifyRequest body, HttpServletRequest request);
 }

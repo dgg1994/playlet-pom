@@ -68,6 +68,12 @@ public interface WalletAccountDao extends BaseMapper<WalletAccountEntity> {
 			+ "where id = #{id} and ifnull(available_balance, 0) >= #{delta}")
 	int deductAvailableBalance(@Param("id") Long id, @Param("delta") BigDecimal delta);
 
+	/** 内部转账扣款：可转余额 = available - open_freeze */
+	@Update("update wallet_account set available_balance = ifnull(available_balance, 0) - #{delta}, "
+			+ "balance_sync_time = now(), gmtModified = now() "
+			+ "where id = #{id} and (ifnull(available_balance, 0) - ifnull(open_freeze_balance, 0)) >= #{delta}")
+	int deductTransferableBalance(@Param("id") Long id, @Param("delta") BigDecimal delta);
+
 	/** 拒绝开卡：解冻开卡冻结金额回可用余额 */
 	@Update("update wallet_account set available_balance = ifnull(available_balance, 0) + #{amount}, "
 			+ "open_freeze_balance = ifnull(open_freeze_balance, 0) - #{amount}, "

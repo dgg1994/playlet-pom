@@ -43,6 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
@@ -294,6 +295,67 @@ public class WalletPhysicalCardFulfillService {
 		}
 		result.setLogisticsInfo(events);
 		return setResultSuccess(result, I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * 卡片详情：有物流单号时查询轨迹并回写发货状态（对齐 onetoken findUserCardInfo）。
+	 */
+	public List<WalletLogisticsEventResp> refreshLogisticsForCardDetail(WalletBankcardEntity card,
+			WalletCardApplyEntity apply, Long ownerWalletUserId) {
+		if (card == null || apply == null) {
+			return Collections.emptyList();
+		}
+		String logisticsNum = resolveLogisticsNum(card, apply);
+		if (StringUtils.isEmpty(logisticsNum)) {
+			return Collections.emptyList();
+		}
+		if (ownerWalletUserId != null && !ownerWalletUserId.equals(apply.getWalletUserId())) {
+			return Collections.emptyList();
+		}
+		String num = logisticsNum.trim();
+		List<WalletCardApplyEntity> applyList = walletCardApplyDao.findByLogisticsNum(num);
+		if (applyList == null || applyList.isEmpty()) {
+			return Collections.emptyList();
+		}
+		WalletCardApplyEntity target = resolveLogisticsApply(applyList, apply.getId(), ownerWalletUserId);
+		if (target == null) {
+			return Collections.emptyList();
+		}
+		EmsTrackingInfoResp tracking;
+		try {
+			tracking = emsTrackingService.queryTrackingInfo(num);
+		} catch (BaseException e) {
+			log.error("card detail logistics ems failed logisticsNum={} applyId={}", num, apply.getId(), e);
+			return Collections.emptyList();
+		} catch (Exception e) {
+			log.error("card detail logistics ems error logisticsNum={} applyId={}", num, apply.getId(), e);
+			return Collections.emptyList();
+		}
+		WalletLogisticsStateEnums shippingState = resolveShippingStateFromEms(tracking);
+		List<WalletLogisticsEventResp> events = extractLogisticsEvents(tracking, target);
+		if (shippingState != null) {
+			syncLogisticsState(applyList, num, shippingState);
+			WalletCardApplyEntity refreshed = walletCardApplyDao.selectById(apply.getId());
+			if (refreshed != null) {
+				apply.setShippingState(refreshed.getShippingState());
+				apply.setShippingStateName(refreshed.getShippingStateName());
+				apply.setLogisticsNum(refreshed.getLogisticsNum());
+				apply.setShippingTime(refreshed.getShippingTime());
+			}
+			WalletBankcardEntity refreshedCard = walletBankcardDao.selectById(card.getId());
+			if (refreshedCard != null) {
+				card.setShippingState(refreshedCard.getShippingState());
+				card.setLogisticsNum(refreshedCard.getLogisticsNum());
+			}
+		}
+		return events;
+	}
+
+	private static String resolveLogisticsNum(WalletBankcardEntity card, WalletCardApplyEntity apply) {
+		if (!StringUtils.isEmpty(card.getLogisticsNum())) {
+			return card.getLogisticsNum();
+		}
+		return apply.getLogisticsNum();
 	}
 
 	private ResponseBase validatePhysicalBinding(WalletCardApplyEntity apply, Long applyId) {

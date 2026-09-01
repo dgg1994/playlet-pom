@@ -44,6 +44,19 @@ public enum WalletCardStatusEnums {
 		return String.valueOf(code);
 	}
 
+	/** 三方 /api/bankcard/info 返回的 status 整型码映射 */
+	public static WalletCardStatusEnums fromThirdPartyCode(Integer code) {
+		if (code == null) {
+			return null;
+		}
+		for (WalletCardStatusEnums e : values()) {
+			if (e.code == code) {
+				return e;
+			}
+		}
+		return null;
+	}
+
 	/**
 	 * WebHook status 映射（cardActive / ACTIVE / 正常 等）。
 	 */

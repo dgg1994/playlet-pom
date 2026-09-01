@@ -55,8 +55,17 @@ public class WalletWebhookNotifyRequest {
 	@ApiModelProperty(value = "交易币种")
 	private String transactionCurrency;
 
-	@ApiModelProperty(value = "卡状态（cardActive/cardFreeze/cardClose 等）")
+	@ApiModelProperty(value = "卡状态（cardActive/cardFreeze/cardClose，见 Apifox cardStatusChange）")
 	private String status;
+
+	@ApiModelProperty(value = "冻结原因（cardFreeze 时可选）")
+	private String reason;
+
+	@ApiModelProperty(value = "老系统卡 id（迁移兼容）")
+	private String oldUserBankcardId;
+
+	@ApiModelProperty(value = "退款金额（cardClose 时）")
+	private String refundAmount;
 
 	@ApiModelProperty(value = "交易创建时间戳（毫秒）")
 	private Long createAt;

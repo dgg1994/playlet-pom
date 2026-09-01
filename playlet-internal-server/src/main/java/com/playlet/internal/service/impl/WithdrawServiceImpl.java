@@ -4,10 +4,15 @@ import com.playlet.internal.api.request.*;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
+import com.playlet.internal.entity.wallet.WalletLogEntity;
+import com.playlet.internal.entity.wallet.WalletTransfetListEntity;
 import com.playlet.internal.enums.WithdrawUserTypeEnums;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
+
+import java.math.BigDecimal;
 import com.playlet.internal.service.WithdrawService;
 import com.playlet.internal.service.support.WalletCardholderService;
+import com.playlet.internal.service.support.WalletTransferService;
 import com.playlet.internal.service.support.WalletUsdtTopinService;
 import com.playlet.internal.service.support.WithdrawBizService;
 import com.playlet.internal.service.third.WalletUserService;
@@ -39,6 +44,8 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 	private WalletUsdtTopinService walletUsdtTopinService;
 	@Autowired
 	private WalletCardholderService walletCardholderService;
+	@Autowired
+	private WalletTransferService walletTransferService;
 
 	@Override
 	public ResponseBase topinUsdtAddress(String uid) {
@@ -141,6 +148,15 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
 		return walletUserService.listCards(WithdrawUserTypeEnums.APP.getCode(), uid);
+	}
+
+	@Override
+	public ResponseBase findUserCardInfo(Long id, HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.findUserCardInfo(WithdrawUserTypeEnums.APP.getCode(), uid, id);
 	}
 
 	@Override
@@ -321,5 +337,42 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
 		return walletUserService.listTransactions(WithdrawUserTypeEnums.APP.getCode(), uid, page);
+	}
+
+	@Override
+	public ResponseBase transfer(@RequestBody WalletTransfetListEntity query, HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletTransferService.transfer(WithdrawUserTypeEnums.APP.getCode(), uid, query);
+	}
+
+	@Override
+	public ResponseBase transferReading(Double sendMoney, HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		BigDecimal amount = sendMoney == null ? null : BigDecimal.valueOf(sendMoney);
+		return walletTransferService.transferReading(WithdrawUserTypeEnums.APP.getCode(), uid, amount);
+	}
+
+	@Override
+	public ResponseBase findReading(HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletTransferService.findReading();
+	}
+
+	@Override
+	public ResponseBase walletLog(@RequestBody(required = false) WalletLogEntity query, HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletTransferService.walletLog(WithdrawUserTypeEnums.APP.getCode(), uid, query);
 	}
 }

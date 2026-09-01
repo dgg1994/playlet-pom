@@ -17,11 +17,14 @@ import com.playlet.internal.api.request.WithdrawReqEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
+import com.playlet.internal.entity.wallet.WalletLogEntity;
+import com.playlet.internal.entity.wallet.WalletTransfetListEntity;
 import com.playlet.internal.enums.WithdrawUserTypeEnums;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
 import com.playlet.internal.service.CreatorWithdrawService;
 import com.playlet.internal.service.support.CreatorRevenueBizService;
 import com.playlet.internal.service.support.WalletCardholderService;
+import com.playlet.internal.service.support.WalletTransferService;
 import com.playlet.internal.service.support.WalletUsdtTopinService;
 import com.playlet.internal.service.support.WithdrawBizService;
 import com.playlet.internal.service.third.WalletUserService;
@@ -34,6 +37,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
+
+import java.math.BigDecimal;
 
 /**
  * 作家端钱包提现入口。
@@ -52,6 +57,8 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 	private WalletUsdtTopinService walletUsdtTopinService;
 	@Autowired
 	private WalletCardholderService walletCardholderService;
+	@Autowired
+	private WalletTransferService walletTransferService;
 
 	@Override
 	public ResponseBase topinUsdtAddress(String uid) {
@@ -168,6 +175,15 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
 		return walletUserService.listCards(WithdrawUserTypeEnums.CREATOR.getCode(), uid);
+	}
+
+	@Override
+	public ResponseBase findUserCardInfo(Long id, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.findUserCardInfo(WithdrawUserTypeEnums.CREATOR.getCode(), uid, id);
 	}
 
 	@Override
@@ -348,5 +364,42 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
 		return walletUserService.listTransactions(WithdrawUserTypeEnums.CREATOR.getCode(), uid, page);
+	}
+
+	@Override
+	public ResponseBase transfer(@RequestBody WalletTransfetListEntity query, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletTransferService.transfer(WithdrawUserTypeEnums.CREATOR.getCode(), uid, query);
+	}
+
+	@Override
+	public ResponseBase transferReading(Double sendMoney, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		BigDecimal amount = sendMoney == null ? null : BigDecimal.valueOf(sendMoney);
+		return walletTransferService.transferReading(WithdrawUserTypeEnums.CREATOR.getCode(), uid, amount);
+	}
+
+	@Override
+	public ResponseBase findReading(HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletTransferService.findReading();
+	}
+
+	@Override
+	public ResponseBase walletLog(@RequestBody(required = false) WalletLogEntity query, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletTransferService.walletLog(WithdrawUserTypeEnums.CREATOR.getCode(), uid, query);
 	}
 }

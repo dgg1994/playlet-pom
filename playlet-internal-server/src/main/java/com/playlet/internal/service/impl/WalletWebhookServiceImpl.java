@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.playlet.internal.api.request.WalletWebhookNotifyRequest;
 import com.playlet.internal.api.response.WalletWebhookNotifyResponse;
 import com.playlet.internal.api.response.ThirdBankcardBalanceResp;
+import com.playlet.internal.api.response.ThirdBankcardInfoResp;
 import com.playlet.internal.config.ThirdPartyProperties;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.WalletConstants;
@@ -23,6 +24,8 @@ import com.playlet.internal.enums.WalletKycStateEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.WalletWebhookService;
 import com.playlet.internal.service.WithdrawPayoutService;
+import com.playlet.internal.service.support.WalletBankcardSyncSupport;
+import com.playlet.internal.service.support.WalletCardCloseWebhookSupport;
 import com.playlet.internal.service.support.WalletOpenCardSettlementService;
 import com.playlet.internal.service.third.ThirdService;
 import com.playlet.internal.service.third.WalletUserService;
@@ -76,6 +79,10 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 	private WithdrawPayoutService withdrawPayoutService;
 	@Autowired
 	private WalletOpenCardSettlementService walletOpenCardSettlementService;
+	@Autowired
+	private WalletBankcardSyncSupport walletBankcardSyncSupport;
+	@Autowired
+	private WalletCardCloseWebhookSupport walletCardCloseWebhookSupport;
 
 	@Lazy
 	@Autowired
@@ -183,6 +190,8 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 					body.getOrderId());
 			if (!StringUtils.isEmpty(body.getCardNo())) {
 				walletBankcardDao.updateCardNo(card.getId(), body.getCardNo());
+			} else {
+				walletBankcardSyncSupport.syncCardNo(card);
 			}
 			syncCardBalance(card);
 			linkWithdrawPayout(txn, body.getOrderId(), true, null);
@@ -191,42 +200,158 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 		// 无本地流水时仍尝试同步余额
 		if (!StringUtils.isEmpty(body.getCardNo())) {
 			walletBankcardDao.updateCardNo(card.getId(), body.getCardNo());
+		} else {
+			walletBankcardSyncSupport.syncCardNo(card);
 		}
 		syncCardBalance(card);
 		log.info("wallet webhook recharge no local txn userBankcardId={} orderId={}",
 				body.getUserBankcardId(), body.getOrderId());
 	}
 
-	/** 卡状态变更：同步 wallet_bankcard.card_status */
+	/**
+	 * 银行卡状态变更（对齐 onetoken cardStateUp + Apifox cardStatusChange）。
+	 * status：cardActive / cardFreeze / cardClose
+	 */
 	private void handleCardStatusChange(WalletWebhookNotifyRequest body) {
-		if (body.getUserBankcardId() == null || StringUtils.isEmpty(body.getStatus())) {
-			throw new BaseException("card status webhook param empty");
+		if (StringUtils.isEmpty(body.getStatus())) {
+			throw new BaseException("card status webhook status empty");
 		}
-		WalletBankcardEntity card = walletBankcardDao.findByUserBankcardId(body.getUserBankcardId());
+		WalletBankcardEntity card = resolveWebhookCard(body);
 		if (card == null) {
-			log.warn("wallet webhook card status card not found userBankcardId={}", body.getUserBankcardId());
+			log.warn("wallet webhook card status card not found userBankcardId={} oldUserBankcardId={}",
+					body.getUserBankcardId(), body.getOldUserBankcardId());
 			return;
 		}
 		WalletCardStatusEnums status = WalletCardStatusEnums.fromWebhookStatus(body.getStatus());
 		if (status == null) {
-			log.warn("wallet webhook card status unknown status={} userBankcardId={}",
-					body.getStatus(), body.getUserBankcardId());
+			throw new BaseException("card status webhook unknown status=" + body.getStatus());
+		}
+		if (WalletCardStatusEnums.ACTIVE.equals(status)) {
+			handleCardActiveWebhook(body, card);
 			return;
 		}
+		if (WalletCardStatusEnums.FREEZE.equals(status)) {
+			handleCardFreezeWebhook(body, card);
+			return;
+		}
+		if (WalletCardStatusEnums.CLOSED.equals(status)) {
+			WalletUserEntity user = walletUserDao.findByWalletUid(card.getWalletUid());
+			walletCardCloseWebhookSupport.handleCardClose(body, card, user);
+			return;
+		}
+		persistWebhookCardNo(body, card);
+		walletBankcardDao.updateCardStatus(card.getId(), status.getCode(), status.getLabel());
+		log.info("wallet webhook card status updated userBankcardId={} status={}",
+				card.getUserBankcardId(), status.getLabel());
+	}
+
+	/** cardActive：轮询确认激活 + 回写卡号 + 核销冻结 */
+	private void handleCardActiveWebhook(WalletWebhookNotifyRequest body, WalletBankcardEntity card) {
+		if (!confirmThirdPartyCardActive(card)) {
+			throw new BaseException("card not active after retry userBankcardId=" + body.getUserBankcardId());
+		}
+		persistWebhookCardNo(body, card);
+		walletBankcardDao.updateCardStatus(card.getId(),
+				WalletCardStatusEnums.ACTIVE.getCode(), WalletCardStatusEnums.ACTIVE.getLabel());
+		WalletUserEntity user = walletUserDao.findByWalletUid(card.getWalletUid());
+		if (user != null) {
+			walletUserService.markAccountActivated(user.getId());
+		}
+		walletOpenCardSettlementService.onCardActivated(card);
+		log.info("wallet webhook card activated userBankcardId={} cardNoPresent={}",
+				body.getUserBankcardId(), !StringUtils.isEmpty(card.getCardNo()));
+	}
+
+	/** cardFreeze：更新本地冻结状态 */
+	private void handleCardFreezeWebhook(WalletWebhookNotifyRequest body, WalletBankcardEntity card) {
+		persistWebhookCardNo(body, card);
+		walletBankcardDao.updateCardStatus(card.getId(),
+				WalletCardStatusEnums.FREEZE.getCode(), WalletCardStatusEnums.FREEZE.getLabel());
+		log.info("wallet webhook card frozen userBankcardId={} reason={}",
+				card.getUserBankcardId(), body.getReason());
+	}
+
+	private void persistWebhookCardNo(WalletWebhookNotifyRequest body, WalletBankcardEntity card) {
 		if (!StringUtils.isEmpty(body.getCardNo())) {
 			walletBankcardDao.updateCardNo(card.getId(), body.getCardNo());
+			card.setCardNo(body.getCardNo());
+			return;
 		}
-		walletBankcardDao.updateCardStatus(card.getId(), status.getCode(), status.getLabel());
-		if (WalletCardStatusEnums.ACTIVE.equals(status)) {
-			WalletUserEntity user = walletUserDao.findByWalletUid(card.getWalletUid());
-			if (user != null) {
-				walletUserService.markAccountActivated(user.getId());
+		walletBankcardSyncSupport.syncCardNo(card);
+	}
+
+	/** 按 userBankcardId / oldUserBankcardId 解析本地卡 */
+	private WalletBankcardEntity resolveWebhookCard(WalletWebhookNotifyRequest body) {
+		if (body.getUserBankcardId() != null) {
+			WalletBankcardEntity card = walletBankcardDao.findByUserBankcardId(body.getUserBankcardId());
+			if (card != null) {
+				return card;
 			}
-			// 虚拟卡核销冻结；实体/虚拟均标记申请单激活成功
-			walletOpenCardSettlementService.onCardActivated(card);
 		}
-		log.info("wallet webhook card status updated userBankcardId={} status={}",
-				body.getUserBankcardId(), status.getLabel());
+		Long oldId = parseOldUserBankcardId(body.getOldUserBankcardId());
+		if (oldId == null) {
+			return null;
+		}
+		return walletBankcardDao.findByUserBankcardId(oldId);
+	}
+
+	private static Long parseOldUserBankcardId(String oldUserBankcardId) {
+		if (StringUtils.isEmpty(oldUserBankcardId)) {
+			return null;
+		}
+		try {
+			return Long.parseLong(oldUserBankcardId.trim());
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
+	/**
+	 * 轮询三方 /api/bankcard/info 确认卡已激活（对齐 onetoken activeCard 重试逻辑）。
+	 */
+	private boolean confirmThirdPartyCardActive(WalletBankcardEntity card) {
+		if (card == null || card.getWalletUid() == null || card.getUserBankcardId() == null) {
+			return false;
+		}
+		int maxRetries = WalletWebhookConstants.CARD_ACTIVE_CONFIRM_MAX_RETRIES;
+		long intervalMs = WalletWebhookConstants.CARD_ACTIVE_CONFIRM_RETRY_INTERVAL_MS;
+		ThirdBankcardInfoResp info = queryThirdPartyCardInfo(card);
+		int retryCount = 0;
+		while (!isThirdPartyCardActive(info) && retryCount < maxRetries) {
+			retryCount++;
+			log.warn("wallet webhook card not active yet userBankcardId={} status={} retry={}/{}",
+					card.getUserBankcardId(), info == null ? null : info.getStatus(), retryCount, maxRetries);
+			try {
+				Thread.sleep(intervalMs);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				log.error("wallet webhook card active confirm interrupted userBankcardId={}",
+						card.getUserBankcardId(), e);
+				return false;
+			}
+			info = queryThirdPartyCardInfo(card);
+		}
+		if (!isThirdPartyCardActive(info)) {
+			log.error("wallet webhook card active confirm failed userBankcardId={} finalStatus={}",
+					card.getUserBankcardId(), info == null ? null : info.getStatus());
+			return false;
+		}
+		walletBankcardSyncSupport.syncCardNo(card);
+		return true;
+	}
+
+	private ThirdBankcardInfoResp queryThirdPartyCardInfo(WalletBankcardEntity card) {
+		try {
+			return thirdService.getBankcardInfo(card.getWalletUid(), card.getUserBankcardId());
+		} catch (Exception e) {
+			log.error("wallet webhook query card info failed userBankcardId={}", card.getUserBankcardId(), e);
+			return null;
+		}
+	}
+
+	private static boolean isThirdPartyCardActive(ThirdBankcardInfoResp info) {
+		return info != null
+				&& WalletCardStatusEnums.ACTIVE.equals(WalletCardStatusEnums.fromThirdPartyCode(info.getStatus()));
 	}
 
 	/** 卡交易通知：落 wallet_card_transaction */

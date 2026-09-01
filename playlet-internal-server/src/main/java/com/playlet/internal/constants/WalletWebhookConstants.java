@@ -24,6 +24,18 @@ public final class WalletWebhookConstants {
 	/** 事件：商户充值 */
 	public static final String EVENT_MERCHANT_RECHARGE = "merchantRecharge";
 
+	/** cardStatusChange：卡片激活 */
+	public static final String STATUS_CARD_ACTIVE = "cardActive";
+	/** cardStatusChange：卡片冻结 */
+	public static final String STATUS_CARD_FREEZE = "cardFreeze";
+	/** cardStatusChange：卡片关闭 */
+	public static final String STATUS_CARD_CLOSE = "cardClose";
+
+	/** 虚拟卡激活确认：轮询三方卡信息最大重试次数（对齐 onetoken） */
+	public static final int CARD_ACTIVE_CONFIRM_MAX_RETRIES = 5;
+	/** 虚拟卡激活确认：轮询间隔毫秒 */
+	public static final long CARD_ACTIVE_CONFIRM_RETRY_INTERVAL_MS = 3000L;
+
 	/** 处理状态：待处理 */
 	public static final int PROCESS_PENDING = 0;
 	/** 处理状态：成功 */
