@@ -60,4 +60,9 @@ public interface WalletBankcardDao extends BaseMapper<WalletBankcardEntity> {
 	/** 设为默认提现卡 */
 	@Update("update wallet_bankcard set is_default = 1, gmtModified = now() where id = #{id}")
 	int markDefault(@Param("id") Long id);
+
+	@Update("update wallet_bankcard set shipping_state = #{shippingState}, logistics_num = #{logisticsNum}, "
+			+ "gmtModified = now() where id = #{id}")
+	int updateLogistics(@Param("id") Long id, @Param("shippingState") Integer shippingState,
+			@Param("logisticsNum") String logisticsNum);
 }

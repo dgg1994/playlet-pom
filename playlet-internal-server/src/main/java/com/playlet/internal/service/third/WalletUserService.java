@@ -7,6 +7,7 @@ import com.playlet.internal.api.request.*;
 import com.playlet.internal.api.response.*;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
+import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.WalletConstants;
 import com.playlet.internal.constants.WalletKycApiStatus;
 import com.playlet.internal.dao.wallet.*;
@@ -14,10 +15,12 @@ import com.playlet.internal.entity.wallet.*;
 import com.playlet.internal.enums.WalletCardApplyStateEnums;
 import com.playlet.internal.enums.WalletCardStatusEnums;
 import com.playlet.internal.enums.WalletKycStateEnums;
+import com.playlet.internal.enums.WalletLogisticsStateEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
 import com.playlet.internal.service.support.WalletCardProductService;
 import com.playlet.internal.service.support.WalletCardholderService;
+import com.playlet.internal.service.support.WalletPhysicalCardFulfillService;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.OrderCodeFactory;
 import com.playlet.internal.utils.PasswordHashUtils;
@@ -74,6 +77,8 @@ public class WalletUserService extends BaseApiService {
 	private WalletKycFileDao walletKycFileDao;
 	@Autowired
 	private WalletCardholderService walletCardholderService;
+	@Autowired
+	private WalletPhysicalCardFulfillService walletPhysicalCardFulfillService;
 
 	/**
 	 * 本地账号注册成功后调用：开通 U 卡三方用户并写入 P0 表。
@@ -206,11 +211,12 @@ public class WalletUserService extends BaseApiService {
 	}
 
 	/**
-	 * 商户可用卡产品列表：读本地 wallet_card_product，仅 enable=1。
+	 * 卡产品列表（对齐 onetoken POST /card/findList）：可按 VIRTUAL / PHYSICAL 筛选。
 	 */
-	public ResponseBase listCardProducts() {
-		List<WalletCardProductItemResp> items = walletCardProductService.listEnabledProducts();
-		log.info("wallet card product list size={}", items.size());
+	public ResponseBase findCardProductList(WalletCardProductListRequest query) {
+		List<WalletCardProductItemResp> items = walletCardProductService.findList(query);
+		log.info("wallet card findList size={} bankCardNature={}",
+				items.size(), query == null ? null : query.getBankCardNature());
 		return setResultSuccess(items, I18nUtil.getMessage("base_success"));
 	}
 
@@ -227,7 +233,8 @@ public class WalletUserService extends BaseApiService {
 	}
 
 	/**
-	 * 申请开卡：校验产品 + 持卡人 + KYC 资料 → 落申请单 → KYC 已通过时虚拟卡自动三方发卡（对齐 worldpay openCardApply）。
+	 * 申请开卡（对齐 onetoken openCardApply）：支付密码 → 校验产品/持卡人/KYC 资料 → 计算费用并冻结余额
+	 * → 落申请单 → KYC 已通过时虚拟卡自动三方发卡。
 	 */
 	@Transactional(rollbackFor = Exception.class)
 	public ResponseBase applyCard(Integer userType, Integer localUid, WalletApplyCardRequest query) {
@@ -243,9 +250,10 @@ public class WalletUserService extends BaseApiService {
 		if (account == null) {
 			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
 		}
-		// 对齐 worldpay：须已有 KYC 证件资料，但不要求 KYC 已通过
-		if (!hasApplyKycMaterial(user, query)) {
-			return setResultError(I18nUtil.getMessage("user_kyc_null"));
+		// 支付密码校验（对齐 onetoken checkPayPasswrod）
+		ResponseBase payPwdResult = checkPayPassword(account, query.getPayPassword());
+		if (!Constants.HTTP_RES_CODE_200.equals(payPwdResult.getCode())) {
+			return payPwdResult;
 		}
 		WalletCardProductEntity product = walletCardProductDao.findById(query.getProductId());
 		if (product == null) {
@@ -254,16 +262,14 @@ public class WalletUserService extends BaseApiService {
 		if (!Integer.valueOf(1).equals(product.getEnable())) {
 			return setResultError(I18nUtil.getMessage("wallet.product_disabled"));
 		}
-		boolean physicalCard = isPhysicalCard(product.getBankcardNature());
-		// 实体卡须传邮寄地址明细（本地落库）；三方 deliveryAddressId 可选
-		if (physicalCard && !isMailingAddressValid(query.getMailingAddress())) {
-			return setResultError(I18nUtil.getMessage("wallet.apply_physical_address_required"));
+		// 须已有 KYC 证件资料，但不要求 KYC 已通过
+		if (!hasApplyKycMaterial(user, query)) {
+			return setResultError(I18nUtil.getMessage("user_kyc_null"));
 		}
-		WalletUserHolderEntity holder;
-		try {
-			holder = resolveOrCreateHolder(user, query);
-		} catch (BaseException e) {
-			return setResultError(e.getMessage());
+		boolean physicalCard = isPhysicalCard(product.getBankcardNature());
+		// 实体卡须传邮寄地址或三方邮寄地址 id（对齐 onetoken mailingAddress / deliveryAddressId）
+		if (physicalCard && !hasPhysicalMailingInfo(query)) {
+			return setResultError(I18nUtil.getMessage("mailingAddress_null"));
 		}
 		String requestOrderId = resolveApplyRequestOrderId(query.getRequestOrderId(), localUid);
 		// 幂等：同 requestOrderId 直接返回已有申请结果
@@ -277,14 +283,29 @@ public class WalletUserService extends BaseApiService {
 			return setResultSuccess(buildApplyCardResp(existedApply, existedCard, product, thirdOrderNo,
 					idempotentAutoIssued), I18nUtil.getMessage("base_success"));
 		}
-
 		int topupType = query.getTopupType() == null
 				? WalletConstants.TOPUP_TYPE_WALLET : query.getTopupType();
+		OpenCardFeeBundle fees = resolveOpenCardFees(product, query, physicalCard);
+		// 钱包充值方式：校验可用余额是否覆盖开卡总费用
+		if (WalletConstants.TOPUP_TYPE_WALLET == topupType && fees.openCardTotal.compareTo(BigDecimal.ZERO) > 0) {
+			BigDecimal available = account.getAvailableBalance() == null
+					? BigDecimal.ZERO : account.getAvailableBalance();
+			if (available.compareTo(fees.openCardTotal) < 0) {
+				return setResult(Constants.HTTP_RES_CODE_601,
+						I18nUtil.getMessage("wallet.balance_not_enough"), null);
+			}
+		}
+		WalletUserHolderEntity holder;
+		try {
+			holder = resolveOrCreateHolder(user, query);
+		} catch (BaseException e) {
+			return setResultError(e.getMessage());
+		}
 		Date now = new Date();
 		boolean kycApproved = isKycApproved(account);
-		// 先落申请单 + 持卡人/KYC/邮寄地址快照（对齐 worldpay addApply）
+		// 落申请单 + 持卡人/KYC/邮寄地址快照（对齐 onetoken addApply）
 		WalletCardApplyEntity apply = buildApplyEntity(user, account, product, query, holder.getId(),
-				requestOrderId, topupType, physicalCard, false, now);
+				requestOrderId, topupType, physicalCard, false, fees, now);
 		try {
 			walletCardApplyDao.insert(apply);
 			persistApplySnapshots(user, apply.getId(), holder, query, now);
@@ -302,20 +323,22 @@ public class WalletUserService extends BaseApiService {
 			log.error("wallet apply card insert apply failed requestOrderId={}", requestOrderId, e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
-		// 申请单须落 KYC 快照（对齐 worldpay 保存 kyc 信息）
 		if (walletCardApplyKycDao.findByApplyId(apply.getId()) == null) {
-			return setResultError(I18nUtil.getMessage("user_kyc_null"));
+			throw new BaseException(I18nUtil.getMessage("user_kyc_null"));
 		}
-
-		// 虚拟卡 + KYC 已通过：自动调三方开卡；否则保持申请中待补/待审 KYC
+		// 冻结开卡费用：月费 + 开卡费 + 预存费 + 邮费（对齐 onetoken 冻结 walletBalance）
+		if (fees.openCardTotal.compareTo(BigDecimal.ZERO) > 0) {
+			freezeOpenCardBalance(account, fees.openCardTotal, apply.getId());
+		}
+		// 虚拟卡 + KYC 已通过：自动调三方开卡；否则待激活待审 KYC
 		ThirdBankcardApplyResp third = null;
 		boolean autoIssued = false;
 		if (!physicalCard && kycApproved) {
 			third = issueVirtualCardThird(user, apply, product, query.getDeliveryAddressId());
 			autoIssued = third != null && third.getUserBankcardId() != null;
 			if (autoIssued) {
-				apply.setApplyState(WalletCardApplyStateEnums.ISSUED.getCode());
-				apply.setApplyStateName(WalletCardApplyStateEnums.ISSUED.getLabel());
+				apply.setApplyState(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getCode());
+				apply.setApplyStateName(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getLabel());
 				apply.setGmtModified(new Date());
 				try {
 					walletCardApplyDao.updateById(apply);
@@ -324,9 +347,11 @@ public class WalletUserService extends BaseApiService {
 					throw new BaseException(I18nUtil.getMessage("base_error"), e);
 				}
 			}
-		} else if (physicalCard && kycApproved && query.getDeliveryAddressId() != null) {
-			// 实体卡 KYC 已通过且已有三方邮寄地址时同步调三方申请
-			third = issueVirtualCardThird(user, apply, product, query.getDeliveryAddressId());
+		} else if (physicalCard && kycApproved) {
+			Integer deliveryAddressId = resolveDeliveryAddressId(query);
+			if (deliveryAddressId != null) {
+				third = issueVirtualCardThird(user, apply, product, deliveryAddressId);
+			}
 		}
 
 		WalletBankcardEntity card = persistIssuedBankcard(user, apply, product, third, now);
@@ -334,11 +359,22 @@ public class WalletUserService extends BaseApiService {
 			walletAccountDao.markActivated(user.getId());
 		}
 		String thirdOrderNo = third == null ? null : third.getOrderNo();
-		log.info("wallet apply card success walletUserId={} productId={} applyId={} holderId={} userBankcardId={} autoIssued={} kycApproved={}",
-				user.getId(), query.getProductId(), apply.getId(), holder.getId(),
+		log.info("wallet apply card success walletUserId={} productId={} applyId={} holderId={} openCardTotal={} userBankcardId={} autoIssued={} kycApproved={}",
+				user.getId(), query.getProductId(), apply.getId(), holder.getId(), fees.openCardTotal,
 				third == null ? null : third.getUserBankcardId(), autoIssued, kycApproved);
 		return setResultSuccess(buildApplyCardResp(apply, card, product, thirdOrderNo, autoIssued),
 				I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * C 端查询实体卡物流（校验申请单归属）。
+	 */
+	public ResponseBase findLogistics(Integer userType, Integer localUid, String logisticsNum, Long applyId) {
+		WalletUserEntity user = walletUserDao.findByLocal(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		return walletPhysicalCardFulfillService.findLogistics(logisticsNum, applyId, user.getId());
 	}
 
 	/** 解析已有持卡人或新建持卡人 */
@@ -405,6 +441,9 @@ public class WalletUserService extends BaseApiService {
 		send.setApplyId(applyId);
 		send.setWalletUserId(user.getId());
 		send.setWalletUid(user.getWalletUid());
+		if (mailing.getAddressId() != null) {
+			send.setAddressId(mailing.getAddressId());
+		}
 		send.setNation(mailing.getNation().trim());
 		send.setProvince(mailing.getProvince());
 		send.setCity(mailing.getCity());
@@ -509,6 +548,31 @@ public class WalletUserService extends BaseApiService {
 				&& !StringUtils.isEmpty(mailing.getCollectTel());
 	}
 
+	/** 实体卡是否已有邮寄信息：本地地址明细或三方 deliveryAddressId */
+	private static boolean hasPhysicalMailingInfo(WalletApplyCardRequest query) {
+		if (query == null) {
+			return false;
+		}
+		if (resolveDeliveryAddressId(query) != null) {
+			return true;
+		}
+		return isMailingAddressValid(query.getMailingAddress());
+	}
+
+	/** 解析三方邮寄地址 id：优先顶层 deliveryAddressId，其次 mailingAddress.addressId */
+	private static Integer resolveDeliveryAddressId(WalletApplyCardRequest query) {
+		if (query == null) {
+			return null;
+		}
+		if (query.getDeliveryAddressId() != null) {
+			return query.getDeliveryAddressId();
+		}
+		if (query.getMailingAddress() != null && query.getMailingAddress().getAddressId() != null) {
+			return query.getMailingAddress().getAddressId();
+		}
+		return null;
+	}
+
 	private static String mapPaperworkType(Integer certType) {
 		if (certType == null) {
 			return null;
@@ -521,7 +585,7 @@ public class WalletUserService extends BaseApiService {
 
 	private static WalletCardApplyEntity buildApplyEntity(WalletUserEntity user, WalletAccountEntity account,
 			WalletCardProductEntity product, WalletApplyCardRequest query, Long holderId, String requestOrderId,
-			int topupType, boolean physicalCard, boolean autoIssued, Date now) {
+			int topupType, boolean physicalCard, boolean autoIssued, OpenCardFeeBundle fees, Date now) {
 		WalletCardApplyEntity apply = new WalletCardApplyEntity();
 		apply.setWalletUserId(user.getId());
 		apply.setWalletUid(user.getWalletUid());
@@ -530,12 +594,16 @@ public class WalletUserService extends BaseApiService {
 		apply.setCardUuid(product.getProductUuid());
 		apply.setCardType(product.getBankcardNature());
 		apply.setTopupType(topupType);
+		apply.setOpenCardCost(fees.openCardCost);
+		apply.setPreSaveCost(fees.preSaveCost);
+		apply.setLogisticsMonery(fees.logisticsMonery);
+		apply.setOpenCardTotal(fees.openCardTotal);
 		if (autoIssued) {
-			apply.setApplyState(WalletCardApplyStateEnums.ISSUED.getCode());
-			apply.setApplyStateName(WalletCardApplyStateEnums.ISSUED.getLabel());
+			apply.setApplyState(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getCode());
+			apply.setApplyStateName(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getLabel());
 		} else {
-			apply.setApplyState(WalletCardApplyStateEnums.APPLYING.getCode());
-			apply.setApplyStateName(WalletCardApplyStateEnums.APPLYING.getLabel());
+			apply.setApplyState(WalletCardApplyStateEnums.WAIT_ACTIVATION.getCode());
+			apply.setApplyStateName(WalletCardApplyStateEnums.WAIT_ACTIVATION.getLabel());
 		}
 		apply.setKycState(account.getKycState());
 		apply.setKycStateName(account.getKycStateName());
@@ -549,8 +617,8 @@ public class WalletUserService extends BaseApiService {
 		if (physicalCard
 				&& account.getKycState() != null
 				&& account.getKycState() == WalletKycStateEnums.SUCCESS_APPROVE.getCode()) {
-			apply.setShippingState(0);
-			apply.setShippingStateName("待发货");
+			apply.setShippingState(WalletLogisticsStateEnums.WAIT_SUCCESS.getCode());
+			apply.setShippingStateName(WalletLogisticsStateEnums.WAIT_SUCCESS.getLabel());
 		}
 		apply.setSetTime(now);
 		apply.setGmtModified(now);
@@ -570,6 +638,10 @@ public class WalletUserService extends BaseApiService {
 			resp.setApplyStateName(apply.getApplyStateName());
 			resp.setKycState(apply.getKycState());
 			resp.setKycStateName(apply.getKycStateName());
+			resp.setOpenCardCost(apply.getOpenCardCost());
+			resp.setPreSaveCost(apply.getPreSaveCost());
+			resp.setLogisticsMonery(apply.getLogisticsMonery());
+			resp.setOpenCardTotal(apply.getOpenCardTotal());
 			boolean kycApproved = apply.getKycState() != null
 					&& apply.getKycState() == WalletKycStateEnums.SUCCESS_APPROVE.getCode();
 			resp.setKycSubmitRequired(!kycApproved && card == null);
@@ -770,8 +842,8 @@ public class WalletUserService extends BaseApiService {
 				}
 				Date now = new Date();
 				persistIssuedBankcard(user, apply, product, third, now);
-				apply.setApplyState(WalletCardApplyStateEnums.ISSUED.getCode());
-				apply.setApplyStateName(WalletCardApplyStateEnums.ISSUED.getLabel());
+				apply.setApplyState(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getCode());
+				apply.setApplyStateName(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getLabel());
 				apply.setKycState(WalletKycStateEnums.SUCCESS_APPROVE.getCode());
 				apply.setKycStateName(WalletKycStateEnums.SUCCESS_APPROVE.getLabel());
 				apply.setGmtModified(now);
@@ -1455,6 +1527,75 @@ public class WalletUserService extends BaseApiService {
 		apply.setSetTime(now);
 		apply.setGmtModified(now);
 		return apply;
+	}
+
+	/** 支付密码校验（对齐 onetoken checkPayPasswrod） */
+	private ResponseBase checkPayPassword(WalletAccountEntity account, String password) {
+		if (StringUtils.isEmpty(password)) {
+			return setResultError(I18nUtil.getMessage("pay_password_entry"));
+		}
+		if (StringUtils.isEmpty(account.getPayPassword())) {
+			return setResult(Constants.HTTP_RES_CODE_602, I18nUtil.getMessage("pay_password_null"), null);
+		}
+		if (!PasswordHashUtils.matches(password, account.getPayPassword())) {
+			return setResultError(I18nUtil.getMessage("pay_password_error"));
+		}
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	/** 开卡费用：月费 + 开卡费 + 预存费 + 邮费 */
+	private static OpenCardFeeBundle resolveOpenCardFees(WalletCardProductEntity product,
+			WalletApplyCardRequest query, boolean physicalCard) {
+		BigDecimal monthFee = nz(product.getMonthFee());
+		BigDecimal openCardCost = query.getOpenCardCost() != null
+				? query.getOpenCardCost() : WalletCardProductService.resolveOpenCardCost(product);
+		BigDecimal logisticsMonery = BigDecimal.ZERO;
+		if (physicalCard) {
+			if (query.getLogisticsMonery() != null) {
+				logisticsMonery = query.getLogisticsMonery();
+			} else {
+				logisticsMonery = WalletCardProductService.resolveLogisticsMonery(product);
+			}
+		}
+		BigDecimal preSaveCost = physicalCard
+				? BigDecimal.ZERO : WalletCardProductService.resolvePreSaveCost(product);
+		BigDecimal openCardTotal = monthFee.add(openCardCost).add(preSaveCost).add(logisticsMonery);
+		OpenCardFeeBundle bundle = new OpenCardFeeBundle();
+		bundle.openCardCost = openCardCost;
+		bundle.preSaveCost = preSaveCost;
+		bundle.logisticsMonery = logisticsMonery;
+		bundle.openCardTotal = openCardTotal;
+		return bundle;
+	}
+
+	/** 申请开卡冻结：可用余额 → 开卡冻结余额 */
+	private void freezeOpenCardBalance(WalletAccountEntity account, BigDecimal amount, Long applyId) {
+		try {
+			int rows = walletAccountDao.freezeOpenCardBalance(account.getId(), amount);
+			if (rows <= 0) {
+				throw new BaseException(I18nUtil.getMessage("wallet.balance_not_enough"));
+			}
+		} catch (BaseException e) {
+			throw e;
+		} catch (Exception e) {
+			log.error("wallet apply card freeze balance failed applyId={} walletUserId={} amount={}",
+					applyId, account.getWalletUserId(), amount, e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+		log.info("wallet apply card freeze balance applyId={} walletUserId={} amount={}",
+				applyId, account.getWalletUserId(), amount);
+	}
+
+	private static BigDecimal nz(BigDecimal value) {
+		return value == null ? BigDecimal.ZERO : value;
+	}
+
+	/** 开卡费用明细 */
+	private static final class OpenCardFeeBundle {
+		private BigDecimal openCardCost;
+		private BigDecimal preSaveCost;
+		private BigDecimal logisticsMonery;
+		private BigDecimal openCardTotal;
 	}
 
 	/**

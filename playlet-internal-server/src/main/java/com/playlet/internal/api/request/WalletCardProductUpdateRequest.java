@@ -7,6 +7,7 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import javax.validation.constraints.NotNull;
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -37,4 +38,7 @@ public class WalletCardProductUpdateRequest {
 
 	@ApiModelProperty("卡简介；null 表示不改，传对象则可更新 title/content")
 	private WalletCardProductSynopsisResp synopsisData;
+
+	@ApiModelProperty("实体卡邮费（美元）；null 表示不改")
+	private BigDecimal logisticsMonery;
 }

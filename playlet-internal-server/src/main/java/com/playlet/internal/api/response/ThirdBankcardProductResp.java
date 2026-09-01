@@ -52,4 +52,16 @@ public class ThirdBankcardProductResp {
 
 	@ApiModelProperty("卡片展示图 URL")
 	private String cardImg;
+
+	@ApiModelProperty("开卡费用（部分渠道返回）")
+	private Double openCardCost;
+
+	@ApiModelProperty("预存费用（部分渠道返回）")
+	private Double preSaveCost;
+
+	@ApiModelProperty("月费（部分渠道返回）")
+	private Double monthFee;
+
+	@ApiModelProperty("卡最大余额/充值上限（部分渠道返回）")
+	private Double rechargeMaxLimit;
 }

@@ -34,6 +34,10 @@ public class WalletCardApplySendEntity {
 	@ApiModelProperty(name = "walletUid", value = "钱包三方 uid")
 	private Long walletUid;
 
+	@TableField("address_id")
+	@ApiModelProperty(name = "addressId", value = "三方邮寄地址 id")
+	private Integer addressId;
+
 	@TableField("nation")
 	@ApiModelProperty(name = "nation", value = "国家")
 	private String nation;

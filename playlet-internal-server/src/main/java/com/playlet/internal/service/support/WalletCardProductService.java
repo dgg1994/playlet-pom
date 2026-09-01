@@ -1,5 +1,6 @@
 package com.playlet.internal.service.support;
 
+import com.playlet.internal.api.request.WalletCardProductListRequest;
 import com.playlet.internal.api.request.WalletCardProductUpdateRequest;
 import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.api.response.ThirdBankcardProductResp;
@@ -46,15 +47,29 @@ public class WalletCardProductService {
 
 	/** C 端可申请卡产品列表（仅 enable=1） */
 	public List<WalletCardProductItemResp> listEnabledProducts() {
-		List<WalletCardProductEntity> rows = walletCardProductDao.findEnabledList();
+		return listEnabledProducts(null);
+	}
+
+	/**
+	 * 卡产品列表（对齐 onetoken CardService.findList）：仅上架产品，可按卡性质筛选。
+	 */
+	public List<WalletCardProductItemResp> listEnabledProducts(String bankCardNature) {
+		List<WalletCardProductEntity> rows = walletCardProductDao.findEnabledList(bankCardNature);
 		if (rows == null || rows.isEmpty()) {
 			return Collections.emptyList();
 		}
 		List<WalletCardProductItemResp> items = new ArrayList<>(rows.size());
 		for (WalletCardProductEntity row : rows) {
+			enrichLabelJoin(row, LanguageContext.getLanguage());
 			items.add(toItemResp(row));
 		}
 		return items;
+	}
+
+	/** 对齐 onetoken findList 入参 */
+	public List<WalletCardProductItemResp> findList(WalletCardProductListRequest query) {
+		String bankCardNature = query == null ? null : query.getBankCardNature();
+		return listEnabledProducts(bankCardNature);
 	}
 
 	/** 管理端：按 productId 查询卡产品详情（对齐 onetoken CardService.findById） */
@@ -203,6 +218,9 @@ public class WalletCardProductService {
 				existed.setCardTitle(synopsis.getTitle());
 			}
 		}
+		if (patch.getLogisticsMonery() != null) {
+			existed.setLogisticsMonery(patch.getLogisticsMonery());
+		}
 		existed.setGmtModified(new Date());
 		try {
 			walletCardProductDao.updateById(existed);
@@ -260,9 +278,17 @@ public class WalletCardProductService {
 		item.setCardMode(row.getCardMode());
 		item.setCurrency(StringUtils.isEmpty(row.getCurrency())
 				? WalletConstants.DEFAULT_CURRENCY : row.getCurrency());
-		if (row.getApplyFee() != null) {
+		BigDecimal openCardCost = resolveOpenCardCost(row);
+		item.setOpenCardCost(toDouble(openCardCost));
+		if (openCardCost != null) {
+			item.setApplyFee(openCardCost.intValue());
+		} else if (row.getApplyFee() != null) {
 			item.setApplyFee(row.getApplyFee().intValue());
 		}
+		item.setPreSaveCost(toDouble(resolvePreSaveCost(row)));
+		item.setMonthFee(toDouble(nz(row.getMonthFee())));
+		item.setMaxBalance(toDouble(nz(row.getRechargeMaxLimit())));
+		item.setLogisticsMonery(toDouble(resolveLogisticsMonery(row)));
 		if (row.getRechargeFee() != null) {
 			item.setRechargeFee(row.getRechargeFee().doubleValue());
 		}
@@ -275,6 +301,53 @@ public class WalletCardProductService {
 				? row.getLabelList() : buildLabelList(row.getDescription2()));
 		item.setSynopsisData(buildSynopsis(row.getCardTitle(), row.getDescription1()));
 		return item;
+	}
+
+	/** 实体卡邮费：仅 PHYSICAL 产品有值 */
+	public static BigDecimal resolveLogisticsMonery(WalletCardProductEntity row) {
+		if (row == null || !WalletConstants.BANKCARD_NATURE_PHYSICAL.equalsIgnoreCase(row.getBankcardNature())) {
+			return BigDecimal.ZERO;
+		}
+		return nz(row.getLogisticsMonery());
+	}
+
+	/** 开卡费：open_card_cost 优先，否则 apply_fee */
+	public static BigDecimal resolveOpenCardCost(WalletCardProductEntity row) {
+		if (row == null) {
+			return BigDecimal.ZERO;
+		}
+		if (row.getOpenCardCost() != null) {
+			return row.getOpenCardCost();
+		}
+		return nz(row.getApplyFee());
+	}
+
+	/** 预存费：实体卡为 0；有配置用 pre_save_cost，否则虚拟卡回退 activeMinLimit */
+	public static BigDecimal resolvePreSaveCost(WalletCardProductEntity row) {
+		if (row == null) {
+			return BigDecimal.ZERO;
+		}
+		if (WalletConstants.BANKCARD_NATURE_PHYSICAL.equalsIgnoreCase(row.getBankcardNature())) {
+			return BigDecimal.ZERO;
+		}
+		if (row.getPreSaveCost() != null) {
+			return row.getPreSaveCost();
+		}
+		if (row.getActiveMinLimit() != null && row.getActiveMinLimit() > 0) {
+			return BigDecimal.valueOf(row.getActiveMinLimit());
+		}
+		return BigDecimal.ZERO;
+	}
+
+	private static BigDecimal nz(BigDecimal value) {
+		return value == null ? BigDecimal.ZERO : value;
+	}
+
+	private static Double toDouble(BigDecimal value) {
+		if (value == null) {
+			return 0.0D;
+		}
+		return value.doubleValue();
 	}
 
 	/** description2 → 卡标签；支持 | / ， / , 分隔多标签 */
@@ -328,8 +401,20 @@ public class WalletCardProductService {
 		target.setBankcardRegion(third.getBankcardRegion());
 		target.setActiveMinLimit(third.getActiveMinLimit());
 		target.setRechargeMinLimit(third.getRechargeMinLimit());
+		if (third.getRechargeMaxLimit() != null) {
+			target.setRechargeMaxLimit(toBigDecimal(third.getRechargeMaxLimit()));
+		}
 		target.setCurrency(StringUtils.isEmpty(third.getCcy()) ? WalletConstants.DEFAULT_CURRENCY : third.getCcy());
 		target.setApplyFee(toBigDecimal(third.getApplyFee()));
+		if (third.getOpenCardCost() != null) {
+			target.setOpenCardCost(toBigDecimal(third.getOpenCardCost()));
+		}
+		if (third.getPreSaveCost() != null) {
+			target.setPreSaveCost(toBigDecimal(third.getPreSaveCost()));
+		}
+		if (third.getMonthFee() != null) {
+			target.setMonthFee(toBigDecimal(third.getMonthFee()));
+		}
 		target.setRechargeFee(toBigDecimal(third.getRechargeFee()));
 		if (StringUtils.isEmpty(target.getCardImg()) && !StringUtils.isEmpty(third.getCardImg())) {
 			target.setCardImg(third.getCardImg());

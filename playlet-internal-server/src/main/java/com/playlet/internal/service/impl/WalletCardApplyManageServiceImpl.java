@@ -5,6 +5,7 @@ import com.github.pagehelper.PageInfo;
 import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.api.request.BankcardApplyRequest;
 import com.playlet.internal.api.request.WalletCardApplyRejectRequest;
+import com.playlet.internal.api.request.WalletCardShippingRequest;
 import com.playlet.internal.api.response.ThirdBankcardApplyResp;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.WalletConstants;
@@ -29,8 +30,10 @@ import com.playlet.internal.enums.WalletCardStatusEnums;
 import com.playlet.internal.enums.WalletKycStateEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.WalletCardApplyManageService;
+import com.playlet.internal.service.support.WalletPhysicalCardFulfillService;
 import com.playlet.internal.service.third.ThirdService;
 import com.playlet.internal.utils.I18nUtil;
+import com.playlet.internal.utils.IpUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
@@ -39,6 +42,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+
+import javax.servlet.http.HttpServletRequest;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -75,6 +80,10 @@ public class WalletCardApplyManageServiceImpl implements WalletCardApplyManageSe
 	private WalletAccountDao walletAccountDao;
 	@Autowired
 	private ThirdService thirdService;
+	@Autowired
+	private WalletPhysicalCardFulfillService walletPhysicalCardFulfillService;
+	@Autowired
+	private IpUtil ipUtil;
 
 	@Override
 	@SysLogAnnotation(module = "银行卡申请记录", type = "POST", remark = "查询申请记录")
@@ -122,7 +131,7 @@ public class WalletCardApplyManageServiceImpl implements WalletCardApplyManageSe
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
 		if (apply.getApplyState() == null
-				|| apply.getApplyState() != WalletCardApplyStateEnums.APPLYING.getCode()) {
+				|| apply.getApplyState() != WalletCardApplyStateEnums.WAIT_ACTIVATION.getCode()) {
 			return setResultError(I18nUtil.getMessage("card_open_state"));
 		}
 		if (apply.getKycState() == null
@@ -166,8 +175,8 @@ public class WalletCardApplyManageServiceImpl implements WalletCardApplyManageSe
 		Date now = new Date();
 		insertAppliedBankcard(user, apply.getId(), product, third, now);
 		walletAccountDao.markActivated(user.getId());
-		apply.setApplyState(WalletCardApplyStateEnums.ISSUED.getCode());
-		apply.setApplyStateName(WalletCardApplyStateEnums.ISSUED.getLabel());
+		apply.setApplyState(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getCode());
+		apply.setApplyStateName(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getLabel());
 		apply.setGmtModified(now);
 		try {
 			walletCardApplyDao.updateById(apply);
@@ -194,12 +203,12 @@ public class WalletCardApplyManageServiceImpl implements WalletCardApplyManageSe
 			return setResultError(I18nUtil.getMessage("wallet.apply_not_found"));
 		}
 		if (apply.getApplyState() == null
-				|| apply.getApplyState() != WalletCardApplyStateEnums.APPLYING.getCode()) {
+				|| apply.getApplyState() != WalletCardApplyStateEnums.WAIT_ACTIVATION.getCode()) {
 			return setResultError(I18nUtil.getMessage("wallet.apply_state_invalid"));
 		}
 		Date now = new Date();
-		apply.setApplyState(WalletCardApplyStateEnums.REJECTED.getCode());
-		apply.setApplyStateName(WalletCardApplyStateEnums.REJECTED.getLabel());
+		apply.setApplyState(WalletCardApplyStateEnums.ERROR_ACTIVATION.getCode());
+		apply.setApplyStateName(WalletCardApplyStateEnums.ERROR_ACTIVATION.getLabel());
 		apply.setRejectInfo(entity.getRejectInfo().trim());
 		apply.setGmtModified(now);
 		try {
@@ -212,6 +221,31 @@ public class WalletCardApplyManageServiceImpl implements WalletCardApplyManageSe
 		unfreezeOpenCardTotal(apply);
 		log.info("admin reject apply success applyId={} walletUserId={}", entity.getId(), apply.getWalletUserId());
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	@SysLogAnnotation(module = "银行卡申请记录", type = "GET", remark = "实体卡分配激活")
+	public ResponseBase cardBinding(Long applyId, String cardNumber, String pinNum) {
+		return walletPhysicalCardFulfillService.cardBinding(applyId, cardNumber, pinNum);
+	}
+
+	@Override
+	@SysLogAnnotation(module = "银行卡申请记录", type = "POST", remark = "实体卡发货")
+	public ResponseBase shipping(@RequestBody WalletCardShippingRequest entity, HttpServletRequest request) {
+		String clientIp = request == null ? null : ipUtil.getClientIp(request);
+		return walletPhysicalCardFulfillService.shipping(entity, clientIp);
+	}
+
+	@Override
+	@SysLogAnnotation(module = "银行卡申请记录", type = "GET", remark = "修改物流单号")
+	public ResponseBase upLogisticsNum(Long applyId, String logisticsNum) {
+		return walletPhysicalCardFulfillService.upLogisticsNum(applyId, logisticsNum);
+	}
+
+	@Override
+	@SysLogAnnotation(module = "银行卡申请记录", type = "GET", remark = "查询物流跟踪")
+	public ResponseBase findLogistics(String logisticsNum, Long applyId) {
+		return walletPhysicalCardFulfillService.findLogistics(logisticsNum, applyId, null);
 	}
 
 	/** 补齐列表/详情关联数据 */

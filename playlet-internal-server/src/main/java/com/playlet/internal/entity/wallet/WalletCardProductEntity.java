@@ -70,6 +70,14 @@ public class WalletCardProductEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "rechargeMinLimit", value = "单笔充值最小金额")
 	private Integer rechargeMinLimit;
 
+	@TableField("recharge_max_limit")
+	@ApiModelProperty(name = "rechargeMaxLimit", value = "卡最大余额")
+	private BigDecimal rechargeMaxLimit;
+
+	@TableField("logistics_monery")
+	@ApiModelProperty(name = "logisticsMonery", value = "实体卡邮费（申请默认）")
+	private BigDecimal logisticsMonery;
+
 	@TableField("currency")
 	@ApiModelProperty(name = "currency", value = "币种")
 	private String currency;
@@ -77,6 +85,14 @@ public class WalletCardProductEntity extends PageQueryHelperEntity {
 	@TableField("apply_fee")
 	@ApiModelProperty(name = "applyFee", value = "开卡费")
 	private BigDecimal applyFee;
+
+	@TableField("open_card_cost")
+	@ApiModelProperty(name = "openCardCost", value = "开卡费用（展示/冻结；空则回退 applyFee）")
+	private BigDecimal openCardCost;
+
+	@TableField("pre_save_cost")
+	@ApiModelProperty(name = "preSaveCost", value = "预存费用")
+	private BigDecimal preSaveCost;
 
 	@TableField("apply_discount")
 	@ApiModelProperty(name = "applyDiscount", value = "申请折扣")

@@ -34,7 +34,22 @@ public class WalletCardProductItemResp {
 	@ApiModelProperty("消费币种")
 	private String currency;
 
-	@ApiModelProperty("开卡费用")
+	@ApiModelProperty("开卡费用（美元）")
+	private Double openCardCost;
+
+	@ApiModelProperty("预存费用（美元）")
+	private Double preSaveCost;
+
+	@ApiModelProperty("月服务费（美元）")
+	private Double monthFee;
+
+	@ApiModelProperty("卡最大余额（美元）")
+	private Double maxBalance;
+
+	@ApiModelProperty("实体卡邮费（美元）；申请时不传则取此默认值")
+	private Double logisticsMonery;
+
+	@ApiModelProperty("开卡费用（兼容字段，同 openCardCost 整数部分）")
 	private Integer applyFee;
 
 	@ApiModelProperty("充值手续费比例 0-1")

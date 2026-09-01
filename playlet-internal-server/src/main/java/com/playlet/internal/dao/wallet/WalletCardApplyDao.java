@@ -7,6 +7,8 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -37,8 +39,19 @@ public interface WalletCardApplyDao extends BaseMapper<WalletCardApplyEntity> {
 			@Param("kycStateName") String kycStateName, @Param("kycAuditResult") String kycAuditResult);
 
 	@Select("select * from wallet_card_apply where wallet_user_id = #{walletUserId} "
-			+ "and apply_state = 0 and upper(card_type) = 'VIRTUAL' order by setTime asc, id asc")
+			+ "and apply_state = 1 and upper(card_type) = 'VIRTUAL' order by setTime asc, id asc")
 	List<WalletCardApplyEntity> findPendingVirtualByWalletUserId(@Param("walletUserId") Long walletUserId);
+
+	@Select("select * from wallet_card_apply where logistics_num = #{logisticsNum}")
+	List<WalletCardApplyEntity> findByLogisticsNum(@Param("logisticsNum") String logisticsNum);
+
+	@Update("update wallet_card_apply set shipping_state = #{shippingState}, "
+			+ "shipping_state_name = #{shippingStateName}, logistics_num = #{logisticsNum}, "
+			+ "shipping_time = #{shippingTime}, logistics_monery = #{logisticsMonery}, gmtModified = now() "
+			+ "where id = #{id}")
+	int updateShipping(@Param("id") Long id, @Param("shippingState") Integer shippingState,
+			@Param("shippingStateName") String shippingStateName, @Param("logisticsNum") String logisticsNum,
+			@Param("shippingTime") Date shippingTime, @Param("logisticsMonery") BigDecimal logisticsMonery);
 
 	@Select("<script>"
 			+ "select * from wallet_card_apply where 1=1"

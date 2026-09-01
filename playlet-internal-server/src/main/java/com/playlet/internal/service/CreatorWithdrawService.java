@@ -78,18 +78,22 @@ public interface CreatorWithdrawService {
 	@ApiOperation(value = "卡片列表", notes = "默认卡优先；首页切换与卡片列表页复用；需作家登录")
 	ResponseBase cardList(HttpServletRequest request);
 
-	@GetMapping("/card/product/list")
-	@ApiOperation(value = "可用卡产品列表", notes = "商户可申请的卡产品，申请开卡前选品；含卡标签 labelList、卡简介 synopsisData；需作家登录")
-	ResponseBase cardProductList(HttpServletRequest request);
+	@PostMapping("/card/findList")
+	@ApiOperation(value = "银行卡信息列表", notes = "对齐 onetoken /card/findList；可按 bankCardNature 筛选虚拟/实体卡；需作家登录")
+	ResponseBase cardFindList(@RequestBody(required = false) WalletCardProductListRequest query,
+			HttpServletRequest request);
 
 	@GetMapping("/card/product/findById")
 	@ApiOperation(value = "卡产品详情", notes = "按 productId 查询可申请卡产品；含 labelList、synopsisData；需作家登录")
 	ResponseBase cardProductDetail(Integer productId, HttpServletRequest request);
 
+	@GetMapping("/card/findLogistics")
+	@ApiOperation(value = "查询物流跟踪", notes = "实体卡物流轨迹；需作家登录")
+	ResponseBase findLogistics(String logisticsNum, Long applyId, HttpServletRequest request);
+
 	@PostMapping("/card/apply")
-	@ApiOperation(value = "申请卡片", notes = "需作家登录；传 productId；holderId 或 holderData 必传其一；"
-			+ "须已上传 KYC 证件或在 kycData 中带证件照；KYC 未通过时先落申请单，再调 kyc/applyByCardApply 或 kyc/apply；"
-			+ "KYC 已通过时虚拟卡自动发卡")
+	@ApiOperation(value = "申请开卡", notes = "需作家登录；实体卡须 mailingAddress 或 deliveryAddressId；"
+			+ "邮费 logisticsMonery 不传取产品默认；冻结总费用含邮费；KYC 未通过可后补")
 	ResponseBase applyCard(@RequestBody WalletApplyCardRequest query, HttpServletRequest request);
 
 	@PostMapping("/cardholder/add")

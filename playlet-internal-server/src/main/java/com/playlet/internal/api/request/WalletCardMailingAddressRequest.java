@@ -31,4 +31,7 @@ public class WalletCardMailingAddressRequest {
 
 	@ApiModelProperty(value = "邮编")
 	private String postCode;
+
+	@ApiModelProperty(value = "三方邮寄地址 id（与 deliveryAddressId 二选一或同时传）")
+	private Integer addressId;
 }

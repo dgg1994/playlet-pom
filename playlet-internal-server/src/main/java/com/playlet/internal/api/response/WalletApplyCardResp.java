@@ -4,6 +4,8 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
+import java.math.BigDecimal;
+
 /**
  * 申请开卡结果（对齐 worldpay 申请开卡 + 自动发卡）。
  */
@@ -55,4 +57,16 @@ public class WalletApplyCardResp {
 
 	@ApiModelProperty("KYC 未通过时为 true，需调用 /wallet/kyc/applyByCardApply 或 /wallet/kyc/apply")
 	private Boolean kycSubmitRequired;
+
+	@ApiModelProperty("开卡费")
+	private BigDecimal openCardCost;
+
+	@ApiModelProperty("预存费")
+	private BigDecimal preSaveCost;
+
+	@ApiModelProperty("邮费（实体卡）")
+	private BigDecimal logisticsMonery;
+
+	@ApiModelProperty("开卡总费用（含月费+开卡费+预存费+邮费）")
+	private BigDecimal openCardTotal;
 }

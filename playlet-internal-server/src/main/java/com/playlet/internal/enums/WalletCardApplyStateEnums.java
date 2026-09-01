@@ -1,13 +1,15 @@
 package com.playlet.internal.enums;
 
 /**
- * 开卡申请本地状态。
+ * 开卡申请状态（对齐 worldpay OpenCardStateEnums）。
  */
 public enum WalletCardApplyStateEnums {
 
-	APPLYING(0, "申请中"),
-	ISSUED(1, "已发卡"),
-	REJECTED(2, "已拒绝");
+	WAIT_ACTIVATION(1, "待激活"),
+	PROCESS_ACTIVATION(2, "激活中"),
+	SUCCESS_ACTIVATION(3, "激活成功"),
+	ERROR_ACTIVATION(4, "激活失败"),
+	WAIT_USER_ACTIVATION(5, "待用户充值激活");
 
 	private final int code;
 	private final String label;
@@ -23,5 +25,17 @@ public enum WalletCardApplyStateEnums {
 
 	public String getLabel() {
 		return label;
+	}
+
+	public static WalletCardApplyStateEnums fromCode(Integer code) {
+		if (code == null) {
+			return WAIT_ACTIVATION;
+		}
+		for (WalletCardApplyStateEnums item : values()) {
+			if (item.code == code) {
+				return item;
+			}
+		}
+		return WAIT_ACTIVATION;
 	}
 }

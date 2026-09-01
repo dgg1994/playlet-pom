@@ -11,6 +11,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 
 import com.playlet.internal.entity.wallet.WalletBankcardEntity;
 import com.playlet.internal.entity.wallet.WalletCardApplyKycEntity;
@@ -18,6 +19,7 @@ import com.playlet.internal.entity.wallet.WalletCardApplyManEntity;
 import com.playlet.internal.entity.wallet.WalletCardApplySendEntity;
 import com.playlet.internal.entity.wallet.WalletCardProductEntity;
 
+import com.playlet.internal.api.response.WalletLogisticsEventResp;
 import lombok.EqualsAndHashCode;
 
 /**
@@ -62,7 +64,7 @@ public class WalletCardApplyEntity extends PageQueryHelperEntity {
 	private Integer topupType;
 
 	@TableField("apply_state")
-	@ApiModelProperty(name = "applyState", value = "开卡状态")
+	@ApiModelProperty(name = "applyState", value = "开卡状态：1待激活 2激活中 3激活成功 4激活失败 5待用户充值激活")
 	private Integer applyState;
 
 	@TableField("apply_state_name")
@@ -113,6 +115,14 @@ public class WalletCardApplyEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "logisticsNum", value = "物流单号")
 	private String logisticsNum;
 
+	@TableField("shipping_time")
+	@ApiModelProperty(name = "shippingTime", value = "发货时间")
+	private Date shippingTime;
+
+	@TableField("logistics_monery")
+	@ApiModelProperty(name = "logisticsMonery", value = "邮费")
+	private BigDecimal logisticsMonery;
+
 	@TableField("setTime")
 	@ApiModelProperty(name = "setTime", value = "申请时间")
 	private Date setTime;
@@ -145,4 +155,9 @@ public class WalletCardApplyEntity extends PageQueryHelperEntity {
 	@TableField(exist = false)
 	@ApiModelProperty(name = "userCardData", value = "用户银行卡")
 	private WalletBankcardEntity userCardData;
+
+	/** 物流轨迹节点（findLogistics 返回） */
+	@TableField(exist = false)
+	@ApiModelProperty(name = "logisticsInfo", value = "物流轨迹")
+	private List<WalletLogisticsEventResp> logisticsInfo;
 }

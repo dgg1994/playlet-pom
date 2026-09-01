@@ -14,8 +14,14 @@ import java.util.List;
 @Repository
 public interface WalletCardProductDao extends BaseMapper<WalletCardProductEntity> {
 
-	@Select("select * from wallet_card_product where enable = 1 order by hot desc, id asc")
-	List<WalletCardProductEntity> findEnabledList();
+	@Select("<script>"
+			+ "select * from wallet_card_product where enable = 1 "
+			+ "<if test='bankcardNature != null and bankcardNature != \"\"'>"
+			+ " and bankcard_nature = #{bankcardNature} "
+			+ "</if>"
+			+ "order by hot desc, id asc"
+			+ "</script>")
+	List<WalletCardProductEntity> findEnabledList(@Param("bankcardNature") String bankcardNature);
 
 	@Select("<script>"
 			+ "select * from wallet_card_product where 1 = 1 "

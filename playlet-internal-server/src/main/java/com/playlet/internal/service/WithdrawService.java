@@ -12,6 +12,7 @@ import com.playlet.internal.api.request.KycCountryListRequest;
 import com.playlet.internal.api.request.UsdtTopinNotifyRequest;
 import com.playlet.internal.api.request.WalletApplyCardRequest;
 import com.playlet.internal.api.request.WalletBindPayPwdRequest;
+import com.playlet.internal.api.request.WalletCardProductListRequest;
 import com.playlet.internal.api.request.WalletCardholderSaveRequest;
 import com.playlet.internal.api.request.WithdrawReqEntity;
 import com.playlet.internal.base.ResponseBase;
@@ -86,19 +87,27 @@ public interface WithdrawService {
 	@ApiOperation(value = "卡片列表", notes = "默认卡优先；首页切换与卡片列表页复用；需登录")
 	ResponseBase cardList(HttpServletRequest request);
 
-	@GetMapping("/card/product/list")
-	@ApiOperation(value = "可用卡产品列表", notes = "商户可申请的卡产品，申请开卡前选品；含卡标签 labelList、卡简介 synopsisData；需登录")
-	ResponseBase cardProductList(HttpServletRequest request);
+	@PostMapping("/card/findList")
+	@ApiOperation(value = "银行卡信息列表", notes = "对齐 onetoken /card/findList；可按 bankCardNature=VIRTUAL|PHYSICAL 筛选；"
+			+ "返回卡规则：开卡费/预存费/月服务费/卡最大余额；实体卡含 logisticsMonery 邮费；需登录")
+	ResponseBase cardFindList(@RequestBody(required = false) WalletCardProductListRequest query,
+			HttpServletRequest request);
 
 	@GetMapping("/card/product/findById")
 	@ApiOperation(value = "卡产品详情", notes = "按 productId 查询可申请卡产品；含 labelList、synopsisData；需登录")
 	ResponseBase cardProductDetail(Integer productId, HttpServletRequest request);
 
+	@GetMapping("/card/findLogistics")
+	@ApiOperation(value = "查询物流跟踪", notes = "实体卡物流轨迹；需登录且申请单归属当前用户")
+	ResponseBase findLogistics(String logisticsNum, Long applyId, HttpServletRequest request);
+
 	@PostMapping("/card/apply")
-	@ApiOperation(value = "申请卡片", notes = "需登录；传 productId；holderId 或 holderData 必传其一；"
-			+ "实体卡须传 mailingAddress；须已上传 KYC 证件或在 kycData 中带证件照；"
-			+ "KYC 未通过时先落申请单(申请中)，再调 /wallet/kyc/applyByCardApply 或 /wallet/kyc/apply；"
-			+ "KYC 已通过时虚拟卡自动调三方发卡；返回 applyId/kycState/kycSubmitRequired 等")
+	@ApiOperation(value = "申请开卡", notes = "需登录；传 productId、payPassword（6位）；holderId 或 holderData 必传其一；"
+			+ "实体卡须传 mailingAddress 或 deliveryAddressId，邮费 logisticsMonery 不传则取卡产品默认值；"
+			+ "须已上传 KYC 证件或在 kycData 中带证件照；"
+			+ "校验通过后落申请单(待激活)并冻结开卡总费用(月费+开卡费+预存费+邮费)；"
+			+ "KYC 未通过时可后补 /wallet/kyc/applyByCardApply 或 /wallet/kyc/apply；"
+			+ "KYC 已通过时虚拟卡自动调三方发卡；返回 applyId/费用明细/kycState 等")
 	ResponseBase applyCard(@RequestBody WalletApplyCardRequest query, HttpServletRequest request);
 
 	@PostMapping("/cardholder/add")

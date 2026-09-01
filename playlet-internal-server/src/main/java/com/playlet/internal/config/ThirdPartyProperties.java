@@ -33,4 +33,7 @@ public class ThirdPartyProperties {
 	/** HTTP 读超时（毫秒） */
 	private Integer readTimeoutMs = 10000;
 
+	/** 17track 物流 API Key（对齐 worldpay EMS_API_KEY） */
+	private String emsApiKey = "";
+
 }

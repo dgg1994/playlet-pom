@@ -11,6 +11,7 @@ import com.playlet.internal.api.request.KycApplyRequest;
 import com.playlet.internal.api.request.KycCountryListRequest;
 import com.playlet.internal.api.request.WalletApplyCardRequest;
 import com.playlet.internal.api.request.WalletBindPayPwdRequest;
+import com.playlet.internal.api.request.WalletCardProductListRequest;
 import com.playlet.internal.api.request.WalletCardholderSaveRequest;
 import com.playlet.internal.api.request.WithdrawReqEntity;
 import com.playlet.internal.base.BaseApiService;
@@ -170,12 +171,12 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 	}
 
 	@Override
-	public ResponseBase cardProductList(HttpServletRequest request) {
+	public ResponseBase cardFindList(WalletCardProductListRequest query, HttpServletRequest request) {
 		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
-		return walletUserService.listCardProducts();
+		return walletUserService.findCardProductList(query);
 	}
 
 	@Override
@@ -185,6 +186,15 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
 		return walletUserService.getCardProductDetail(productId);
+	}
+
+	@Override
+	public ResponseBase findLogistics(String logisticsNum, Long applyId, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.findLogistics(WithdrawUserTypeEnums.CREATOR.getCode(), uid, logisticsNum, applyId);
 	}
 
 	@Override
