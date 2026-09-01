@@ -12,6 +12,7 @@ import com.playlet.internal.entity.wallet.WalletUserEntity;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.third.ThirdService;
 import com.playlet.internal.utils.StringUtils;
+import com.playlet.internal.utils.WalletRequestOrderIdSupport;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
@@ -41,7 +42,7 @@ public class WithdrawWalletRechargeSupport {
 		if (order == null || order.getUid() == null || order.getUserType() == null) {
 			return false;
 		}
-		if (order.getTargetUserBankcardId() == null || StringUtils.isEmpty(order.getRequestOrderId())) {
+		if (order.getTargetUserBankcardId() == null) {
 			log.warn("withdraw wallet payout missing target orderNo={}", order.getOrderNo());
 			return false;
 		}
@@ -65,7 +66,9 @@ public class WithdrawWalletRechargeSupport {
 		BankcardRechargeRequest req = new BankcardRechargeRequest();
 		req.setUserBankcardId(order.getTargetUserBankcardId());
 		req.setAmount(amount);
-		req.setRequestOrderId(order.getRequestOrderId());
+		String requestOrderId = WalletRequestOrderIdSupport.resolve(order.getRequestOrderId(),
+				WalletConstants.REQUEST_ORDER_PREFIX_CARD_RECHARGE, user.getWalletUid());
+		req.setRequestOrderId(requestOrderId);
 		try {
 			thirdService.rechargeBankcard(user.getWalletUid(), req);
 			insertRechargeTransaction(user, card, order, req);

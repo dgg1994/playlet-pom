@@ -113,6 +113,7 @@ public interface WithdrawService {
 	@ApiOperation(value = "申请开卡", notes = "需登录；传 productId、payPassword（6位）；holderId 或 holderData 必传其一；"
 			+ "实体卡须传 mailingAddress 或 deliveryAddressId，邮费 logisticsMonery 不传则取卡产品默认值；"
 			+ "须已上传 KYC 证件或在 kycData 中带证件照；"
+			+ "requestOrderId 可选（不传服务端自动生成 CA 前缀单号），同单号幂等；"
 			+ "校验通过后落申请单(待激活)并冻结开卡总费用(月费+开卡费+预存费+邮费)；"
 			+ "KYC 未通过时可后补 /wallet/kyc/applyByCardApply 或 /wallet/kyc/apply；"
 			+ "KYC 已通过时虚拟卡自动调三方发卡并首充，申请单直接为激活成功(applyState=3)；返回 applyId/费用明细/kycState 等")
@@ -155,7 +156,8 @@ public interface WithdrawService {
 	ResponseBase cardBalance(@RequestBody BankcardUserIdRequest query, HttpServletRequest request);
 
 	@PostMapping("/card/recharge")
-	@ApiOperation(value = "银行卡充值", notes = "需登录；从 wallet_account.available_balance 扣款后充到 U 卡；requestOrderId 幂等")
+	@ApiOperation(value = "银行卡充值", notes = "需登录；从 wallet_account.available_balance 扣款后充到 U 卡；"
+			+ "requestOrderId 可选（不传服务端自动生成 CR 前缀单号），同单号幂等；返回 requestOrderId/amount/availableBalance")
 	ResponseBase cardRecharge(@RequestBody BankcardRechargeRequest query, HttpServletRequest request);
 
 	@PostMapping("/card/updateStatus")

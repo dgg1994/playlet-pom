@@ -24,6 +24,15 @@ public final class WalletConstants {
 	/** 内部转账订单号前缀 */
 	public static final String TRANSFER_ORDER_PREFIX = "TF";
 
+	/** 开卡申请幂等单号前缀 */
+	public static final String REQUEST_ORDER_PREFIX_CARD_APPLY = "CA";
+
+	/** 银行卡充值幂等单号前缀 */
+	public static final String REQUEST_ORDER_PREFIX_CARD_RECHARGE = "CR";
+
+	/** 开卡首充幂等单号前缀（无申请单号时） */
+	public static final String REQUEST_ORDER_PREFIX_FIRST_TOPUP = "FT";
+
 	/** 业务类型：充值 */
 	public static final String BIZ_RECHARGE = "RECHARGE";
 	/** 业务类型：提现 */

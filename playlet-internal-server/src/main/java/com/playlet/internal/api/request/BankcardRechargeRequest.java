@@ -17,6 +17,6 @@ public class BankcardRechargeRequest {
 	@ApiModelProperty(value = "充值金额", required = true)
 	private Integer amount;
 
-	@ApiModelProperty(value = "商户订单号（幂等）", required = true)
+	@ApiModelProperty(value = "商户订单号（幂等；不传则由服务端自动生成 CR 前缀单号）")
 	private String requestOrderId;
 }

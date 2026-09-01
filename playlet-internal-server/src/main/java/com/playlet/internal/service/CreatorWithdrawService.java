@@ -101,7 +101,8 @@ public interface CreatorWithdrawService {
 
 	@PostMapping("/card/apply")
 	@ApiOperation(value = "申请开卡", notes = "需作家登录；实体卡须 mailingAddress 或 deliveryAddressId；"
-			+ "邮费 logisticsMonery 不传取产品默认；冻结总费用含邮费；KYC 未通过可后补")
+			+ "邮费 logisticsMonery 不传取产品默认；requestOrderId 可选（不传服务端自动生成 CA 前缀单号）；"
+			+ "冻结总费用含邮费；KYC 未通过可后补")
 	ResponseBase applyCard(@RequestBody WalletApplyCardRequest query, HttpServletRequest request);
 
 	@PostMapping("/cardholder/add")
@@ -141,7 +142,8 @@ public interface CreatorWithdrawService {
 	ResponseBase cardBalance(@RequestBody BankcardUserIdRequest query, HttpServletRequest request);
 
 	@PostMapping("/card/recharge")
-	@ApiOperation(value = "银行卡充值", notes = "需作家登录；从 wallet_account.available_balance 扣款后充到 U 卡；requestOrderId 幂等")
+	@ApiOperation(value = "银行卡充值", notes = "需作家登录；从 wallet_account.available_balance 扣款后充到 U 卡；"
+			+ "requestOrderId 可选（不传服务端自动生成 CR 前缀单号），同单号幂等；返回 requestOrderId/amount/availableBalance")
 	ResponseBase cardRecharge(@RequestBody BankcardRechargeRequest query, HttpServletRequest request);
 
 	@PostMapping("/card/updateStatus")

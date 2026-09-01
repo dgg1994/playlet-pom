@@ -25,9 +25,9 @@ import com.playlet.internal.service.support.WalletOpenCardSettlementService;
 import com.playlet.internal.service.support.WalletPhysicalCardFulfillService;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.KycFieldNormalizeUtil;
-import com.playlet.internal.utils.OrderCodeFactory;
 import com.playlet.internal.utils.PasswordHashUtils;
 import com.playlet.internal.utils.StringUtils;
+import com.playlet.internal.utils.WalletRequestOrderIdSupport;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
@@ -321,7 +321,8 @@ public class WalletUserService extends BaseApiService {
 		if (physicalCard && !hasPhysicalMailingInfo(query)) {
 			return setResultError(I18nUtil.getMessage("mailingAddress_null"));
 		}
-		String requestOrderId = resolveApplyRequestOrderId(query.getRequestOrderId(), localUid);
+		String requestOrderId = WalletRequestOrderIdSupport.resolve(query.getRequestOrderId(),
+				WalletConstants.REQUEST_ORDER_PREFIX_CARD_APPLY, localUid.longValue());
 		// 幂等：同 requestOrderId 直接返回已有申请结果
 		WalletCardApplyEntity existedApply = walletCardApplyDao.findByRequestOrderId(requestOrderId);
 		if (existedApply != null) {
@@ -597,6 +598,9 @@ public class WalletUserService extends BaseApiService {
 	}
 
 	private static boolean hasKycContent(WalletCardApplyKycRequest kycData) {
+		if (kycData == null) {
+			return false;
+		}
 		return !StringUtils.isEmpty(kycData.getPaperworkType())
 				|| !StringUtils.isEmpty(kycData.getPaperworkNum())
 				|| !StringUtils.isEmpty(kycData.getFrontPhotoUrl())
@@ -929,13 +933,6 @@ public class WalletUserService extends BaseApiService {
 		}
 	}
 
-	private static String resolveApplyRequestOrderId(String requestOrderId, Integer localUid) {
-		if (!StringUtils.isEmpty(requestOrderId)) {
-			return requestOrderId.trim();
-		}
-		return "CA" + OrderCodeFactory.getOrderCode(localUid.longValue());
-	}
-
 	private static boolean isPhysicalCard(String bankcardNature) {
 		return WalletConstants.BANKCARD_NATURE_PHYSICAL.equalsIgnoreCase(bankcardNature);
 	}
@@ -1079,20 +1076,24 @@ public class WalletUserService extends BaseApiService {
 			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
 		}
 		if (query == null || query.getUserBankcardId() == null || query.getAmount() == null
-				|| query.getAmount() <= 0 || StringUtils.isEmpty(query.getRequestOrderId())) {
+				|| query.getAmount() <= 0) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
+		String requestOrderId = WalletRequestOrderIdSupport.resolve(query.getRequestOrderId(),
+				WalletConstants.REQUEST_ORDER_PREFIX_CARD_RECHARGE, user.getWalletUid());
+		query.setRequestOrderId(requestOrderId);
 		WalletAccountEntity account = walletAccountDao.findByWalletUserId(user.getId());
 		if (account == null) {
 			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
 		}
 		BigDecimal amount = BigDecimal.valueOf(query.getAmount());
 		// 幂等：同一 requestOrderId 不重复扣款
-		WalletCardTransactionEntity existed = walletCardTransactionDao.findByRequestOrderId(query.getRequestOrderId());
+		WalletCardTransactionEntity existed = walletCardTransactionDao.findByRequestOrderId(requestOrderId);
 		if (existed != null) {
 			log.info("wallet card recharge idempotent skip deduct requestOrderId={} walletAccountId={}",
-					query.getRequestOrderId(), account.getId());
-			return setResultSuccess(I18nUtil.getMessage("base_success"));
+					requestOrderId, account.getId());
+			return setResultSuccess(buildCardRechargeResp(requestOrderId, amount, account.getAvailableBalance(), true),
+					I18nUtil.getMessage("base_success"));
 		}
 		WalletBankcardEntity card = findOwnedCard(user, query.getUserBankcardId());
 		if (card == null) {
@@ -1122,9 +1123,22 @@ public class WalletUserService extends BaseApiService {
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 		insertRechargeTransaction(user, card, query);
+		WalletAccountEntity refreshedAccount = walletAccountDao.findByWalletUserId(user.getId());
+		BigDecimal availableAfter = refreshedAccount == null ? null : refreshedAccount.getAvailableBalance();
 		log.info("wallet card recharge submitted walletUserId={} userBankcardId={} requestOrderId={} amount={}",
-				user.getId(), query.getUserBankcardId(), query.getRequestOrderId(), amount);
-		return setResultSuccess(I18nUtil.getMessage("base_success"));
+				user.getId(), query.getUserBankcardId(), requestOrderId, amount);
+		return setResultSuccess(buildCardRechargeResp(requestOrderId, amount, availableAfter, false),
+				I18nUtil.getMessage("base_success"));
+	}
+
+	private static WalletCardRechargeResp buildCardRechargeResp(String requestOrderId, BigDecimal amount,
+			BigDecimal availableBalance, boolean idempotent) {
+		WalletCardRechargeResp resp = new WalletCardRechargeResp();
+		resp.setRequestOrderId(requestOrderId);
+		resp.setAmount(amount);
+		resp.setAvailableBalance(availableBalance);
+		resp.setIdempotent(idempotent);
+		return resp;
 	}
 
 	/** 三方充卡失败时退回已扣的 available_balance */

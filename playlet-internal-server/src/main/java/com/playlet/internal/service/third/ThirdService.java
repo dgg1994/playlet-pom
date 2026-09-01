@@ -34,6 +34,7 @@ import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.utils.KycFieldNormalizeUtil;
 import com.playlet.internal.utils.RsaSignUtil;
 import com.playlet.internal.utils.StringUtils;
+import com.playlet.internal.utils.WalletRequestOrderIdSupport;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
@@ -308,9 +309,12 @@ public class ThirdService {
 	 */
 	public void rechargeBankcard(Long uid, BankcardRechargeRequest body) {
 		requireUid(uid);
-		if (body == null || body.getUserBankcardId() == null || body.getAmount() == null
-				|| StringUtils.isEmpty(body.getRequestOrderId())) {
-			throw new BaseException("userBankcardId/amount/requestOrderId不能为空");
+		if (body == null || body.getUserBankcardId() == null || body.getAmount() == null) {
+			throw new BaseException("userBankcardId/amount不能为空");
+		}
+		if (StringUtils.isEmpty(body.getRequestOrderId())) {
+			body.setRequestOrderId(WalletRequestOrderIdSupport.resolve(null,
+					WalletConstants.REQUEST_ORDER_PREFIX_CARD_RECHARGE, uid));
 		}
 		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.CARD_RECHARGE_PATH;
 		log.info("third party card recharge start uid={} userBankcardId={} amount={} requestOrderId={}",

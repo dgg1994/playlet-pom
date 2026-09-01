@@ -16,8 +16,8 @@ import com.playlet.internal.enums.WalletLogisticsStateEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.third.ThirdService;
 import com.playlet.internal.utils.I18nUtil;
-import com.playlet.internal.utils.OrderCodeFactory;
 import com.playlet.internal.utils.StringUtils;
+import com.playlet.internal.utils.WalletRequestOrderIdSupport;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
@@ -257,7 +257,8 @@ public class WalletOpenCardSettlementService {
 		if (!StringUtils.isEmpty(apply.getRequestOrderId())) {
 			return apply.getRequestOrderId() + "-FT";
 		}
-		return "FT" + OrderCodeFactory.getOrderCode(apply.getWalletUid());
+		return WalletRequestOrderIdSupport.resolve(null, WalletConstants.REQUEST_ORDER_PREFIX_FIRST_TOPUP,
+				apply.getWalletUid());
 	}
 
 	private void insertFirstTopUpTransaction(WalletUserEntity user, WalletBankcardEntity card,
