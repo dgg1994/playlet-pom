@@ -23,6 +23,7 @@ import com.playlet.internal.enums.WalletKycStateEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.WalletWebhookService;
 import com.playlet.internal.service.WithdrawPayoutService;
+import com.playlet.internal.service.support.WalletOpenCardSettlementService;
 import com.playlet.internal.service.third.ThirdService;
 import com.playlet.internal.service.third.WalletUserService;
 import com.playlet.internal.utils.RsaVerifyUtil;
@@ -73,6 +74,8 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 	private ThirdService thirdService;
 	@Autowired
 	private WithdrawPayoutService withdrawPayoutService;
+	@Autowired
+	private WalletOpenCardSettlementService walletOpenCardSettlementService;
 
 	@Lazy
 	@Autowired
@@ -219,6 +222,8 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 			if (user != null) {
 				walletUserService.markAccountActivated(user.getId());
 			}
+			// 虚拟卡核销冻结；实体/虚拟均标记申请单激活成功
+			walletOpenCardSettlementService.onCardActivated(card);
 		}
 		log.info("wallet webhook card status updated userBankcardId={} status={}",
 				body.getUserBankcardId(), status.getLabel());

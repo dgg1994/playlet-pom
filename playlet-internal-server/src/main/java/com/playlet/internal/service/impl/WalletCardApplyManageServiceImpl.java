@@ -17,7 +17,6 @@ import com.playlet.internal.dao.wallet.WalletCardApplyManDao;
 import com.playlet.internal.dao.wallet.WalletCardApplySendDao;
 import com.playlet.internal.dao.wallet.WalletCardProductDao;
 import com.playlet.internal.dao.wallet.WalletUserDao;
-import com.playlet.internal.entity.wallet.WalletAccountEntity;
 import com.playlet.internal.entity.wallet.WalletBankcardEntity;
 import com.playlet.internal.entity.wallet.WalletCardApplyEntity;
 import com.playlet.internal.entity.wallet.WalletCardApplyKycEntity;
@@ -30,6 +29,7 @@ import com.playlet.internal.enums.WalletCardStatusEnums;
 import com.playlet.internal.enums.WalletKycStateEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.WalletCardApplyManageService;
+import com.playlet.internal.service.support.WalletOpenCardSettlementService;
 import com.playlet.internal.service.support.WalletPhysicalCardFulfillService;
 import com.playlet.internal.service.third.ThirdService;
 import com.playlet.internal.utils.I18nUtil;
@@ -82,6 +82,8 @@ public class WalletCardApplyManageServiceImpl implements WalletCardApplyManageSe
 	private ThirdService thirdService;
 	@Autowired
 	private WalletPhysicalCardFulfillService walletPhysicalCardFulfillService;
+	@Autowired
+	private WalletOpenCardSettlementService walletOpenCardSettlementService;
 	@Autowired
 	private IpUtil ipUtil;
 
@@ -174,6 +176,7 @@ public class WalletCardApplyManageServiceImpl implements WalletCardApplyManageSe
 		}
 		Date now = new Date();
 		insertAppliedBankcard(user, apply.getId(), product, third, now);
+		WalletBankcardEntity card = walletBankcardDao.findByUserBankcardId(third.getUserBankcardId());
 		walletAccountDao.markActivated(user.getId());
 		apply.setApplyState(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getCode());
 		apply.setApplyStateName(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getLabel());
@@ -183,6 +186,9 @@ public class WalletCardApplyManageServiceImpl implements WalletCardApplyManageSe
 		} catch (Exception e) {
 			log.error("admin open card update apply failed applyId={}", id, e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+		if (card != null) {
+			walletOpenCardSettlementService.afterVirtualCardIssued(user, apply, card);
 		}
 		log.info("admin open card success applyId={} walletUid={} userBankcardId={}",
 				id, user.getWalletUid(), third.getUserBankcardId());
@@ -218,7 +224,7 @@ public class WalletCardApplyManageServiceImpl implements WalletCardApplyManageSe
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 		// 解冻开卡冻结金额
-		unfreezeOpenCardTotal(apply);
+		walletOpenCardSettlementService.unfreezeApplyTotal(apply);
 		log.info("admin reject apply success applyId={} walletUserId={}", entity.getId(), apply.getWalletUserId());
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
@@ -266,29 +272,6 @@ public class WalletCardApplyManageServiceImpl implements WalletCardApplyManageSe
 		entity.setKycData(kyc);
 		WalletBankcardEntity userCard = walletBankcardDao.findByCardApplyId(applyId);
 		entity.setUserCardData(userCard);
-	}
-
-	/** 拒绝时解冻 wallet_account.open_freeze_balance */
-	private void unfreezeOpenCardTotal(WalletCardApplyEntity apply) {
-		if (apply.getOpenCardTotal() == null || apply.getOpenCardTotal().compareTo(BigDecimal.ZERO) <= 0) {
-			return;
-		}
-		WalletAccountEntity account = walletAccountDao.findByWalletUserId(apply.getWalletUserId());
-		if (account == null) {
-			log.warn("admin reject apply account missing walletUserId={} applyId={}",
-					apply.getWalletUserId(), apply.getId());
-			return;
-		}
-		try {
-			int rows = walletAccountDao.unfreezeOpenCardBalance(account.getId(), apply.getOpenCardTotal());
-			if (rows <= 0) {
-				log.warn("admin reject unfreeze skipped applyId={} accountId={} amount={}",
-						apply.getId(), account.getId(), apply.getOpenCardTotal());
-			}
-		} catch (Exception e) {
-			log.error("admin reject unfreeze failed applyId={} accountId={}", apply.getId(), account.getId(), e);
-			throw new BaseException(I18nUtil.getMessage("base_error"), e);
-		}
 	}
 
 	/** 三方开卡成功后写入本地卡记录 */

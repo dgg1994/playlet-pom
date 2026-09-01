@@ -30,6 +30,7 @@ import com.playlet.internal.enums.WalletCardStatusEnums;
 import com.playlet.internal.enums.WalletKycStateEnums;
 import com.playlet.internal.enums.WalletLogisticsStateEnums;
 import com.playlet.internal.exception.BaseException;
+import com.playlet.internal.service.support.WalletOpenCardSettlementService;
 import com.playlet.internal.service.third.ThirdService;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.OrderCodeFactory;
@@ -75,6 +76,8 @@ public class WalletPhysicalCardFulfillService {
 	private ThirdService thirdService;
 	@Autowired
 	private EmsTrackingService emsTrackingService;
+	@Autowired
+	private WalletOpenCardSettlementService walletOpenCardSettlementService;
 
 	/**
 	 * 实体卡分配激活：绑定卡号并调三方激活。
@@ -103,15 +106,6 @@ public class WalletPhysicalCardFulfillService {
 		if (product == null) {
 			return setResultError(I18nUtil.getMessage("bank_card_null"));
 		}
-		// 开卡费扣减（对齐 worldpay 实体卡绑卡扣费）
-		BigDecimal openCardCost = apply.getOpenCardCost() == null ? BigDecimal.ZERO : apply.getOpenCardCost();
-		if (openCardCost.compareTo(BigDecimal.ZERO) > 0) {
-			WalletAccountEntity account = walletAccountDao.findByWalletUserId(user.getId());
-			if (account == null || account.getAvailableBalance() == null
-					|| account.getAvailableBalance().compareTo(openCardCost) < 0) {
-				return setResultError(I18nUtil.getMessage("wallet.balance_not_enough"));
-			}
-		}
 		BankcardActiveRequest activeReq = buildActiveRequest(apply, product, cardNumber.trim());
 		ThirdBankcardActiveResp third;
 		try {
@@ -129,9 +123,6 @@ public class WalletPhysicalCardFulfillService {
 		Date now = new Date();
 		insertPhysicalBankcard(user, apply, product, third, cardNumber.trim(), now);
 		setPinAfterBinding(user, third.getUserBankcardId(), pinNum.trim());
-		if (openCardCost.compareTo(BigDecimal.ZERO) > 0) {
-			deductOpenCardCost(user.getId(), openCardCost);
-		}
 		apply.setApplyState(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getCode());
 		apply.setApplyStateName(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getLabel());
 		apply.setGmtModified(now);
@@ -199,7 +190,8 @@ public class WalletPhysicalCardFulfillService {
 			log.error("physical card shipping update apply failed applyId={}", apply.getId(), e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
-		deductShippingFreight(apply, freight);
+		// 发货时核销开卡冻结（费用已在申请时冻结，不再重复扣 available_balance）
+		walletOpenCardSettlementService.settleApplyFreeze(apply);
 		log.info("physical card shipping success applyId={} logisticsNum={}", apply.getId(), logisticsNum);
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
@@ -312,6 +304,11 @@ public class WalletPhysicalCardFulfillService {
 				|| apply.getKycState() != WalletKycStateEnums.SUCCESS_APPROVE.getCode()) {
 			return setResultError(I18nUtil.getMessage("user_kyc_state"));
 		}
+		// 实体卡绑卡须已发货（对齐 onetoken entityCardActiva）
+		if (apply.getShippingState() == null
+				|| apply.getShippingState() != WalletLogisticsStateEnums.ALREADY_SHIPPING.getCode()) {
+			return setResultError(I18nUtil.getMessage("shipping_not"));
+		}
 		if (Integer.valueOf(WalletCardApplyStateEnums.SUCCESS_ACTIVATION.getCode()).equals(apply.getApplyState())) {
 			return setResultError(I18nUtil.getMessage("bank_card_binding"));
 		}
@@ -396,46 +393,6 @@ public class WalletPhysicalCardFulfillService {
 		} catch (Exception e) {
 			log.error("physical card set pin failed walletUid={} userBankcardId={}",
 					user.getWalletUid(), userBankcardId, e);
-			throw new BaseException(I18nUtil.getMessage("base_error"), e);
-		}
-	}
-
-	private void deductOpenCardCost(Long walletUserId, BigDecimal amount) {
-		WalletAccountEntity account = walletAccountDao.findByWalletUserId(walletUserId);
-		if (account == null) {
-			return;
-		}
-		try {
-			int rows = walletAccountDao.deductAvailableBalance(account.getId(), amount);
-			if (rows <= 0) {
-				throw new BaseException(I18nUtil.getMessage("wallet.balance_not_enough"));
-			}
-		} catch (BaseException e) {
-			throw e;
-		} catch (Exception e) {
-			log.error("deduct open card cost failed walletUserId={}", walletUserId, e);
-			throw new BaseException(I18nUtil.getMessage("base_error"), e);
-		}
-	}
-
-	private void deductShippingFreight(WalletCardApplyEntity apply, BigDecimal freight) {
-		if (freight == null || freight.compareTo(BigDecimal.ZERO) <= 0) {
-			return;
-		}
-		if (!Integer.valueOf(WalletConstants.TOPUP_TYPE_WALLET).equals(apply.getTopupType())) {
-			return;
-		}
-		WalletAccountEntity account = walletAccountDao.findByWalletUserId(apply.getWalletUserId());
-		if (account == null) {
-			return;
-		}
-		try {
-			int rows = walletAccountDao.deductAvailableBalance(account.getId(), freight);
-			if (rows <= 0) {
-				log.warn("deduct shipping freight skipped applyId={} amount={}", apply.getId(), freight);
-			}
-		} catch (Exception e) {
-			log.error("deduct shipping freight failed applyId={}", apply.getId(), e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 	}

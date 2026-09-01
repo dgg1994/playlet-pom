@@ -82,6 +82,12 @@ public interface WalletAccountDao extends BaseMapper<WalletAccountEntity> {
 			+ "where id = #{id} and ifnull(available_balance, 0) >= #{amount}")
 	int freezeOpenCardBalance(@Param("id") Long id, @Param("amount") BigDecimal amount);
 
+	/** 开卡成功核销：仅扣减开卡冻结，不回退可用余额 */
+	@Update("update wallet_account set open_freeze_balance = ifnull(open_freeze_balance, 0) - #{amount}, "
+			+ "balance_sync_time = now(), gmtModified = now() "
+			+ "where id = #{id} and ifnull(open_freeze_balance, 0) >= #{amount}")
+	int settleOpenCardFreeze(@Param("id") Long id, @Param("amount") BigDecimal amount);
+
 	@Select("select * from wallet_account where tron_usdt_address = #{address} limit 1")
 	WalletAccountEntity findByTronUsdtAddress(@Param("address") String address);
 }

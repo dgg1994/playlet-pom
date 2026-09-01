@@ -42,6 +42,21 @@ public interface WalletCardApplyDao extends BaseMapper<WalletCardApplyEntity> {
 			+ "and apply_state = 1 and upper(card_type) = 'VIRTUAL' order by setTime asc, id asc")
 	List<WalletCardApplyEntity> findPendingVirtualByWalletUserId(@Param("walletUserId") Long walletUserId);
 
+	@Select("select * from wallet_card_apply where kyc_state = #{kycState} order by setTime asc, id asc")
+	List<WalletCardApplyEntity> findByKycState(@Param("kycState") Integer kycState);
+
+	@Select("select * from wallet_card_apply where wallet_user_id = #{walletUserId} "
+			+ "and kyc_state = #{kycState} order by setTime asc, id asc")
+	List<WalletCardApplyEntity> findByWalletUserIdAndKycState(@Param("walletUserId") Long walletUserId,
+			@Param("kycState") Integer kycState);
+
+	@Update("update wallet_card_apply set kyc_state = #{kycState}, kyc_state_name = #{kycStateName}, "
+			+ "shipping_state = #{shippingState}, shipping_state_name = #{shippingStateName}, gmtModified = now() "
+			+ "where wallet_user_id = #{walletUserId} and apply_state = 1")
+	int updateKycAndShippingByWalletUserId(@Param("walletUserId") Long walletUserId,
+			@Param("kycState") Integer kycState, @Param("kycStateName") String kycStateName,
+			@Param("shippingState") Integer shippingState, @Param("shippingStateName") String shippingStateName);
+
 	@Select("select * from wallet_card_apply where logistics_num = #{logisticsNum}")
 	List<WalletCardApplyEntity> findByLogisticsNum(@Param("logisticsNum") String logisticsNum);
 
