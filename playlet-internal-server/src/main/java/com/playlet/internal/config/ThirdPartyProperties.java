@@ -28,10 +28,10 @@ public class ThirdPartyProperties {
 	private boolean webhookSignVerifyEnabled = false;
 
 	/** HTTP 连接超时（毫秒） */
-	private Integer connectTimeoutMs = 5000;
+	private Integer connectTimeoutMs = 10000;
 
-	/** HTTP 读超时（毫秒） */
-	private Integer readTimeoutMs = 10000;
+	/** HTTP 读超时（毫秒）；关卡/充值等三方接口可能较慢 */
+	private Integer readTimeoutMs = 60000;
 
 	/** 17track 物流 API Key（对齐 worldpay EMS_API_KEY） */
 	private String emsApiKey = "";

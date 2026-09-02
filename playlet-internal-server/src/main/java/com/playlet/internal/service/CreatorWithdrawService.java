@@ -147,8 +147,8 @@ public interface CreatorWithdrawService {
 	ResponseBase cardBalance(@RequestBody BankcardUserIdRequest query, HttpServletRequest request);
 
 	@PostMapping("/card/topUp")
-	@ApiOperation(value = "银行卡充值", notes = "对齐 onetoken POST /card/topUp；需作家登录；"
-			+ "传 userBankcardId、amount、payPassword（6位）；handlingFees 不传则按卡产品费率计算；"
+	@ApiOperation(value = "银行卡充值", notes = "amount 为钱包扣款总额（含手续费），卡到账 = amount - 手续费；"
+			+ "handlingFees 不传则按卡产品 rechargeFee 自总额反算；需作家登录；"
 			+ "payType 默认 1；requestOrderId 可选（不传服务端自动生成 CR 前缀单号），同单号幂等")
 	ResponseBase cardTopUp(@RequestBody BankcardRechargeRequest query, HttpServletRequest request);
 

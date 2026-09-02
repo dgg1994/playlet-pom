@@ -15,8 +15,8 @@ import java.time.Duration;
 @EnableConfigurationProperties(ThirdPartyProperties.class)
 public class RestTemplateConfig {
 
-	private static final int DEFAULT_CONNECT_TIMEOUT_MS = 5000;
-	private static final int DEFAULT_READ_TIMEOUT_MS = 10000;
+	private static final int DEFAULT_CONNECT_TIMEOUT_MS = 10000;
+	private static final int DEFAULT_READ_TIMEOUT_MS = 60000;
 
 	@Bean
 	public RestTemplate restTemplate(RestTemplateBuilder builder, ThirdPartyProperties thirdPartyProperties) {

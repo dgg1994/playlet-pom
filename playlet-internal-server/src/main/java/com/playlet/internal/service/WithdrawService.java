@@ -147,7 +147,8 @@ public interface WithdrawService {
 	ResponseBase cardBalance(@RequestBody BankcardUserIdRequest query, HttpServletRequest request);
 
 	@PostMapping("/card/recharge")
-	@ApiOperation(value = "银行卡充值", notes = "对齐 onetoken POST /card/卡产品 rechargeFee 费率计算；需登录")
+	@ApiOperation(value = "银行卡充值", notes = "amount 为钱包扣款总额（含手续费），卡到账 = amount - 手续费；"
+			+ "handlingFees 不传则按卡产品 rechargeFee 自总额反算；需登录")
 	ResponseBase cardTopUp(@RequestBody BankcardRechargeRequest query, HttpServletRequest request);
 
 	@PostMapping("/card/updateStatus")
