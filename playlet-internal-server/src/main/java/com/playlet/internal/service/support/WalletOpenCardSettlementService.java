@@ -5,17 +5,24 @@ import com.playlet.internal.constants.WalletConstants;
 import com.playlet.internal.dao.wallet.WalletAccountDao;
 import com.playlet.internal.dao.wallet.WalletCardApplyDao;
 import com.playlet.internal.dao.wallet.WalletCardTransactionDao;
+import com.playlet.internal.dao.wallet.WalletLogDao;
+import com.playlet.internal.dao.wallet.WalletUserDao;
 import com.playlet.internal.entity.wallet.WalletAccountEntity;
 import com.playlet.internal.entity.wallet.WalletBankcardEntity;
 import com.playlet.internal.entity.wallet.WalletCardApplyEntity;
 import com.playlet.internal.entity.wallet.WalletCardTransactionEntity;
+import com.playlet.internal.entity.wallet.WalletLogEntity;
 import com.playlet.internal.entity.wallet.WalletUserEntity;
 import com.playlet.internal.enums.WalletCardApplyStateEnums;
 import com.playlet.internal.enums.WalletKycStateEnums;
+import com.playlet.internal.enums.WalletLogOperateTypeEnums;
+import com.playlet.internal.enums.WalletLogStatusEnums;
+import com.playlet.internal.enums.WalletLogTradeTypeEnums;
 import com.playlet.internal.enums.WalletLogisticsStateEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.third.ThirdService;
 import com.playlet.internal.utils.I18nUtil;
+import com.playlet.internal.utils.OrderCodeFactory;
 import com.playlet.internal.utils.StringUtils;
 import com.playlet.internal.utils.WalletRequestOrderIdSupport;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +50,10 @@ public class WalletOpenCardSettlementService {
 	private WalletCardApplyDao walletCardApplyDao;
 	@Autowired
 	private WalletCardTransactionDao walletCardTransactionDao;
+	@Autowired
+	private WalletLogDao walletLogDao;
+	@Autowired
+	private WalletUserDao walletUserDao;
 	@Autowired
 	private ThirdService thirdService;
 
@@ -91,6 +102,7 @@ public class WalletOpenCardSettlementService {
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 		insertFirstTopUpTransaction(user, card, req);
+		upsertFirstTopUpWalletLog(user, apply, card, req, amount);
 		log.info("wallet first topup submitted applyId={} walletUid={} userBankcardId={} amount={}",
 				apply.getId(), user.getWalletUid(), card.getUserBankcardId(), amount);
 	}
@@ -133,13 +145,18 @@ public class WalletOpenCardSettlementService {
 				apply.getId(), apply.getWalletUserId(), total);
 	}
 
-	/** 拒绝 / KYC 失败：解冻开卡冻结金额回可用余额 */
+	/** 拒绝 / KYC 失败：解冻开卡冻结金额回可用余额，并记「取消开卡」账变 */
 	public void unfreezeApplyTotal(WalletCardApplyEntity apply) {
 		if (apply == null || !isWalletTopup(apply)) {
 			return;
 		}
 		BigDecimal total = apply.getOpenCardTotal() == null ? BigDecimal.ZERO : apply.getOpenCardTotal();
 		if (total.compareTo(BigDecimal.ZERO) <= 0) {
+			return;
+		}
+		String thawOutOrderNo = buildThawOutOrderNo(apply.getId());
+		if (walletLogDao.findByOutOrderNo(thawOutOrderNo) != null) {
+			log.info("wallet unfreeze open card thaw log exists applyId={}", apply.getId());
 			return;
 		}
 		WalletAccountEntity account = walletAccountDao.findByWalletUserId(apply.getWalletUserId());
@@ -153,11 +170,22 @@ public class WalletOpenCardSettlementService {
 			if (rows <= 0) {
 				log.warn("wallet unfreeze open card skipped applyId={} accountId={} amount={}",
 						apply.getId(), account.getId(), total);
+				return;
 			}
 		} catch (Exception e) {
 			log.error("wallet unfreeze open card failed applyId={} accountId={}", apply.getId(), account.getId(), e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
+		WalletUserEntity user = walletUserDao.selectById(apply.getWalletUserId());
+		if (user == null) {
+			log.warn("wallet unfreeze open card user missing applyId={} walletUserId={}",
+					apply.getId(), apply.getWalletUserId());
+			return;
+		}
+		WalletAccountEntity accountAfter = walletAccountDao.findByWalletUserId(apply.getWalletUserId());
+		insertOpenCardThawWalletLog(user, accountAfter, total, thawOutOrderNo);
+		log.info("wallet unfreeze open card success applyId={} walletUserId={} amount={}",
+				apply.getId(), apply.getWalletUserId(), total);
 	}
 
 	/** 卡激活：虚拟卡核销冻结；实体/虚拟均标记申请单激活成功 */
@@ -253,6 +281,49 @@ public class WalletOpenCardSettlementService {
 		return Integer.valueOf(WalletConstants.TOPUP_TYPE_WALLET).equals(apply.getTopupType());
 	}
 
+	private static String buildThawOutOrderNo(Long applyId) {
+		return applyId + WalletConstants.WALLET_LOG_OUT_ORDER_THAW_SUFFIX;
+	}
+
+	/** 开卡失败解冻账变（对齐 onetoken addWalletOpenFreeze / OPEN_CARD_THAW） */
+	private void insertOpenCardThawWalletLog(WalletUserEntity user, WalletAccountEntity account,
+			BigDecimal amount, String thawOutOrderNo) {
+		if (user == null || amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+			return;
+		}
+		BigDecimal balanceAfter = account == null || account.getAvailableBalance() == null
+				? BigDecimal.ZERO : account.getAvailableBalance();
+		Date now = new Date();
+		WalletLogEntity logEntity = new WalletLogEntity();
+		logEntity.setOrderNo(OrderCodeFactory.getOrderCode(user.getWalletUid()));
+		logEntity.setOutOrderNo(thawOutOrderNo);
+		logEntity.setWalletUserId(user.getId());
+		logEntity.setWalletUid(user.getWalletUid());
+		logEntity.setTradeType(WalletLogTradeTypeEnums.INCOME.getCode());
+		logEntity.setTitle(I18nUtil.getMessage("wallet.log.open_card_thaw"));
+		logEntity.setPrimevalMoney(balanceAfter);
+		logEntity.setPrimevalMoneyUnit(WalletConstants.DEFAULT_CURRENCY);
+		logEntity.setRealMoney(amount);
+		logEntity.setServiceCharge(BigDecimal.ZERO);
+		logEntity.setFormName(user.getEmail());
+		logEntity.setFormAccount(String.valueOf(user.getWalletUid()));
+		logEntity.setToName(user.getEmail());
+		logEntity.setToAccount(user.getEmail());
+		logEntity.setStatus(WalletLogStatusEnums.POSTED.getCode());
+		logEntity.setOperateType(WalletLogOperateTypeEnums.OPEN_CARD_THAW.getCode());
+		logEntity.setSetTime(now);
+		logEntity.setGmtModified(now);
+		try {
+			walletLogDao.insert(logEntity);
+		} catch (DuplicateKeyException e) {
+			log.warn("wallet open card thaw wallet log duplicate outOrderNo={}", thawOutOrderNo, e);
+		} catch (Exception e) {
+			log.error("wallet open card thaw wallet log failed walletUserId={} outOrderNo={}",
+					user.getId(), thawOutOrderNo, e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+	}
+
 	private static String buildFirstTopUpOrderId(WalletCardApplyEntity apply) {
 		if (!StringUtils.isEmpty(apply.getRequestOrderId())) {
 			return apply.getRequestOrderId() + "-FT";
@@ -278,8 +349,8 @@ public class WalletOpenCardSettlementService {
 		txn.setRequestOrderId(query.getRequestOrderId());
 		txn.setBizType(WalletConstants.BIZ_RECHARGE);
 		txn.setTransType(WalletConstants.TRANS_TOPUP);
-		txn.setOrderState(WalletConstants.ORDER_STATE_PENDING);
-		txn.setOrderStateName(WalletConstants.ORDER_STATE_PENDING_NAME);
+		txn.setOrderState(WalletLogStatusEnums.PROCESSING.getIntCode());
+		txn.setOrderStateName(WalletLogStatusEnums.PROCESSING.getLabel());
 		txn.setLocalCurrency(currency);
 		txn.setLocalCurrencyAmt(amount);
 		txn.setTransCurrency(currency);
@@ -293,6 +364,70 @@ public class WalletOpenCardSettlementService {
 			log.warn("wallet first topup txn duplicate requestOrderId={}", query.getRequestOrderId(), e);
 		} catch (Exception e) {
 			log.error("wallet first topup txn insert failed requestOrderId={}", query.getRequestOrderId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+	}
+
+	/**
+	 * 开卡首充账变：优先更新申请时「开卡冻结」记录为「开卡」，否则新增（对齐 onetoken firstTopUp）。
+	 */
+	private void upsertFirstTopUpWalletLog(WalletUserEntity user, WalletCardApplyEntity apply,
+			WalletBankcardEntity card, BankcardRechargeRequest query, int amount) {
+		if (user == null || apply == null || query == null) {
+			return;
+		}
+		Date now = new Date();
+		BigDecimal realMoney = BigDecimal.valueOf(amount);
+		WalletLogEntity existed = walletLogDao.findByOutOrderNo(String.valueOf(apply.getId()));
+		if (existed != null) {
+			existed.setOrderNo(OrderCodeFactory.getOrderCode(user.getWalletUid()));
+			existed.setOutOrderNo(query.getRequestOrderId());
+			existed.setOperateType(WalletLogOperateTypeEnums.OPEN_CARD.getCode());
+			existed.setTitle(I18nUtil.getMessage("wallet.log.open_card"));
+			existed.setStatus(WalletLogStatusEnums.PROCESSING.getCode());
+			existed.setRealMoney(realMoney);
+			existed.setServiceCharge(BigDecimal.ZERO);
+			if (card != null) {
+				existed.setWalletBankcardId(card.getId());
+				existed.setToName(card.getCardNo());
+				existed.setToAccount(card.getCardNo());
+			}
+			existed.setGmtModified(now);
+			try {
+				walletLogDao.updateById(existed);
+			} catch (Exception e) {
+				log.error("wallet first topup wallet log update failed applyId={} requestOrderId={}",
+						apply.getId(), query.getRequestOrderId(), e);
+				throw new BaseException(I18nUtil.getMessage("base_error"), e);
+			}
+			return;
+		}
+		WalletLogEntity logEntity = new WalletLogEntity();
+		logEntity.setOrderNo(OrderCodeFactory.getOrderCode(user.getWalletUid()));
+		logEntity.setOutOrderNo(query.getRequestOrderId());
+		logEntity.setWalletUserId(user.getId());
+		logEntity.setWalletUid(user.getWalletUid());
+		logEntity.setTradeType(WalletLogTradeTypeEnums.EXPENDITURE.getCode());
+		logEntity.setTitle(I18nUtil.getMessage("wallet.log.open_card"));
+		logEntity.setPrimevalMoneyUnit(WalletConstants.DEFAULT_CURRENCY);
+		logEntity.setRealMoney(realMoney);
+		logEntity.setServiceCharge(BigDecimal.ZERO);
+		logEntity.setFormName(user.getEmail());
+		logEntity.setFormAccount(String.valueOf(user.getWalletUid()));
+		if (card != null) {
+			logEntity.setWalletBankcardId(card.getId());
+			logEntity.setToName(card.getCardNo());
+			logEntity.setToAccount(card.getCardNo());
+		}
+		logEntity.setStatus(WalletLogStatusEnums.PROCESSING.getCode());
+		logEntity.setOperateType(WalletLogOperateTypeEnums.OPEN_CARD.getCode());
+		logEntity.setSetTime(now);
+		logEntity.setGmtModified(now);
+		try {
+			walletLogDao.insert(logEntity);
+		} catch (Exception e) {
+			log.error("wallet first topup wallet log insert failed applyId={} requestOrderId={}",
+					apply.getId(), query.getRequestOrderId(), e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 	}

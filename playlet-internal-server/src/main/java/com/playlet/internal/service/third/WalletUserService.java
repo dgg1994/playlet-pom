@@ -7,6 +7,7 @@ import com.playlet.internal.api.request.*;
 import com.playlet.internal.api.response.*;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
+import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.WalletConstants;
 import com.playlet.internal.constants.WalletKycApiStatus;
@@ -93,6 +94,8 @@ public class WalletUserService extends BaseApiService {
 	private WalletBankcardSyncSupport walletBankcardSyncSupport;
 	@Autowired
 	private WalletLogDao walletLogDao;
+	@Autowired
+	private WalletCardAccountMailingDao walletCardAccountMailingDao;
 
 	/**
 	 * 本地账号注册成功后调用：开通 U 卡三方用户并写入 P0 表。
@@ -421,7 +424,7 @@ public class WalletUserService extends BaseApiService {
 		}
 		// 冻结开卡费用：月费 + 开卡费 + 预存费 + 邮费（对齐 onetoken 冻结 walletBalance）
 		if (fees.openCardTotal.compareTo(BigDecimal.ZERO) > 0) {
-			freezeOpenCardBalance(account, fees.openCardTotal, apply.getId());
+			freezeOpenCardBalance(user, account, fees.openCardTotal, apply.getId());
 		}
 		// 虚拟卡 + KYC 已通过：自动调三方开卡；否则待激活待审 KYC
 		ThirdBankcardApplyResp third = null;
@@ -1594,6 +1597,152 @@ public class WalletUserService extends BaseApiService {
 	}
 
 	/**
+	 * 查询邮寄地区列表（对齐 onetoken GET /accountMailing/findDelivery → worldPay POST /api/delivery/region）。
+	 */
+	public ResponseBase listMailingRegions(WalletMailingRegionRequest query) {
+		String local = query == null ? null : query.getLocal();
+		if (StringUtils.isEmpty(local)) {
+			local = resolveDeliveryLocale();
+		}
+		Object regions;
+		try {
+			regions = thirdService.listDeliveryRegions(local);
+		} catch (BaseException e) {
+			log.error("wallet mailing region failed local={}", local, e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("wallet mailing region error local={}", local, e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		log.info("wallet mailing region success local={}", local);
+		return setResultSuccess(regions, I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * 添加邮寄地址：调三方落库，返回 id 可作为 deliveryAddressId。
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	public ResponseBase addMailingAddress(Integer userType, Integer localUid, WalletMailingAddressAddRequest query) {
+		WalletUserEntity user = findWalletUser(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		if (query == null) {
+			return setResultError(I18nUtil.getMessage("base_data_null"));
+		}
+		ThirdMailingAddressResp third;
+		try {
+			third = thirdService.addDeliveryAddress(user.getWalletUid(), query);
+		} catch (BaseException e) {
+			log.error("wallet mailing add third failed walletUserId={} walletUid={}",
+					user.getId(), user.getWalletUid(), e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("wallet mailing add third error walletUserId={} walletUid={}",
+					user.getId(), user.getWalletUid(), e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		WalletCardAccountMailingEntity existed = walletCardAccountMailingDao
+				.findByWalletUserAndAddressId(user.getId(), third.getId());
+		Date now = new Date();
+		try {
+			if (existed == null) {
+				WalletCardAccountMailingEntity row = toMailingEntity(user, third, now);
+				walletCardAccountMailingDao.insert(row);
+			} else {
+				fillMailingEntity(existed, third, now);
+				walletCardAccountMailingDao.updateById(existed);
+			}
+		} catch (Exception e) {
+			log.error("wallet mailing add persist failed walletUserId={} addressId={}",
+					user.getId(), third.getId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+		WalletMailingAddressResp resp = toMailingResp(third, now, now);
+		log.info("wallet mailing add success walletUserId={} addressId={}", user.getId(), third.getId());
+		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * 更新邮寄地址：先校验本地归属，再调三方并回写本地。
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	public ResponseBase updateMailingAddress(Integer userType, Integer localUid,
+			WalletMailingAddressUpdateRequest query) {
+		WalletUserEntity user = findWalletUser(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		if (query == null || query.getId() == null) {
+			return setResultError(I18nUtil.getMessage("base_data_null"));
+		}
+		WalletCardAccountMailingEntity local = walletCardAccountMailingDao
+				.findByWalletUserAndAddressId(user.getId(), query.getId());
+		if (local == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		ThirdMailingAddressResp third;
+		try {
+			third = thirdService.updateDeliveryAddress(user.getWalletUid(), query);
+		} catch (BaseException e) {
+			log.error("wallet mailing update third failed walletUserId={} addressId={}",
+					user.getId(), query.getId(), e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("wallet mailing update third error walletUserId={} addressId={}",
+					user.getId(), query.getId(), e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		Date now = new Date();
+		try {
+			fillMailingEntity(local, third, now);
+			walletCardAccountMailingDao.updateById(local);
+		} catch (Exception e) {
+			log.error("wallet mailing update persist failed walletUserId={} addressId={}",
+					user.getId(), query.getId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+		WalletMailingAddressResp resp = toMailingResp(third, local.getSetTime(), now);
+		log.info("wallet mailing update success walletUserId={} addressId={}", user.getId(), third.getId());
+		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * 查询邮寄地址（本地分页，对齐 onetoken POST /accountMailing/find）。
+	 */
+	public ResponseBase findMailingAddresses(Integer userType, Integer localUid, WalletMailingAddressFindRequest query) {
+		WalletUserEntity user = findWalletUser(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		if (query == null) {
+			query = new WalletMailingAddressFindRequest();
+		}
+		WalletCardAccountMailingEntity criteria = new WalletCardAccountMailingEntity();
+		criteria.setWalletUserId(user.getId());
+		criteria.setCountryRegionId(query.getCountryRegionId());
+		criteria.setCountry(query.getCountry());
+		criteria.setReceiverName(query.getReceiverName());
+		PageHelper.startPage(query.getPageNumber(), query.getPageSize());
+		List<WalletCardAccountMailingEntity> rows = walletCardAccountMailingDao.findList(criteria);
+		if (rows == null) {
+			rows = new ArrayList<>();
+		}
+		PageInfo<WalletCardAccountMailingEntity> basePage = new PageInfo<>(rows);
+		List<WalletMailingAddressResp> items = new ArrayList<>(rows.size());
+		for (WalletCardAccountMailingEntity row : rows) {
+			items.add(toMailingResp(row));
+		}
+		PageInfo<WalletMailingAddressResp> pageInfo = new PageInfo<>(items);
+		pageInfo.setTotal(basePage.getTotal());
+		pageInfo.setPages(basePage.getPages());
+		pageInfo.setPageNum(basePage.getPageNum());
+		pageInfo.setPageSize(basePage.getPageSize());
+		log.info("wallet mailing find walletUserId={} size={}", user.getId(), items.size());
+		return setResultSuccess(pageInfo, I18nUtil.getMessage("base_success"));
+	}
+
+	/**
 	 * KYC 国家列表：透传三方 POST /api/user/kyc/country/list；name 空则返回全部。
 	 */
 	public ResponseBase listKycCountries(String name) {
@@ -1933,8 +2082,11 @@ public class WalletUserService extends BaseApiService {
 		return bundle;
 	}
 
-	/** 申请开卡冻结：可用余额 → 开卡冻结余额 */
-	private void freezeOpenCardBalance(WalletAccountEntity account, BigDecimal amount, Long applyId) {
+	/** 申请开卡冻结：可用余额 → 开卡冻结余额，并记「开卡冻结」账变 */
+	private void freezeOpenCardBalance(WalletUserEntity user, WalletAccountEntity account,
+			BigDecimal amount, Long applyId) {
+		BigDecimal balanceBefore = account.getAvailableBalance() == null
+				? BigDecimal.ZERO : account.getAvailableBalance();
 		try {
 			int rows = walletAccountDao.freezeOpenCardBalance(account.getId(), amount);
 			if (rows <= 0) {
@@ -1947,8 +2099,43 @@ public class WalletUserService extends BaseApiService {
 					applyId, account.getWalletUserId(), amount, e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
+		insertOpenCardFreezeWalletLog(user, account, amount, applyId, balanceBefore);
 		log.info("wallet apply card freeze balance applyId={} walletUserId={} amount={}",
 				applyId, account.getWalletUserId(), amount);
+	}
+
+	private void insertOpenCardFreezeWalletLog(WalletUserEntity user, WalletAccountEntity account,
+			BigDecimal amount, Long applyId, BigDecimal balanceBefore) {
+		if (user == null || applyId == null || amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+			return;
+		}
+		Date now = new Date();
+		WalletLogEntity logEntity = new WalletLogEntity();
+		logEntity.setOrderNo(OrderCodeFactory.getOrderCode(user.getWalletUid()));
+		logEntity.setOutOrderNo(String.valueOf(applyId));
+		logEntity.setWalletUserId(user.getId());
+		logEntity.setWalletUid(user.getWalletUid());
+		logEntity.setTradeType(WalletLogTradeTypeEnums.EXPENDITURE.getCode());
+		logEntity.setTitle(I18nUtil.getMessage("wallet.log.open_card_freeze"));
+		logEntity.setPrimevalMoney(balanceBefore);
+		logEntity.setPrimevalMoneyUnit(WalletConstants.DEFAULT_CURRENCY);
+		logEntity.setRealMoney(amount);
+		logEntity.setServiceCharge(BigDecimal.ZERO);
+		logEntity.setFormName(user.getEmail());
+		logEntity.setFormAccount(String.valueOf(user.getWalletUid()));
+		logEntity.setToName(user.getEmail());
+		logEntity.setToAccount(user.getEmail());
+		logEntity.setStatus(WalletLogStatusEnums.POSTED.getCode());
+		logEntity.setOperateType(WalletLogOperateTypeEnums.OPEN_CARD_FREEZE.getCode());
+		logEntity.setSetTime(now);
+		logEntity.setGmtModified(now);
+		try {
+			walletLogDao.insert(logEntity);
+		} catch (Exception e) {
+			log.error("wallet apply card freeze wallet log failed applyId={} walletUserId={}",
+					applyId, user.getId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
 	}
 
 	private static BigDecimal nz(BigDecimal value) {
@@ -2102,8 +2289,8 @@ public class WalletUserService extends BaseApiService {
 		txn.setTransType(WalletConstants.TRANS_TOPUP);
 		txn.setPayType(payType);
 		txn.setHandlingFees(handlingFees);
-		txn.setOrderState(WalletConstants.ORDER_STATE_PENDING);
-		txn.setOrderStateName(WalletConstants.ORDER_STATE_PENDING_NAME);
+		txn.setOrderState(WalletLogStatusEnums.PROCESSING.getIntCode());
+		txn.setOrderStateName(WalletLogStatusEnums.PROCESSING.getLabel());
 		txn.setLocalCurrency(currency);
 		txn.setLocalCurrencyAmt(targetAmount);
 		txn.setTransCurrency(currency);
@@ -2336,7 +2523,8 @@ public class WalletUserService extends BaseApiService {
 		item.setBizType(row.getBizType());
 		item.setTransType(row.getTransType());
 		item.setOrderState(row.getOrderState());
-		item.setOrderStateName(row.getOrderStateName());
+		WalletLogStatusEnums orderState = WalletLogStatusEnums.fromIntCode(row.getOrderState());
+		item.setOrderStateName(orderState != null ? orderState.getLabel() : row.getOrderStateName());
 		item.setAmount(toDisplayAmount(row));
 		item.setCurrency(resolveTxnCurrency(row));
 		item.setCardNo(row.getCardNo());
@@ -2375,5 +2563,77 @@ public class WalletUserService extends BaseApiService {
 			return row.getLocalCurrency();
 		}
 		return WalletConstants.DEFAULT_CURRENCY;
+	}
+
+	/** 请求头 language → worldPay 邮寄地区 locale */
+	private static String resolveDeliveryLocale() {
+		String language = LanguageContext.getLanguage();
+		if (StringUtils.isEmpty(language)) {
+			return "zh_CN";
+		}
+		String normalized = language.trim().toLowerCase(Locale.ROOT);
+		if ("zh-cn".equals(normalized) || "zh".equals(normalized)) {
+			return "zh_CN";
+		}
+		if ("zh-hk".equals(normalized) || "tw".equals(normalized)) {
+			return "zh_HK";
+		}
+		if ("en".equals(normalized)) {
+			return "en_US";
+		}
+		return language.trim();
+	}
+
+	private static WalletCardAccountMailingEntity toMailingEntity(WalletUserEntity user,
+			ThirdMailingAddressResp third, Date now) {
+		WalletCardAccountMailingEntity row = new WalletCardAccountMailingEntity();
+		row.setWalletUserId(user.getId());
+		row.setWalletUid(user.getWalletUid());
+		fillMailingEntity(row, third, now);
+		row.setSetTime(now);
+		return row;
+	}
+
+	private static void fillMailingEntity(WalletCardAccountMailingEntity row,
+			ThirdMailingAddressResp third, Date now) {
+		row.setAddressId(third.getId());
+		row.setCountryRegionId(third.getCountryRegionId());
+		row.setCountry(third.getCountry());
+		row.setCity(third.getCity());
+		row.setReceiverName(third.getReceiverName());
+		row.setReceiverMobile(third.getReceiverMobile());
+		row.setReceiverAddress(third.getReceiverAddress());
+		row.setPostCode(third.getPostCode());
+		row.setGmtModified(now);
+	}
+
+	private static WalletMailingAddressResp toMailingResp(WalletCardAccountMailingEntity row) {
+		WalletMailingAddressResp resp = new WalletMailingAddressResp();
+		resp.setId(row.getAddressId());
+		resp.setCountryRegionId(row.getCountryRegionId());
+		resp.setCountry(row.getCountry());
+		resp.setCity(row.getCity());
+		resp.setReceiverName(row.getReceiverName());
+		resp.setReceiverMobile(row.getReceiverMobile());
+		resp.setReceiverAddress(row.getReceiverAddress());
+		resp.setPostCode(row.getPostCode());
+		resp.setSetTime(row.getSetTime());
+		resp.setGmtModified(row.getGmtModified());
+		return resp;
+	}
+
+	private static WalletMailingAddressResp toMailingResp(ThirdMailingAddressResp third, Date setTime, Date gmtModified) {
+		WalletMailingAddressResp resp = new WalletMailingAddressResp();
+		resp.setId(third.getId());
+		resp.setCountryRegionId(third.getCountryRegionId());
+		resp.setCountry(third.getCountry());
+		resp.setCity(third.getCity());
+		resp.setReceiverName(third.getReceiverName());
+		resp.setReceiverMobile(third.getReceiverMobile());
+		resp.setReceiverAddress(third.getReceiverAddress());
+		resp.setPostCode(third.getPostCode());
+		resp.setSetTime(setTime);
+		resp.setGmtModified(gmtModified);
+		return resp;
 	}
 }

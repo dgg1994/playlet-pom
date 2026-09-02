@@ -72,7 +72,7 @@ public class WalletCardTransactionEntity {
 	private Integer payType;
 
 	@TableField("order_state")
-	@ApiModelProperty(name = "orderState", value = "订单状态")
+	@ApiModelProperty(name = "orderState", value = "订单状态：1处理中 2成功 3失败（与 wallet_log.status 一致）")
 	private Integer orderState;
 
 	@TableField("order_state_name")

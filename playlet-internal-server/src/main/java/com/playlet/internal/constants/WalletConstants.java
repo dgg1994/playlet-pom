@@ -33,6 +33,9 @@ public final class WalletConstants {
 	/** 开卡首充幂等单号前缀（无申请单号时） */
 	public static final String REQUEST_ORDER_PREFIX_FIRST_TOPUP = "FT";
 
+	/** 开卡解冻账变 outOrderNo 后缀（与申请单 id 拼接，幂等） */
+	public static final String WALLET_LOG_OUT_ORDER_THAW_SUFFIX = "-THAW";
+
 	/** 业务类型：充值 */
 	public static final String BIZ_RECHARGE = "RECHARGE";
 	/** 业务类型：提现 */
@@ -52,18 +55,6 @@ public final class WalletConstants {
 
 	/** 交易类型：充值 */
 	public static final String TRANS_TOPUP = "TOPUP";
-
-	/** 充值流水：处理中 */
-	public static final int ORDER_STATE_PENDING = 0;
-	public static final String ORDER_STATE_PENDING_NAME = "处理中";
-
-	/** 充值/交易流水：成功 */
-	public static final int ORDER_STATE_SUCCESS = 1;
-	public static final String ORDER_STATE_SUCCESS_NAME = "成功";
-
-	/** 充值/交易流水：失败 */
-	public static final int ORDER_STATE_FAILED = 2;
-	public static final String ORDER_STATE_FAILED_NAME = "失败";
 
 	/** 证件类型：身份证（需正反面） */
 	public static final int KYC_CERT_ID_CARD = 1;

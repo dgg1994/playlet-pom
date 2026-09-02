@@ -193,4 +193,22 @@ public interface CreatorWithdrawService {
 	@PostMapping("/walletLog")
 	@ApiOperation(value = "钱包账变记录", notes = "分页；默认当月；需作家登录")
 	ResponseBase walletLog(@RequestBody(required = false) WalletLogEntity query, HttpServletRequest request);
+
+	@PostMapping("/mailing/region")
+	@ApiOperation(value = "查询邮寄地区列表", notes = "对齐 onetoken /accountMailing/findDelivery；透传 worldPay POST /api/delivery/region；需作家登录")
+	ResponseBase mailingRegion(@RequestBody(required = false) WalletMailingRegionRequest query,
+			HttpServletRequest request);
+
+	@PostMapping("/mailing/add")
+	@ApiOperation(value = "添加邮寄地址", notes = "对齐 onetoken /accountMailing/add；返回 id 可作为 deliveryAddressId；需作家登录且已开通钱包")
+	ResponseBase mailingAdd(@RequestBody WalletMailingAddressAddRequest query, HttpServletRequest request);
+
+	@PostMapping("/mailing/update")
+	@ApiOperation(value = "更新邮寄地址", notes = "对齐 onetoken /accountMailing/update；id 为三方邮寄地址 id；需作家登录且已开通钱包")
+	ResponseBase mailingUpdate(@RequestBody WalletMailingAddressUpdateRequest query, HttpServletRequest request);
+
+	@PostMapping("/mailing/find")
+	@ApiOperation(value = "查询邮寄地址", notes = "对齐 onetoken /accountMailing/find；本地分页；需作家登录且已开通钱包")
+	ResponseBase mailingFind(@RequestBody(required = false) WalletMailingAddressFindRequest query,
+			HttpServletRequest request);
 }

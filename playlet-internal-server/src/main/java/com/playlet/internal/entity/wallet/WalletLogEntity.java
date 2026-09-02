@@ -100,7 +100,7 @@ public class WalletLogEntity extends PageQueryHelperEntity {
 	private Integer operateType;
 
 	@TableField("status")
-	@ApiModelProperty(name = "status", value = "状态")
+	@ApiModelProperty(name = "status", value = "状态：1处理中 2成功（与 wallet_card_transaction.order_state 一致）")
 	private String status;
 
 	@TableField("tran_hash")

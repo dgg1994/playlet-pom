@@ -14,6 +14,9 @@ import com.playlet.internal.api.request.BankcardUserIdRequest;
 import com.playlet.internal.api.request.KycApplyRequest;
 import com.playlet.internal.api.request.KycCountryListRequest;
 import com.playlet.internal.api.request.RegisterRequest;
+import com.playlet.internal.api.request.WalletMailingAddressAddRequest;
+import com.playlet.internal.api.request.WalletMailingAddressUpdateRequest;
+import com.playlet.internal.api.request.WalletMailingRegionRequest;
 import com.playlet.internal.api.response.KycCountryResp;
 import com.playlet.internal.api.response.KycStatusResp;
 import com.playlet.internal.api.response.WalletKycFileUploadResp;
@@ -24,6 +27,7 @@ import com.playlet.internal.api.response.ThirdBankcardCanActiveResp;
 import com.playlet.internal.api.response.ThirdBankcardInfoResp;
 import com.playlet.internal.api.response.ThirdBankcardPinResp;
 import com.playlet.internal.api.response.ThirdBankcardProductResp;
+import com.playlet.internal.api.response.ThirdMailingAddressResp;
 import com.playlet.internal.api.response.ThirdUserBankcardResp;
 import com.playlet.internal.api.response.ThirdUserRegisterResp;
 import com.playlet.internal.config.ThirdPartyProperties;
@@ -408,6 +412,90 @@ public class ThirdService {
 		ThirdBankcardPinResp resp = treeToValue(data, ThirdBankcardPinResp.class, "查询Pin");
 		log.info("third party card queryPin success uid={} userBankcardId={}", uid, userBankcardId);
 		return resp;
+	}
+
+	/**
+	 * 查询邮寄地区列表。文档：POST /api/delivery/region
+	 */
+	public Object listDeliveryRegions(String local) {
+		if (StringUtils.isEmpty(local)) {
+			throw new BaseException("地区不能为空");
+		}
+		WalletMailingRegionRequest body = new WalletMailingRegionRequest();
+		body.setLocal(local.trim());
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.DELIVERY_REGION_PATH;
+		log.info("third party delivery region start local={}", local.trim());
+		JsonNode data = exchange(HttpMethod.POST, url, body, null, "查询邮寄地区列表");
+		if (data == null || data.isNull()) {
+			return Collections.emptyList();
+		}
+		try {
+			return objectMapper.convertValue(data, Object.class);
+		} catch (Exception e) {
+			log.error("third party delivery region parse failed local={}", local, e);
+			throw new BaseException("查询邮寄地区列表响应解析失败", e);
+		}
+	}
+
+	/**
+	 * 添加邮寄地址。文档：POST /api/delivery/address/add
+	 */
+	public ThirdMailingAddressResp addDeliveryAddress(Long uid, WalletMailingAddressAddRequest body) {
+		requireUid(uid);
+		validateMailingAddressAdd(body);
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.DELIVERY_ADDRESS_ADD_PATH;
+		log.info("third party delivery address add start uid={} countryRegionId={}", uid, body.getCountryRegionId());
+		JsonNode data = exchange(HttpMethod.POST, url, body, String.valueOf(uid), "添加邮寄地址");
+		ThirdMailingAddressResp resp = treeToValue(data, ThirdMailingAddressResp.class, "添加邮寄地址");
+		if (resp == null || resp.getId() == null) {
+			throw new BaseException("添加邮寄地址响应 id 为空");
+		}
+		log.info("third party delivery address add success uid={} addressId={}", uid, resp.getId());
+		return resp;
+	}
+
+	/**
+	 * 更新邮寄地址。文档：POST /api/delivery/address/update
+	 */
+	public ThirdMailingAddressResp updateDeliveryAddress(Long uid, WalletMailingAddressUpdateRequest body) {
+		requireUid(uid);
+		validateMailingAddressUpdate(body);
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.DELIVERY_ADDRESS_UPDATE_PATH;
+		log.info("third party delivery address update start uid={} addressId={}", uid, body.getId());
+		JsonNode data = exchange(HttpMethod.POST, url, body, String.valueOf(uid), "更新邮寄地址");
+		ThirdMailingAddressResp resp = treeToValue(data, ThirdMailingAddressResp.class, "更新邮寄地址");
+		if (resp == null || resp.getId() == null) {
+			throw new BaseException("更新邮寄地址响应 id 为空");
+		}
+		log.info("third party delivery address update success uid={} addressId={}", uid, resp.getId());
+		return resp;
+	}
+
+	private static void validateMailingAddressAdd(WalletMailingAddressAddRequest body) {
+		if (body == null
+				|| body.getCountryRegionId() == null
+				|| StringUtils.isEmpty(body.getCountry())
+				|| StringUtils.isEmpty(body.getCity())
+				|| StringUtils.isEmpty(body.getReceiverName())
+				|| StringUtils.isEmpty(body.getReceiverMobile())
+				|| StringUtils.isEmpty(body.getReceiverAddress())
+				|| StringUtils.isEmpty(body.getPostCode())) {
+			throw new BaseException("邮寄地址必填字段不完整");
+		}
+	}
+
+	private static void validateMailingAddressUpdate(WalletMailingAddressUpdateRequest body) {
+		if (body == null
+				|| body.getId() == null
+				|| body.getCountryRegionId() == null
+				|| StringUtils.isEmpty(body.getCountry())
+				|| StringUtils.isEmpty(body.getCity())
+				|| StringUtils.isEmpty(body.getReceiverName())
+				|| StringUtils.isEmpty(body.getReceiverMobile())
+				|| StringUtils.isEmpty(body.getReceiverAddress())
+				|| StringUtils.isEmpty(body.getPostCode())) {
+			throw new BaseException("邮寄地址必填字段不完整");
+		}
 	}
 
 	/** 校验上传文件：非空 + 后缀白名单（对齐 worldpayPolymeric） */

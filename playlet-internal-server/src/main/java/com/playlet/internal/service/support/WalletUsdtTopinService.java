@@ -7,24 +7,32 @@ import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.UsdtTopinProperties;
 import com.playlet.internal.config.heard.LanguageContext;
+import com.playlet.internal.constants.UsdtTopinConstants;
+import com.playlet.internal.constants.WalletConstants;
 import com.playlet.internal.constants.WalletNetworkTypeConstants;
 import com.playlet.internal.constants.WalletSysConfigConstants;
 import com.playlet.internal.dao.system.SysInfoDao;
 import com.playlet.internal.dao.wallet.WalletAccountDao;
+import com.playlet.internal.dao.wallet.WalletLogDao;
 import com.playlet.internal.dao.wallet.WalletUserDao;
 import com.playlet.internal.dao.wallet.WalletUsdtTopupDao;
 import com.playlet.internal.dao.wallet.WalletWeb3AddressDao;
 import com.playlet.internal.entity.system.SysInfoEntity;
 import com.playlet.internal.entity.wallet.WalletAccountEntity;
+import com.playlet.internal.entity.wallet.WalletLogEntity;
 import com.playlet.internal.entity.wallet.WalletUserEntity;
 import com.playlet.internal.entity.wallet.WalletUsdtTopupEntity;
 import com.playlet.internal.entity.wallet.WalletWeb3AddressEntity;
 import com.playlet.internal.enums.NoticeStateEnums;
+import com.playlet.internal.enums.WalletLogOperateTypeEnums;
+import com.playlet.internal.enums.WalletLogStatusEnums;
+import com.playlet.internal.enums.WalletLogTradeTypeEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.third.UsdtTopinClient;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.IpUtil;
+import com.playlet.internal.utils.OrderCodeFactory;
 import com.playlet.internal.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,6 +61,8 @@ public class WalletUsdtTopinService extends BaseApiService {
 	private WalletWeb3AddressDao walletWeb3AddressDao;
 	@Autowired
 	private WalletUsdtTopupDao walletUsdtTopupDao;
+	@Autowired
+	private WalletLogDao walletLogDao;
 	@Autowired
 	private SysInfoDao sysInfoDao;
 	@Autowired
@@ -101,26 +111,41 @@ public class WalletUsdtTopinService extends BaseApiService {
 		}
 	}
 
-	/** USDT 充值回调：验签 + 幂等 + 增加可用余额 */
+	/** USDT 充值回调：验签 + 幂等 + 增加可用余额 + 记钱包账变 */
 	@Transactional(rollbackFor = Exception.class)
 	public ResponseBase handleNotify(UsdtTopinNotifyRequest body, HttpServletRequest request) {
 		if (body == null || StringUtils.isEmpty(body.getHash()) || StringUtils.isEmpty(body.getAmount())) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
+		String txHash = body.getHash().trim();
+		// 非转入类型直接忽略（对齐 onetoken topinUsdtNotify）
+		if (!StringUtils.isEmpty(body.getType())
+				&& !UsdtTopinConstants.NOTIFY_TYPE_IN.equalsIgnoreCase(body.getType().trim())) {
+			log.info("usdt topin notify skip non-in type={} hash={}", body.getType(), txHash);
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		}
+		if (!StringUtils.isEmpty(body.getCoin()) && !isSupportedTopinCoin(body.getCoin())) {
+			log.info("usdt topin notify skip unsupported coin={} hash={}", body.getCoin(), txHash);
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		}
 		String clientIp = ipUtil.getClientIp(request);
 		if (!isCallbackIpAllowed(clientIp)) {
-			log.warn("usdt topin notify ip denied ip={} hash={}", clientIp, body.getHash());
+			log.warn("usdt topin notify ip denied ip={} hash={}", clientIp, txHash);
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
 		String sign = body.getSign();
 		body.setSign(null);
 		if (!usdtTopinClient.verifySign(body, sign)) {
-			log.warn("usdt topin notify sign failed hash={} uid={}", body.getHash(), body.getUid());
+			log.warn("usdt topin notify sign failed hash={} uid={}", txHash, body.getUid());
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
-		WalletUsdtTopupEntity existed = walletUsdtTopupDao.findByTxHash(body.getHash());
+		WalletUsdtTopupEntity existed = walletUsdtTopupDao.findByTxHash(txHash);
 		if (existed != null) {
-			log.info("usdt topin notify duplicate hash={}", body.getHash());
+			log.info("usdt topin notify duplicate hash={}", txHash);
+			return setResultError(I18nUtil.getMessage("wallet.usdt_topup_duplicate"));
+		}
+		if (walletLogDao.findByOutOrderNo(txHash) != null) {
+			log.info("usdt topin notify duplicate wallet log hash={}", txHash);
 			return setResultError(I18nUtil.getMessage("wallet.usdt_topup_duplicate"));
 		}
 		WalletUserEntity user = resolveUser(body);
@@ -136,7 +161,7 @@ public class WalletUsdtTopinService extends BaseApiService {
 		try {
 			amount = new BigDecimal(body.getAmount().trim());
 		} catch (Exception e) {
-			log.error("usdt topin notify invalid amount hash={} amount={}", body.getHash(), body.getAmount(), e);
+			log.error("usdt topin notify invalid amount hash={} amount={}", txHash, body.getAmount(), e);
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
 		if (amount.signum() <= 0) {
@@ -149,15 +174,16 @@ public class WalletUsdtTopinService extends BaseApiService {
 			WalletUsdtTopupEntity row = buildTopupLog(user, account, body, amount, before, after);
 			GenericityUtil.setDate(row);
 			walletUsdtTopupDao.insert(row);
+			insertWalletTopUpLog(user, account, body, amount, after, txHash);
 		} catch (DuplicateKeyException e) {
-			log.warn("usdt topin notify concurrent duplicate hash={}", body.getHash(), e);
+			log.warn("usdt topin notify concurrent duplicate hash={}", txHash, e);
 			return setResultError(I18nUtil.getMessage("wallet.usdt_topup_duplicate"));
 		} catch (Exception e) {
-			log.error("usdt topin notify persist failed hash={} walletUid={}", body.getHash(), user.getWalletUid(), e);
+			log.error("usdt topin notify persist failed hash={} walletUid={}", txHash, user.getWalletUid(), e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 		log.info("usdt topin credited walletUid={} hash={} amount={} balanceAfter={}",
-				user.getWalletUid(), body.getHash(), amount, after);
+				user.getWalletUid(), txHash, amount, after);
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
@@ -271,7 +297,7 @@ public class WalletUsdtTopinService extends BaseApiService {
 		row.setLocalUid(user.getLocalUid());
 		row.setTxHash(body.getHash().trim());
 		row.setOrderNo(body.getOrder_no());
-		row.setCoin(StringUtils.isEmpty(body.getCoin()) ? "USDT" : body.getCoin());
+		row.setCoin(StringUtils.isEmpty(body.getCoin()) ? UsdtTopinConstants.COIN_USDT : body.getCoin());
 		row.setAmount(amount);
 		row.setOutAddress(body.getOutaddress());
 		row.setInAddress(StringUtils.isEmpty(body.getInaddress()) ? account.getTronUsdtAddress() : body.getInaddress());
@@ -281,6 +307,45 @@ public class WalletUsdtTopinService extends BaseApiService {
 		row.setSetTime(now);
 		row.setGmtModified(now);
 		return row;
+	}
+
+	/** USDT 链上充值账变（对齐 onetoken addCallbackLog / WALLET_TOP_UP） */
+	private void insertWalletTopUpLog(WalletUserEntity user, WalletAccountEntity account,
+			UsdtTopinNotifyRequest body, BigDecimal amount, BigDecimal balanceAfter, String txHash) {
+		Date now = new Date();
+		String inAddress = StringUtils.isEmpty(body.getInaddress())
+				? account.getTronUsdtAddress() : body.getInaddress();
+		WalletLogEntity logEntity = new WalletLogEntity();
+		logEntity.setOrderNo(StringUtils.isEmpty(body.getOrder_no())
+				? OrderCodeFactory.getOrderCode(user.getWalletUid()) : body.getOrder_no());
+		logEntity.setOutOrderNo(txHash);
+		logEntity.setWalletUserId(user.getId());
+		logEntity.setWalletUid(user.getWalletUid());
+		logEntity.setTradeType(WalletLogTradeTypeEnums.INCOME.getCode());
+		logEntity.setTitle(I18nUtil.getMessage("wallet.log.wallet_top_up"));
+		logEntity.setNetworkType(body.getAddress());
+		logEntity.setPrimevalMoney(balanceAfter);
+		logEntity.setPrimevalMoneyUnit(WalletConstants.DEFAULT_CURRENCY);
+		logEntity.setRealMoney(amount);
+		logEntity.setServiceCharge(BigDecimal.ZERO);
+		logEntity.setFormAccount(body.getOutaddress());
+		logEntity.setToName(user.getEmail());
+		logEntity.setToAccount(inAddress);
+		logEntity.setTranHash(txHash);
+		logEntity.setStatus(WalletLogStatusEnums.POSTED.getCode());
+		logEntity.setOperateType(WalletLogOperateTypeEnums.WALLET_TOP_UP.getCode());
+		logEntity.setSetTime(now);
+		logEntity.setGmtModified(now);
+		walletLogDao.insert(logEntity);
+	}
+
+	private static boolean isSupportedTopinCoin(String coin) {
+		if (StringUtils.isEmpty(coin)) {
+			return false;
+		}
+		String normalized = coin.trim();
+		return UsdtTopinConstants.COIN_USDT.equalsIgnoreCase(normalized)
+				|| UsdtTopinConstants.COIN_USDC.equalsIgnoreCase(normalized);
 	}
 
 	private boolean isCallbackIpAllowed(String clientIp) {

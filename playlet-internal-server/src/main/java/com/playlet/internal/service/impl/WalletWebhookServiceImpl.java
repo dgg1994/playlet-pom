@@ -12,15 +12,18 @@ import com.playlet.internal.constants.WalletWebhookConstants;
 import com.playlet.internal.dao.welfare.UserWithdrawOrderDao;
 import com.playlet.internal.dao.wallet.WalletBankcardDao;
 import com.playlet.internal.dao.wallet.WalletCardTransactionDao;
+import com.playlet.internal.dao.wallet.WalletLogDao;
 import com.playlet.internal.dao.wallet.WalletUserDao;
 import com.playlet.internal.dao.wallet.WalletWebhookEventDao;
 import com.playlet.internal.entity.welfare.UserWithdrawOrderEntity;
 import com.playlet.internal.entity.wallet.WalletBankcardEntity;
 import com.playlet.internal.entity.wallet.WalletCardTransactionEntity;
+import com.playlet.internal.entity.wallet.WalletLogEntity;
 import com.playlet.internal.entity.wallet.WalletUserEntity;
 import com.playlet.internal.entity.wallet.WalletWebhookEventEntity;
 import com.playlet.internal.enums.WalletCardStatusEnums;
 import com.playlet.internal.enums.WalletKycStateEnums;
+import com.playlet.internal.enums.WalletLogStatusEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.WalletWebhookService;
 import com.playlet.internal.service.WithdrawPayoutService;
@@ -29,6 +32,7 @@ import com.playlet.internal.service.support.WalletCardCloseWebhookSupport;
 import com.playlet.internal.service.support.WalletOpenCardSettlementService;
 import com.playlet.internal.service.third.ThirdService;
 import com.playlet.internal.service.third.WalletUserService;
+import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.RsaVerifyUtil;
 import com.playlet.internal.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -69,6 +73,8 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 	private WalletBankcardDao walletBankcardDao;
 	@Autowired
 	private WalletCardTransactionDao walletCardTransactionDao;
+	@Autowired
+	private WalletLogDao walletLogDao;
 	@Autowired
 	private UserWithdrawOrderDao userWithdrawOrderDao;
 	@Autowired
@@ -186,8 +192,9 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 		WalletCardTransactionEntity txn = findRechargeTransaction(body);
 		if (txn != null) {
 			walletCardTransactionDao.updateOrderState(txn.getId(),
-					WalletConstants.ORDER_STATE_SUCCESS, WalletConstants.ORDER_STATE_SUCCESS_NAME,
+					WalletLogStatusEnums.POSTED.getIntCode(), WalletLogStatusEnums.POSTED.getLabel(),
 					body.getOrderId());
+			markRechargeWalletLogPosted(txn, card);
 			if (!StringUtils.isEmpty(body.getCardNo())) {
 				walletBankcardDao.updateCardNo(card.getId(), body.getCardNo());
 			} else {
@@ -399,7 +406,7 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 		row.setGmtModified(now);
 		walletCardTransactionDao.insert(row);
 
-		if (Integer.valueOf(WalletConstants.ORDER_STATE_SUCCESS).equals(row.getOrderState())) {
+		if (Integer.valueOf(WalletLogStatusEnums.POSTED.getIntCode()).equals(row.getOrderState())) {
 			syncCardBalance(card);
 		}
 		log.info("wallet webhook transaction inserted transactionId={} userBankcardId={}",
@@ -417,6 +424,33 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 	private void handleMerchantRecharge(WalletWebhookNotifyRequest body) {
 		log.info("wallet webhook merchantRecharge eventId={} amount={} txHash={}",
 				body.getEventId(), body.getAmount(), body.getTxHash());
+	}
+
+	/** 充值成功：账变由处理中 → 已入账 */
+	private void markRechargeWalletLogPosted(WalletCardTransactionEntity txn, WalletBankcardEntity card) {
+		if (txn == null || StringUtils.isEmpty(txn.getRequestOrderId())) {
+			return;
+		}
+		WalletLogEntity walletLog = walletLogDao.findByOutOrderNo(txn.getRequestOrderId());
+		if (walletLog == null) {
+			return;
+		}
+		walletLog.setStatus(WalletLogStatusEnums.POSTED.getCode());
+		if (card != null) {
+			if (!StringUtils.isEmpty(card.getCardNo())) {
+				walletLog.setToName(card.getCardNo());
+				walletLog.setToAccount(card.getCardNo());
+			}
+			walletLog.setWalletBankcardId(card.getId());
+		}
+		walletLog.setGmtModified(new Date());
+		try {
+			walletLogDao.updateById(walletLog);
+		} catch (Exception e) {
+			log.error("wallet webhook recharge wallet log update failed requestOrderId={}",
+					txn.getRequestOrderId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
 	}
 
 	private WalletCardTransactionEntity findRechargeTransaction(WalletWebhookNotifyRequest body) {
@@ -609,25 +643,25 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 		return WalletConstants.BIZ_AUTH;
 	}
 
-	/** 三方 transStatus：1 成功，其它视为处理中/失败 */
+	/** 三方 transStatus：1 成功，2 失败，其它处理中 */
 	private static Integer mapTransOrderState(Integer transStatus) {
 		if (Integer.valueOf(1).equals(transStatus)) {
-			return WalletConstants.ORDER_STATE_SUCCESS;
+			return WalletLogStatusEnums.POSTED.getIntCode();
 		}
 		if (Integer.valueOf(2).equals(transStatus)) {
-			return WalletConstants.ORDER_STATE_FAILED;
+			return WalletLogStatusEnums.FAILED.getIntCode();
 		}
-		return WalletConstants.ORDER_STATE_PENDING;
+		return WalletLogStatusEnums.PROCESSING.getIntCode();
 	}
 
 	private static String mapTransOrderStateName(Integer transStatus) {
 		if (Integer.valueOf(1).equals(transStatus)) {
-			return WalletConstants.ORDER_STATE_SUCCESS_NAME;
+			return WalletLogStatusEnums.POSTED.getLabel();
 		}
 		if (Integer.valueOf(2).equals(transStatus)) {
-			return WalletConstants.ORDER_STATE_FAILED_NAME;
+			return WalletLogStatusEnums.FAILED.getLabel();
 		}
-		return WalletConstants.ORDER_STATE_PENDING_NAME;
+		return WalletLogStatusEnums.PROCESSING.getLabel();
 	}
 
 	private static String buildTransactionTitle(String cardNo, String merchantName) {

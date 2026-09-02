@@ -1,22 +1,6 @@
 package com.playlet.internal.service;
 
-import com.playlet.internal.api.request.BankcardActiveRequest;
-import com.playlet.internal.api.request.BankcardCanActiveRequest;
-import com.playlet.internal.api.request.BankcardCloseRequest;
-import com.playlet.internal.api.request.BankcardRechargeRequest;
-import com.playlet.internal.api.request.BankcardSetPinRequest;
-import com.playlet.internal.api.request.BankcardUpdateEmailRequest;
-import com.playlet.internal.api.request.BankcardUpdateStatusRequest;
-import com.playlet.internal.api.request.BankcardUserIdRequest;
-import com.playlet.internal.api.request.KycApplyRequest;
-import com.playlet.internal.api.request.KycCountryListRequest;
-import com.playlet.internal.api.request.UsdtTopinNotifyRequest;
-import com.playlet.internal.api.request.WalletApplyCardRequest;
-import com.playlet.internal.api.request.WalletBindPayPwdRequest;
-import com.playlet.internal.api.request.WalletCardProductListRequest;
-import com.playlet.internal.api.request.WalletCardTagRequest;
-import com.playlet.internal.api.request.WalletCardholderSaveRequest;
-import com.playlet.internal.api.request.WithdrawReqEntity;
+import com.playlet.internal.api.request.*;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.entity.wallet.WalletLogEntity;
 import com.playlet.internal.entity.wallet.WalletTransfetListEntity;
@@ -207,4 +191,22 @@ public interface WithdrawService {
 	@PostMapping("/walletLog")
 	@ApiOperation(value = "钱包账变记录", notes = "分页；默认当月；含当月收支汇总；需登录")
 	ResponseBase walletLog(@RequestBody(required = false) WalletLogEntity query, HttpServletRequest request);
+
+	@PostMapping("/mailing/region")
+	@ApiOperation(value = "查询邮寄地区列表", notes = "对齐 onetoken /accountMailing/findDelivery；透传 worldPay POST /api/delivery/region；需登录")
+	ResponseBase mailingRegion(@RequestBody(required = false) WalletMailingRegionRequest query,
+			HttpServletRequest request);
+
+	@PostMapping("/mailing/add")
+	@ApiOperation(value = "添加邮寄地址", notes = "对齐 onetoken /accountMailing/add；返回 id 可作为 deliveryAddressId；需登录且已开通钱包")
+	ResponseBase mailingAdd(@RequestBody WalletMailingAddressAddRequest query, HttpServletRequest request);
+
+	@PostMapping("/mailing/update")
+	@ApiOperation(value = "更新邮寄地址", notes = "对齐 onetoken /accountMailing/update；id 为三方邮寄地址 id；需登录且已开通钱包")
+	ResponseBase mailingUpdate(@RequestBody WalletMailingAddressUpdateRequest query, HttpServletRequest request);
+
+	@PostMapping("/mailing/find")
+	@ApiOperation(value = "查询邮寄地址", notes = "对齐 onetoken /accountMailing/find；本地分页；需登录且已开通钱包")
+	ResponseBase mailingFind(@RequestBody(required = false) WalletMailingAddressFindRequest query,
+			HttpServletRequest request);
 }

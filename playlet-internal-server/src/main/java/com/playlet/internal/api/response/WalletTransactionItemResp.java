@@ -29,7 +29,7 @@ public class WalletTransactionItemResp {
 	@ApiModelProperty("交易类型 TOPUP/AUTH/REFUND/CLOSE")
 	private String transType;
 
-	@ApiModelProperty("订单状态")
+	@ApiModelProperty("订单状态：1处理中 2成功 3失败")
 	private Integer orderState;
 
 	@ApiModelProperty("状态文案，如 已拒绝")

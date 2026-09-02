@@ -47,4 +47,12 @@ public final class WalletApiPaths {
 	public static final String CARD_UPDATE_EMAIL_PATH = "/api/bankcard/update/email";
 	/** 查询 Pin */
 	public static final String CARD_QUERY_PIN_PATH = "/api/bankcard/queryPin";
+
+	//---------------------------------------------邮寄---------------------------------------------------------------
+	/** 查询邮寄地区列表 */
+	public static final String DELIVERY_REGION_PATH = "/api/delivery/region";
+	/** 添加邮寄地址 */
+	public static final String DELIVERY_ADDRESS_ADD_PATH = "/api/delivery/address/add";
+	/** 更新邮寄地址 */
+	public static final String DELIVERY_ADDRESS_UPDATE_PATH = "/api/delivery/address/update";
 }

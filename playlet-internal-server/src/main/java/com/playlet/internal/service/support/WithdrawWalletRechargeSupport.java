@@ -2,6 +2,7 @@ package com.playlet.internal.service.support;
 
 import com.playlet.internal.api.request.BankcardRechargeRequest;
 import com.playlet.internal.constants.WalletConstants;
+import com.playlet.internal.enums.WalletLogStatusEnums;
 import com.playlet.internal.dao.wallet.WalletBankcardDao;
 import com.playlet.internal.dao.wallet.WalletCardTransactionDao;
 import com.playlet.internal.dao.wallet.WalletUserDao;
@@ -104,8 +105,8 @@ public class WithdrawWalletRechargeSupport {
 		txn.setWithdrawOrderId(order.getId());
 		txn.setBizType(WalletConstants.BIZ_RECHARGE);
 		txn.setTransType(WalletConstants.TRANS_TOPUP);
-		txn.setOrderState(WalletConstants.ORDER_STATE_PENDING);
-		txn.setOrderStateName(WalletConstants.ORDER_STATE_PENDING_NAME);
+		txn.setOrderState(WalletLogStatusEnums.PROCESSING.getIntCode());
+		txn.setOrderStateName(WalletLogStatusEnums.PROCESSING.getLabel());
 		txn.setLocalCurrency(currency);
 		txn.setLocalCurrencyAmt(amount);
 		txn.setTransCurrency(currency);

@@ -121,8 +121,8 @@ public class WalletCardCloseWebhookSupport {
 		txn.setThirdOrderNum(orderNo);
 		txn.setBizType(WalletConstants.BIZ_CLOSE);
 		txn.setTransType(WalletConstants.BIZ_CLOSE);
-		txn.setOrderState(WalletConstants.ORDER_STATE_SUCCESS);
-		txn.setOrderStateName(WalletConstants.ORDER_STATE_SUCCESS_NAME);
+		txn.setOrderState(WalletLogStatusEnums.POSTED.getIntCode());
+		txn.setOrderStateName(WalletLogStatusEnums.POSTED.getLabel());
 		txn.setLocalCurrency(currency);
 		txn.setLocalCurrencyAmt(refund.negate());
 		txn.setTransCurrency(currency);

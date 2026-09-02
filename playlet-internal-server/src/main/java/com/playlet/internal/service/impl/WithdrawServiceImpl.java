@@ -384,4 +384,43 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 		}
 		return walletTransferService.walletLog(WithdrawUserTypeEnums.APP.getCode(), uid, query);
 	}
+
+	@Override
+	public ResponseBase mailingRegion(@RequestBody(required = false) WalletMailingRegionRequest query,
+			HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.listMailingRegions(query);
+	}
+
+	@Override
+	public ResponseBase mailingAdd(@RequestBody WalletMailingAddressAddRequest query, HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.addMailingAddress(WithdrawUserTypeEnums.APP.getCode(), uid, query);
+	}
+
+	@Override
+	public ResponseBase mailingUpdate(@RequestBody WalletMailingAddressUpdateRequest query,
+			HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.updateMailingAddress(WithdrawUserTypeEnums.APP.getCode(), uid, query);
+	}
+
+	@Override
+	public ResponseBase mailingFind(@RequestBody(required = false) WalletMailingAddressFindRequest query,
+			HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.findMailingAddresses(WithdrawUserTypeEnums.APP.getCode(), uid, query);
+	}
 }
