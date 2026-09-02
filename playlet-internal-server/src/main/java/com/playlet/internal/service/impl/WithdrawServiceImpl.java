@@ -160,6 +160,15 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 	}
 
 	@Override
+	public ResponseBase upCardTag(@RequestBody WalletCardTagRequest query, HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.upCardTag(WithdrawUserTypeEnums.APP.getCode(), uid, query);
+	}
+
+	@Override
 	public ResponseBase cardFindList(WalletCardProductListRequest query, HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
@@ -277,7 +286,7 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 	}
 
 	@Override
-	public ResponseBase cardRecharge(@RequestBody BankcardRechargeRequest query, HttpServletRequest request) {
+	public ResponseBase cardTopUp(@RequestBody BankcardRechargeRequest query, HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
@@ -295,7 +304,7 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 	}
 
 	@Override
-	public ResponseBase cardClose(@RequestBody BankcardUserIdRequest query, HttpServletRequest request) {
+	public ResponseBase cardClose(@RequestBody BankcardCloseRequest query, HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
@@ -331,12 +340,12 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 	}
 
 	@Override
-	public ResponseBase transactionList(PageQueryHelperEntity page, HttpServletRequest request) {
+	public ResponseBase transactionList(PageQueryHelperEntity page, Long userBankcardId, HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
-		return walletUserService.listTransactions(WithdrawUserTypeEnums.APP.getCode(), uid, page);
+		return walletUserService.listTransactions(WithdrawUserTypeEnums.APP.getCode(), uid, page, userBankcardId);
 	}
 
 	@Override

@@ -15,6 +15,9 @@ import com.playlet.internal.entity.wallet.*;
 import com.playlet.internal.enums.WalletCardApplyStateEnums;
 import com.playlet.internal.enums.WalletCardStatusEnums;
 import com.playlet.internal.enums.WalletKycStateEnums;
+import com.playlet.internal.enums.WalletLogOperateTypeEnums;
+import com.playlet.internal.enums.WalletLogStatusEnums;
+import com.playlet.internal.enums.WalletLogTradeTypeEnums;
 import com.playlet.internal.enums.WalletLogisticsStateEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
@@ -25,6 +28,7 @@ import com.playlet.internal.service.support.WalletOpenCardSettlementService;
 import com.playlet.internal.service.support.WalletPhysicalCardFulfillService;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.KycFieldNormalizeUtil;
+import com.playlet.internal.utils.OrderCodeFactory;
 import com.playlet.internal.utils.PasswordHashUtils;
 import com.playlet.internal.utils.StringUtils;
 import com.playlet.internal.utils.WalletRequestOrderIdSupport;
@@ -87,6 +91,8 @@ public class WalletUserService extends BaseApiService {
 	private WalletOpenCardSettlementService walletOpenCardSettlementService;
 	@Autowired
 	private WalletBankcardSyncSupport walletBankcardSyncSupport;
+	@Autowired
+	private WalletLogDao walletLogDao;
 
 	/**
 	 * 本地账号注册成功后调用：开通 U 卡三方用户并写入 P0 表。
@@ -258,6 +264,42 @@ public class WalletUserService extends BaseApiService {
 		log.info("wallet findUserCardInfo walletUserId={} walletBankcardId={} userBankcardId={}",
 				user.getId(), card.getId(), card.getUserBankcardId());
 		return setResultSuccess(detail, I18nUtil.getMessage("base_success"));
+	}
+
+	/**
+	 * 修改持有银行卡自定义标签（对齐 onetoken POST /appUserCard/upTag）。
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	public ResponseBase upCardTag(Integer userType, Integer localUid, WalletCardTagRequest query) {
+		WalletUserEntity user = findWalletUser(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		if (query == null || query.getUserBankcardId() == null) {
+			return setResultError(I18nUtil.getMessage("base_data_null"));
+		}
+		if (query.getTag() == null) {
+			return setResultError(I18nUtil.getMessage("base_data_null"));
+		}
+		WalletBankcardEntity card = findOwnedCard(user, query.getUserBankcardId());
+		if (card == null) {
+			return setResultError(I18nUtil.getMessage("base_data_null"));
+		}
+		String tagName = query.getTag().trim();
+		try {
+			walletBankcardDao.updateTagName(card.getId(), tagName);
+		} catch (Exception e) {
+			log.error("wallet card upTag failed walletUserId={} userBankcardId={}",
+					user.getId(), query.getUserBankcardId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+		card.setTagName(tagName);
+		WalletCardProductEntity product = card.getCardProductId() == null
+				? null : walletCardProductDao.findById(card.getCardProductId());
+		WalletCardItemResp resp = toCardItem(card, product);
+		log.info("wallet card upTag success walletUserId={} userBankcardId={} tagName={}",
+				user.getId(), query.getUserBankcardId(), tagName);
+		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
 	}
 
 	/**
@@ -1067,75 +1109,195 @@ public class WalletUserService extends BaseApiService {
 	}
 
 	/**
-	 * 银行卡充值：从 wallet_account.available_balance 扣款后调三方充卡，结果由 Webhook 回写。
+	 * 银行卡充值（对齐 onetoken POST /card/topUp）：校验支付密码/卡状态/限额，扣钱包后调三方充卡。
 	 */
 	@Transactional(rollbackFor = Exception.class)
-	public ResponseBase rechargeCard(Integer userType, Integer localUid, BankcardRechargeRequest query) {
+	public synchronized ResponseBase rechargeCard(Integer userType, Integer localUid, BankcardRechargeRequest query) {
 		WalletUserEntity user = findWalletUser(userType, localUid);
 		if (user == null) {
 			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
 		}
-		if (query == null || query.getUserBankcardId() == null || query.getAmount() == null
-				|| query.getAmount() <= 0) {
+		if (query == null || query.getUserBankcardId() == null) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
-		String requestOrderId = WalletRequestOrderIdSupport.resolve(query.getRequestOrderId(),
-				WalletConstants.REQUEST_ORDER_PREFIX_CARD_RECHARGE, user.getWalletUid());
-		query.setRequestOrderId(requestOrderId);
+		ensureWalletAccount(user);
 		WalletAccountEntity account = walletAccountDao.findByWalletUserId(user.getId());
 		if (account == null) {
 			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
 		}
-		BigDecimal amount = BigDecimal.valueOf(query.getAmount());
+		// C 端须校验支付密码；type=false 时跳过（管理/系统）
+		if (query.getType() == null || Boolean.TRUE.equals(query.getType())) {
+			ResponseBase payPwdResult = checkPayPassword(account, query.getPayPassword());
+			if (!Constants.HTTP_RES_CODE_200.equals(payPwdResult.getCode())) {
+				return payPwdResult;
+			}
+		}
+		BigDecimal targetAmount = resolveTopUpTargetAmount(query);
+		if (targetAmount.compareTo(BigDecimal.ZERO) <= 0) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		query.setTargetAmount(targetAmount);
+		query.setAmount(targetAmount.intValue());
+		int payType = query.getPayType() == null ? WalletConstants.TOPUP_TYPE_WALLET : query.getPayType();
+		query.setPayType(payType);
+		String requestOrderId = WalletRequestOrderIdSupport.resolve(query.getRequestOrderId(),
+				WalletConstants.REQUEST_ORDER_PREFIX_CARD_RECHARGE, user.getWalletUid());
+		query.setRequestOrderId(requestOrderId);
 		// 幂等：同一 requestOrderId 不重复扣款
 		WalletCardTransactionEntity existed = walletCardTransactionDao.findByRequestOrderId(requestOrderId);
 		if (existed != null) {
-			log.info("wallet card recharge idempotent skip deduct requestOrderId={} walletAccountId={}",
+			log.info("wallet card topUp idempotent skip deduct requestOrderId={} walletAccountId={}",
 					requestOrderId, account.getId());
-			return setResultSuccess(buildCardRechargeResp(requestOrderId, amount, account.getAvailableBalance(), true),
-					I18nUtil.getMessage("base_success"));
+			return setResultSuccess(buildCardRechargeResp(query, account.getAvailableBalance(), true),
+					I18nUtil.getMessage("topUp_result"));
 		}
 		WalletBankcardEntity card = findOwnedCard(user, query.getUserBankcardId());
 		if (card == null) {
 			return setResultError(I18nUtil.getMessage("wallet.card_not_found"));
 		}
-		BigDecimal balanceBefore = nvlBalance(account.getAvailableBalance());
-		// 先扣本地钱包可用余额，再调三方充卡
-		int deducted = walletAccountDao.deductAvailableBalance(account.getId(), amount);
-		if (deducted <= 0) {
-			log.warn("wallet card recharge deduct failed walletAccountId={} requestOrderId={} amount={} balanceBefore={}",
-					account.getId(), query.getRequestOrderId(), amount, balanceBefore);
-			return setResultError(I18nUtil.getMessage("wallet.balance_not_enough"));
+		// 未激活无法充值
+		if (card.getCardStatus() == null
+				|| card.getCardStatus() != WalletCardStatusEnums.ACTIVE.getCode()) {
+			return setResultError(I18nUtil.getMessage("card_no_active"));
 		}
-		log.info("wallet card recharge deducted walletAccountId={} requestOrderId={} amount={} balanceBefore={}",
-				account.getId(), query.getRequestOrderId(), amount, balanceBefore);
+		WalletCardProductEntity product = card.getCardProductId() == null
+				? null : walletCardProductDao.findById(card.getCardProductId());
+		if (product == null) {
+			return setResultError(I18nUtil.getMessage("bank_card_null"));
+		}
+		BigDecimal handlingFees = resolveTopUpHandlingFees(targetAmount, query.getHandlingFees(), product);
+		query.setHandlingFees(handlingFees);
+		ResponseBase limitCheck = validateTopUpLimits(product, targetAmount, handlingFees);
+		if (!Constants.HTTP_RES_CODE_200.equals(limitCheck.getCode())) {
+			return limitCheck;
+		}
+		BigDecimal deductTotal = targetAmount.add(handlingFees);
+		if (WalletConstants.TOPUP_TYPE_WALLET == payType) {
+			BigDecimal available = nvlBalance(account.getAvailableBalance());
+			if (available.compareTo(BigDecimal.ZERO) <= 0 || available.compareTo(deductTotal) < 0) {
+				return setResult(Constants.HTTP_RES_CODE_601, I18nUtil.getMessage("wallet_Balance_null"), null);
+			}
+		}
+		BigDecimal balanceBefore = nvlBalance(account.getAvailableBalance());
+		if (WalletConstants.TOPUP_TYPE_WALLET == payType) {
+			int deducted = walletAccountDao.deductAvailableBalance(account.getId(), deductTotal);
+			if (deducted <= 0) {
+				log.warn("wallet card topUp deduct failed walletAccountId={} requestOrderId={} deductTotal={} balanceBefore={}",
+						account.getId(), requestOrderId, deductTotal, balanceBefore);
+				return setResult(Constants.HTTP_RES_CODE_601, I18nUtil.getMessage("wallet_Balance_null"), null);
+			}
+			log.info("wallet card topUp deducted walletAccountId={} requestOrderId={} targetAmount={} handlingFees={} balanceBefore={}",
+					account.getId(), requestOrderId, targetAmount, handlingFees, balanceBefore);
+		}
 		try {
 			thirdService.rechargeBankcard(user.getWalletUid(), query);
 		} catch (BaseException e) {
-			log.error("wallet card recharge rejected walletUid={} requestOrderId={}",
-					user.getWalletUid(), query.getRequestOrderId(), e);
-			refundAvailableBalance(account.getId(), amount, query.getRequestOrderId());
+			log.error("wallet card topUp rejected walletUid={} requestOrderId={}",
+					user.getWalletUid(), requestOrderId, e);
+			if (WalletConstants.TOPUP_TYPE_WALLET == payType) {
+				refundAvailableBalance(account.getId(), deductTotal, requestOrderId);
+			}
 			return setResultError(e.getMessage());
 		} catch (Exception e) {
-			log.error("wallet card recharge error walletUid={} requestOrderId={}",
-					user.getWalletUid(), query.getRequestOrderId(), e);
-			refundAvailableBalance(account.getId(), amount, query.getRequestOrderId());
+			log.error("wallet card topUp error walletUid={} requestOrderId={}",
+					user.getWalletUid(), requestOrderId, e);
+			if (WalletConstants.TOPUP_TYPE_WALLET == payType) {
+				refundAvailableBalance(account.getId(), deductTotal, requestOrderId);
+			}
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
-		insertRechargeTransaction(user, card, query);
+		insertRechargeTransaction(user, card, query, targetAmount, handlingFees, payType);
+		if (WalletConstants.TOPUP_TYPE_WALLET == payType) {
+			insertTopUpWalletLog(user, account, card, query, targetAmount, handlingFees, balanceBefore);
+		}
 		WalletAccountEntity refreshedAccount = walletAccountDao.findByWalletUserId(user.getId());
 		BigDecimal availableAfter = refreshedAccount == null ? null : refreshedAccount.getAvailableBalance();
-		log.info("wallet card recharge submitted walletUserId={} userBankcardId={} requestOrderId={} amount={}",
-				user.getId(), query.getUserBankcardId(), requestOrderId, amount);
-		return setResultSuccess(buildCardRechargeResp(requestOrderId, amount, availableAfter, false),
-				I18nUtil.getMessage("base_success"));
+		log.info("wallet card topUp submitted walletUserId={} userBankcardId={} requestOrderId={} targetAmount={} handlingFees={}",
+				user.getId(), query.getUserBankcardId(), requestOrderId, targetAmount, handlingFees);
+		return setResultSuccess(buildCardRechargeResp(query, availableAfter, false),
+				I18nUtil.getMessage("topUp_result"));
 	}
 
-	private static WalletCardRechargeResp buildCardRechargeResp(String requestOrderId, BigDecimal amount,
+	private static BigDecimal resolveTopUpTargetAmount(BankcardRechargeRequest query) {
+		if (query.getTargetAmount() != null) {
+			return query.getTargetAmount().setScale(2, RoundingMode.HALF_UP);
+		}
+		if (query.getAmount() == null) {
+			return BigDecimal.ZERO;
+		}
+		return BigDecimal.valueOf(query.getAmount()).setScale(2, RoundingMode.HALF_UP);
+	}
+
+	/** 手续费：客户端传入优先，否则按卡产品 rechargeFee 费率计算 */
+	private static BigDecimal resolveTopUpHandlingFees(BigDecimal targetAmount, BigDecimal clientFees,
+			WalletCardProductEntity product) {
+		if (clientFees != null) {
+			return clientFees.max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+		}
+		if (product == null || product.getRechargeFee() == null || targetAmount == null) {
+			return BigDecimal.ZERO;
+		}
+		return targetAmount.multiply(product.getRechargeFee()).setScale(2, RoundingMode.HALF_UP);
+	}
+
+	/** 充值上下限（对齐 onetoken topUp：targetAmount + handlingFees） */
+	private static ResponseBase validateTopUpLimits(WalletCardProductEntity product, BigDecimal targetAmount,
+			BigDecimal handlingFees) {
+		BigDecimal total = targetAmount.add(handlingFees);
+		Integer minLimit = product.getRechargeMinLimit();
+		if (minLimit != null && minLimit > 0 && total.compareTo(BigDecimal.valueOf(minLimit)) < 0) {
+			return setResultError(I18nUtil.getMessage("topup_money_min"));
+		}
+		BigDecimal maxLimit = product.getRechargeMaxLimit();
+		if (maxLimit != null && maxLimit.compareTo(BigDecimal.ZERO) > 0
+				&& total.compareTo(maxLimit) > 0) {
+			return setResultError(I18nUtil.getMessage("topup_money_max"));
+		}
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	private void insertTopUpWalletLog(WalletUserEntity user, WalletAccountEntity account, WalletBankcardEntity card,
+			BankcardRechargeRequest query, BigDecimal targetAmount, BigDecimal handlingFees,
+			BigDecimal balanceBefore) {
+		Date now = new Date();
+		WalletLogEntity logEntity = new WalletLogEntity();
+		logEntity.setOrderNo(OrderCodeFactory.getOrderCode(user.getWalletUid()));
+		logEntity.setOutOrderNo(query.getRequestOrderId());
+		logEntity.setWalletUserId(user.getId());
+		logEntity.setWalletUid(user.getWalletUid());
+		logEntity.setTradeType(WalletLogTradeTypeEnums.EXPENDITURE.getCode());
+		logEntity.setTitle(I18nUtil.getMessage("wallet.log.card_top_up"));
+		logEntity.setPrimevalMoney(balanceBefore);
+		logEntity.setPrimevalMoneyUnit(WalletConstants.DEFAULT_CURRENCY);
+		logEntity.setRealMoney(targetAmount);
+		logEntity.setServiceCharge(handlingFees);
+		logEntity.setFormName(user.getEmail());
+		logEntity.setFormAccount(String.valueOf(user.getWalletUid()));
+		logEntity.setToName(card.getCardNo());
+		logEntity.setToAccount(card.getCardNo());
+		logEntity.setWalletBankcardId(card.getId());
+		logEntity.setStatus(WalletLogStatusEnums.PROCESSING.getCode());
+		logEntity.setOperateType(WalletLogOperateTypeEnums.CARD_TOP_UP.getCode());
+		logEntity.setSetUser(query.getSetUser());
+		logEntity.setSetUserName(query.getSetUserName());
+		logEntity.setSetTime(now);
+		logEntity.setGmtModified(now);
+		try {
+			walletLogDao.insert(logEntity);
+		} catch (Exception e) {
+			log.error("wallet card topUp wallet log insert failed requestOrderId={}", query.getRequestOrderId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+	}
+
+	private static WalletCardRechargeResp buildCardRechargeResp(BankcardRechargeRequest query,
 			BigDecimal availableBalance, boolean idempotent) {
 		WalletCardRechargeResp resp = new WalletCardRechargeResp();
-		resp.setRequestOrderId(requestOrderId);
-		resp.setAmount(amount);
+		resp.setRequestOrderId(query.getRequestOrderId());
+		resp.setAmount(query.getTargetAmount());
+		resp.setTargetAmount(query.getTargetAmount());
+		resp.setHandlingFees(query.getHandlingFees());
+		resp.setPayType(query.getPayType());
 		resp.setAvailableBalance(availableBalance);
 		resp.setIdempotent(idempotent);
 		return resp;
@@ -1192,13 +1354,23 @@ public class WalletUserService extends BaseApiService {
 	 * 注销银行卡。
 	 */
 	@Transactional(rollbackFor = Exception.class)
-	public ResponseBase closeCard(Integer userType, Integer localUid, BankcardUserIdRequest query) {
+	public ResponseBase closeCard(Integer userType, Integer localUid, BankcardCloseRequest query) {
 		WalletUserEntity user = findWalletUser(userType, localUid);
 		if (user == null) {
 			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
 		}
 		if (query == null || query.getUserBankcardId() == null) {
 			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		ensureWalletAccount(user);
+		WalletAccountEntity account = walletAccountDao.findByWalletUserId(user.getId());
+		if (account == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		// 注销卡须校验支付密码
+		ResponseBase payPwdResult = checkPayPassword(account, query.getPayPassword());
+		if (!Constants.HTTP_RES_CODE_200.equals(payPwdResult.getCode())) {
+			return payPwdResult;
 		}
 		WalletBankcardEntity card = findOwnedCard(user, query.getUserBankcardId());
 		if (card == null) {
@@ -1381,9 +1553,10 @@ public class WalletUserService extends BaseApiService {
 	}
 
 	/**
-	 * 交易记录分页：首页传较小 pageSize，点「全部」继续翻页。
+	 * 交易记录分页：首页传较小 pageSize，点「全部」继续翻页；可选 userBankcardId 按卡筛选。
 	 */
-	public ResponseBase listTransactions(Integer userType, Integer localUid, PageQueryHelperEntity page) {
+	public ResponseBase listTransactions(Integer userType, Integer localUid, PageQueryHelperEntity page,
+			Long userBankcardId) {
 		WalletUserEntity user = walletUserDao.findByLocal(userType, localUid);
 		if (user == null) {
 			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
@@ -1391,8 +1564,19 @@ public class WalletUserService extends BaseApiService {
 		if (page == null) {
 			page = new PageQueryHelperEntity();
 		}
-		PageHelper.startPage(page.getPageNumber(), page.getPageSize());
-		List<WalletCardTransactionEntity> rows = walletCardTransactionDao.findByWalletUserId(user.getId());
+		List<WalletCardTransactionEntity> rows;
+		if (userBankcardId != null) {
+			// 按卡筛选时先校验卡归属，避免越权查他人流水
+			WalletBankcardEntity card = findOwnedCard(user, userBankcardId);
+			if (card == null) {
+				return setResultError(I18nUtil.getMessage("wallet.card_not_found"));
+			}
+			PageHelper.startPage(page.getPageNumber(), page.getPageSize());
+			rows = walletCardTransactionDao.findByWalletUserIdAndUserBankcardId(user.getId(), userBankcardId);
+		} else {
+			PageHelper.startPage(page.getPageNumber(), page.getPageSize());
+			rows = walletCardTransactionDao.findByWalletUserId(user.getId());
+		}
 		if (rows == null) {
 			rows = new ArrayList<>();
 		}
@@ -1901,9 +2085,8 @@ public class WalletUserService extends BaseApiService {
 
 	/** 充值提交后落本地流水 */
 	private void insertRechargeTransaction(WalletUserEntity user, WalletBankcardEntity card,
-			BankcardRechargeRequest query) {
+			BankcardRechargeRequest query, BigDecimal targetAmount, BigDecimal handlingFees, int payType) {
 		Date now = new Date();
-		BigDecimal amount = new BigDecimal(query.getAmount());
 		String currency = StringUtils.isEmpty(card.getCurrency())
 				? WalletConstants.DEFAULT_CURRENCY : card.getCurrency();
 		WalletCardTransactionEntity txn = new WalletCardTransactionEntity();
@@ -1917,12 +2100,14 @@ public class WalletUserService extends BaseApiService {
 		txn.setRequestOrderId(query.getRequestOrderId());
 		txn.setBizType(WalletConstants.BIZ_RECHARGE);
 		txn.setTransType(WalletConstants.TRANS_TOPUP);
+		txn.setPayType(payType);
+		txn.setHandlingFees(handlingFees);
 		txn.setOrderState(WalletConstants.ORDER_STATE_PENDING);
 		txn.setOrderStateName(WalletConstants.ORDER_STATE_PENDING_NAME);
 		txn.setLocalCurrency(currency);
-		txn.setLocalCurrencyAmt(amount);
+		txn.setLocalCurrencyAmt(targetAmount);
 		txn.setTransCurrency(currency);
-		txn.setTransCurrencyAmt(amount);
+		txn.setTransCurrencyAmt(targetAmount);
 		txn.setTitle("卡充值");
 		txn.setSetTime(now);
 		txn.setGmtModified(now);

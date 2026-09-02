@@ -86,6 +86,11 @@ public interface CreatorWithdrawService {
 			+ "月服务费/USD充值/USDT充值/提现手续费；需作家登录")
 	ResponseBase findUserCardInfo(Long id, HttpServletRequest request);
 
+	@PostMapping("/card/upTag")
+	@ApiOperation(value = "修改银行卡标签", notes = "对齐 onetoken POST /appUserCard/upTag；"
+			+ "传 userBankcardId、tag；需作家登录且卡须归属当前用户")
+	ResponseBase upCardTag(@RequestBody WalletCardTagRequest query, HttpServletRequest request);
+
 	@PostMapping("/card/findList")
 	@ApiOperation(value = "银行卡信息列表", notes = "对齐 onetoken /card/findList；可按 bankCardNature 筛选虚拟/实体卡；需作家登录")
 	ResponseBase cardFindList(@RequestBody(required = false) WalletCardProductListRequest query,
@@ -141,18 +146,19 @@ public interface CreatorWithdrawService {
 	@ApiOperation(value = "查询银行卡余额", notes = "拉三方并同步本地余额缓存；需作家登录")
 	ResponseBase cardBalance(@RequestBody BankcardUserIdRequest query, HttpServletRequest request);
 
-	@PostMapping("/card/recharge")
-	@ApiOperation(value = "银行卡充值", notes = "需作家登录；从 wallet_account.available_balance 扣款后充到 U 卡；"
-			+ "requestOrderId 可选（不传服务端自动生成 CR 前缀单号），同单号幂等；返回 requestOrderId/amount/availableBalance")
-	ResponseBase cardRecharge(@RequestBody BankcardRechargeRequest query, HttpServletRequest request);
+	@PostMapping("/card/topUp")
+	@ApiOperation(value = "银行卡充值", notes = "对齐 onetoken POST /card/topUp；需作家登录；"
+			+ "传 userBankcardId、amount、payPassword（6位）；handlingFees 不传则按卡产品费率计算；"
+			+ "payType 默认 1；requestOrderId 可选（不传服务端自动生成 CR 前缀单号），同单号幂等")
+	ResponseBase cardTopUp(@RequestBody BankcardRechargeRequest query, HttpServletRequest request);
 
 	@PostMapping("/card/updateStatus")
 	@ApiOperation(value = "更新银行卡状态", notes = "冻结/解冻；enable=true 解冻，false 冻结；需作家登录")
 	ResponseBase cardUpdateStatus(@RequestBody BankcardUpdateStatusRequest query, HttpServletRequest request);
 
 	@PostMapping("/card/close")
-	@ApiOperation(value = "注销银行卡", notes = "关卡；需作家登录")
-	ResponseBase cardClose(@RequestBody BankcardUserIdRequest query, HttpServletRequest request);
+	@ApiOperation(value = "注销银行卡", notes = "关卡；需作家登录；传 userBankcardId、payPassword（6位）")
+	ResponseBase cardClose(@RequestBody BankcardCloseRequest query, HttpServletRequest request);
 
 	@PostMapping("/card/info")
 	@ApiOperation(value = "查询银行卡信息", notes = "含 cvv/明文卡号等敏感信息；需作家登录")
@@ -167,8 +173,10 @@ public interface CreatorWithdrawService {
 	ResponseBase cardQueryPin(@RequestBody BankcardUserIdRequest query, HttpServletRequest request);
 
 	@GetMapping("/transaction/list")
-	@ApiOperation(value = "交易记录", notes = "分页；首页可用较小 pageSize，点全部继续翻页；需作家登录")
-	ResponseBase transactionList(PageQueryHelperEntity page, HttpServletRequest request);
+	@ApiOperation(value = "交易记录", notes = "分页；可选 userBankcardId 按卡筛选；首页可用较小 pageSize，点全部继续翻页；需作家登录")
+	ResponseBase transactionList(PageQueryHelperEntity page,
+			@RequestParam(value = "userBankcardId", required = false) Long userBankcardId,
+			HttpServletRequest request);
 
 	@PostMapping("/transfer")
 	@ApiOperation(value = "钱包内部转账", notes = "需作家登录；recipientEmail 为收款人邮箱；sendMoney 为转出金额；payPassword 必填")

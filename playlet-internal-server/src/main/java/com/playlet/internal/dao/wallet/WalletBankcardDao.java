@@ -52,6 +52,10 @@ public interface WalletBankcardDao extends BaseMapper<WalletBankcardEntity> {
 	@Update("update wallet_bankcard set pin_set = #{pinSet}, gmtModified = now() where id = #{id}")
 	int updatePinSet(@Param("id") Long id, @Param("pinSet") Integer pinSet);
 
+	/** 更新用户自定义标签 */
+	@Update("update wallet_bankcard set tag_name = #{tagName}, gmtModified = now() where id = #{id}")
+	int updateTagName(@Param("id") Long id, @Param("tagName") String tagName);
+
 	/** 取消该用户其它默认卡 */
 	@Update("update wallet_bankcard set is_default = 0, gmtModified = now() "
 			+ "where wallet_user_id = #{walletUserId} and is_default = 1")

@@ -1,19 +1,6 @@
 package com.playlet.internal.service.impl;
 
-import com.playlet.internal.api.request.BankcardActiveRequest;
-import com.playlet.internal.api.request.BankcardCanActiveRequest;
-import com.playlet.internal.api.request.BankcardRechargeRequest;
-import com.playlet.internal.api.request.BankcardSetPinRequest;
-import com.playlet.internal.api.request.BankcardUpdateEmailRequest;
-import com.playlet.internal.api.request.BankcardUpdateStatusRequest;
-import com.playlet.internal.api.request.BankcardUserIdRequest;
-import com.playlet.internal.api.request.KycApplyRequest;
-import com.playlet.internal.api.request.KycCountryListRequest;
-import com.playlet.internal.api.request.WalletApplyCardRequest;
-import com.playlet.internal.api.request.WalletBindPayPwdRequest;
-import com.playlet.internal.api.request.WalletCardProductListRequest;
-import com.playlet.internal.api.request.WalletCardholderSaveRequest;
-import com.playlet.internal.api.request.WithdrawReqEntity;
+import com.playlet.internal.api.request.*;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
@@ -187,6 +174,15 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 	}
 
 	@Override
+	public ResponseBase upCardTag(@RequestBody WalletCardTagRequest query, HttpServletRequest request) {
+		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return walletUserService.upCardTag(WithdrawUserTypeEnums.CREATOR.getCode(), uid, query);
+	}
+
+	@Override
 	public ResponseBase cardFindList(WalletCardProductListRequest query, HttpServletRequest request) {
 		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
 		if (uid == null) {
@@ -304,7 +300,7 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 	}
 
 	@Override
-	public ResponseBase cardRecharge(@RequestBody BankcardRechargeRequest query, HttpServletRequest request) {
+	public ResponseBase cardTopUp(@RequestBody BankcardRechargeRequest query, HttpServletRequest request) {
 		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
@@ -322,7 +318,7 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 	}
 
 	@Override
-	public ResponseBase cardClose(@RequestBody BankcardUserIdRequest query, HttpServletRequest request) {
+	public ResponseBase cardClose(@RequestBody BankcardCloseRequest query, HttpServletRequest request) {
 		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
@@ -358,12 +354,12 @@ public class CreatorWithdrawServiceImpl extends BaseApiService implements Creato
 	}
 
 	@Override
-	public ResponseBase transactionList(PageQueryHelperEntity page, HttpServletRequest request) {
+	public ResponseBase transactionList(PageQueryHelperEntity page, Long userBankcardId, HttpServletRequest request) {
 		Integer uid = CreatorTokenUtil.resolveCreatorId(request);
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
-		return walletUserService.listTransactions(WithdrawUserTypeEnums.CREATOR.getCode(), uid, page);
+		return walletUserService.listTransactions(WithdrawUserTypeEnums.CREATOR.getCode(), uid, page, userBankcardId);
 	}
 
 	@Override

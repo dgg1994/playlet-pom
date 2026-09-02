@@ -32,6 +32,12 @@ public interface WalletCardTransactionDao extends BaseMapper<WalletCardTransacti
 			+ "order by setTime desc, id desc")
 	List<WalletCardTransactionEntity> findByUserBankcardId(@Param("userBankcardId") Long userBankcardId);
 
+	/** 按钱包用户 + 三方卡 ID 查交易（分页由 PageHelper 截断） */
+	@Select("select * from wallet_card_transaction where wallet_user_id = #{walletUserId} "
+			+ "and user_bankcard_id = #{userBankcardId} order by setTime desc, id desc")
+	List<WalletCardTransactionEntity> findByWalletUserIdAndUserBankcardId(@Param("walletUserId") Long walletUserId,
+			@Param("userBankcardId") Long userBankcardId);
+
 	@Select("select * from wallet_card_transaction where wallet_user_id = #{walletUserId} "
 			+ "and biz_type = #{bizType} order by setTime desc, id desc")
 	List<WalletCardTransactionEntity> findByWalletUserIdAndBizType(@Param("walletUserId") Long walletUserId,

@@ -50,6 +50,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -309,16 +310,32 @@ public class ThirdService {
 	 */
 	public void rechargeBankcard(Long uid, BankcardRechargeRequest body) {
 		requireUid(uid);
-		if (body == null || body.getUserBankcardId() == null || body.getAmount() == null) {
-			throw new BaseException("userBankcardId/amount不能为空");
+		if (body == null || body.getUserBankcardId() == null) {
+			throw new BaseException("userBankcardId不能为空");
+		}
+		if (body.getTargetAmount() == null && body.getAmount() == null) {
+			throw new BaseException("amount不能为空");
+		}
+		if (body.getTargetAmount() == null) {
+			body.setTargetAmount(BigDecimal.valueOf(body.getAmount()));
+		}
+		if (body.getAmount() == null) {
+			body.setAmount(body.getTargetAmount().intValue());
+		}
+		if (body.getHandlingFees() == null) {
+			body.setHandlingFees(BigDecimal.ZERO);
+		}
+		if (body.getPayType() == null) {
+			body.setPayType(WalletConstants.TOPUP_TYPE_WALLET);
 		}
 		if (StringUtils.isEmpty(body.getRequestOrderId())) {
 			body.setRequestOrderId(WalletRequestOrderIdSupport.resolve(null,
 					WalletConstants.REQUEST_ORDER_PREFIX_CARD_RECHARGE, uid));
 		}
 		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.CARD_RECHARGE_PATH;
-		log.info("third party card recharge start uid={} userBankcardId={} amount={} requestOrderId={}",
-				uid, body.getUserBankcardId(), body.getAmount(), body.getRequestOrderId());
+		log.info("third party card recharge start uid={} userBankcardId={} amount={} targetAmount={} handlingFees={} payType={} requestOrderId={}",
+				uid, body.getUserBankcardId(), body.getAmount(), body.getTargetAmount(), body.getHandlingFees(),
+				body.getPayType(), body.getRequestOrderId());
 		exchange(HttpMethod.POST, url, body, String.valueOf(uid), "银行卡充值");
 		log.info("third party card recharge success uid={} requestOrderId={}", uid, body.getRequestOrderId());
 	}
