@@ -12,7 +12,9 @@ public enum WalletLogOperateTypeEnums {
 	CARD_CLOSE(7, "wallet.log.card_close"),
 	OPEN_CARD_FREEZE(8, "wallet.log.open_card_freeze"),
 	OPEN_CARD_THAW(9, "wallet.log.open_card_thaw"),
-	SYS_TOP_UP(10, "wallet.log.sys_top_up");
+	SYS_TOP_UP(10, "wallet.log.sys_top_up"),
+	/** 短剧金币提现入账 U 卡钱包余额 */
+	COIN_TO_WALLET(11, "wallet.log.coin_to_wallet");
 
 	private final int code;
 	private final String i18nKey;

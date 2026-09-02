@@ -95,15 +95,15 @@ public class CreatorWithdrawWalletHandler implements WithdrawWalletHandler {
 			return;
 		}
 		CreatorAccountEntity account = creatorAccountDao.selectById(uid);
-		long before = account == null || account.getCoinBalance() == null ? 0L : account.getCoinBalance();
-		long frozen = account == null || account.getFrozenCoinBalance() == null ? 0L : account.getFrozenCoinBalance();
+		long after = account == null || account.getCoinBalance() == null ? 0L : account.getCoinBalance();
+		long frozenAfter = account == null || account.getFrozenCoinBalance() == null ? 0L : account.getFrozenCoinBalance();
 		CreatorCoinLedgerEntity ledger = new CreatorCoinLedgerEntity();
 		ledger.setCreatorId(uid);
 		ledger.setChangeAmt((long) -amt);
-		ledger.setBalanceBefore(before);
-		ledger.setBalanceAfter(before - amt);
-		ledger.setFrozenBefore(frozen);
-		ledger.setFrozenAfter(Math.max(0L, frozen - amt));
+		ledger.setBalanceAfter(after);
+		ledger.setBalanceBefore(after + amt);
+		ledger.setFrozenBefore(frozenAfter);
+		ledger.setFrozenAfter(frozenAfter);
 		ledger.setBizType(bizType);
 		ledger.setBizId(bizId);
 		ledger.setRemark("提现扣减");

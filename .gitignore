@@ -19,3 +19,8 @@ startup.log
 # OS
 .DS_Store
 Thumbs.db
+/.cursor/rules/code-comments.mdc
+/.cursor/rules/exception-handling.mdc
+/.cursor/rules/java-style.mdc
+/.cursor/rules/logging.mdc
+/.cursor/rules/domestic-first.mdc

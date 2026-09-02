@@ -19,6 +19,9 @@ public class WithdrawReqEntity {
 	@ApiModelProperty(value = "提现金币数量", required = true)
 	private Integer points;
 
+	@ApiModelProperty(value = "支付密码校验")
+	private String payPassword;
+
 	@ApiModelProperty(value = "币种编码，如 USDT；不传则取启用配置首条")
 	private String assetCode;
 

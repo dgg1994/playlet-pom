@@ -2,10 +2,17 @@ package com.playlet.internal.service.support;
 
 import com.playlet.internal.constants.WalletConstants;
 import com.playlet.internal.dao.wallet.WalletAccountDao;
+import com.playlet.internal.dao.wallet.WalletCardTransactionDao;
+import com.playlet.internal.dao.wallet.WalletLogDao;
 import com.playlet.internal.dao.wallet.WalletUserDao;
 import com.playlet.internal.entity.wallet.WalletAccountEntity;
+import com.playlet.internal.entity.wallet.WalletCardTransactionEntity;
+import com.playlet.internal.entity.wallet.WalletLogEntity;
 import com.playlet.internal.entity.wallet.WalletUserEntity;
 import com.playlet.internal.enums.WalletKycStateEnums;
+import com.playlet.internal.enums.WalletLogOperateTypeEnums;
+import com.playlet.internal.enums.WalletLogStatusEnums;
+import com.playlet.internal.enums.WalletLogTradeTypeEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.utils.I18nUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -17,38 +24,139 @@ import java.math.BigDecimal;
 import java.util.Date;
 
 /**
- * 提现入账：校验钱包账户并向 available_balance 增加 U。
+ * 提现入账：校验钱包账户、增加 U 余额并写入 wallet_log / wallet_card_transaction。
  */
 @Slf4j
 @Component
 public class WithdrawWalletAccountSupport {
 
+	private static final String COIN_WITHDRAW_FORM = "COIN";
+
 	@Autowired
 	private WalletUserDao walletUserDao;
 	@Autowired
 	private WalletAccountDao walletAccountDao;
+	@Autowired
+	private WalletLogDao walletLogDao;
+	@Autowired
+	private WalletCardTransactionDao walletCardTransactionDao;
 
 	/** 是否已开通钱包账户（wallet_user + wallet_account） */
 	public boolean isReady(Integer userType, Integer localUid) {
 		return requireAccount(userType, localUid, false) != null;
 	}
 
-	/** 提现入账：原子增加可用余额，返回入账后余额 */
-	public BigDecimal creditAvailableBalance(Integer userType, Integer localUid, BigDecimal amount, String orderNo) {
-		if (amount == null || amount.signum() <= 0) {
+	/**
+	 * 金币提现入账：增加 available_balance 并写入 wallet_log（幂等 outOrderNo=orderNo）。
+	 *
+	 * @param actualAmt 实到 U（已扣 withdraw_config 手续费）
+	 * @param feeAmt    提现手续费（展示在 service_charge）
+	 */
+	public BigDecimal creditCoinWithdraw(Integer userType, Integer localUid, BigDecimal actualAmt,
+			BigDecimal feeAmt, int points, String orderNo, Long withdrawOrderId) {
+		if (actualAmt == null || actualAmt.signum() <= 0) {
 			throw new BaseException(I18nUtil.getMessage("withdraw.actual_zero"));
 		}
-		WalletAccountEntity account = requireAccount(userType, localUid, true);
-		int rows = walletAccountDao.addAvailableBalance(account.getId(), amount);
+		WalletUserEntity user = requireWalletUser(userType, localUid);
+		WalletAccountEntity account = requireAccount(user, true);
+		BigDecimal balanceBefore = nvl(account.getAvailableBalance());
+		int rows = walletAccountDao.addAvailableBalance(account.getId(), actualAmt);
 		if (rows <= 0) {
 			log.error("withdraw credit balance failed walletAccountId={} orderNo={} amount={}",
-					account.getId(), orderNo, amount);
+					account.getId(), orderNo, actualAmt);
 			throw new BaseException(I18nUtil.getMessage("base_error"));
 		}
-		BigDecimal after = nvl(account.getAvailableBalance()).add(amount);
+		BigDecimal balanceAfter = balanceBefore.add(actualAmt);
+		insertCoinWithdrawWalletLog(user, balanceBefore, actualAmt, feeAmt, points, orderNo);
+		insertCoinWithdrawCardTransaction(user, actualAmt, feeAmt, points, orderNo, withdrawOrderId);
 		log.info("withdraw credited walletAccountId={} orderNo={} amount={} balanceAfter={}",
-				account.getId(), orderNo, amount, after);
-		return after;
+				account.getId(), orderNo, actualAmt, balanceAfter);
+		return balanceAfter;
+	}
+
+	/** 写入金币提现账变；outOrderNo 幂等 */
+	private void insertCoinWithdrawWalletLog(WalletUserEntity user, BigDecimal balanceBefore,
+			BigDecimal actualAmt, BigDecimal feeAmt, int points, String orderNo) {
+		if (walletLogDao.findByOutOrderNo(orderNo) != null) {
+			return;
+		}
+		Date now = new Date();
+		BigDecimal serviceCharge = nvl(feeAmt);
+		WalletLogEntity logEntity = new WalletLogEntity();
+		logEntity.setOrderNo(orderNo);
+		logEntity.setOutOrderNo(orderNo);
+		logEntity.setWalletUserId(user.getId());
+		logEntity.setWalletUid(user.getWalletUid());
+		logEntity.setTradeType(WalletLogTradeTypeEnums.INCOME.getCode());
+		logEntity.setTitle(I18nUtil.getMessage("wallet.log.coin_to_wallet"));
+		logEntity.setPrimevalMoney(balanceBefore);
+		logEntity.setPrimevalMoneyUnit(WalletConstants.DEFAULT_CURRENCY);
+		logEntity.setRealMoney(actualAmt);
+		logEntity.setServiceCharge(serviceCharge);
+		logEntity.setFormName(COIN_WITHDRAW_FORM);
+		logEntity.setFormAccount(String.valueOf(points));
+		logEntity.setToName(user.getEmail());
+		logEntity.setToAccount(user.getEmail());
+		logEntity.setMemo("points=" + points);
+		logEntity.setStatus(WalletLogStatusEnums.POSTED.getCode());
+		logEntity.setOperateType(WalletLogOperateTypeEnums.COIN_TO_WALLET.getCode());
+		logEntity.setSetTime(now);
+		logEntity.setGmtModified(now);
+		try {
+			walletLogDao.insert(logEntity);
+		} catch (DuplicateKeyException e) {
+			log.warn("coin withdraw wallet log duplicate orderNo={}", orderNo, e);
+		} catch (Exception e) {
+			log.error("coin withdraw wallet log failed walletUserId={} orderNo={}", user.getId(), orderNo, e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+	}
+
+	/** 金币提现：同步落 wallet_card_transaction，供 /transaction/list 与后台流水查询 */
+	private void insertCoinWithdrawCardTransaction(WalletUserEntity user, BigDecimal actualAmt,
+			BigDecimal feeAmt, int points, String orderNo, Long withdrawOrderId) {
+		if (walletCardTransactionDao.findByRequestOrderId(orderNo) != null) {
+			return;
+		}
+		Date now = new Date();
+		BigDecimal serviceCharge = nvl(feeAmt);
+		WalletCardTransactionEntity txn = new WalletCardTransactionEntity();
+		txn.setWalletUserId(user.getId());
+		txn.setWalletUid(user.getWalletUid());
+		txn.setWalletBankcardId(null);
+		txn.setUserBankcardId(WalletConstants.WALLET_BALANCE_BANKCARD_PLACEHOLDER);
+		txn.setRequestOrderId(orderNo);
+		txn.setWithdrawOrderId(withdrawOrderId);
+		txn.setBizType(WalletConstants.BIZ_COIN_TO_WALLET);
+		txn.setTransType(WalletConstants.TRANS_COIN_TO_WALLET);
+		txn.setPayType(WalletConstants.TOPUP_TYPE_WALLET);
+		txn.setOrderState(WalletLogStatusEnums.POSTED.getIntCode());
+		txn.setOrderStateName(WalletLogStatusEnums.POSTED.getLabel());
+		txn.setLocalCurrency(WalletConstants.DEFAULT_CURRENCY);
+		txn.setLocalCurrencyAmt(actualAmt);
+		txn.setTransCurrency(WalletConstants.DEFAULT_CURRENCY);
+		txn.setTransCurrencyAmt(actualAmt);
+		txn.setHandlingFees(serviceCharge);
+		txn.setTitle(I18nUtil.getMessage("wallet.log.coin_to_wallet"));
+		txn.setSetTime(now);
+		txn.setGmtModified(now);
+		try {
+			walletCardTransactionDao.insert(txn);
+		} catch (DuplicateKeyException e) {
+			log.warn("coin withdraw card txn duplicate orderNo={}", orderNo, e);
+		} catch (Exception e) {
+			log.error("coin withdraw card txn failed walletUserId={} orderNo={} points={}",
+					user.getId(), orderNo, points, e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+	}
+
+	private WalletUserEntity requireWalletUser(Integer userType, Integer localUid) {
+		WalletUserEntity user = walletUserDao.findByLocal(userType, localUid);
+		if (user == null) {
+			throw new BaseException(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		return user;
 	}
 
 	private WalletAccountEntity requireAccount(Integer userType, Integer localUid, boolean createIfMissing) {
@@ -59,6 +167,10 @@ public class WithdrawWalletAccountSupport {
 		if (user == null) {
 			return null;
 		}
+		return requireAccount(user, createIfMissing);
+	}
+
+	private WalletAccountEntity requireAccount(WalletUserEntity user, boolean createIfMissing) {
 		WalletAccountEntity account = walletAccountDao.findByWalletUserId(user.getId());
 		if (account != null) {
 			return account;

@@ -48,13 +48,22 @@ public final class WalletConstants {
 	public static final String BIZ_CLOSE = "CLOSE";
 	/** 业务类型：开卡申请 */
 	public static final String BIZ_APPLY = "APPLY";
+	/** 业务类型：短剧金币提现入账钱包余额（非 U 卡扣款） */
+	public static final String BIZ_COIN_TO_WALLET = "COIN_TO_WALLET";
+
+	/** 交易类型：充值 */
+	public static final String TRANS_TOPUP = "TOPUP";
+	/** 交易类型：金币提现入账钱包 */
+	public static final String TRANS_COIN_TO_WALLET = "COIN_TO_WALLET";
+
+	/**
+	 * 金币提现入账钱包时无实体卡，wallet_card_transaction.user_bankcard_id 占位值。
+	 */
+	public static final long WALLET_BALANCE_BANKCARD_PLACEHOLDER = 0L;
 
 	/** 默认卡标记 */
 	public static final int CARD_DEFAULT_YES = 1;
 	public static final int CARD_DEFAULT_NO = 0;
-
-	/** 交易类型：充值 */
-	public static final String TRANS_TOPUP = "TOPUP";
 
 	/** 证件类型：身份证（需正反面） */
 	public static final int KYC_CERT_ID_CARD = 1;

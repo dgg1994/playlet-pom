@@ -10,6 +10,7 @@ import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.RedisKeyConstants;
 import com.playlet.internal.constants.WithdrawConstants;
+import com.playlet.internal.dao.wallet.WalletAccountDao;
 import com.playlet.internal.dao.welfare.UserWithdrawOrderDao;
 import com.playlet.internal.dao.welfare.WithdrawConfigDao;
 import com.playlet.internal.entity.welfare.UserWithdrawOrderEntity;
@@ -59,6 +60,8 @@ public class WithdrawBizService extends BaseApiService {
 	private WithdrawWalletAccountSupport withdrawWalletAccountSupport;
 	@Autowired
 	private WithdrawWalletSupport withdrawWalletSupport;
+    @Autowired
+    private WalletAccountDao walletAccountDao;
 
 	/** 提现首页：可用余额、钱包就绪、今日已用、资产配置；uid 为空时金币等为 0 */
 	public ResponseBase home(Integer uid, WithdrawUserTypeEnums userType) {
@@ -119,6 +122,11 @@ public class WithdrawBizService extends BaseApiService {
 		if (points <= 0) {
 			return setResultError(I18nUtil.getMessage("withdraw.points_invalid"));
 		}
+		// 支付密码校验
+		String payPassword = walletAccountDao.selectPayPasswordById(uid);
+		if (!PasswordHashUtils.matches(req.getPayPassword(), payPassword)) {
+			return setResultError(I18nUtil.getMessage("pay_password_error"));
+		}
 		if (!withdrawWalletAccountSupport.isReady(userType.getCode(), uid)) {
 			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
 		}
@@ -166,12 +174,14 @@ public class WithdrawBizService extends BaseApiService {
 			GenericityUtil.setDate(order);
 			userWithdrawOrderDao.insert(order);
 			handler.writeWithdrawFreezeLedger(uid, points, orderNo);
-			withdrawWalletAccountSupport.creditAvailableBalance(
-					userType.getCode(), uid, amount.getActualAmt(), orderNo);
-			handler.writeWithdrawLedger(uid, points, orderNo);
+			// 入账 U 卡钱包并写 wallet_log + wallet_card_transaction
+			withdrawWalletAccountSupport.creditCoinWithdraw(
+					userType.getCode(), uid, amount.getActualAmt(), amount.getFeeAmt(), points, orderNo, order.getId());
 			if (handler.settleFrozen(uid, points) <= 0) {
 				throw new BaseException("settle frozen coin failed");
 			}
+			// 金币扣减流水须在 settle 之后写入，余额快照才与库一致
+			handler.writeWithdrawLedger(uid, points, orderNo);
 			log.info("withdraw success userType={} uid={} orderNo={} points={} actualU={}",
 					userType.getCode(), uid, orderNo, points, amount.getActualAmt());
 			return setResultSuccess(I18nUtil.getMessage("base_success"));

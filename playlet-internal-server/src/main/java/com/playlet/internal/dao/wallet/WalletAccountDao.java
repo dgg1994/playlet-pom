@@ -96,4 +96,7 @@ public interface WalletAccountDao extends BaseMapper<WalletAccountEntity> {
 
 	@Select("select * from wallet_account where tron_usdt_address = #{address} limit 1")
 	WalletAccountEntity findByTronUsdtAddress(@Param("address") String address);
+
+	@Select("select wa.pay_password  from wallet_account wa where wa.wallet_user_id = (select id from wallet_user wu where wu.local_uid = #{uid})")
+	String selectPayPasswordById(@Param("uid") Integer uid);
 }
