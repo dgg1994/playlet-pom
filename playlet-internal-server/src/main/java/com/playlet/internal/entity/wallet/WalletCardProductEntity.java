@@ -110,6 +110,10 @@ public class WalletCardProductEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "cardImg", value = "展示图")
 	private String cardImg;
 
+	@TableField("card_list_img")
+	@ApiModelProperty(name = "cardListImg", value = "列表展示图")
+	private String cardListImg;
+
 	@TableField("description1")
 	@ApiModelProperty(name = "description1", value = "卡简介正文（映射 synopsisData.content）")
 	private String description1;
@@ -148,8 +152,21 @@ public class WalletCardProductEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "synopsisData", value = "卡简介")
 	private WalletCardProductSynopsisResp synopsisData;
 
+	/** 管理端筛选：卡性质（对齐 onetoken bankCardNature） */
+	@TableField(exist = false)
+	@ApiModelProperty(name = "bankCardNature", value = "PHYSICAL/VIRTUAL 筛选别名")
+	private String bankCardNatureFilter;
+
+	/** 管理端筛选：标题（对齐 onetoken title） */
+	@TableField(exist = false)
+	private String title;
+
 	/** 管理端编辑回显：关联的标签 id 列表（wallet_card_label_join） */
 	@TableField(exist = false)
 	@ApiModelProperty(name = "labelIdList", value = "关联标签 id 列表")
 	private List<Integer> labelIdList;
+
+	/** 管理端编辑回显：关联简介 id 列表 */
+	@TableField(exist = false)
+	private List<Integer> synopsisIdList;
 }

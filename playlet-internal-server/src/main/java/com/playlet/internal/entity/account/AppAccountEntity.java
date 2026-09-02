@@ -166,4 +166,8 @@ public class AppAccountEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "walletInfo", value = "钱包概要（余额/KYC/开卡/支付密码是否已设）", required = false)
 	private WalletUserInfoResp walletInfo;
 
+	/** 管理端 APP 用户列表：KYC 状态筛选 */
+	@TableField(exist = false)
+	private Integer kycState;
+
 }

@@ -23,6 +23,8 @@ public interface WalletLogDao extends BaseMapper<WalletLogEntity> {
 			+ "<if test='walletUid != null'> and wallet_uid = #{walletUid}</if>"
 			+ "<if test='title != null'> and title = #{title}</if>"
 			+ "<if test='status != null'> and status = #{status}</if>"
+			+ "<if test='userEmail != null and userEmail != \"\"'> "
+			+ "and wallet_user_id in (select id from wallet_user where email like concat('%', #{userEmail}, '%')) </if>"
 			+ "<if test='toAccount != null'> and to_account = #{toAccount}</if>"
 			+ "<if test='yearsMonth != null'> and date_format(setTime, '%Y-%m') = #{yearsMonth}</if>"
 			+ "<if test='operateTypeList != null and operateTypeList.size() &gt; 0'> and operate_type in "

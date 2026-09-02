@@ -42,6 +42,17 @@ public enum WalletKycStateEnums {
 	 *
 	 * @param apiStatus uncommitted/waiting/success/fail/wait_confirm/wait_audit
 	 */
+	public static java.util.List<com.playlet.internal.entity.system.DicEntity> getList() {
+		java.util.List<com.playlet.internal.entity.system.DicEntity> list = new java.util.ArrayList<>();
+		for (WalletKycStateEnums item : values()) {
+			com.playlet.internal.entity.system.DicEntity dic = new com.playlet.internal.entity.system.DicEntity();
+			dic.setId(item.code);
+			dic.setName(item.label);
+			list.add(dic);
+		}
+		return list;
+	}
+
 	public static WalletKycStateEnums fromApiStatus(String apiStatus) {
 		if (apiStatus == null || apiStatus.isEmpty()) {
 			return WAIT_APPROVE;

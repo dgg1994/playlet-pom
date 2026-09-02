@@ -11,7 +11,8 @@ public enum WalletLogOperateTypeEnums {
 	INTERNAL_TRANSFER_OUT(6, "wallet.log.internal_transfer_out"),
 	CARD_CLOSE(7, "wallet.log.card_close"),
 	OPEN_CARD_FREEZE(8, "wallet.log.open_card_freeze"),
-	OPEN_CARD_THAW(9, "wallet.log.open_card_thaw");
+	OPEN_CARD_THAW(9, "wallet.log.open_card_thaw"),
+	SYS_TOP_UP(10, "wallet.log.sys_top_up");
 
 	private final int code;
 	private final String i18nKey;

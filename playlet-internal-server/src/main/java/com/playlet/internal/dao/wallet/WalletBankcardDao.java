@@ -69,4 +69,29 @@ public interface WalletBankcardDao extends BaseMapper<WalletBankcardEntity> {
 			+ "gmtModified = now() where id = #{id}")
 	int updateLogistics(@Param("id") Long id, @Param("shippingState") Integer shippingState,
 			@Param("logisticsNum") String logisticsNum);
+
+	/** 管理端：用户持卡分页列表（关联 wallet_user / 申请持卡人） */
+	@Select("<script>"
+			+ "select b.id, cast(wu.local_uid as char) as uid, b.card_product_id as cardId, b.card_uuid as cardUuid, "
+			+ "b.card_apply_id as applyId, b.bankcard_nature as cardType, b.card_no as cardNo, "
+			+ "b.user_bankcard_id as userBankcardId, b.card_status as status, b.card_status_name as statusName, "
+			+ "b.balance, b.tag_name as tagName, wu.email as userEmail, wu.mobile_number as userTel, "
+			+ "m.user_name as userName, b.setTime "
+			+ "from wallet_bankcard b "
+			+ "left join wallet_user wu on b.wallet_user_id = wu.id "
+			+ "left join wallet_card_apply_man m on b.card_apply_id = m.apply_id "
+			+ "where 1=1 "
+			+ "<if test='status != null'> and b.card_status = #{status} </if>"
+			+ "<if test='cardType != null and cardType != \"\"'> and b.bankcard_nature = #{cardType} </if>"
+			+ "<if test='cardNo != null and cardNo != \"\"'> and b.card_no like concat('%', #{cardNo}, '%') </if>"
+			+ "<if test='userEmail != null and userEmail != \"\"'> and wu.email like concat('%', #{userEmail}, '%') </if>"
+			+ "<if test='userTel != null and userTel != \"\"'> and wu.mobile_number like concat('%', #{userTel}, '%') </if>"
+			+ "<if test='userName != null and userName != \"\"'> "
+			+ "and (m.user_name like concat('%', #{userName}, '%') or m.user_surname like concat('%', #{userName}, '%')) "
+			+ "</if>"
+			+ "<if test='uid != null and uid != \"\"'> and wu.local_uid = #{uid} and wu.user_type = 1 </if>"
+			+ " order by b.balance desc, b.id desc"
+			+ "</script>")
+	java.util.List<com.playlet.internal.api.response.WalletBankcardAdminResp> findAdminList(
+			com.playlet.internal.query.wallet.WalletBankcardAdminQuery query);
 }

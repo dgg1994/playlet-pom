@@ -88,6 +88,16 @@ public final class WalletConstants {
 	/** 三方 KYC 文件上传表单字段名 */
 	public static final String KYC_UPLOAD_FIELD_ID_CARD = "idCard";
 
+	/** 管理端上下架：1 上架 / 2 下架 */
+	public static final int ADMIN_CARD_STATE_ON = 1;
+	public static final int ADMIN_CARD_STATE_OFF = 2;
+
+	/** C 端 app 用户类型 */
+	public static final int USER_TYPE_APP = 1;
+
+	/** 人工充值订单号前缀 */
+	public static final String MANUAL_TOPUP_ORDER_PREFIX = "MT";
+
 	/** KYC 上传允许的文件后缀（小写，含点） */
 	public static final String[] KYC_UPLOAD_ALLOWED_SUFFIXES = {".png", ".pdf", ".jpg", ".jpeg"};
 }

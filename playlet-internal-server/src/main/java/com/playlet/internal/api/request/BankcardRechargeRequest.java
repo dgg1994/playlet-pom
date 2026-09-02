@@ -42,4 +42,7 @@ public class BankcardRechargeRequest {
 
 	@ApiModelProperty(value = "操作人名称")
 	private String setUserName;
+
+	@ApiModelProperty(value = "C 端用户 uid（app_account.id；管理端 topUp 必传）")
+	private Object uid;
 }

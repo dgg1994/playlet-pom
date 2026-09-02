@@ -52,5 +52,25 @@ public interface DicService {
 	@GetMapping("/findProtocolType")
 	@ApiOperation(value = "查询协议类型",notes = "查询协议类型",response = ResponseBase.class)
 	ResponseBase findProtocolType();
+
+	@GetMapping("/findCardState")
+	@Operation(summary = "查询卡状态", description = "用户持卡/开卡申请卡状态下拉")
+	ResponseBase findCardState();
+
+	@GetMapping("/findPayType")
+	@Operation(summary = "查询充值方式", description = "1钱包 2银行卡")
+	ResponseBase findPayType();
+
+	@GetMapping("/findKycState")
+	@Operation(summary = "查询KYC状态", description = "KYC认证状态下拉")
+	ResponseBase findKycState();
+
+	@GetMapping("/findNetwokList")
+	@Operation(summary = "查询网络类型", description = "TRON/BSC等链网络")
+	ResponseBase findNetwokList();
+
+	@GetMapping("/findRecordState")
+	@Operation(summary = "查询审核状态", description = "提现审核状态下拉")
+	ResponseBase findRecordState();
 }
 

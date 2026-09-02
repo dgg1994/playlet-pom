@@ -4,10 +4,12 @@ import com.playlet.internal.api.request.WalletWebhookNotifyRequest;
 import com.playlet.internal.constants.WalletConstants;
 import com.playlet.internal.dao.wallet.WalletAccountDao;
 import com.playlet.internal.dao.wallet.WalletBankcardDao;
+import com.playlet.internal.dao.wallet.WalletCardCloseDao;
 import com.playlet.internal.dao.wallet.WalletCardTransactionDao;
 import com.playlet.internal.dao.wallet.WalletLogDao;
 import com.playlet.internal.entity.wallet.WalletAccountEntity;
 import com.playlet.internal.entity.wallet.WalletBankcardEntity;
+import com.playlet.internal.entity.wallet.WalletCardCloseEntity;
 import com.playlet.internal.entity.wallet.WalletCardTransactionEntity;
 import com.playlet.internal.entity.wallet.WalletLogEntity;
 import com.playlet.internal.entity.wallet.WalletUserEntity;
@@ -41,6 +43,8 @@ public class WalletCardCloseWebhookSupport {
 	@Autowired
 	private WalletCardTransactionDao walletCardTransactionDao;
 	@Autowired
+	private WalletCardCloseDao walletCardCloseDao;
+	@Autowired
 	private WalletLogDao walletLogDao;
 	@Autowired
 	private WalletBankcardSyncSupport walletBankcardSyncSupport;
@@ -65,6 +69,7 @@ public class WalletCardCloseWebhookSupport {
 		walletBankcardDao.updateBalance(card.getId(), BigDecimal.ZERO);
 		walletBankcardDao.updateCardStatus(card.getId(),
 				WalletCardStatusEnums.CLOSED.getCode(), WalletCardStatusEnums.CLOSED.getLabel());
+		insertCardCloseRecord(user, card, refund, orderNoFromBody(body));
 		if (refund.compareTo(BigDecimal.ZERO) <= 0 || user == null) {
 			log.info("wallet webhook card close no refund userBankcardId={} refund={}",
 					card.getUserBankcardId(), refund);
@@ -173,5 +178,41 @@ public class WalletCardCloseWebhookSupport {
 
 	private static BigDecimal nz(BigDecimal value) {
 		return value == null ? BigDecimal.ZERO : value;
+	}
+
+	/** 销卡 Webhook 落库 wallet_card_close，供管理端 cardClose/findList 查询 */
+	private void insertCardCloseRecord(WalletUserEntity user, WalletBankcardEntity card,
+			BigDecimal refund, String requestOrderId) {
+		if (user == null || card == null) {
+			return;
+		}
+		Date now = new Date();
+		WalletCardCloseEntity close = new WalletCardCloseEntity();
+		close.setWalletUserId(user.getId());
+		close.setWalletUid(user.getWalletUid());
+		close.setCardProductId(card.getCardProductId());
+		close.setCardUuid(card.getCardUuid());
+		close.setCardType(card.getBankcardNature());
+		close.setCardNo(card.getCardNo());
+		close.setUserBankcardId(card.getUserBankcardId());
+		close.setBalance(card.getBalance());
+		close.setRefundAmt(refund);
+		close.setRequestOrderId(requestOrderId);
+		close.setReviewStatus(2);
+		close.setSetTime(now);
+		close.setGmtModified(now);
+		try {
+			walletCardCloseDao.insert(close);
+		} catch (Exception e) {
+			log.error("wallet card close record insert failed userBankcardId={}", card.getUserBankcardId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+	}
+
+	private static String orderNoFromBody(WalletWebhookNotifyRequest body) {
+		if (body == null) {
+			return null;
+		}
+		return body.getOrderId();
 	}
 }

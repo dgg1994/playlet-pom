@@ -14,13 +14,13 @@ import java.math.BigDecimal;
 import java.util.Date;
 
 /**
- * USDT 链上充值流水。
+ * 销卡申请记录。
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-@TableName("wallet_usdt_topup_log")
-@ApiModel(value = "USDT充值流水", description = "链上充值回调落库，tx_hash 幂等")
-public class WalletUsdtTopupEntity extends PageQueryHelperEntity {
+@TableName("wallet_card_close")
+@ApiModel(value = "销卡记录", description = "用户销卡申请及审核状态")
+public class WalletCardCloseEntity extends PageQueryHelperEntity {
 
 	@TableId(type = IdType.AUTO)
 	private Long id;
@@ -31,35 +31,32 @@ public class WalletUsdtTopupEntity extends PageQueryHelperEntity {
 	@TableField("wallet_uid")
 	private Long walletUid;
 
-	@TableField("user_type")
-	private Integer userType;
+	@TableField("card_product_id")
+	private Integer cardProductId;
 
-	@TableField("local_uid")
-	private Integer localUid;
+	@TableField("card_uuid")
+	private String cardUuid;
 
-	@TableField("tx_hash")
-	private String txHash;
+	@TableField("card_type")
+	private String cardType;
 
-	@TableField("order_no")
-	private String orderNo;
+	@TableField("card_no")
+	private String cardNo;
 
-	@TableField("coin")
-	private String coin;
+	@TableField("user_bankcard_id")
+	private Long userBankcardId;
 
-	@TableField("amount")
-	private BigDecimal amount;
+	@TableField("balance")
+	private BigDecimal balance;
 
-	@TableField("out_address")
-	private String outAddress;
+	@TableField("refund_amt")
+	private BigDecimal refundAmt;
 
-	@TableField("in_address")
-	private String inAddress;
+	@TableField("request_order_id")
+	private String requestOrderId;
 
-	@TableField("balance_before")
-	private BigDecimal balanceBefore;
-
-	@TableField("balance_after")
-	private BigDecimal balanceAfter;
+	@TableField("review_status")
+	private Integer reviewStatus;
 
 	@TableField("setTime")
 	private Date setTime;
@@ -67,12 +64,9 @@ public class WalletUsdtTopupEntity extends PageQueryHelperEntity {
 	@TableField("gmtModified")
 	private Date gmtModified;
 
-	@TableField("network_type")
-	private String networkType;
-
 	@TableField(exist = false)
 	private String userEmail;
 
 	@TableField(exist = false)
-	private String walletAddressFilter;
+	private String reviewStatusName;
 }

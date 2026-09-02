@@ -53,4 +53,20 @@ public interface WalletCardTransactionDao extends BaseMapper<WalletCardTransacti
 			+ "gmtModified = now() where id = #{id}")
 	int updateOrderState(@Param("id") Long id, @Param("orderState") Integer orderState,
 			@Param("orderStateName") String orderStateName, @Param("thirdOrderNum") String thirdOrderNum);
+
+	/** 管理端卡交易流水（关联用户邮箱） */
+	@Select("<script>"
+			+ "select t.*, wu.email as userEmail from wallet_card_transaction t "
+			+ "left join wallet_user wu on t.wallet_user_id = wu.id where 1=1 "
+			+ "<if test='transType != null and transType != \"\"'> "
+			+ "and (t.trans_type = #{transType} or t.biz_type = #{transType}) </if>"
+			+ "<if test='cardNo != null and cardNo != \"\"'> and t.card_no like concat('%', #{cardNo}, '%') </if>"
+			+ "<if test='requestOrderId != null and requestOrderId != \"\"'> and t.request_order_id = #{requestOrderId} </if>"
+			+ "<if test='userEmail != null and userEmail != \"\"'> and wu.email like concat('%', #{userEmail}, '%') </if>"
+			+ "<if test='walletUid != null'> and t.wallet_uid = #{walletUid} </if>"
+			+ "<if test='uid != null and uid != \"\"'> and wu.local_uid = #{uid} and wu.user_type = 1 </if>"
+			+ " order by t.order_state desc, t.setTime desc"
+			+ "</script>")
+	java.util.List<com.playlet.internal.entity.wallet.WalletCardTransactionEntity> findPcList(
+			com.playlet.internal.query.wallet.WalletCardTransactionAdminQuery query);
 }

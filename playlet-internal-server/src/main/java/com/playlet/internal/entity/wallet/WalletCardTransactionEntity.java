@@ -114,4 +114,13 @@ public class WalletCardTransactionEntity {
 	@TableField("gmtModified")
 	@ApiModelProperty(name = "gmtModified", value = "更新时间")
 	private Date gmtModified;
+
+	@TableField(exist = false)
+	private String userEmail;
+
+	@TableField(exist = false)
+	private String transTypeLabel;
+
+	@TableField(exist = false)
+	private java.math.BigDecimal totalManey;
 }
