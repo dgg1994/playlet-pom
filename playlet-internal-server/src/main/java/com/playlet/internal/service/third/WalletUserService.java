@@ -1041,7 +1041,7 @@ public class WalletUserService extends BaseApiService {
 	}
 
 	/**
-	 * 设置 ATM Pin。
+	 * 设置 ATM Pin（须校验钱包支付密码）。
 	 */
 	@Transactional(rollbackFor = Exception.class)
 	public ResponseBase setCardPin(Integer userType, Integer localUid, BankcardSetPinRequest query) {
@@ -1051,6 +1051,16 @@ public class WalletUserService extends BaseApiService {
 		}
 		if (query == null || query.getUserBankcardId() == null || StringUtils.isEmpty(query.getPin())) {
 			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		ensureWalletAccount(user);
+		WalletAccountEntity account = walletAccountDao.findByWalletUserId(user.getId());
+		if (account == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		// 设置 Pin 前校验支付密码，与关卡/充值一致
+		ResponseBase payPwdResult = checkPayPassword(account, query.getPayPassword());
+		if (!Constants.HTTP_RES_CODE_200.equals(payPwdResult.getCode())) {
+			return payPwdResult;
 		}
 		WalletBankcardEntity card = findOwnedCard(user, query.getUserBankcardId());
 		if (card == null) {

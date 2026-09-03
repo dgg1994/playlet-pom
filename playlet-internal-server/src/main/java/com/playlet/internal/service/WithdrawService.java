@@ -139,7 +139,7 @@ public interface WithdrawService {
 	ResponseBase cardActive(@RequestBody BankcardActiveRequest query, HttpServletRequest request);
 
 	@PostMapping("/card/setPin")
-	@ApiOperation(value = "设置Pin", notes = "设置 ATM 支付密码；需登录")
+	@ApiOperation(value = "设置Pin", notes = "设置 ATM Pin；需登录；传 userBankcardId、pin、payPassword（6位）")
 	ResponseBase cardSetPin(@RequestBody BankcardSetPinRequest query, HttpServletRequest request);
 
 	@PostMapping("/card/balance")

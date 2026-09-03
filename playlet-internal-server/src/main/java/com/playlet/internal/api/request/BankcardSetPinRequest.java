@@ -19,4 +19,7 @@ public class BankcardSetPinRequest {
 	@ApiModelProperty(value = "pin码", required = true)
 	@JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
 	private String pin;
+
+	@ApiModelProperty(value = "支付密码（6 位数字；须已绑定）", required = true)
+	private String payPassword;
 }
