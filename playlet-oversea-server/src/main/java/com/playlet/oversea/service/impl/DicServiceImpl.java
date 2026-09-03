@@ -71,5 +71,35 @@ public class DicServiceImpl extends BaseApiService implements DicService{
 		return setResultSuccess(list, I18nUtil.getMessage("base_success"));
 	}
 
+	@Override
+	@SysLogAnnotation(module = "字典管理", type = "get", remark = "查询卡状态")
+	public ResponseBase findCardState() {
+		return setResultSuccess(WalletCardStateDicEnums.getList(), I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	@SysLogAnnotation(module = "字典管理", type = "get", remark = "查询充值方式")
+	public ResponseBase findPayType() {
+		return setResultSuccess(WalletPayTypeEnums.getList(), I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	@SysLogAnnotation(module = "字典管理", type = "get", remark = "查询KYC状态")
+	public ResponseBase findKycState() {
+		return setResultSuccess(WalletKycStateEnums.getList(), I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	@SysLogAnnotation(module = "字典管理", type = "get", remark = "查询网络类型")
+	public ResponseBase findNetwokList() {
+		return setResultSuccess(WalletNetworkTypeDicEnums.getList(), I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	@SysLogAnnotation(module = "字典管理", type = "get", remark = "查询审核状态")
+	public ResponseBase findRecordState() {
+		return setResultSuccess(WalletRecordStateEnums.getList(), I18nUtil.getMessage("base_success"));
+	}
+
 }
 

@@ -2,6 +2,7 @@ package com.playlet.oversea.service.support;
 
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
+import com.playlet.oversea.api.request.WithdrawReqEntity;
 import com.playlet.oversea.api.response.WithdrawHomeRespEntity;
 import com.playlet.oversea.api.response.WithdrawHomeRespEntity.WithdrawAssetItemEntity;
 import com.playlet.oversea.api.response.WithdrawRecordItemEntity;
@@ -9,28 +10,21 @@ import com.playlet.oversea.base.BaseApiService;
 import com.playlet.oversea.base.ResponseBase;
 import com.playlet.oversea.constants.RedisKeyConstants;
 import com.playlet.oversea.constants.WithdrawConstants;
+import com.playlet.oversea.dao.wallet.WalletAccountDao;
 import com.playlet.oversea.dao.welfare.UserWithdrawOrderDao;
 import com.playlet.oversea.dao.welfare.WithdrawConfigDao;
 import com.playlet.oversea.entity.welfare.UserWithdrawOrderEntity;
 import com.playlet.oversea.entity.welfare.WithdrawConfigEntity;
-import com.playlet.oversea.enums.OnePayBindStatusEnums;
 import com.playlet.oversea.enums.WithdrawOrderStatusEnums;
 import com.playlet.oversea.enums.WithdrawUserTypeEnums;
 import com.playlet.oversea.exception.BaseException;
 import com.playlet.oversea.query.pub.PageQueryHelperEntity;
-import com.playlet.oversea.service.WithdrawPayoutService;
-import com.playlet.oversea.utils.GenericityUtil;
-import com.playlet.oversea.utils.I18nUtil;
-import com.playlet.oversea.utils.OrderCodeFactory;
-import com.playlet.oversea.utils.RedisUtil;
-import com.playlet.oversea.utils.StringUtils;
-import com.playlet.oversea.utils.TransactionUtils;
+import com.playlet.oversea.service.support.WithdrawAmountCalculator.Result;
+import com.playlet.oversea.utils.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -63,29 +57,32 @@ public class WithdrawBizService extends BaseApiService {
 	@Autowired
 	private RedisUtil redisUtil;
 	@Autowired
-	private WithdrawPayoutService withdrawPayoutService;
+	private WithdrawWalletAccountSupport withdrawWalletAccountSupport;
+	@Autowired
+	private WithdrawWalletSupport withdrawWalletSupport;
+    @Autowired
+    private WalletAccountDao walletAccountDao;
 
-	/** 提现首页：可用余额、绑定状态、今日已用、资产配置；uid 为空时金币等为 0 */
+	/** 提现首页：可用余额、钱包就绪、今日已用、资产配置；uid 为空时金币等为 0 */
 	public ResponseBase home(Integer uid, WithdrawUserTypeEnums userType) {
 		WithdrawHomeRespEntity resp = new WithdrawHomeRespEntity();
 		if (uid != null) {
 			WithdrawWalletHandler handler = walletHandlerRegistry.of(userType.getCode());
 			WithdrawWalletSnapshot snap = handler.load(uid);
+			boolean walletReady = withdrawWalletAccountSupport.isReady(userType.getCode(), uid);
+			snap.setWalletWithdrawReady(walletReady ? 1 : 0);
 			// 可提 = 总余额 - 冻结
 			resp.setCoinBalance(snap.getCoinBalance() - snap.getFrozenCoinBalance());
 			resp.setFrozenCoinBalance(snap.getFrozenCoinBalance());
-			resp.setOnepayBindStatus(nvlInt(snap.getOnepayBindStatus()));
+			resp.setWalletWithdrawReady(walletReady ? 1 : 0);
 			Integer allUsed = userWithdrawOrderDao.sumPointsToday(uid, userType.getCode(), todayStart());
 			resp.setTodayUsedPoints(allUsed == null ? 0 : allUsed);
-			UserWithdrawOrderEntity latestAny = userWithdrawOrderDao.findLatestByUid(uid, userType.getCode());
-			if (latestAny != null && !StringUtils.isEmpty(latestAny.getOnepayAccount())) {
-				resp.setLastWalletAddress(latestAny.getOnepayAccount());
-			}
+			resp.setLastWalletAddress(WithdrawConstants.PAYOUT_TARGET_BALANCE_LABEL);
 		} else {
 			// 未登录：仅展示资产配置，用户金币/绑定/今日已用均为 0
 			resp.setCoinBalance(0L);
 			resp.setFrozenCoinBalance(0L);
-			resp.setOnepayBindStatus(0);
+			resp.setWalletWithdrawReady(0);
 			resp.setTodayUsedPoints(0);
 		}
 
@@ -108,11 +105,7 @@ public class WithdrawBizService extends BaseApiService {
 				Integer used = userWithdrawOrderDao.sumPointsTodayByAsset(uid, userType.getCode(), cfg.getAssetCode(),
 						cfg.getNetwork(), todayStart());
 				item.setTodayUsedPoints(used == null ? 0 : used);
-				UserWithdrawOrderEntity latest = userWithdrawOrderDao.findLatestByUidAndAsset(uid, userType.getCode(),
-						cfg.getAssetCode(), cfg.getNetwork());
-				if (latest != null && !StringUtils.isEmpty(latest.getOnepayAccount())) {
-					item.setLastWalletAddress(latest.getOnepayAccount());
-				}
+				item.setLastWalletAddress(WithdrawConstants.PAYOUT_TARGET_BALANCE_LABEL);
 			} else {
 				item.setTodayUsedPoints(0);
 			}
@@ -122,38 +115,46 @@ public class WithdrawBizService extends BaseApiService {
 		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
 	}
 
-	/** 提交提现：只冻结不扣减，事务提交后再通知 OnePay */
+	/** 提交提现：按配置换算为 U，同步扣减金币并入账 wallet_account.available_balance */
 	@Transactional(rollbackFor = Exception.class)
-	public ResponseBase submit(Integer uid, Integer pointsRaw, WithdrawUserTypeEnums userType) {
-		int points = pointsRaw == null ? 0 : pointsRaw;
+	public ResponseBase submit(Integer uid, WithdrawReqEntity req, WithdrawUserTypeEnums userType) {
+		int points = req == null || req.getPoints() == null ? 0 : req.getPoints();
 		if (points <= 0) {
 			return setResultError(I18nUtil.getMessage("withdraw.points_invalid"));
 		}
+		// 支付密码校验
+		String payPassword = walletAccountDao.selectPayPasswordById(uid);
+		if (!PasswordHashUtils.matches(req.getPayPassword(), payPassword)) {
+			return setResultError(I18nUtil.getMessage("pay_password_error"));
+		}
+		if (!withdrawWalletAccountSupport.isReady(userType.getCode(), uid)) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		WithdrawConfigEntity cfg = resolveConfig(req);
+		if (cfg == null) {
+			return setResultError(I18nUtil.getMessage("withdraw.disabled"));
+		}
+		Result amount = WithdrawAmountCalculator.calculate(points, cfg);
+		if (amount.getActualAmt().signum() <= 0) {
+			return setResultError(I18nUtil.getMessage("withdraw.actual_zero"));
+		}
 		WithdrawWalletHandler handler = walletHandlerRegistry.of(userType.getCode());
 		WithdrawWalletSnapshot snap = handler.load(uid);
-		if (!Integer.valueOf(OnePayBindStatusEnums.BOUND.getCode()).equals(snap.getOnepayBindStatus())
-				|| StringUtils.isEmpty(snap.getOnepayAccount())) {
-			return setResultError(I18nUtil.getMessage("withdraw.onepay_not_bound"));
-		}
 		long available = snap.getCoinBalance() - snap.getFrozenCoinBalance();
 		if (available < points) {
 			return setResultError(I18nUtil.getMessage("withdraw.balance_not_enough"));
 		}
-		WithdrawConfigEntity cfg = withdrawConfigDao.findActive(
-				WithdrawConstants.ASSET_ONEPAY, WithdrawConstants.NETWORK_ONEPAY);
-		if (cfg != null) {
-			int min = cfg.getMinWithdrawPoints() == null ? 0 : cfg.getMinWithdrawPoints();
-			if (points < min) {
-				return setResultError(I18nUtil.getMessage("withdraw.below_min", String.valueOf(min)));
-			}
-			int dayMax = cfg.getMaxWithdrawPointsDay() == null ? 0 : cfg.getMaxWithdrawPointsDay();
-			if (dayMax > 0) {
-				Integer used = userWithdrawOrderDao.sumPointsTodayByAsset(uid, userType.getCode(), cfg.getAssetCode(),
-						cfg.getNetwork(), todayStart());
-				int usedAmt = used == null ? 0 : used;
-				if (usedAmt + points > dayMax) {
-					return setResultError(I18nUtil.getMessage("withdraw.day_limit"));
-				}
+		int min = cfg.getMinWithdrawPoints() == null ? 0 : cfg.getMinWithdrawPoints();
+		if (points < min) {
+			return setResultError(I18nUtil.getMessage("withdraw.below_min", String.valueOf(min)));
+		}
+		int dayMax = cfg.getMaxWithdrawPointsDay() == null ? 0 : cfg.getMaxWithdrawPointsDay();
+		if (dayMax > 0) {
+			Integer used = userWithdrawOrderDao.sumPointsTodayByAsset(uid, userType.getCode(), cfg.getAssetCode(),
+					cfg.getNetwork(), todayStart());
+			int usedAmt = used == null ? 0 : used;
+			if (usedAmt + points > dayMax) {
+				return setResultError(I18nUtil.getMessage("withdraw.day_limit"));
 			}
 		}
 
@@ -169,27 +170,26 @@ public class WithdrawBizService extends BaseApiService {
 			if (handler.freeze(uid, points) <= 0) {
 				return setResultError(I18nUtil.getMessage("withdraw.balance_not_enough"));
 			}
-			UserWithdrawOrderEntity order = buildOrder(uid, userType, snap.getOnepayAccount(),
-					handler.findOpenId(uid), points, cfg, orderNo);
+			UserWithdrawOrderEntity order = buildOrder(uid, userType, points, cfg, amount, orderNo);
 			GenericityUtil.setDate(order);
 			userWithdrawOrderDao.insert(order);
-			// 提交提现先记冻结流水，成功/失败再分别记扣减或退回
 			handler.writeWithdrawFreezeLedger(uid, points, orderNo);
-			final Long orderId = order.getId();
-			// 避免外部已受理、本地事务却回滚
-			if (TransactionSynchronizationManager.isSynchronizationActive()) {
-				TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-					@Override
-					public void afterCommit() {
-						withdrawPayoutService.payoutAsync(orderId);
-					}
-				});
-			} else {
-				withdrawPayoutService.payoutAsync(orderId);
+			// 入账 U 卡钱包并写 wallet_log + wallet_card_transaction
+			withdrawWalletAccountSupport.creditCoinWithdraw(
+					userType.getCode(), uid, amount.getActualAmt(), amount.getFeeAmt(), points, orderNo, order.getId());
+			if (handler.settleFrozen(uid, points) <= 0) {
+				throw new BaseException("settle frozen coin failed");
 			}
-			log.info("withdraw submit userType={} uid={} orderNo={} points={}",
-					userType.getCode(), uid, orderNo, points);
+			// 金币扣减流水须在 settle 之后写入，余额快照才与库一致
+			handler.writeWithdrawLedger(uid, points, orderNo);
+			log.info("withdraw success userType={} uid={} orderNo={} points={} actualU={}",
+					userType.getCode(), uid, orderNo, points, amount.getActualAmt());
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		} catch (BaseException e) {
+			log.error("withdraw submit biz failed userType={} uid={} orderNo={}",
+					userType.getCode(), uid, orderNo, e);
+			TransactionUtils.markRollbackOnly();
+			throw e;
 		} catch (Exception e) {
 			log.error("withdraw submit failed userType={} uid={} orderNo={}",
 					userType.getCode(), uid, orderNo, e);
@@ -198,7 +198,7 @@ public class WithdrawBizService extends BaseApiService {
 		}
 	}
 
-	/** 提现记录：按主体隔离分页，地址脱敏 */
+	/** 提现记录：按主体隔离分页 */
 	public ResponseBase records(PageQueryHelperEntity page, Integer uid, WithdrawUserTypeEnums userType) {
 		if (page == null) {
 			page = new PageQueryHelperEntity();
@@ -221,23 +221,40 @@ public class WithdrawBizService extends BaseApiService {
 		return setResultSuccess(pageInfo, I18nUtil.getMessage("base_success"));
 	}
 
-	/** 落单快照：userType 必须写入，回调靠它路由钱包 */
-	private UserWithdrawOrderEntity buildOrder(Integer uid, WithdrawUserTypeEnums userType, String onepayAccount,
-			String onepayOpenId, int points, WithdrawConfigEntity cfg, String orderNo) {
+	private WithdrawConfigEntity resolveConfig(WithdrawReqEntity req) {
+		String assetCode = req == null ? null : req.getAssetCode();
+		String network = req == null ? null : req.getNetwork();
+		if (!StringUtils.isEmpty(assetCode) && !StringUtils.isEmpty(network)) {
+			WithdrawConfigEntity cfg = withdrawConfigDao.findActive(assetCode.trim(), network.trim());
+			if (cfg == null) {
+				return null;
+			}
+			return cfg;
+		}
+		List<WithdrawConfigEntity> cfgs = withdrawConfigDao.findActiveList();
+		if (cfgs == null || cfgs.isEmpty()) {
+			return null;
+		}
+		return cfgs.get(0);
+	}
+
+	/** 落单快照：同步成功，gateway=BALANCE */
+	private UserWithdrawOrderEntity buildOrder(Integer uid, WithdrawUserTypeEnums userType, int points,
+			WithdrawConfigEntity cfg, Result amount, String orderNo) {
 		UserWithdrawOrderEntity order = new UserWithdrawOrderEntity();
 		order.setOrderNo(orderNo);
 		order.setUid(uid);
 		order.setUserType(userType.getCode());
-		order.setAssetCode(cfg == null ? WithdrawConstants.ASSET_ONEPAY : cfg.getAssetCode());
-		order.setNetwork(cfg == null ? WithdrawConstants.NETWORK_ONEPAY : cfg.getNetwork());
-		order.setOnepayAccount(onepayAccount);
-		order.setOnepayOpenId(onepayOpenId);
+		order.setAssetCode(cfg.getAssetCode());
+		order.setNetwork(cfg.getNetwork());
+		order.setGateway(WithdrawConstants.GATEWAY_BALANCE);
+		order.setRequestOrderId(orderNo);
 		order.setPointsAmt(points);
-		order.setRate(cfg == null || cfg.getPointsPerUnit() == null ? 1 : cfg.getPointsPerUnit());
-		order.setFeeAmt(cfg == null ? BigDecimal.ZERO : scale(cfg.getServiceFee()));
-		order.setGrossAmt(BigDecimal.valueOf(points));
-		order.setActualAmt(BigDecimal.valueOf(points));
-		order.setStatus(WithdrawOrderStatusEnums.PENDING.getCode());
+		order.setRate(amount.getPointsPerUnit());
+		order.setFeeAmt(amount.getFeeAmt());
+		order.setGrossAmt(amount.getGrossAmt());
+		order.setActualAmt(amount.getActualAmt());
+		order.setStatus(WithdrawOrderStatusEnums.SUCCESS.getCode());
 		return order;
 	}
 
@@ -250,7 +267,7 @@ public class WithdrawBizService extends BaseApiService {
 		// 列表展示为支出
 		item.setPointsAmt(row.getPointsAmt() == null ? 0 : -Math.abs(row.getPointsAmt()));
 		item.setActualAmt(scale(row.getActualAmt()));
-		item.setOnepayAccountMasked(maskAccount(row.getOnepayAccount()));
+		item.setPayoutTargetMasked(resolvePayoutTarget(row));
 		item.setStatus(row.getStatus());
 		item.setStatusLabel(WithdrawOrderStatusEnums.getLableByCode(row.getStatus()));
 		item.setThirdOrderNo(row.getThirdOrderNo());
@@ -259,32 +276,20 @@ public class WithdrawBizService extends BaseApiService {
 		return item;
 	}
 
+	private String resolvePayoutTarget(UserWithdrawOrderEntity row) {
+		if (row != null && WithdrawConstants.GATEWAY_BALANCE.equalsIgnoreCase(row.getGateway())) {
+			return WithdrawConstants.PAYOUT_TARGET_BALANCE_LABEL;
+		}
+		return withdrawWalletSupport.maskTargetByBankcardId(
+				row == null ? null : row.getTargetBankcardId());
+	}
+
 	/** C 端 W、作家 CW，降低单号撞车概率 */
 	private static String orderPrefix(WithdrawUserTypeEnums userType) {
 		if (userType == WithdrawUserTypeEnums.CREATOR) {
 			return WithdrawConstants.ORDER_NO_PREFIX_CREATOR;
 		}
 		return WithdrawConstants.ORDER_NO_PREFIX_APP;
-	}
-
-	/** OnePay 账号脱敏：邮箱走名称脱敏，其他走前2后2 */
-	private static String maskAccount(String account) {
-		if (StringUtils.isEmpty(account)) {
-			return account;
-		}
-		if (account.contains("@")) {
-			int at = account.indexOf('@');
-			String name = account.substring(0, at);
-			String domain = account.substring(at);
-			if (name.length() <= 1) {
-				return "*" + domain;
-			}
-			return name.charAt(0) + "***" + domain;
-		}
-		if (account.length() < 6) {
-			return "***";
-		}
-		return account.substring(0, 2) + "***" + account.substring(account.length() - 2);
 	}
 
 	private static BigDecimal scale(BigDecimal v) {
@@ -298,9 +303,5 @@ public class WithdrawBizService extends BaseApiService {
 	private static String todayStart() {
 		LocalDateTime start = LocalDate.now(ZONE).atStartOfDay();
 		return start.format(DAY_START_FMT);
-	}
-
-	private static int nvlInt(Integer v) {
-		return v == null ? 0 : v;
 	}
 }

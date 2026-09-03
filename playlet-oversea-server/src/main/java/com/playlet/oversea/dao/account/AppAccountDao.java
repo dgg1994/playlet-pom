@@ -87,4 +87,24 @@ public interface AppAccountDao extends BaseMapper<AppAccountEntity> {
 			+ "onepay_bind_status = #{bindStatus}, onepay_bind_time = null, gmtModified = now() "
 			+ "where id = #{uid}")
 	int clearOnePayBind(@Param("uid") Integer uid, @Param("bindStatus") Integer bindStatus);
+
+	@Select("<script>"
+			+ "select a.id, cast(a.id as char) as uid, a.user_account as userAccount, a.user_email as userEmail, "
+			+ "a.mobile_number as mobileNumber, a.mobile_prefix as mobilePrefix, a.user_state as userState, "
+			+ "a.invitation_code as invitationCode, a.setTime, a.gmtModified, "
+			+ "wa.available_balance as walletBalance, wa.freeze_balance as freezeBalance, "
+			+ "wa.open_freeze_balance as openFreezeBalance, wa.kyc_state as kycState, "
+			+ "wa.kyc_state_name as kycStateName, wa.kyc_audit_result as kycAuditResult, "
+			+ "wa.activation_state as activationState, wa.activation_time as activationTime "
+			+ "from app_account a "
+			+ "inner join wallet_user wu on wu.user_type = 1 and wu.local_uid = a.id "
+			+ "left join wallet_account wa on wa.wallet_user_id = wu.id where 1=1 "
+			+ "<if test='userEmail != null and userEmail != \"\"'> and a.user_email like concat('%', #{userEmail}, '%') </if>"
+			+ "<if test='mobileNumber != null and mobileNumber != \"\"'> and a.mobile_number = #{mobileNumber} </if>"
+			+ "<if test='userState != null'> and a.user_state = #{userState} </if>"
+			+ "<if test='kycState != null'> and wa.kyc_state = #{kycState} </if>"
+			+ " order by a.setTime desc"
+			+ "</script>")
+	java.util.List<com.playlet.oversea.api.response.AppUserInfoReqEntity> findWalletAppUserList(
+			com.playlet.oversea.entity.account.AppAccountEntity entity);
 }

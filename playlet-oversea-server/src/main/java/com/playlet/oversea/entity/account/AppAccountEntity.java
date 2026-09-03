@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.playlet.oversea.api.response.WalletUserInfoResp;
 import com.playlet.oversea.query.pub.PageQueryHelperEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -176,5 +177,14 @@ public class AppAccountEntity extends PageQueryHelperEntity {
 	@TableField(exist = false)
 	@ApiModelProperty(name = "likeCount",value = "获赞数",required = false,dataType = "Long")
 	private Long likeCount;
+
+	/** findToken 附带：U 卡钱包概要；未开通时为 null */
+	@TableField(exist = false)
+	@ApiModelProperty(name = "walletInfo", value = "钱包概要（余额/KYC/开卡/支付密码是否已设）", required = false)
+	private WalletUserInfoResp walletInfo;
+
+	/** 管理端 APP 用户列表：KYC 状态筛选 */
+	@TableField(exist = false)
+	private Integer kycState;
 
 }

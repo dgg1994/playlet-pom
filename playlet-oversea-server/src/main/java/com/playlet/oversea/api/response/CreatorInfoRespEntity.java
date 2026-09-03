@@ -78,4 +78,7 @@ public class CreatorInfoRespEntity {
 
 	@ApiModelProperty("注册时间")
 	private Date setTime;
+
+	@ApiModelProperty("钱包概要（未开通为 null）")
+	private WalletUserInfoResp walletInfo;
 }

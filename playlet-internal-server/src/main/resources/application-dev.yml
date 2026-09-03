@@ -7,7 +7,7 @@ spring:
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://127.0.0.1:3306/playlet_internal?useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT%2B8
+    url: jdbc:mysql://127.0.0.1:3306/playlet_oversea?useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT%2B8
     username: root
     password: 123456
     type: com.alibaba.druid.pool.DruidDataSource
@@ -37,17 +37,15 @@ spring:
         min-idle: 0   #连接池中的最小空闲连接
 
 qiniu:
-  access-key: _-kITMkw7LIfn8B42GArIyGTi1yxBIYmbSBkixPf
-  secret-key: v2GPTtydb6AhMfLjyCLERN4G8GJLY3DvLlzrJ6xD
-  bucket: strawberryplaylet
-  domain: https://caomei.debai.com # 访问域名；库内存 key，读时再拼域名/签名
+  access-key: aIVqHJJg5vLcDvm0tITYpvJzbyduH6mDqLMdezmL
+  secret-key: aVQRmkTTjALfOXxrVIGLwzA5ukVYHEgLUNeX40hq
+  bucket: strawberryplaylets
+  domain: https://cn.yingchuanmedia.com # 访问域名；库内存 key，读时再拼域名/签名
   private-enabled: true           # 空间改为私有后设为 true
   url-expire-seconds: 3600         # 封面等签名有效期（秒）
   video-expire-seconds: 7200       #
   pm3u8-expires-seconds: 43200     # pm3u8 为 ts 分片批量授权的有效期（秒）
-  upload-token-expire-seconds: 3600 # 前端直传 UploadToken 有效期
   upload-url: https://upload-z2.qiniup.com # 前端直传入口
-
 #极光推送
 jpush:
   app_key: 24757b7ef620adc87a005d33

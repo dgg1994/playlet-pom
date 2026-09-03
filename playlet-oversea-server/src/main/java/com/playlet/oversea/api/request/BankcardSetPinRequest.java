@@ -1,0 +1,25 @@
+package com.playlet.oversea.api.request;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
+
+/**
+ * 设置银行卡 Pin 入参。
+ */
+@Data
+@ApiModel(value = "设置Pin", description = "POST /api/bankcard/setPin")
+public class BankcardSetPinRequest {
+
+	@ApiModelProperty(value = "用户银行卡id", required = true)
+	private Long userBankcardId;
+
+	// 仅接收、不回显；出站调三方时在 ThirdService 单独组装 body
+	@ApiModelProperty(value = "pin码", required = true)
+	@JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+	private String pin;
+
+	@ApiModelProperty(value = "支付密码（6 位数字；须已绑定）", required = true)
+	private String payPassword;
+}

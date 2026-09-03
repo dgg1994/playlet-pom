@@ -21,6 +21,7 @@ import com.playlet.oversea.service.CreatorAuthService;
 import com.playlet.oversea.service.MediaUrlService;
 import com.playlet.oversea.service.support.CreatorOnePayBindOps;
 import com.playlet.oversea.service.support.OnePayBindService;
+import com.playlet.oversea.service.third.WalletUserService;
 import com.playlet.oversea.utils.*;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -66,6 +67,8 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
     private OnePayBindService onePayBindService;
     @Autowired
     private CreatorOnePayBindOps creatorOnePayBindOps;
+    @Autowired
+    private WalletUserService walletUserService;
 
     @Override
     public ResponseBase sendEmailCode(@RequestParam("userAccount") String userAccount,
@@ -149,6 +152,12 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         try {
             creatorAccountDao.insert(account);
             creatorProfileDao.insert(buildProfile(account.getId(), query, now));
+            // 作家注册后开通钱包三方用户
+            walletUserService.registerOnSignUp(WithdrawUserTypeEnums.CREATOR.getCode(), account.getId(),
+                    email, account.getMobilePrefix(), account.getMobileNumber());
+        } catch (BaseException e) {
+            log.error("creator wallet register failed email={}", maskEmail(email), e);
+            throw e;
         } catch (Exception e) {
             log.error("creator signUp failed email={}", maskEmail(email), e);
             throw new BaseException(I18nUtil.getMessage("base_error"), e);
@@ -445,6 +454,9 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
             resp.setIdCardFront(mediaUrlService.sign(profile.getIdCardFront()));
             resp.setIdCardBack(mediaUrlService.sign(profile.getIdCardBack()));
         }
+        // 钱包概要并入 findInfo，未开通则为 null
+        resp.setWalletInfo(walletUserService.getInfoOrNull(
+                WithdrawUserTypeEnums.CREATOR.getCode(), account.getId()));
         return resp;
     }
 

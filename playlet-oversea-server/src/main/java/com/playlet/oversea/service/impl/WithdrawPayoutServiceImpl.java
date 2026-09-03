@@ -1,7 +1,5 @@
 package com.playlet.oversea.service.impl;
 
-import com.playlet.oversea.api.request.OnePayWithdrawPayoutRequest;
-import com.playlet.oversea.config.OnePayProperties;
 import com.playlet.oversea.dao.welfare.UserWithdrawOrderDao;
 import com.playlet.oversea.entity.welfare.UserWithdrawOrderEntity;
 import com.playlet.oversea.enums.WithdrawOrderStatusEnums;
@@ -9,21 +7,19 @@ import com.playlet.oversea.exception.BaseException;
 import com.playlet.oversea.service.WithdrawPayoutService;
 import com.playlet.oversea.service.support.WithdrawWalletHandler;
 import com.playlet.oversea.service.support.WithdrawWalletHandlerRegistry;
+import com.playlet.oversea.service.support.WithdrawWalletRechargeSupport;
 import com.playlet.oversea.utils.StringUtils;
 import com.playlet.oversea.utils.TransactionUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 
 /**
- * OnePay 打款：提交后只冻结；确认到账再解冻并扣减。按订单 user_type 路由 C 端 / 作家钱包。
+ * U 卡提现打款：提交后只冻结；Webhook 确认充值结果后再解冻并扣减。
  */
 @Slf4j
 @Service
@@ -37,9 +33,7 @@ public class WithdrawPayoutServiceImpl implements WithdrawPayoutService {
 	@Autowired
 	private WithdrawWalletHandlerRegistry walletHandlerRegistry;
 	@Autowired
-	private RestTemplate restTemplate;
-	@Autowired
-	private OnePayProperties onePayProperties;
+	private WithdrawWalletRechargeSupport withdrawWalletRechargeSupport;
 
 	@Lazy
 	@Autowired
@@ -59,23 +53,19 @@ public class WithdrawPayoutServiceImpl implements WithdrawPayoutService {
 			if (order == null) {
 				return;
 			}
-			if (StringUtils.isEmpty(onePayProperties.getWithdrawUrl())) {
-				if (mockSuccess) {
-					self.confirmSuccess(order.getOrderNo(), "MOCK_" + order.getOrderNo(), null);
-				} else {
-					self.failAndUnfreeze(order.getOrderNo(), "mock payout failed");
-				}
+			if (mockSuccess) {
+				self.confirmSuccess(order.getOrderNo(), "MOCK_" + order.getOrderNo(), null);
 				return;
 			}
-			if (!callOnePay(order)) {
-				self.failAndUnfreeze(order.getOrderNo(), "onepay reject");
+			if (!withdrawWalletRechargeSupport.submitPayout(order)) {
+				self.failAndUnfreeze(order.getOrderNo(), "wallet recharge reject");
 			}
 		} catch (Exception e) {
 			log.error("withdraw payout failed orderId={}", orderId, e);
 			UserWithdrawOrderEntity order = userWithdrawOrderDao.selectById(orderId);
 			if (order != null && !StringUtils.isEmpty(order.getOrderNo())) {
 				try {
-					self.failAndUnfreeze(order.getOrderNo(), "onepay error");
+					self.failAndUnfreeze(order.getOrderNo(), "wallet payout error");
 				} catch (Exception ex) {
 					log.error("withdraw payout compensate failed orderId={}", orderId, ex);
 				}
@@ -108,7 +98,7 @@ public class WithdrawPayoutServiceImpl implements WithdrawPayoutService {
 		return moved > 0;
 	}
 
-	/** OnePay 确认到账：解冻并扣减金币 */
+	/** 充值确认到账：解冻并扣减金币 */
 	@Transactional(rollbackFor = Exception.class)
 	public void confirmSuccess(String orderNo, String thirdOrderNo, String failReason) {
 		UserWithdrawOrderEntity order = loadPayingOrPending(orderNo);
@@ -138,7 +128,7 @@ public class WithdrawPayoutServiceImpl implements WithdrawPayoutService {
 				orderNo, order.getUserType(), order.getUid(), amt);
 	}
 
-	/** OnePay 失败：只解冻，不扣 coin_balance */
+	/** 打款失败：只解冻，不扣 coin_balance */
 	@Transactional(rollbackFor = Exception.class)
 	public void failAndUnfreeze(String orderNo, String failReason) {
 		UserWithdrawOrderEntity order = loadPayingOrPending(orderNo);
@@ -185,29 +175,6 @@ public class WithdrawPayoutServiceImpl implements WithdrawPayoutService {
 			return null;
 		}
 		return order;
-	}
-
-	private boolean callOnePay(UserWithdrawOrderEntity order) {
-		OnePayWithdrawPayoutRequest req = new OnePayWithdrawPayoutRequest();
-		req.setOrderNo(order.getOrderNo());
-		req.setOnePayAccount(order.getOnepayAccount());
-		req.setOnePayOpenId(order.getOnepayOpenId());
-		req.setPoints(nvlPoints(order.getPointsAmt()));
-		try {
-			log.info("onepay withdraw request orderNo={} userType={} uid={} points={}",
-					order.getOrderNo(), order.getUserType(), order.getUid(), req.getPoints());
-			ResponseEntity<String> result = restTemplate.postForEntity(
-					onePayProperties.getWithdrawUrl(), req, String.class);
-			if (result.getStatusCode() != HttpStatus.OK) {
-				log.warn("onepay withdraw rejected orderNo={} status={}",
-						order.getOrderNo(), result.getStatusCode());
-				return false;
-			}
-			return true;
-		} catch (Exception e) {
-			log.error("onepay withdraw http failed orderNo={}", order.getOrderNo(), e);
-			return false;
-		}
 	}
 
 	private static int nvlPoints(Integer points) {

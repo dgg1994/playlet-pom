@@ -39,8 +39,6 @@ public class AppWithdrawWalletHandler implements WithdrawWalletHandler {
 		}
 		snap.setCoinBalance(nvl(account.getCoinBalance()));
 		snap.setFrozenCoinBalance(nvl(account.getFrozenCoinBalance()));
-		snap.setOnepayBindStatus(account.getOnepayBindStatus());
-		snap.setOnepayAccount(account.getOnepayAccount());
 		return snap;
 	}
 
@@ -57,12 +55,6 @@ public class AppWithdrawWalletHandler implements WithdrawWalletHandler {
 	@Override
 	public int unfreeze(Integer uid, int amt) {
 		return appAccountDao.unfreezeCoinBalance(uid, amt);
-	}
-
-	@Override
-	public String findOpenId(Integer uid) {
-		AppAccountEntity account = appAccountDao.findByUid(uid);
-		return account == null ? null : account.getOnepayOpenId();
 	}
 
 	@Override
@@ -108,15 +100,16 @@ public class AppWithdrawWalletHandler implements WithdrawWalletHandler {
 			return;
 		}
 		AppAccountEntity account = appAccountDao.findByUid(uid);
-		long before = nvl(account == null ? null : account.getCoinBalance());
-		long frozen = nvl(account == null ? null : account.getFrozenCoinBalance());
+		long after = nvl(account == null ? null : account.getCoinBalance());
+		long frozenAfter = nvl(account == null ? null : account.getFrozenCoinBalance());
 		UserCoinLedgerEntity ledger = new UserCoinLedgerEntity();
 		ledger.setUid(uid);
 		ledger.setChangeAmt(-amt);
-		ledger.setBalanceBefore(before);
-		ledger.setBalanceAfter(before - amt);
-		ledger.setFrozenBefore(frozen);
-		ledger.setFrozenAfter(Math.max(0L, frozen - amt));
+		// settle 已扣减 coin_balance，反推扣减前余额
+		ledger.setBalanceAfter(after);
+		ledger.setBalanceBefore(after + amt);
+		ledger.setFrozenAfter(frozenAfter);
+		ledger.setFrozenBefore(frozenAfter);
 		ledger.setBizType(bizType);
 		ledger.setBizId(bizId);
 		ledger.setTaskCode("");

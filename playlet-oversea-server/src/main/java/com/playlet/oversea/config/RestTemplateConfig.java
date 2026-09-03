@@ -9,17 +9,24 @@ import org.springframework.web.client.RestTemplate;
 import java.time.Duration;
 
 /**
- * HTTP 客户端：超时取自 onepay.* yml。
+ * HTTP 客户端：超时优先取 third-party.*（U 卡）；并启用 OnePay / USDT 配置。
  */
 @Configuration
-@EnableConfigurationProperties(OnePayProperties.class)
+@EnableConfigurationProperties({ThirdPartyProperties.class, OnePayProperties.class, UsdtTopinProperties.class})
 public class RestTemplateConfig {
 
+	private static final int DEFAULT_CONNECT_TIMEOUT_MS = 10000;
+	private static final int DEFAULT_READ_TIMEOUT_MS = 60000;
+
 	@Bean
-	public RestTemplate restTemplate(RestTemplateBuilder builder, OnePayProperties onePayProperties) {
+	public RestTemplate restTemplate(RestTemplateBuilder builder, ThirdPartyProperties thirdPartyProperties) {
+		int connectTimeout = thirdPartyProperties.getConnectTimeoutMs() == null
+				? DEFAULT_CONNECT_TIMEOUT_MS : thirdPartyProperties.getConnectTimeoutMs();
+		int readTimeout = thirdPartyProperties.getReadTimeoutMs() == null
+				? DEFAULT_READ_TIMEOUT_MS : thirdPartyProperties.getReadTimeoutMs();
 		return builder
-				.setConnectTimeout(Duration.ofMillis(onePayProperties.getConnectTimeoutMs()))
-				.setReadTimeout(Duration.ofMillis(onePayProperties.getReadTimeoutMs()))
+				.setConnectTimeout(Duration.ofMillis(connectTimeout))
+				.setReadTimeout(Duration.ofMillis(readTimeout))
 				.build();
 	}
 }

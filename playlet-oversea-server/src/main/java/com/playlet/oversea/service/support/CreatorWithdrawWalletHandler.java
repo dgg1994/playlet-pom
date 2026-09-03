@@ -2,10 +2,8 @@ package com.playlet.oversea.service.support;
 
 import com.playlet.oversea.dao.creator.CreatorAccountDao;
 import com.playlet.oversea.dao.creator.CreatorCoinLedgerDao;
-import com.playlet.oversea.dao.creator.CreatorProfileDao;
 import com.playlet.oversea.entity.creator.CreatorAccountEntity;
 import com.playlet.oversea.entity.creator.CreatorCoinLedgerEntity;
-import com.playlet.oversea.entity.creator.CreatorProfileEntity;
 import com.playlet.oversea.enums.CoinBizTypeEnums;
 import com.playlet.oversea.enums.WithdrawUserTypeEnums;
 import com.playlet.oversea.exception.BaseException;
@@ -16,7 +14,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 
 /**
- * 作家提现：扣 creator_account，记 creator_coin_ledger，OnePay 在 creator_profile。
+ * 作家提现：扣 creator_account，记 creator_coin_ledger。
  */
 @Slf4j
 @Component
@@ -24,8 +22,6 @@ public class CreatorWithdrawWalletHandler implements WithdrawWalletHandler {
 
 	@Autowired
 	private CreatorAccountDao creatorAccountDao;
-	@Autowired
-	private CreatorProfileDao creatorProfileDao;
 	@Autowired
 	private CreatorCoinLedgerDao creatorCoinLedgerDao;
 
@@ -43,11 +39,6 @@ public class CreatorWithdrawWalletHandler implements WithdrawWalletHandler {
 		}
 		snap.setCoinBalance(nvl(account.getCoinBalance()));
 		snap.setFrozenCoinBalance(nvl(account.getFrozenCoinBalance()));
-		CreatorProfileEntity profile = creatorProfileDao.findByCreatorId(uid);
-		if (profile != null) {
-			snap.setOnepayBindStatus(profile.getOnepayBindStatus());
-			snap.setOnepayAccount(profile.getOnepayAccount());
-		}
 		return snap;
 	}
 
@@ -64,12 +55,6 @@ public class CreatorWithdrawWalletHandler implements WithdrawWalletHandler {
 	@Override
 	public int unfreeze(Integer uid, int amt) {
 		return creatorAccountDao.unfreezeCoinBalance(uid, amt);
-	}
-
-	@Override
-	public String findOpenId(Integer uid) {
-		CreatorProfileEntity profile = creatorProfileDao.findByCreatorId(uid);
-		return profile == null ? null : profile.getOnepayOpenId();
 	}
 
 	@Override
@@ -110,15 +95,15 @@ public class CreatorWithdrawWalletHandler implements WithdrawWalletHandler {
 			return;
 		}
 		CreatorAccountEntity account = creatorAccountDao.selectById(uid);
-		long before = account == null || account.getCoinBalance() == null ? 0L : account.getCoinBalance();
-		long frozen = account == null || account.getFrozenCoinBalance() == null ? 0L : account.getFrozenCoinBalance();
+		long after = account == null || account.getCoinBalance() == null ? 0L : account.getCoinBalance();
+		long frozenAfter = account == null || account.getFrozenCoinBalance() == null ? 0L : account.getFrozenCoinBalance();
 		CreatorCoinLedgerEntity ledger = new CreatorCoinLedgerEntity();
 		ledger.setCreatorId(uid);
 		ledger.setChangeAmt((long) -amt);
-		ledger.setBalanceBefore(before);
-		ledger.setBalanceAfter(before - amt);
-		ledger.setFrozenBefore(frozen);
-		ledger.setFrozenAfter(Math.max(0L, frozen - amt));
+		ledger.setBalanceAfter(after);
+		ledger.setBalanceBefore(after + amt);
+		ledger.setFrozenBefore(frozenAfter);
+		ledger.setFrozenAfter(frozenAfter);
 		ledger.setBizType(bizType);
 		ledger.setBizId(bizId);
 		ledger.setRemark("提现扣减");

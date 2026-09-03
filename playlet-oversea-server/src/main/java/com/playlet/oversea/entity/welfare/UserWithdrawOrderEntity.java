@@ -43,13 +43,21 @@ public class UserWithdrawOrderEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "network", value = "网络", dataType = "String")
 	private String network;
 
-	@TableField("onepay_account")
-	@ApiModelProperty(name = "onepayAccount", value = "OnePay 账号", dataType = "String")
-	private String onepayAccount;
+	@TableField("gateway")
+	@ApiModelProperty(name = "gateway", value = "打款网关 WALLET", dataType = "String")
+	private String gateway;
 
-	@TableField("onepay_open_id")
-	@ApiModelProperty(name = "onepayOpenId", value = "下单时 OnePay openId 快照", dataType = "String")
-	private String onepayOpenId;
+	@TableField("target_bankcard_id")
+	@ApiModelProperty(name = "targetBankcardId", value = "本地 wallet_bankcard.id", dataType = "Long")
+	private Long targetBankcardId;
+
+	@TableField("target_user_bankcard_id")
+	@ApiModelProperty(name = "targetUserBankcardId", value = "对方 userBankcardId 快照", dataType = "Long")
+	private Long targetUserBankcardId;
+
+	@TableField("request_order_id")
+	@ApiModelProperty(name = "requestOrderId", value = "卡充值幂等单号", dataType = "String")
+	private String requestOrderId;
 
 	@TableField("points_amt")
 	@ApiModelProperty(name = "pointsAmt", value = "扣减积分", dataType = "Integer")
@@ -76,7 +84,7 @@ public class UserWithdrawOrderEntity extends PageQueryHelperEntity {
 	private Integer status;
 
 	@TableField("third_order_no")
-	@ApiModelProperty(name = "thirdOrderNo", value = "OnePay 三方流水号", dataType = "String")
+	@ApiModelProperty(name = "thirdOrderNo", value = "三方流水号", dataType = "String")
 	private String thirdOrderNo;
 
 	@TableField("fail_reason")

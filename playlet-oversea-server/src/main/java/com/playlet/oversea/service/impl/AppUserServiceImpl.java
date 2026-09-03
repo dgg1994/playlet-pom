@@ -29,6 +29,7 @@ import com.playlet.oversea.service.support.AppOnePayBindOps;
 import com.playlet.oversea.service.support.OnePayBindService;
 import com.playlet.oversea.service.support.UserActiveStatService;
 import com.playlet.oversea.service.support.UserOnlineHeartbeatService;
+import com.playlet.oversea.service.third.WalletUserService;
 import com.playlet.oversea.utils.*;
 import com.playlet.oversea.utils.oidc.OidcIdTokenPayload;
 import com.playlet.oversea.utils.oidc.OidcTokenVerifier;
@@ -97,6 +98,9 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	@Autowired
 	private UserActiveStatService userActiveStatService;
 
+	@Autowired
+	private WalletUserService walletUserService;
+
 	@SuppressWarnings("deprecation")
 	@Override
 	public ResponseBase signUp(@RequestBody AppAccountEntity entity) {
@@ -135,6 +139,9 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		account.setSetTime(new Date());
 		account.setGmtModified(new Date());
 		appAccountDao.insert(account);
+		// 本地账号落库后开通钱包三方用户
+		walletUserService.registerOnSignUp(WithdrawUserTypeEnums.APP.getCode(), account.getId(),
+				account.getUserEmail(), account.getMobilePrefix(), account.getMobileNumber());
 		upsertPushBind(account.getId(), account.getRegistrationId(), account.getDeviceName());
 		String token = Jwts.builder()
 				// 设置主题
@@ -359,6 +366,9 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			//entity.setInvitationCode(RandomSuffixInviteCodeUtil.generateUniqueCode(Long.parseLong(entity.getId().toString()), 4, 6));
 			GenericityUtil.setDate(entity);
 			appAccountDao.insert(entity);
+			// 一键登录新建账号同样开通钱包
+			walletUserService.registerOnSignUp(WithdrawUserTypeEnums.APP.getCode(), entity.getId(),
+					entity.getUserEmail(), entity.getMobilePrefix(), entity.getMobileNumber());
 		} catch (Exception e) {
 			log.error("service error", e);
 			throw new RuntimeException(e);
@@ -394,6 +404,9 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			}
 			String avatar = entity.getAvatar();
 			entity.setAvatar(mediaUrlService.sign(avatar));
+			// C 端钱包概要并入 findToken，未开通则为 null
+			entity.setWalletInfo(walletUserService.getInfoOrNull(
+					WithdrawUserTypeEnums.APP.getCode(), entity.getId()));
 			return setResultSuccess(entity);
 		} catch (Exception e) {
 			log.error("service error", e);

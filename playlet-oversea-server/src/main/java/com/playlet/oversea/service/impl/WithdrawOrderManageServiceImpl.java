@@ -78,7 +78,10 @@ public class WithdrawOrderManageServiceImpl implements WithdrawOrderManageServic
 
 	/** 支付方式展示文案 + 状态文案。 */
 	private void fillDisplayFields(WithdrawOrderAdminItemEntity item) {
-		item.setPayMethod(resolvePayMethod(item.getAssetCode()));
+		item.setPayMethod(resolvePayMethod(item.getAssetCode(), item.getGateway()));
+		if (WithdrawConstants.GATEWAY_BALANCE.equalsIgnoreCase(item.getGateway())) {
+			item.setPayAccount(WithdrawConstants.PAYOUT_TARGET_BALANCE_LABEL);
+		}
 		item.setStatusLabel(WithdrawOrderStatusEnums.getLableByCode(item.getStatus()));
 		if (item.getWithdrawCoin() == null) {
 			item.setWithdrawCoin(0);
@@ -88,12 +91,15 @@ public class WithdrawOrderManageServiceImpl implements WithdrawOrderManageServic
 		}
 	}
 
-	private static String resolvePayMethod(String assetCode) {
-		if (StringUtils.isEmpty(assetCode)) {
-			return WithdrawConstants.PAY_METHOD_ONEPAY_LABEL;
+	private static String resolvePayMethod(String assetCode, String gateway) {
+		if (WithdrawConstants.GATEWAY_BALANCE.equalsIgnoreCase(gateway)) {
+			return WithdrawConstants.PAY_METHOD_BALANCE_LABEL;
 		}
-		if (WithdrawConstants.ASSET_ONEPAY.equalsIgnoreCase(assetCode)) {
-			return WithdrawConstants.PAY_METHOD_ONEPAY_LABEL;
+		if (StringUtils.isEmpty(assetCode)) {
+			return WithdrawConstants.PAY_METHOD_WALLET_LABEL;
+		}
+		if (WithdrawConstants.ASSET_WALLET.equalsIgnoreCase(assetCode)) {
+			return WithdrawConstants.PAY_METHOD_WALLET_LABEL;
 		}
 		return assetCode;
 	}
