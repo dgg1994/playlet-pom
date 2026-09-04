@@ -89,6 +89,7 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
                 .antMatchers("/wallet/topinUsdtNotify").permitAll()
                 .antMatchers("/creator/wallet/topinUsdtAddress").permitAll()
                 .antMatchers("/wallet/withdraw/home").permitAll()
+                .antMatchers("/sysNavigateConfig/findList").permitAll()
                 .anyRequest().authenticated()
                 .and()
                 .logout()

@@ -4,6 +4,7 @@ import com.playlet.internal.api.response.WalletCardAdminResp;
 import com.playlet.internal.dao.wallet.WalletCardLabelDao;
 import com.playlet.internal.dao.wallet.WalletCardSynopsisDao;
 import com.playlet.internal.entity.wallet.WalletCardProductEntity;
+import com.playlet.internal.service.MediaUrlService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +20,8 @@ public class WalletAdminCardMapper {
 	private WalletCardLabelDao walletCardLabelDao;
 	@Autowired
 	private WalletCardSynopsisDao walletCardSynopsisDao;
+	@Autowired
+	private MediaUrlService mediaUrlService;
 
 	public WalletCardAdminResp toAdminResp(WalletCardProductEntity row) {
 		if (row == null) {
@@ -29,8 +32,9 @@ public class WalletAdminCardMapper {
 		resp.setUuid(row.getProductUuid());
 		resp.setTitle(row.getCardTitle());
 		resp.setBankCardNature(row.getBankcardNature());
-		resp.setImg(row.getCardImg());
-		resp.setListImg(row.getCardListImg());
+		// 库内多为七牛 key，列表出参签名为可访问 URL
+		resp.setImg(mediaUrlService.sign(row.getCardImg()));
+		resp.setListImg(mediaUrlService.sign(row.getCardListImg()));
 		resp.setOpenCardCost(row.getOpenCardCost());
 		resp.setPreSaveCost(row.getPreSaveCost());
 		resp.setRechargeFee(row.getRechargeFee());
