@@ -1125,7 +1125,7 @@ public class WalletUserService extends BaseApiService {
 	}
 
 	/**
-	 * 银行卡充值：amount 为钱包扣款总额（含手续费），卡到账 = amount - 手续费。
+	 * 银行卡充值：amount 为实际到账金额，handlingFees 为手续费，钱包扣款 = amount + handlingFees。
 	 */
 	@Transactional(rollbackFor = Exception.class)
 	public synchronized ResponseBase rechargeCard(Integer userType, Integer localUid, BankcardRechargeRequest query) {
@@ -1148,8 +1148,9 @@ public class WalletUserService extends BaseApiService {
 				return payPwdResult;
 			}
 		}
-		BigDecimal totalAmount = resolveTopUpTotalAmount(query);
-		if (totalAmount.compareTo(BigDecimal.ZERO) <= 0) {
+		// amount = 到账金额
+		BigDecimal targetAmount = resolveTopUpCardAmount(query);
+		if (targetAmount.compareTo(BigDecimal.ZERO) <= 0) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
 		int payType = query.getPayType() == null ? WalletConstants.TOPUP_TYPE_WALLET : query.getPayType();
@@ -1179,15 +1180,13 @@ public class WalletUserService extends BaseApiService {
 		if (product == null) {
 			return setResultError(I18nUtil.getMessage("bank_card_null"));
 		}
-		BigDecimal handlingFees = resolveTopUpHandlingFeesFromTotal(totalAmount, query.getHandlingFees(), product);
-		BigDecimal targetAmount = totalAmount.subtract(handlingFees).setScale(2, RoundingMode.HALF_UP);
-		if (targetAmount.compareTo(BigDecimal.ZERO) <= 0) {
-			return setResultError(I18nUtil.getMessage("base_error"));
-		}
+		BigDecimal handlingFees = resolveTopUpHandlingFeesFromCardAmount(targetAmount, query.getHandlingFees(), product);
+		// 钱包实际扣款 = 到账 + 手续费
+		BigDecimal totalAmount = targetAmount.add(handlingFees).setScale(2, RoundingMode.HALF_UP);
 		query.setHandlingFees(handlingFees);
 		query.setTargetAmount(targetAmount);
-		query.setAmount(targetAmount.intValue());
-		ResponseBase limitCheck = validateTopUpLimits(product, totalAmount);
+		query.setAmount(targetAmount);
+		ResponseBase limitCheck = validateTopUpLimits(product, targetAmount);
 		if (!Constants.HTTP_RES_CODE_200.equals(limitCheck.getCode())) {
 			return limitCheck;
 		}
@@ -1233,50 +1232,45 @@ public class WalletUserService extends BaseApiService {
 		BigDecimal availableAfter = refreshedAccount == null ? null : refreshedAccount.getAvailableBalance();
 		log.info("wallet card topUp submitted walletUserId={} userBankcardId={} requestOrderId={} totalAmount={} targetAmount={} handlingFees={}",
 				user.getId(), query.getUserBankcardId(), requestOrderId, totalAmount, targetAmount, handlingFees);
-		return setResultSuccess(buildCardRechargeResp(query, totalAmount, availableAfter, false),
+		return setResultSuccess(buildCardRechargeResp(query, availableAfter, false),
 				I18nUtil.getMessage("topUp_result"));
 	}
 
-	/** 解析钱包扣款总额（含手续费） */
-	private static BigDecimal resolveTopUpTotalAmount(BankcardRechargeRequest query) {
+	/** 解析卡到账金额（入参 amount） */
+	private static BigDecimal resolveTopUpCardAmount(BankcardRechargeRequest query) {
 		if (query.getAmount() != null) {
-			return BigDecimal.valueOf(query.getAmount()).setScale(2, RoundingMode.HALF_UP);
+			return query.getAmount().setScale(2, RoundingMode.HALF_UP);
 		}
 		return BigDecimal.ZERO;
 	}
 
 	/**
-	 * 手续费：客户端传入优先；否则按卡产品费率自扣款总额反算（fee = total - total/(1+rate)）。
+	 * 手续费：客户端传入优先；否则按卡产品费率×到账金额（fee = amount × rate）。
 	 */
-	private static BigDecimal resolveTopUpHandlingFeesFromTotal(BigDecimal totalAmount, BigDecimal clientFees,
+	private static BigDecimal resolveTopUpHandlingFeesFromCardAmount(BigDecimal cardAmount, BigDecimal clientFees,
 			WalletCardProductEntity product) {
 		if (clientFees != null) {
-			BigDecimal fee = clientFees.max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
-			if (fee.compareTo(totalAmount) >= 0) {
-				return totalAmount;
-			}
-			return fee;
+			return clientFees.max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
 		}
-		if (product == null || product.getRechargeFee() == null || totalAmount == null) {
+		if (product == null || product.getRechargeFee() == null || cardAmount == null) {
 			return BigDecimal.ZERO;
 		}
 		BigDecimal rate = product.getRechargeFee();
 		if (rate.compareTo(BigDecimal.ZERO) <= 0) {
 			return BigDecimal.ZERO;
 		}
-		BigDecimal target = totalAmount.divide(BigDecimal.ONE.add(rate), 2, RoundingMode.HALF_UP);
-		return totalAmount.subtract(target).setScale(2, RoundingMode.HALF_UP);
+		return cardAmount.multiply(rate).setScale(2, RoundingMode.HALF_UP);
 	}
 
-	/** 充值上下限：按钱包扣款总额校验 */
-	private static ResponseBase validateTopUpLimits(WalletCardProductEntity product, BigDecimal totalAmount) {
+	/** 充值上下限：按实际到账金额校验 */
+	private static ResponseBase validateTopUpLimits(WalletCardProductEntity product, BigDecimal cardAmount) {
 		Integer minLimit = product.getRechargeMinLimit();
-		if (minLimit != null && minLimit > 0 && totalAmount.compareTo(BigDecimal.valueOf(minLimit)) < 0) {
+		if (minLimit != null && minLimit > 0 && cardAmount.compareTo(BigDecimal.valueOf(minLimit)) < 0) {
 			return setResultError(I18nUtil.getMessage("topup_money_min"));
 		}
 		BigDecimal maxLimit = product.getRechargeMaxLimit();
 		if (maxLimit != null && maxLimit.compareTo(BigDecimal.ZERO) > 0
-				&& totalAmount.compareTo(maxLimit) > 0) {
+				&& cardAmount.compareTo(maxLimit) > 0) {
 			return setResultError(I18nUtil.getMessage("topup_money_max"));
 		}
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
@@ -1317,10 +1311,11 @@ public class WalletUserService extends BaseApiService {
 	}
 
 	private static WalletCardRechargeResp buildCardRechargeResp(BankcardRechargeRequest query,
-			BigDecimal totalAmount, BigDecimal availableBalance, boolean idempotent) {
+			BigDecimal availableBalance, boolean idempotent) {
 		WalletCardRechargeResp resp = new WalletCardRechargeResp();
 		resp.setRequestOrderId(query.getRequestOrderId());
-		resp.setAmount(totalAmount);
+		// amount / targetAmount 均为到账金额；钱包扣款 = amount + handlingFees
+		resp.setAmount(query.getTargetAmount());
 		resp.setTargetAmount(query.getTargetAmount());
 		resp.setHandlingFees(query.getHandlingFees());
 		resp.setPayType(query.getPayType());
@@ -1335,9 +1330,9 @@ public class WalletUserService extends BaseApiService {
 		resp.setRequestOrderId(txn.getRequestOrderId());
 		BigDecimal target = txn.getLocalCurrencyAmt() == null ? BigDecimal.ZERO : txn.getLocalCurrencyAmt();
 		BigDecimal fee = txn.getHandlingFees() == null ? BigDecimal.ZERO : txn.getHandlingFees();
+		resp.setAmount(target);
 		resp.setTargetAmount(target);
 		resp.setHandlingFees(fee);
-		resp.setAmount(target.add(fee));
 		resp.setPayType(txn.getPayType());
 		resp.setAvailableBalance(availableBalance);
 		resp.setIdempotent(true);

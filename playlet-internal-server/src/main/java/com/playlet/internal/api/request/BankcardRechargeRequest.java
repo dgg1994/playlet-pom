@@ -16,13 +16,13 @@ public class BankcardRechargeRequest {
 	@ApiModelProperty(value = "银行卡id", required = true)
 	private Long userBankcardId;
 
-	@ApiModelProperty(value = "钱包扣款总额（含手续费）；实际到卡金额 = amount - handlingFees", required = true)
+	@ApiModelProperty(value = "实际到账金额；钱包扣款 = amount + handlingFees", required = true)
 	private BigDecimal amount;
 
-	@ApiModelProperty(value = "卡到账金额（服务端根据 amount 与手续费计算，客户端无需传）")
+	@ApiModelProperty(value = "卡到账金额（与 amount 一致；服务端回填，客户端无需传）")
 	private BigDecimal targetAmount;
 
-	@ApiModelProperty(value = "手续费；不传则按卡产品 rechargeFee 费率计算")
+	@ApiModelProperty(value = "手续费；不传则按卡产品 rechargeFee×到账金额计算；钱包扣款 = amount + handlingFees")
 	private BigDecimal handlingFees;
 
 	@ApiModelProperty(value = "充值方式：1 钱包余额 2 银行卡；默认 1")

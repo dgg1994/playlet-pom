@@ -69,10 +69,6 @@ public class WalletOpenCardSettlementService {
 		if (preSave.compareTo(BigDecimal.ZERO) <= 0) {
 			return;
 		}
-		int amount = preSave.intValue();
-		if (amount <= 0) {
-			return;
-		}
 		String requestOrderId = buildFirstTopUpOrderId(apply);
 		WalletCardTransactionEntity existed = walletCardTransactionDao.findByRequestOrderId(requestOrderId);
 		if (existed != null) {
@@ -88,7 +84,7 @@ public class WalletOpenCardSettlementService {
 		}
 		BankcardRechargeRequest req = new BankcardRechargeRequest();
 		req.setUserBankcardId(card.getUserBankcardId());
-		req.setAmount(amount);
+		req.setAmount(preSave);
 		req.setRequestOrderId(requestOrderId);
 		try {
 			thirdService.rechargeBankcard(user.getWalletUid(), req);
@@ -102,9 +98,9 @@ public class WalletOpenCardSettlementService {
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 		insertFirstTopUpTransaction(user, card, req);
-		upsertFirstTopUpWalletLog(user, apply, card, req, amount);
+		upsertFirstTopUpWalletLog(user, apply, card, req, preSave);
 		log.info("wallet first topup submitted applyId={} walletUid={} userBankcardId={} amount={}",
-				apply.getId(), user.getWalletUid(), card.getUserBankcardId(), amount);
+				apply.getId(), user.getWalletUid(), card.getUserBankcardId(), preSave);
 	}
 
 	/** 虚拟卡开卡成功后：首充 */
@@ -335,7 +331,7 @@ public class WalletOpenCardSettlementService {
 	private void insertFirstTopUpTransaction(WalletUserEntity user, WalletBankcardEntity card,
 			BankcardRechargeRequest query) {
 		Date now = new Date();
-		BigDecimal amount = BigDecimal.valueOf(query.getAmount());
+		BigDecimal amount = query.getAmount();
 		String currency = StringUtils.isEmpty(card.getCurrency())
 				? WalletConstants.DEFAULT_CURRENCY : card.getCurrency();
 		WalletCardTransactionEntity txn = new WalletCardTransactionEntity();
@@ -372,12 +368,12 @@ public class WalletOpenCardSettlementService {
 	 * 开卡首充账变：优先更新申请时「开卡冻结」记录为「开卡」，否则新增（对齐 onetoken firstTopUp）。
 	 */
 	private void upsertFirstTopUpWalletLog(WalletUserEntity user, WalletCardApplyEntity apply,
-			WalletBankcardEntity card, BankcardRechargeRequest query, int amount) {
+			WalletBankcardEntity card, BankcardRechargeRequest query, BigDecimal amount) {
 		if (user == null || apply == null || query == null) {
 			return;
 		}
 		Date now = new Date();
-		BigDecimal realMoney = BigDecimal.valueOf(amount);
+		BigDecimal realMoney = amount;
 		WalletLogEntity existed = walletLogDao.findByOutOrderNo(String.valueOf(apply.getId()));
 		if (existed != null) {
 			existed.setOrderNo(OrderCodeFactory.getOrderCode(user.getWalletUid()));

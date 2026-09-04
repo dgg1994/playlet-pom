@@ -16,13 +16,13 @@ public class WalletCardRechargeResp {
 	@ApiModelProperty("商户订单号")
 	private String requestOrderId;
 
-	@ApiModelProperty("钱包扣款总额（含手续费）")
+	@ApiModelProperty("实际到账金额；钱包扣款 = amount + handlingFees")
 	private BigDecimal amount;
 
-	@ApiModelProperty("卡到账金额（amount - handlingFees）")
+	@ApiModelProperty("卡到账金额（与 amount 一致）")
 	private BigDecimal targetAmount;
 
-	@ApiModelProperty("手续费")
+	@ApiModelProperty("手续费；钱包扣款 = amount + handlingFees")
 	private BigDecimal handlingFees;
 
 	@ApiModelProperty("充值方式：1 钱包 2 银行卡")
