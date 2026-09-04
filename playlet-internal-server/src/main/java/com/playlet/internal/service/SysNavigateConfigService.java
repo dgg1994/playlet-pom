@@ -12,9 +12,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @Api(value = "导航开启隐藏配置",tags = "导航开启隐藏配置")
 public interface SysNavigateConfigService {
 
-	@PostMapping("/findList")
+	@GetMapping("/findList")
 	@ApiOperation(value = "查询配置", notes = "查询配置", response = ResponseBase.class)
-    ResponseBase findList(SysNavigateConfigEntity configEntity);
+    ResponseBase findList();
 	
 	@PostMapping("/update")
 	@ApiOperation(value = "编辑配置", notes = "编辑配置", response = ResponseBase.class)

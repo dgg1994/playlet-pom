@@ -1,7 +1,6 @@
 package com.playlet.internal.service.support;
 
 import com.playlet.internal.api.response.WalletCardAdminResp;
-import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.dao.wallet.WalletCardLabelDao;
 import com.playlet.internal.dao.wallet.WalletCardSynopsisDao;
 import com.playlet.internal.entity.wallet.WalletCardProductEntity;
@@ -43,20 +42,21 @@ public class WalletAdminCardMapper {
 		resp.setLableList(row.getLabelList());
 		resp.setLableIdList(row.getLabelIdList());
 		resp.setSynopsisData(row.getSynopsisData());
-		if (row.getProductUuid() != null) {
-			List<Integer> synopsisIds = walletCardSynopsisDao.querySynopsisIdsByCardId(row.getProductUuid());
+		if (row.getId() != null) {
+			String cardRef = String.valueOf(row.getId());
+			List<Integer> synopsisIds = walletCardSynopsisDao.querySynopsisIdsByCardId(cardRef);
 			resp.setSynopsisIdList(synopsisIds);
 		}
 		return resp;
 	}
 
 	public void enrichLabelAndSynopsisIds(WalletCardProductEntity row) {
-		if (row == null || row.getProductUuid() == null) {
+		if (row == null || row.getId() == null) {
 			return;
 		}
-		String lang = LanguageContext.getLanguage();
-		List<Integer> labelIds = walletCardLabelDao.queryLabelIdsByCardId(row.getProductUuid());
+		String cardRef = String.valueOf(row.getId());
+		List<Integer> labelIds = walletCardLabelDao.queryLabelIdsByCardId(cardRef);
 		row.setLabelIdList(labelIds);
-		row.setSynopsisIdList(walletCardSynopsisDao.querySynopsisIdsByCardId(row.getProductUuid()));
+		row.setSynopsisIdList(walletCardSynopsisDao.querySynopsisIdsByCardId(cardRef));
 	}
 }

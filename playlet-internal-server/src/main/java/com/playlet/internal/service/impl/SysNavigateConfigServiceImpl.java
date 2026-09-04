@@ -62,9 +62,8 @@ public class SysNavigateConfigServiceImpl extends BaseApiService implements SysN
 	}
 
 	@Override
-	public ResponseBase findList(@RequestBody SysNavigateConfigEntity configEntity) {
-		PageHelper.startPage(configEntity.getPageNumber(), configEntity.getPageSize());
-		List<SysNavigateConfigEntity> list = sysNavigateConfigDao.findList(configEntity);
+	public ResponseBase findList() {
+		List<SysNavigateConfigEntity> list = sysNavigateConfigDao.selectList(null);
 		PageInfo<SysNavigateConfigEntity> info = new PageInfo<>(list);
 		return setResultSuccess(info, I18nUtil.getMessage("base_success"));
 	}

@@ -16,7 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.servlet.http.HttpServletRequest;
 
 /**
- * 管理端卡产品（对齐 onetoken /card/**）。
+ * 管理端卡产品（对齐 onetoken /card/**；关联键统一为产品 id）。
  */
 @RequestMapping("/card")
 @Api(value = "卡产品管理", tags = "卡产品管理")
@@ -36,23 +36,23 @@ public interface CardManageService {
 
 	@PostMapping("/updateImg")
 	@ApiOperation(value = "修改封面图")
-	ResponseBase updateImg(@RequestParam("uuid") String uuid, @RequestParam("file") MultipartFile file);
+	ResponseBase updateImg(@RequestParam("id") Integer id, @RequestParam("file") MultipartFile file);
 
 	@PostMapping("/updateListImg")
 	@ApiOperation(value = "修改列表图")
-	ResponseBase updateListImg(@RequestParam("uuid") String uuid, @RequestParam("file") MultipartFile file);
+	ResponseBase updateListImg(@RequestParam("id") Integer id, @RequestParam("file") MultipartFile file);
 
 	@GetMapping("/copyCard")
 	@ApiOperation(value = "复制卡产品")
-	ResponseBase copyCard(String uuid);
+	ResponseBase copyCard(@RequestParam("id") Integer id);
 
 	@GetMapping("/upState")
 	@ApiOperation(value = "上架/下架")
-	ResponseBase upState(String uuid, Integer stateId);
+	ResponseBase upState(@RequestParam("id") Integer id, @RequestParam("stateId") Integer stateId);
 
 	@GetMapping("/delete")
 	@ApiOperation(value = "删除卡产品")
-	ResponseBase delete(String uuid);
+	ResponseBase delete(@RequestParam("id") Integer id);
 
 	@PostMapping("/topUp")
 	@ApiOperation(value = "管理端卡充值")

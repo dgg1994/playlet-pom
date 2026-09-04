@@ -14,7 +14,10 @@ import java.util.List;
 @ApiModel(value = "管理端卡产品更新", description = "POST /card/update")
 public class WalletCardAdminUpdateRequest {
 
-	@ApiModelProperty("卡产品 uuid（本地 product_uuid）")
+	@ApiModelProperty(value = "三方 card_id / 本地主键", required = true)
+	private Integer id;
+
+	@ApiModelProperty(value = "废弃：请用 id", hidden = true)
 	private String uuid;
 
 	@ApiModelProperty("卡名称")
