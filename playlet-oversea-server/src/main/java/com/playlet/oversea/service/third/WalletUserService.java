@@ -2184,6 +2184,26 @@ public class WalletUserService extends BaseApiService {
 	}
 
 	/**
+	 * 校验支付密码是否与库中一致：匹配返回 true，否则 false（不抛业务错误码）。
+	 */
+	public ResponseBase checkPayPasswordMatch(Integer userType, Integer localUid, String password) {
+		WalletUserEntity user = walletUserDao.findByLocal(userType, localUid);
+		if (user == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		WalletAccountEntity account = walletAccountDao.findByWalletUserId(user.getId());
+		if (account == null) {
+			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
+		}
+		boolean matched = !StringUtils.isEmpty(password)
+				&& !StringUtils.isEmpty(account.getPayPassword())
+				&& PasswordHashUtils.matches(password, account.getPayPassword());
+		log.info("wallet check pay password walletUserId={} localUid={} userType={} matched={}",
+				user.getId(), localUid, userType, matched);
+		return setResultSuccess(matched, I18nUtil.getMessage("base_success"));
+	}
+
+	/**
 	 * 首次绑定支付密码。
 	 */
 	public ResponseBase bindPayPassword(Integer userType, Integer localUid, WalletBindPayPwdRequest query) {

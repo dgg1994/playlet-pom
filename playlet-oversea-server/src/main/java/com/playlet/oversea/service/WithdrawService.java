@@ -47,6 +47,10 @@ public interface WithdrawService {
 	@ApiOperation(value = "绑定支付密码", notes = "首次设置，6位数字；需登录。已设置不可重复绑定。")
 	ResponseBase bindPayPwd(@RequestBody WalletBindPayPwdRequest query, HttpServletRequest request);
 
+	@PostMapping("/user/checkPayPwd")
+	@ApiOperation(value = "校验支付密码", notes = "需登录；与 wallet_account.pay_password 比对，一致返回 true，否则 false")
+	ResponseBase checkPayPwd(@RequestBody WalletCheckPayPwdRequest query, HttpServletRequest request);
+
 	@PostMapping("/kyc/country/list")
 	@ApiOperation(value = "KYC国家列表", notes = "透传三方；name 不填返回全部；需登录")
 	ResponseBase kycCountryList(@RequestBody(required = false) KycCountryListRequest query,

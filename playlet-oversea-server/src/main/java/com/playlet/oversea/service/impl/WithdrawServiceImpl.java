@@ -93,6 +93,16 @@ public class WithdrawServiceImpl extends BaseApiService implements WithdrawServi
 	}
 
 	@Override
+	public ResponseBase checkPayPwd(@RequestBody WalletCheckPayPwdRequest query, HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		String payPassword = query == null ? null : query.getPayPassword();
+		return walletUserService.checkPayPasswordMatch(WithdrawUserTypeEnums.APP.getCode(), uid, payPassword);
+	}
+
+	@Override
 	public ResponseBase kycCountryList(@RequestBody(required = false) KycCountryListRequest query,
 			HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
