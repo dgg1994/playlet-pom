@@ -87,6 +87,7 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
                 .antMatchers("/wallet/webhook/**").permitAll()
                 .antMatchers("/webhook/**").permitAll()
                 .antMatchers("/wallet/withdraw/home").permitAll()
+                .antMatchers("/sysNavigateConfig/findList").permitAll()
                 .anyRequest().authenticated()
                 .and()
                 .logout()

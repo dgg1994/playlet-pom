@@ -22,6 +22,7 @@ import com.playlet.oversea.enums.WalletLogTradeTypeEnums;
 import com.playlet.oversea.enums.WalletLogisticsStateEnums;
 import com.playlet.oversea.exception.BaseException;
 import com.playlet.oversea.query.pub.PageQueryHelperEntity;
+import com.playlet.oversea.service.MediaUrlService;
 import com.playlet.oversea.service.support.WalletBankcardSyncSupport;
 import com.playlet.oversea.service.support.WalletCardProductService;
 import com.playlet.oversea.service.support.WalletCardholderService;
@@ -96,6 +97,8 @@ public class WalletUserService extends BaseApiService {
 	private WalletLogDao walletLogDao;
 	@Autowired
 	private WalletCardAccountMailingDao walletCardAccountMailingDao;
+	@Autowired
+	private MediaUrlService mediaUrlService;
 
 	/**
 	 * 本地账号注册成功后调用：开通 U 卡三方用户并写入 P0 表。
@@ -2371,7 +2374,7 @@ public class WalletUserService extends BaseApiService {
 		return card;
 	}
 
-	private static WalletCardDetailResp toCardDetail(WalletBankcardEntity row, WalletCardProductEntity product,
+	private WalletCardDetailResp toCardDetail(WalletBankcardEntity row, WalletCardProductEntity product,
 			WalletCardApplyEntity apply, WalletUserHolderEntity holder) {
 		WalletCardDetailResp detail = new WalletCardDetailResp();
 		WalletCardItemResp item = toCardItem(row, product);
@@ -2466,7 +2469,7 @@ public class WalletUserService extends BaseApiService {
 		}
 	}
 
-	private static WalletCardItemResp toCardItem(WalletBankcardEntity row, WalletCardProductEntity product) {
+	private WalletCardItemResp toCardItem(WalletBankcardEntity row, WalletCardProductEntity product) {
 		String cardTitle = product == null ? null : product.getCardTitle();
 		WalletCardItemResp item = new WalletCardItemResp();
 		item.setId(row.getId());
@@ -2485,9 +2488,24 @@ public class WalletUserService extends BaseApiService {
 		item.setIsDefault(row.getIsDefault() == null ? WalletConstants.CARD_DEFAULT_NO : row.getIsDefault());
 		item.setPinSet(row.getPinSet());
 		item.setTagName(row.getTagName());
-		item.setCardImg(product == null ? null : product.getCardImg());
+		item.setCardImg(resolveCardImgUrl(product));
 		item.setSetTime(row.getSetTime());
 		return item;
+	}
+
+	/** 卡图：优先 cardImg，其次 listImg；出参统一七牛签名/拼域名 */
+	private String resolveCardImgUrl(WalletCardProductEntity product) {
+		if (product == null) {
+			return null;
+		}
+		String keyOrUrl = product.getCardImg();
+		if (StringUtils.isEmpty(keyOrUrl)) {
+			keyOrUrl = product.getCardListImg();
+		}
+		if (StringUtils.isEmpty(keyOrUrl)) {
+			return null;
+		}
+		return mediaUrlService.sign(keyOrUrl);
 	}
 
 	/** 按产品 id 批量加载卡图、卡名称等展示字段 */

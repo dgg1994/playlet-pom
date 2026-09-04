@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 public interface SysNavigateConfigService {
 
 	@GetMapping("/findList")
-	@ApiOperation(value = "查询配置", notes = "查询配置", response = ResponseBase.class)
+	@ApiOperation(value = "查询配置", notes = "按库值返回开关：1→true，其它→false", response = ResponseBase.class)
     ResponseBase findList();
 	
 	@PostMapping("/update")

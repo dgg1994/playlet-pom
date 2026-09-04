@@ -17,7 +17,7 @@ public class BankcardRechargeRequest {
 	private Long userBankcardId;
 
 	@ApiModelProperty(value = "钱包扣款总额（含手续费）；实际到卡金额 = amount - handlingFees", required = true)
-	private Integer amount;
+	private BigDecimal amount;
 
 	@ApiModelProperty(value = "卡到账金额（服务端根据 amount 与手续费计算，客户端无需传）")
 	private BigDecimal targetAmount;

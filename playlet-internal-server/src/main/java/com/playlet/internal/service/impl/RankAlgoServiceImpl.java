@@ -12,13 +12,16 @@ import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.TheaterHomeCacheHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.playlet.internal.constants.RankBoardGroupConstants.DATE_FMT;
 import static com.playlet.internal.constants.RankBoardGroupConstants.DATE_TIME_FMT;
@@ -26,6 +29,9 @@ import static com.playlet.internal.constants.RankBoardGroupConstants.DATE_TIME_F
 @Slf4j
 @Service
 public class RankAlgoServiceImpl implements RankAlgoService {
+
+	/** 同进程内串行刷榜，避免 delete/insert 交错撞唯一键 */
+	private final Object rewriteLock = new Object();
 
 	@Autowired
 	private RankBoardDao rankBoardDao;
@@ -41,6 +47,7 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 	 * 某一榜没开或找不到就跳过，不影响其他榜。
 	 */
 	@Override
+	@Transactional(rollbackFor = Exception.class)
 	public void refreshAllP0() {
 		refreshHotPlayBoard();
 		refreshNewBoard();
@@ -202,15 +209,26 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 		log.info("refresh board {} size={}", groupId, rows == null ? 0 : rows.size());
 	}
 
-	/** 清空旧名单，再按分数顺序写入 1、2、3… */
+	/** 清空旧名单，再按分数顺序写入 1、2、3…（drama 去重 + 本机串行，避免撞 uk_rank_list_board_drama） */
 	private void rewriteRankList(String groupId, List<DramaRankAggRow> rows) {
-		rankListDao.deleteByBoardGroupId(groupId);
-		if (rows != null && !rows.isEmpty()) {
-			int rankNo = 1;
-			for (DramaRankAggRow row : rows) {
-				if (row.getDramaId() == null) {
-					continue;
+		synchronized (rewriteLock) {
+			Map<Integer, DramaRankAggRow> uniqueByDrama = new LinkedHashMap<>();
+			if (rows != null) {
+				for (DramaRankAggRow row : rows) {
+					if (row == null || row.getDramaId() == null) {
+						continue;
+					}
+					// 同分多行时保留先出现的（已按分数排序）
+					uniqueByDrama.putIfAbsent(row.getDramaId(), row);
 				}
+			}
+			if (rows != null && uniqueByDrama.size() < rows.size()) {
+				log.warn("rank rewrite dedupe board={} rawSize={} uniqueSize={}",
+						groupId, rows.size(), uniqueByDrama.size());
+			}
+			rankListDao.deleteByBoardGroupId(groupId);
+			int rankNo = 1;
+			for (DramaRankAggRow row : uniqueByDrama.values()) {
 				RankListEntity entity = new RankListEntity();
 				entity.setBoardGroupId(groupId);
 				entity.setRankNo(rankNo++);
@@ -223,10 +241,15 @@ public class RankAlgoServiceImpl implements RankAlgoService {
 					entity.setSetTime(now);
 					entity.setGmtModified(now);
 				}
-				rankListDao.insert(entity);
+				try {
+					rankListDao.insert(entity);
+				} catch (DuplicateKeyException e) {
+					// 并发刷榜或人工插入抢先：跳过该剧，不中断整榜
+					log.warn("rank rewrite skip duplicate board={} dramaId={}", groupId, row.getDramaId());
+				}
 			}
+			theaterHomeCacheHelper.invalidateAll();
 		}
-		theaterHomeCacheHelper.invalidateAll();
 	}
 
 	/** 统计从哪天开始：今天往前推 windowDays 天（含今天），时区上海 */

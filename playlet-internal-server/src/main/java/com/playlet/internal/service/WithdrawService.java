@@ -72,7 +72,7 @@ public interface WithdrawService {
 			HttpServletRequest request);
 
 	@GetMapping("/card/list")
-	@ApiOperation(value = "卡片列表", notes = "默认卡优先；首页切换与卡片列表页复用；需登录")
+	@ApiOperation(value = "卡片列表", notes = "默认卡优先；首页切换与卡片列表页复用；需登录；cardImg 经七牛签名")
 	ResponseBase cardList(HttpServletRequest request);
 
 	@GetMapping("/card/findUserCardInfo")

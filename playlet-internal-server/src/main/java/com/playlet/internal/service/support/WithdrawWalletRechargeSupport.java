@@ -59,14 +59,9 @@ public class WithdrawWalletRechargeSupport {
 					order.getOrderNo(), order.getTargetUserBankcardId());
 			return false;
 		}
-		int amount = resolveRechargeAmount(order);
-		if (amount <= 0) {
-			log.warn("withdraw wallet payout invalid amount orderNo={} amount={}", order.getOrderNo(), amount);
-			return false;
-		}
 		BankcardRechargeRequest req = new BankcardRechargeRequest();
 		req.setUserBankcardId(order.getTargetUserBankcardId());
-		req.setAmount(amount);
+		req.setAmount(order.getActualAmt());
 		String requestOrderId = WalletRequestOrderIdSupport.resolve(order.getRequestOrderId(),
 				WalletConstants.REQUEST_ORDER_PREFIX_CARD_RECHARGE, user.getWalletUid());
 		req.setRequestOrderId(requestOrderId);
@@ -74,7 +69,7 @@ public class WithdrawWalletRechargeSupport {
 			thirdService.rechargeBankcard(user.getWalletUid(), req);
 			insertRechargeTransaction(user, card, order, req);
 			log.info("withdraw wallet payout submitted orderNo={} requestOrderId={} amount={}",
-					order.getOrderNo(), order.getRequestOrderId(), amount);
+					order.getOrderNo(), order.getRequestOrderId(), order.getActualAmt());
 			return true;
 		} catch (BaseException e) {
 			log.error("withdraw wallet payout rejected orderNo={} requestOrderId={}",
@@ -90,7 +85,7 @@ public class WithdrawWalletRechargeSupport {
 	private void insertRechargeTransaction(WalletUserEntity user, WalletBankcardEntity card,
 			UserWithdrawOrderEntity order, BankcardRechargeRequest query) {
 		Date now = new Date();
-		BigDecimal amount = new BigDecimal(query.getAmount());
+		BigDecimal amount = query.getAmount();
 		String currency = StringUtils.isEmpty(card.getCurrency())
 				? WalletConstants.DEFAULT_CURRENCY : card.getCurrency();
 		WalletCardTransactionEntity txn = new WalletCardTransactionEntity();

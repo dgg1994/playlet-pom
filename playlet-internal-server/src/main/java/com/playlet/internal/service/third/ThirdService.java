@@ -321,10 +321,10 @@ public class ThirdService {
 			throw new BaseException("amount不能为空");
 		}
 		if (body.getTargetAmount() == null) {
-			body.setTargetAmount(BigDecimal.valueOf(body.getAmount()));
+			body.setTargetAmount(body.getAmount());
 		}
 		if (body.getAmount() == null) {
-			body.setAmount(body.getTargetAmount().intValue());
+			body.setAmount(body.getTargetAmount());
 		}
 		if (body.getHandlingFees() == null) {
 			body.setHandlingFees(BigDecimal.ZERO);

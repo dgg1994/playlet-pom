@@ -1,6 +1,5 @@
 package com.playlet.internal.service.impl;
 
-import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
@@ -17,6 +16,7 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Collections;
 import java.util.List;
 
 @RestController
@@ -48,23 +48,22 @@ public class SysNavigateConfigServiceImpl extends BaseApiService implements SysN
 	public ResponseBase find() {
 		String appVersion = AppVersionContext.getAppVersion();
 		String deviceType = DeviceTypeContext.getDeviceType();
-		SysNavigateConfigEntity configEntity = sysNavigateConfigDao.findOne(appVersion,deviceType);
-		if(configEntity != null) {
-			return setResultSuccess(configEntity,I18nUtil.getMessage("base_success"));			
-		}else {
-			SysNavigateConfigEntity entity = new SysNavigateConfigEntity();
-			entity.setWalletState(false);
-			entity.setWelfareState(false);
-			entity.setPayPasswordState(false);
-			entity.setSiteState(false);
-			return setResultSuccess(entity,I18nUtil.getMessage("base_success"));	
+		SysNavigateConfigEntity configEntity = sysNavigateConfigDao.findOne(appVersion, deviceType);
+		if (configEntity != null) {
+			return setResultSuccess(configEntity, I18nUtil.getMessage("base_success"));
 		}
+		SysNavigateConfigEntity entity = new SysNavigateConfigEntity();
+		entity.setWalletState(2);
+		entity.setWelfareState(2);
+		entity.setPayPasswordState(2);
+		entity.setSiteState(2);
+		return setResultSuccess(entity, I18nUtil.getMessage("base_success"));
 	}
 
 	@Override
 	public ResponseBase findList() {
-		List<SysNavigateConfigEntity> list = sysNavigateConfigDao.selectList(null);
-		PageInfo<SysNavigateConfigEntity> info = new PageInfo<>(list);
+		List<SysNavigateConfigEntity> list = sysNavigateConfigDao.findList(new SysNavigateConfigEntity());
+		PageInfo<SysNavigateConfigEntity> info = new PageInfo<>(list == null ? Collections.emptyList() : list);
 		return setResultSuccess(info, I18nUtil.getMessage("base_success"));
 	}
 

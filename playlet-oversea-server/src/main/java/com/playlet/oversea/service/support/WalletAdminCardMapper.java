@@ -32,6 +32,12 @@ public class WalletAdminCardMapper {
 		resp.setUuid(row.getProductUuid());
 		resp.setTitle(row.getCardTitle());
 		resp.setBankCardNature(row.getBankcardNature());
+		// 卡片类型 / 币种 / 月费 / 卡号段
+		resp.setCardType(row.getBankcardNature());
+		resp.setCurrency(row.getCurrency());
+		resp.setMonthFee(row.getMonthFee());
+		resp.setCardBin(row.getCardBin());
+		resp.setCardBrand(row.getCardBrand());
 		// 库内多为七牛 key，列表出参签名为可访问 URL
 		resp.setImg(mediaUrlService.sign(row.getCardImg()));
 		resp.setListImg(mediaUrlService.sign(row.getCardListImg()));

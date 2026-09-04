@@ -23,7 +23,7 @@ import javax.servlet.http.HttpServletRequest;
 public interface CardManageService {
 
 	@PostMapping("/findListPag")
-	@ApiOperation(value = "卡产品分页列表", notes = "img/listImg 出参经七牛签名为可访问 URL")
+	@ApiOperation(value = "卡产品分页列表", notes = "含 cardType/currency/monthFee/cardBin；img/listImg 经七牛签名")
 	ResponseBase findListPag(WalletCardProductEntity entity);
 
 	@GetMapping("/pullList")

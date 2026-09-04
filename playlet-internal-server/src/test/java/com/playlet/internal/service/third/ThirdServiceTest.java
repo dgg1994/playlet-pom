@@ -81,12 +81,4 @@ class ThirdServiceTest {
 		System.out.println(balance);
 	}
 
-	@Test
-	void rechargeBankcard() {
-		BankcardRechargeRequest body = new BankcardRechargeRequest();
-		body.setUserBankcardId(101934L);
-		body.setAmount(10);
-		body.setRequestOrderId("TEST-RC-" + System.currentTimeMillis());
-		thirdService.rechargeBankcard(102430L, body);
-	}
 }

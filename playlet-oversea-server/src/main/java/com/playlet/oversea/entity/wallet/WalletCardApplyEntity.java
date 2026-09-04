@@ -146,6 +146,16 @@ public class WalletCardApplyEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "cardData", value = "卡产品信息")
 	private WalletCardProductEntity cardData;
 
+	/** 列表展示：卡产品名称（来自 cardData.cardTitle） */
+	@TableField(exist = false)
+	@ApiModelProperty(name = "cardTitle", value = "银行卡名称")
+	private String cardTitle;
+
+	/** 列表展示：卡产品图（七牛签名 URL，来自 cardData.cardImg） */
+	@TableField(exist = false)
+	@ApiModelProperty(name = "cardImg", value = "银行卡图片")
+	private String cardImg;
+
 	/** 管理端列表/详情：KYC 快照 */
 	@TableField(exist = false)
 	@ApiModelProperty(name = "kycData", value = "KYC 快照")

@@ -53,8 +53,9 @@ public interface WalletCardProductDao extends BaseMapper<WalletCardProductEntity
 	@Select("select * from wallet_card_product where id = #{id} limit 1")
 	WalletCardProductEntity findById(@Param("id") Integer id);
 
-	/** 列表展示：批量取卡图与卡名称 */
-	@Select("<script>select id, card_img, card_title from wallet_card_product where id in "
+	/** 列表展示：批量取卡图与卡名称（显式别名，避免下划线未映射导致 cardImg 为空/未签名） */
+	@Select("<script>select id, card_img as cardImg, card_list_img as cardListImg, card_title as cardTitle "
+			+ "from wallet_card_product where id in "
 			+ "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
 			+ "</script>")
 	List<WalletCardProductEntity> findCardImgByIds(@Param("ids") List<Integer> ids);

@@ -23,8 +23,27 @@ public class WalletCardAdminResp {
 	@ApiModelProperty("卡产品 uuid")
 	private String uuid;
 
+	@ApiModelProperty("卡名称")
 	private String title;
+
+	@ApiModelProperty("卡片类型 PHYSICAL / VIRTUAL")
 	private String bankCardNature;
+
+	@ApiModelProperty("卡片类型（同 bankCardNature，兼容前端 cardType）")
+	private String cardType;
+
+	@ApiModelProperty("卡币种")
+	private String currency;
+
+	@ApiModelProperty("月费")
+	private BigDecimal monthFee;
+
+	@ApiModelProperty("卡号段 / BIN")
+	private String cardBin;
+
+	@ApiModelProperty("卡品牌")
+	private String cardBrand;
+
 	private String img;
 	private String listImg;
 	private BigDecimal openCardCost;

@@ -23,8 +23,9 @@ import javax.servlet.http.HttpServletRequest;
 public interface WalletCardApplyManageService {
 
 	@PostMapping("/openCardApply")
-	@ApiOperation(value = "申请记录", notes = "分页查询开卡申请；含持卡人/邮寄/KYC/卡产品/已开卡信息")
-	ResponseBase openCardApply(WalletCardApplyEntity entity);
+	@ApiOperation(value = "申请记录", notes = "分页查询开卡申请；管理端可筛全量；App 带登录 token 时仅返回当前用户记录；"
+			+ "含持卡人/邮寄/KYC/卡产品/已开卡信息；顶层返回 cardTitle、cardImg（七牛签名）")
+	ResponseBase openCardApply(WalletCardApplyEntity entity, HttpServletRequest request);
 
 	@GetMapping("/openCardApplyInfo")
 	@ApiOperation(value = "申请记录详情", notes = "按 id 查询申请详情")

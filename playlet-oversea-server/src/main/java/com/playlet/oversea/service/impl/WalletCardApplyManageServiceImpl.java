@@ -27,14 +27,19 @@ import com.playlet.oversea.entity.wallet.WalletUserEntity;
 import com.playlet.oversea.enums.WalletCardApplyStateEnums;
 import com.playlet.oversea.enums.WalletCardStatusEnums;
 import com.playlet.oversea.enums.WalletKycStateEnums;
+import com.playlet.oversea.enums.WithdrawUserTypeEnums;
 import com.playlet.oversea.exception.BaseException;
+import com.playlet.oversea.service.MediaUrlService;
 import com.playlet.oversea.service.WalletCardApplyManageService;
 import com.playlet.oversea.service.support.WalletOpenCardSettlementService;
 import com.playlet.oversea.service.support.WalletPhysicalCardFulfillService;
 import com.playlet.oversea.service.third.ThirdService;
 import com.playlet.oversea.service.third.WalletUserService;
+import com.playlet.oversea.utils.AppTokenUtil;
 import com.playlet.oversea.utils.I18nUtil;
 import com.playlet.oversea.utils.IpUtil;
+import com.playlet.oversea.utils.SysUserTokenUtil;
+import com.playlet.oversea.constants.Constants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
@@ -89,12 +94,28 @@ public class WalletCardApplyManageServiceImpl implements WalletCardApplyManageSe
 	private WalletUserService walletUserService;
 	@Autowired
 	private IpUtil ipUtil;
+	@Autowired
+	private MediaUrlService mediaUrlService;
 
 	@Override
 	@SysLogAnnotation(module = "银行卡申请记录", type = "POST", remark = "查询申请记录")
-	public ResponseBase openCardApply(@RequestBody(required = false) WalletCardApplyEntity entity) {
+	public ResponseBase openCardApply(@RequestBody(required = false) WalletCardApplyEntity entity,
+			HttpServletRequest request) {
 		if (entity == null) {
 			entity = new WalletCardApplyEntity();
+		}
+		// App token：强制按当前用户钱包过滤；管理端：可筛全量；其它未登录拒绝
+		Integer appUid = AppTokenUtil.resolveUid(request);
+		if (appUid != null) {
+			WalletUserEntity walletUser = walletUserDao.findByLocal(WithdrawUserTypeEnums.APP.getCode(), appUid);
+			if (walletUser == null) {
+				return setResultSuccess(new PageInfo<>(new ArrayList<>()), I18nUtil.getMessage("base_success"));
+			}
+			entity.setWalletUserId(walletUser.getId());
+			entity.setWalletUid(null);
+			log.info("cardApply openCardApply app scope localUid={} walletUserId={}", appUid, walletUser.getId());
+		} else if (SysUserTokenUtil.resolveAdminId(request) == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
 		PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
 		List<WalletCardApplyEntity> list = walletCardApplyDao.findAdminList(entity);
@@ -274,6 +295,11 @@ public class WalletCardApplyManageServiceImpl implements WalletCardApplyManageSe
 		if (entity.getCardProductId() != null) {
 			WalletCardProductEntity product = walletCardProductDao.findById(entity.getCardProductId());
 			entity.setCardData(product);
+			// 列表顶层字段：银行卡名称 / 图片（图片出参七牛签名）
+			if (product != null) {
+				entity.setCardTitle(product.getCardTitle());
+				entity.setCardImg(mediaUrlService.sign(product.getCardImg()));
+			}
 		}
 		WalletCardApplyKycEntity kyc = walletCardApplyKycDao.findByApplyId(applyId);
 		entity.setKycData(kyc);

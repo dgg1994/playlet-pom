@@ -9,10 +9,10 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface SysNavigateConfigDao extends BaseMapper<SysNavigateConfigEntity>{
+public interface SysNavigateConfigDao extends BaseMapper<SysNavigateConfigEntity> {
 
 	@Select("select * from sys_navigate_config where app_version = #{appVersion} and device_type = #{deviceType}")
-	SysNavigateConfigEntity findOne(@Param("appVersion") String appVersion,@Param("deviceType") String deviceType);
+	SysNavigateConfigEntity findOne(@Param("appVersion") String appVersion, @Param("deviceType") String deviceType);
 
 	@Select("<script>"
 			+ "select * from sys_navigate_config where 1=1"

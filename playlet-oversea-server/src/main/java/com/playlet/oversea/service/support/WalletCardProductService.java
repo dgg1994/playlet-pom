@@ -14,6 +14,7 @@ import com.playlet.oversea.dao.wallet.WalletCardProductDao;
 import com.playlet.oversea.entity.wallet.WalletCardLabelEntity;
 import com.playlet.oversea.entity.wallet.WalletCardProductEntity;
 import com.playlet.oversea.exception.BaseException;
+import com.playlet.oversea.service.MediaUrlService;
 import com.playlet.oversea.service.third.ThirdService;
 import com.playlet.oversea.utils.I18nUtil;
 import com.playlet.oversea.utils.StringUtils;
@@ -44,6 +45,8 @@ public class WalletCardProductService {
 	private WalletCardLabelDao walletCardLabelDao;
 	@Autowired
 	private ThirdService thirdService;
+	@Autowired
+	private MediaUrlService mediaUrlService;
 
 	/** C 端可申请卡产品列表（仅 enable=1） */
 	public List<WalletCardProductItemResp> listEnabledProducts() {
@@ -268,7 +271,7 @@ public class WalletCardProductService {
 		return sb.toString();
 	}
 
-	public static WalletCardProductItemResp toItemResp(WalletCardProductEntity row) {
+	public WalletCardProductItemResp toItemResp(WalletCardProductEntity row) {
 		WalletCardProductItemResp item = new WalletCardProductItemResp();
 		item.setProductId(row.getId());
 		item.setCardTitle(row.getCardTitle());
@@ -295,7 +298,12 @@ public class WalletCardProductService {
 		item.setBankcardRegion(row.getBankcardRegion());
 		item.setActiveMinLimit(row.getActiveMinLimit());
 		item.setRechargeMinLimit(row.getRechargeMinLimit());
-		item.setCardImg(row.getCardImg());
+		// 库内多为七牛 key，出参签名为可访问 URL
+		String cardImg = row.getCardImg();
+		if (StringUtils.isEmpty(cardImg)) {
+			cardImg = row.getCardListImg();
+		}
+		item.setCardImg(mediaUrlService.sign(cardImg));
 		// 对齐 worldpay findList：标签列表 + 简介对象（本地暂存于 description1/2）
 		item.setLabelList(row.getLabelList() != null && !row.getLabelList().isEmpty()
 				? row.getLabelList() : buildLabelList(row.getDescription2()));
