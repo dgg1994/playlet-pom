@@ -2,11 +2,9 @@ package com.playlet.oversea.service.support;
 
 import com.playlet.oversea.constants.WalletConstants;
 import com.playlet.oversea.dao.wallet.WalletAccountDao;
-import com.playlet.oversea.dao.wallet.WalletCardTransactionDao;
 import com.playlet.oversea.dao.wallet.WalletLogDao;
 import com.playlet.oversea.dao.wallet.WalletUserDao;
 import com.playlet.oversea.entity.wallet.WalletAccountEntity;
-import com.playlet.oversea.entity.wallet.WalletCardTransactionEntity;
 import com.playlet.oversea.entity.wallet.WalletLogEntity;
 import com.playlet.oversea.entity.wallet.WalletUserEntity;
 import com.playlet.oversea.enums.WalletKycStateEnums;
@@ -24,7 +22,7 @@ import java.math.BigDecimal;
 import java.util.Date;
 
 /**
- * 提现入账：校验钱包账户、增加 U 余额并写入 wallet_log / wallet_card_transaction。
+ * 提现入账：校验钱包账户、增加 U 余额并写入 wallet_log（钱包账变，非卡交易）。
  */
 @Slf4j
 @Component
@@ -38,8 +36,6 @@ public class WithdrawWalletAccountSupport {
 	private WalletAccountDao walletAccountDao;
 	@Autowired
 	private WalletLogDao walletLogDao;
-	@Autowired
-	private WalletCardTransactionDao walletCardTransactionDao;
 
 	/** 是否已开通钱包账户（wallet_user + wallet_account） */
 	public boolean isReady(Integer userType, Integer localUid) {
@@ -48,6 +44,7 @@ public class WithdrawWalletAccountSupport {
 
 	/**
 	 * 金币提现入账：增加 available_balance 并写入 wallet_log（幂等 outOrderNo=orderNo）。
+	 * 属钱包余额操作，不写 wallet_card_transaction。
 	 *
 	 * @param actualAmt 实到 U（已扣 withdraw_config 手续费）
 	 * @param feeAmt    提现手续费（展示在 service_charge）
@@ -68,9 +65,8 @@ public class WithdrawWalletAccountSupport {
 		}
 		BigDecimal balanceAfter = balanceBefore.add(actualAmt);
 		insertCoinWithdrawWalletLog(user, balanceBefore, actualAmt, feeAmt, points, orderNo);
-		insertCoinWithdrawCardTransaction(user, actualAmt, feeAmt, points, orderNo, withdrawOrderId);
-		log.info("withdraw credited walletAccountId={} orderNo={} amount={} balanceAfter={}",
-				account.getId(), orderNo, actualAmt, balanceAfter);
+		log.info("withdraw credited walletAccountId={} orderNo={} withdrawOrderId={} amount={} balanceAfter={}",
+				account.getId(), orderNo, withdrawOrderId, actualAmt, balanceAfter);
 		return balanceAfter;
 	}
 
@@ -108,45 +104,6 @@ public class WithdrawWalletAccountSupport {
 			log.warn("coin withdraw wallet log duplicate orderNo={}", orderNo, e);
 		} catch (Exception e) {
 			log.error("coin withdraw wallet log failed walletUserId={} orderNo={}", user.getId(), orderNo, e);
-			throw new BaseException(I18nUtil.getMessage("base_error"), e);
-		}
-	}
-
-	/** 金币提现：同步落 wallet_card_transaction，供 /transaction/list 与后台流水查询 */
-	private void insertCoinWithdrawCardTransaction(WalletUserEntity user, BigDecimal actualAmt,
-			BigDecimal feeAmt, int points, String orderNo, Long withdrawOrderId) {
-		if (walletCardTransactionDao.findByRequestOrderId(orderNo) != null) {
-			return;
-		}
-		Date now = new Date();
-		BigDecimal serviceCharge = nvl(feeAmt);
-		WalletCardTransactionEntity txn = new WalletCardTransactionEntity();
-		txn.setWalletUserId(user.getId());
-		txn.setWalletUid(user.getWalletUid());
-		txn.setWalletBankcardId(null);
-		txn.setUserBankcardId(WalletConstants.WALLET_BALANCE_BANKCARD_PLACEHOLDER);
-		txn.setRequestOrderId(orderNo);
-		txn.setWithdrawOrderId(withdrawOrderId);
-		txn.setBizType(WalletConstants.BIZ_COIN_TO_WALLET);
-		txn.setTransType(WalletConstants.TRANS_COIN_TO_WALLET);
-		txn.setPayType(WalletConstants.TOPUP_TYPE_WALLET);
-		txn.setOrderState(WalletLogStatusEnums.POSTED.getIntCode());
-		txn.setOrderStateName(WalletLogStatusEnums.POSTED.getLabel());
-		txn.setLocalCurrency(WalletConstants.DEFAULT_CURRENCY);
-		txn.setLocalCurrencyAmt(actualAmt);
-		txn.setTransCurrency(WalletConstants.DEFAULT_CURRENCY);
-		txn.setTransCurrencyAmt(actualAmt);
-		txn.setHandlingFees(serviceCharge);
-		txn.setTitle(I18nUtil.getMessage("wallet.log.coin_to_wallet"));
-		txn.setSetTime(now);
-		txn.setGmtModified(now);
-		try {
-			walletCardTransactionDao.insert(txn);
-		} catch (DuplicateKeyException e) {
-			log.warn("coin withdraw card txn duplicate orderNo={}", orderNo, e);
-		} catch (Exception e) {
-			log.error("coin withdraw card txn failed walletUserId={} orderNo={} points={}",
-					user.getId(), orderNo, points, e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 	}

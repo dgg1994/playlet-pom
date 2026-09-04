@@ -59,33 +59,7 @@ public class AppWithdrawWalletHandler implements WithdrawWalletHandler {
 
 	@Override
 	public void writeWithdrawFreezeLedger(Integer uid, int amt, String orderNo) {
-		if (uid == null || amt <= 0) {
-			return;
-		}
-		String bizType = CoinBizTypeEnums.WITHDRAW_FREEZE.getName();
-		String bizId = "WITHDRAW:" + orderNo;
-		if (userCoinLedgerDao.findByBiz(uid, bizType, bizId) != null) {
-			return;
-		}
-		AppAccountEntity account = appAccountDao.findByUid(uid);
-		long before = nvl(account == null ? null : account.getCoinBalance());
-		long frozenBefore = nvl(account == null ? null : account.getFrozenCoinBalance()) - amt;
-		if (frozenBefore < 0) {
-			frozenBefore = 0;
-		}
-		UserCoinLedgerEntity ledger = new UserCoinLedgerEntity();
-		ledger.setUid(uid);
-		ledger.setChangeAmt(0);
-		ledger.setBalanceBefore(before);
-		ledger.setBalanceAfter(before);
-		ledger.setFrozenBefore(frozenBefore);
-		ledger.setFrozenAfter(frozenBefore + amt);
-		ledger.setBizType(bizType);
-		ledger.setBizId(bizId);
-		ledger.setTaskCode("");
-		ledger.setAdBoostFlag(0);
-		ledger.setRemark("提现冻结");
-		insertLedger(ledger, uid, bizId, "withdraw freeze ledger");
+		// App 金币提现同步入账，不单独记「提现冻结」流水
 	}
 
 	@Override

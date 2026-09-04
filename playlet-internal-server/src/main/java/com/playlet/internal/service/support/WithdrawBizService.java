@@ -174,7 +174,7 @@ public class WithdrawBizService extends BaseApiService {
 			GenericityUtil.setDate(order);
 			userWithdrawOrderDao.insert(order);
 			handler.writeWithdrawFreezeLedger(uid, points, orderNo);
-			// 入账 U 卡钱包并写 wallet_log + wallet_card_transaction
+			// 入账钱包余额并写 wallet_log（非卡交易）
 			withdrawWalletAccountSupport.creditCoinWithdraw(
 					userType.getCode(), uid, amount.getActualAmt(), amount.getFeeAmt(), points, orderNo, order.getId());
 			if (handler.settleFrozen(uid, points) <= 0) {
