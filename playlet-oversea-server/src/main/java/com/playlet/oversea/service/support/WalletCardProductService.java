@@ -11,8 +11,10 @@ import com.playlet.oversea.api.response.WalletCardProductSyncResp;
 import com.playlet.oversea.constants.WalletConstants;
 import com.playlet.oversea.dao.wallet.WalletCardLabelDao;
 import com.playlet.oversea.dao.wallet.WalletCardProductDao;
+import com.playlet.oversea.dao.wallet.WalletCardSynopsisDao;
 import com.playlet.oversea.entity.wallet.WalletCardLabelEntity;
 import com.playlet.oversea.entity.wallet.WalletCardProductEntity;
+import com.playlet.oversea.entity.wallet.WalletCardSynopsisEntity;
 import com.playlet.oversea.exception.BaseException;
 import com.playlet.oversea.service.MediaUrlService;
 import com.playlet.oversea.service.third.ThirdService;
@@ -44,6 +46,8 @@ public class WalletCardProductService {
 	@Autowired
 	private WalletCardLabelDao walletCardLabelDao;
 	@Autowired
+	private WalletCardSynopsisDao walletCardSynopsisDao;
+	@Autowired
 	private ThirdService thirdService;
 	@Autowired
 	private MediaUrlService mediaUrlService;
@@ -63,7 +67,9 @@ public class WalletCardProductService {
 		}
 		List<WalletCardProductItemResp> items = new ArrayList<>(rows.size());
 		for (WalletCardProductEntity row : rows) {
-			enrichLabelJoin(row, LanguageContext.getLanguage());
+			String language = LanguageContext.getLanguage();
+			enrichLabelJoin(row, language);
+			enrichSynopsisJoin(row, language);
 			items.add(toItemResp(row));
 		}
 		return items;
@@ -99,6 +105,7 @@ public class WalletCardProductService {
 			throw new BaseException(I18nUtil.getMessage("wallet.product_not_found"));
 		}
 		enrichLabelJoin(row, LanguageContext.getLanguage());
+		enrichSynopsisJoin(row, LanguageContext.getLanguage());
 		return toItemResp(row);
 	}
 
@@ -126,6 +133,23 @@ public class WalletCardProductService {
 		}
 		row.setLabelList(labelList);
 		row.setLabelIdList(labelIdList);
+	}
+
+	/** 关联表简介优先：wallet_card_synopsis_join × wallet_card_synopsis（按语言） */
+	private void enrichSynopsisJoin(WalletCardProductEntity row, String language) {
+		if (row == null || row.getId() == null) {
+			return;
+		}
+		String lang = StringUtils.isEmpty(language) ? LanguageContext.getLanguage() : language;
+		WalletCardSynopsisEntity synopsis = walletCardSynopsisDao.findByCardId(String.valueOf(row.getId()), lang);
+		if (synopsis == null) {
+			return;
+		}
+		WalletCardProductSynopsisResp resp = new WalletCardProductSynopsisResp();
+		resp.setId(synopsis.getId());
+		resp.setTitle(synopsis.getTitle());
+		resp.setContent(synopsis.getContent());
+		row.setSynopsisData(resp);
 	}
 
 	/** 一键拉取三方卡产品并 upsert 到本地表 */
@@ -304,10 +328,11 @@ public class WalletCardProductService {
 			cardImg = row.getCardListImg();
 		}
 		item.setCardImg(mediaUrlService.sign(cardImg));
-		// 对齐 worldpay findList：标签列表 + 简介对象（本地暂存于 description1/2）
+		// 对齐 worldpay findList：标签/简介优先关联表，否则回退 description1/2
 		item.setLabelList(row.getLabelList() != null && !row.getLabelList().isEmpty()
 				? row.getLabelList() : buildLabelList(row.getDescription2()));
-		item.setSynopsisData(buildSynopsis(row.getCardTitle(), row.getDescription1()));
+		item.setSynopsisData(row.getSynopsisData() != null
+				? row.getSynopsisData() : buildSynopsis(row.getCardTitle(), row.getDescription1()));
 		return item;
 	}
 
