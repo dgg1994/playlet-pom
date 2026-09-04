@@ -41,17 +41,14 @@ public interface WalletCardProductDao extends BaseMapper<WalletCardProductEntity
 	@Select("select ifnull(max(id), 0) + 1 from wallet_card_product")
 	Integer nextProductId();
 
-	@Update("update wallet_card_product set enable = #{enable}, gmtModified = now() where product_uuid = #{productUuid}")
-	int updateEnableByProductUuid(@Param("productUuid") String productUuid, @Param("enable") Integer enable);
+	@Update("update wallet_card_product set enable = #{enable}, gmtModified = now() where id = #{id}")
+	int updateEnableById(@Param("id") Integer id, @Param("enable") Integer enable);
 
-	@Update("update wallet_card_product set card_img = #{cardImg}, gmtModified = now() where product_uuid = #{productUuid}")
-	int updateCardImgByProductUuid(@Param("productUuid") String productUuid, @Param("cardImg") String cardImg);
+	@Update("update wallet_card_product set card_img = #{cardImg}, gmtModified = now() where id = #{id}")
+	int updateCardImgById(@Param("id") Integer id, @Param("cardImg") String cardImg);
 
-	@Update("update wallet_card_product set card_list_img = #{cardListImg}, gmtModified = now() where product_uuid = #{productUuid}")
-	int updateCardListImgByProductUuid(@Param("productUuid") String productUuid, @Param("cardListImg") String cardListImg);
-
-	@org.apache.ibatis.annotations.Delete("delete from wallet_card_product where product_uuid = #{productUuid}")
-	int deleteByProductUuid(@Param("productUuid") String productUuid);
+	@Update("update wallet_card_product set card_list_img = #{cardListImg}, gmtModified = now() where id = #{id}")
+	int updateCardListImgById(@Param("id") Integer id, @Param("cardListImg") String cardListImg);
 
 	@Select("select * from wallet_card_product where id = #{id} limit 1")
 	WalletCardProductEntity findById(@Param("id") Integer id);

@@ -99,13 +99,13 @@ public class WalletCardProductService {
 		return toItemResp(row);
 	}
 
-	/** 关联表标签优先覆盖 description2 解析结果 */
+	/** 关联表标签优先覆盖 description2 解析结果（join.card_id = 产品 id） */
 	private void enrichLabelJoin(WalletCardProductEntity row, String language) {
-		if (row == null || StringUtils.isEmpty(row.getProductUuid())) {
+		if (row == null || row.getId() == null) {
 			return;
 		}
 		String lang = StringUtils.isEmpty(language) ? LanguageContext.getLanguage() : language;
-		List<WalletCardLabelEntity> joinLabels = walletCardLabelDao.findByCardId(row.getProductUuid(), lang);
+		List<WalletCardLabelEntity> joinLabels = walletCardLabelDao.findByCardId(String.valueOf(row.getId()), lang);
 		if (joinLabels == null || joinLabels.isEmpty()) {
 			return;
 		}
@@ -405,12 +405,19 @@ public class WalletCardProductService {
 			target.setRechargeMaxLimit(toBigDecimal(third.getRechargeMaxLimit()));
 		}
 		target.setCurrency(StringUtils.isEmpty(third.getCcy()) ? WalletConstants.DEFAULT_CURRENCY : third.getCcy());
-		target.setApplyFee(toBigDecimal(third.getApplyFee()));
+		// 三方主推 applyFee：落库 apply_fee，并同步写入 open_card_cost（渠道若另有 openCardCost 则优先）
+		BigDecimal applyFee = toBigDecimal(third.getApplyFee());
+		target.setApplyFee(applyFee);
 		if (third.getOpenCardCost() != null) {
 			target.setOpenCardCost(toBigDecimal(third.getOpenCardCost()));
+		} else if (applyFee != null) {
+			target.setOpenCardCost(applyFee);
 		}
+		// 预存费：有值则写，否则默认 0（避免展示/冻结回退歧义）
 		if (third.getPreSaveCost() != null) {
 			target.setPreSaveCost(toBigDecimal(third.getPreSaveCost()));
+		} else {
+			target.setPreSaveCost(BigDecimal.ZERO);
 		}
 		if (third.getMonthFee() != null) {
 			target.setMonthFee(toBigDecimal(third.getMonthFee()));

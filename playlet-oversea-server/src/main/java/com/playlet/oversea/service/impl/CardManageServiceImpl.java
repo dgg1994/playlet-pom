@@ -40,11 +40,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.UUID;
 
 import static com.playlet.oversea.base.BaseApiService.setResultError;
 import static com.playlet.oversea.base.BaseApiService.setResultSuccess;
@@ -125,11 +123,11 @@ public class CardManageServiceImpl implements CardManageService {
 	@Override
 	@SysLogAnnotation(module = "卡产品管理", type = "POST", remark = "编辑卡产品")
 	public ResponseBase update(@RequestBody WalletCardAdminUpdateRequest req) {
-		if (req == null || StringUtils.isEmpty(req.getUuid())) {
+		if (req == null || req.getId() == null) {
 			return setResultError(I18nUtil.getMessage("parameter_error"));
 		}
 		try {
-			WalletCardProductEntity existed = walletCardProductDao.findByProductUuid(req.getUuid());
+			WalletCardProductEntity existed = walletCardProductDao.findById(req.getId());
 			if (existed == null) {
 				return setResultError(I18nUtil.getMessage("base_data_null"));
 			}
@@ -159,39 +157,41 @@ public class CardManageServiceImpl implements CardManageService {
 			}
 			existed.setGmtModified(new Date());
 			walletCardProductDao.updateById(existed);
-			replaceLabelJoin(req.getUuid(), req.getLableIdList());
-			replaceSynopsisJoin(req.getUuid(), req.getSynopsisIdList());
-			log.info("card update success uuid={}", req.getUuid());
+			// 标签/简介关联键统一为产品 id（join.card_id 存字符串形式的 id）
+			String cardRef = cardJoinKey(existed.getId());
+			replaceLabelJoin(cardRef, req.getLableIdList());
+			replaceSynopsisJoin(cardRef, req.getSynopsisIdList());
+			log.info("card update success id={}", existed.getId());
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (BaseException e) {
-			log.error("card update failed uuid={}", req.getUuid(), e);
+			log.error("card update failed id={}", req.getId(), e);
 			throw e;
 		} catch (Exception e) {
-			log.error("card update error uuid={}", req.getUuid(), e);
+			log.error("card update error id={}", req.getId(), e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 	}
 
 	@Override
 	@SysLogAnnotation(module = "卡产品管理", type = "POST", remark = "修改封面图")
-	public ResponseBase updateImg(String uuid, MultipartFile file) {
-		return updateProductImage(uuid, file, true);
+	public ResponseBase updateImg(Integer id, MultipartFile file) {
+		return updateProductImage(id, file, true);
 	}
 
 	@Override
 	@SysLogAnnotation(module = "卡产品管理", type = "POST", remark = "修改列表图")
-	public ResponseBase updateListImg(String uuid, MultipartFile file) {
-		return updateProductImage(uuid, file, false);
+	public ResponseBase updateListImg(Integer id, MultipartFile file) {
+		return updateProductImage(id, file, false);
 	}
 
 	@Override
 	@SysLogAnnotation(module = "卡产品管理", type = "GET", remark = "复制卡产品")
-	public ResponseBase copyCard(String uuid) {
-		if (StringUtils.isEmpty(uuid)) {
+	public ResponseBase copyCard(Integer id) {
+		if (id == null) {
 			return setResultError(I18nUtil.getMessage("parameter_error"));
 		}
 		try {
-			WalletCardProductEntity source = walletCardProductDao.findByProductUuid(uuid);
+			WalletCardProductEntity source = walletCardProductDao.findById(id);
 			if (source == null) {
 				return setResultError(I18nUtil.getMessage("base_data_null"));
 			}
@@ -199,58 +199,61 @@ public class CardManageServiceImpl implements CardManageService {
 			BeanUtils.copyProperties(source, copy);
 			Integer newId = walletCardProductDao.nextProductId();
 			copy.setId(newId);
-			copy.setProductUuid(UUID.randomUUID().toString().replace("-", ""));
+			copy.setProductUuid(null);
 			Date now = new Date();
 			copy.setSetTime(now);
 			copy.setGmtModified(now);
 			walletCardProductDao.insert(copy);
-			List<Integer> labelIds = walletCardLabelDao.queryLabelIdsByCardId(uuid);
-			replaceLabelJoin(copy.getProductUuid(), labelIds);
-			List<Integer> synopsisIds = walletCardSynopsisDao.querySynopsisIdsByCardId(uuid);
-			replaceSynopsisJoin(copy.getProductUuid(), synopsisIds);
-			log.info("card copy success sourceUuid={} newUuid={}", uuid, copy.getProductUuid());
+			String sourceRef = cardJoinKey(id);
+			String copyRef = cardJoinKey(newId);
+			List<Integer> labelIds = walletCardLabelDao.queryLabelIdsByCardId(sourceRef);
+			replaceLabelJoin(copyRef, labelIds);
+			List<Integer> synopsisIds = walletCardSynopsisDao.querySynopsisIdsByCardId(sourceRef);
+			replaceSynopsisJoin(copyRef, synopsisIds);
+			log.info("card copy success sourceId={} newId={}", id, newId);
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			log.error("card copy failed uuid={}", uuid, e);
+			log.error("card copy failed id={}", id, e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 	}
 
 	@Override
 	@SysLogAnnotation(module = "卡产品管理", type = "GET", remark = "上下架")
-	public ResponseBase upState(String uuid, Integer stateId) {
-		if (StringUtils.isEmpty(uuid) || stateId == null) {
+	public ResponseBase upState(Integer id, Integer stateId) {
+		if (id == null || stateId == null) {
 			return setResultError(I18nUtil.getMessage("parameter_error"));
 		}
 		// stateId 1=上架 enable=1；2=下架 enable=0
 		int enable = WalletConstants.ADMIN_CARD_STATE_ON == stateId ? 1 : 0;
 		try {
-			int rows = walletCardProductDao.updateEnableByProductUuid(uuid, enable);
+			int rows = walletCardProductDao.updateEnableById(id, enable);
 			if (rows <= 0) {
 				return setResultError(I18nUtil.getMessage("base_data_null"));
 			}
-			log.info("card upState uuid={} stateId={} enable={}", uuid, stateId, enable);
+			log.info("card upState id={} stateId={} enable={}", id, stateId, enable);
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			log.error("card upState failed uuid={}", uuid, e);
+			log.error("card upState failed id={}", id, e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 	}
 
 	@Override
 	@SysLogAnnotation(module = "卡产品管理", type = "GET", remark = "删除卡产品")
-	public ResponseBase delete(String uuid) {
-		if (StringUtils.isEmpty(uuid)) {
+	public ResponseBase delete(Integer id) {
+		if (id == null) {
 			return setResultError(I18nUtil.getMessage("parameter_error"));
 		}
 		try {
-			walletCardLabelJoinDao.deleteByCardId(uuid);
-			walletCardSynopsisJoinDao.deleteByCardId(uuid);
-			walletCardProductDao.deleteByProductUuid(uuid);
-			log.info("card delete uuid={}", uuid);
+			String cardRef = cardJoinKey(id);
+			walletCardLabelJoinDao.deleteByCardId(cardRef);
+			walletCardSynopsisJoinDao.deleteByCardId(cardRef);
+			walletCardProductDao.deleteById(id);
+			log.info("card delete id={}", id);
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			log.error("card delete failed uuid={}", uuid, e);
+			log.error("card delete failed id={}", id, e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 	}
@@ -277,30 +280,35 @@ public class CardManageServiceImpl implements CardManageService {
 		return walletCardApplyManageService.shipping(entity, request);
 	}
 
-	private ResponseBase updateProductImage(String uuid, MultipartFile file, boolean cover) {
-		if (StringUtils.isEmpty(uuid) || file == null || file.isEmpty()) {
+	private ResponseBase updateProductImage(Integer id, MultipartFile file, boolean cover) {
+		if (id == null || file == null || file.isEmpty()) {
 			return setResultError(I18nUtil.getMessage("parameter_error"));
 		}
 		try {
 			String url = QiniuUploadUtils.uploadFile(file, CARD_IMG_UPLOAD_PATH);
 			int rows = cover
-					? walletCardProductDao.updateCardImgByProductUuid(uuid, url)
-					: walletCardProductDao.updateCardListImgByProductUuid(uuid, url);
+					? walletCardProductDao.updateCardImgById(id, url)
+					: walletCardProductDao.updateCardListImgById(id, url);
 			if (rows <= 0) {
 				return setResultError(I18nUtil.getMessage("base_data_null"));
 			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
-			log.error("card update image failed uuid={} cover={}", uuid, cover, e);
+			log.error("card update image failed id={} cover={}", id, cover, e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 	}
 
-	private void replaceLabelJoin(String cardUuid, List<Integer> labelIdList) {
-		if (labelIdList == null) {
+	/** join.card_id 存产品 id 字符串 */
+	private static String cardJoinKey(Integer productId) {
+		return productId == null ? null : String.valueOf(productId);
+	}
+
+	private void replaceLabelJoin(String cardRef, List<Integer> labelIdList) {
+		if (labelIdList == null || StringUtils.isEmpty(cardRef)) {
 			return;
 		}
-		walletCardLabelJoinDao.deleteByCardId(cardUuid);
+		walletCardLabelJoinDao.deleteByCardId(cardRef);
 		if (labelIdList.isEmpty()) {
 			return;
 		}
@@ -310,7 +318,7 @@ public class CardManageServiceImpl implements CardManageService {
 				continue;
 			}
 			WalletCardLabelJoinEntity join = new WalletCardLabelJoinEntity();
-			join.setCardId(cardUuid);
+			join.setCardId(cardRef);
 			join.setLabelId(labelId);
 			WalletCardLabelEntity label = walletCardLabelDao.selectById(labelId);
 			if (label != null) {
@@ -322,11 +330,11 @@ public class CardManageServiceImpl implements CardManageService {
 		}
 	}
 
-	private void replaceSynopsisJoin(String cardUuid, List<Integer> synopsisIdList) {
-		if (synopsisIdList == null) {
+	private void replaceSynopsisJoin(String cardRef, List<Integer> synopsisIdList) {
+		if (synopsisIdList == null || StringUtils.isEmpty(cardRef)) {
 			return;
 		}
-		walletCardSynopsisJoinDao.deleteByCardId(cardUuid);
+		walletCardSynopsisJoinDao.deleteByCardId(cardRef);
 		if (synopsisIdList.isEmpty()) {
 			return;
 		}
@@ -336,7 +344,7 @@ public class CardManageServiceImpl implements CardManageService {
 				continue;
 			}
 			WalletCardSynopsisJoinEntity join = new WalletCardSynopsisJoinEntity();
-			join.setCardId(cardUuid);
+			join.setCardId(cardRef);
 			join.setSynopsisId(synopsisId);
 			WalletCardSynopsisEntity synopsis = walletCardSynopsisDao.selectById(synopsisId);
 			if (synopsis != null) {

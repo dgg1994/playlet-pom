@@ -27,7 +27,7 @@ public class WalletCardLabelJoinEntity {
 	private String language;
 
 	@TableField("card_id")
-	@ApiModelProperty("卡产品 uuid（wallet_card_product.product_uuid）")
+	@ApiModelProperty("卡产品 id（wallet_card_product.id 字符串）")
 	private String cardId;
 
 	@TableField("label_id")
