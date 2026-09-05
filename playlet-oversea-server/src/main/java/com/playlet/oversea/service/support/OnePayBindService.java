@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 import java.util.Date;
 
 /**
- * C 端 / 作家端共用的 OnePay 绑定、解绑流程。
+ * 作家端 OnePay 绑定、解绑流程。
  */
 @Slf4j
 @Service

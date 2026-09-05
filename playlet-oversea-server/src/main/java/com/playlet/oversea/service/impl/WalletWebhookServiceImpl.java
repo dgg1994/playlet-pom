@@ -8,6 +8,7 @@ import com.playlet.oversea.api.response.ThirdBankcardInfoResp;
 import com.playlet.oversea.config.ThirdPartyProperties;
 import com.playlet.oversea.constants.Constants;
 import com.playlet.oversea.constants.WalletConstants;
+import com.playlet.oversea.constants.WalletNotifyConstants;
 import com.playlet.oversea.constants.WalletWebhookConstants;
 import com.playlet.oversea.dao.welfare.UserWithdrawOrderDao;
 import com.playlet.oversea.dao.wallet.WalletBankcardDao;
@@ -24,11 +25,13 @@ import com.playlet.oversea.entity.wallet.WalletWebhookEventEntity;
 import com.playlet.oversea.enums.WalletCardStatusEnums;
 import com.playlet.oversea.enums.WalletKycStateEnums;
 import com.playlet.oversea.enums.WalletLogStatusEnums;
+import com.playlet.oversea.enums.WalletNotifyEventEnums;
 import com.playlet.oversea.exception.BaseException;
 import com.playlet.oversea.service.WalletWebhookService;
 import com.playlet.oversea.service.WithdrawPayoutService;
 import com.playlet.oversea.service.support.WalletBankcardSyncSupport;
 import com.playlet.oversea.service.support.WalletCardCloseWebhookSupport;
+import com.playlet.oversea.service.support.WalletNotifyService;
 import com.playlet.oversea.service.support.WalletOpenCardSettlementService;
 import com.playlet.oversea.service.third.ThirdService;
 import com.playlet.oversea.service.third.WalletUserService;
@@ -89,6 +92,8 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 	private WalletBankcardSyncSupport walletBankcardSyncSupport;
 	@Autowired
 	private WalletCardCloseWebhookSupport walletCardCloseWebhookSupport;
+	@Autowired
+	private WalletNotifyService walletNotifyService;
 
 	@Lazy
 	@Autowired
@@ -170,6 +175,19 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 		WalletKycStateEnums localState = WalletKycStateEnums.fromApiStatus(apiStatus);
 		String failedReason = WalletKycStateEnums.ERROR_APPROVE.equals(localState) ? body.getAuditRemark() : null;
 		walletUserService.syncKycFromWebhook(body.getUid(), apiStatus, failedReason);
+		WalletUserEntity user = walletUserDao.findByWalletUid(body.getUid());
+		if (user != null) {
+			String bizId = "wallet:kyc:" + body.getUid() + ":" + apiStatus
+					+ (StringUtils.isEmpty(body.getEventId()) ? "" : (":" + body.getEventId()));
+			if (WalletKycStateEnums.SUCCESS_APPROVE.equals(localState)) {
+				walletNotifyService.notify(user, WalletNotifyEventEnums.KYC_PASS, bizId,
+						WalletNotifyConstants.JUMP_KYC, null);
+			} else if (WalletKycStateEnums.ERROR_APPROVE.equals(localState)) {
+				String reason = StringUtils.isEmpty(failedReason) ? "-" : failedReason;
+				walletNotifyService.notify(user, WalletNotifyEventEnums.KYC_REJECT, bizId,
+						WalletNotifyConstants.JUMP_KYC, null, reason);
+			}
+		}
 		log.info("wallet webhook kyc synced walletUid={} status={}", body.getUid(), apiStatus);
 	}
 
@@ -202,6 +220,12 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 			}
 			syncCardBalance(card);
 			linkWithdrawPayout(txn, body.getOrderId(), true, null);
+			WalletUserEntity user = walletUserDao.findByWalletUid(card.getWalletUid());
+			String amtText = rechargeAmt.toPlainString();
+			String bizId = "wallet:recharge:ok:"
+					+ (StringUtils.isEmpty(txn.getRequestOrderId()) ? body.getEventId() : txn.getRequestOrderId());
+			walletNotifyService.notify(user, WalletNotifyEventEnums.CARD_RECHARGE_SUCCESS, bizId,
+					WalletNotifyConstants.JUMP_CARD, String.valueOf(card.getId()), amtText);
 			return;
 		}
 		// 无本地流水时仍尝试同步余额
@@ -254,6 +278,8 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 
 	/** cardActive：轮询确认激活 + 回写卡号 + 核销冻结 */
 	private void handleCardActiveWebhook(WalletWebhookNotifyRequest body, WalletBankcardEntity card) {
+		boolean wasFrozen = card.getCardStatus() != null
+				&& card.getCardStatus() == WalletCardStatusEnums.FREEZE.getCode();
 		if (!confirmThirdPartyCardActive(card)) {
 			throw new BaseException("card not active after retry userBankcardId=" + body.getUserBankcardId());
 		}
@@ -265,8 +291,14 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 			walletUserService.markAccountActivated(user.getId());
 		}
 		walletOpenCardSettlementService.onCardActivated(card);
-		log.info("wallet webhook card activated userBankcardId={} cardNoPresent={}",
-				body.getUserBankcardId(), !StringUtils.isEmpty(card.getCardNo()));
+		String bizId = "wallet:card:active:" + card.getUserBankcardId()
+				+ (StringUtils.isEmpty(body.getEventId()) ? "" : (":" + body.getEventId()));
+		WalletNotifyEventEnums event = wasFrozen
+				? WalletNotifyEventEnums.CARD_UNFREEZE : WalletNotifyEventEnums.CARD_OPEN_SUCCESS;
+		walletNotifyService.notify(user, event, bizId,
+				WalletNotifyConstants.JUMP_CARD, String.valueOf(card.getId()));
+		log.info("wallet webhook card activated userBankcardId={} cardNoPresent={} wasFrozen={}",
+				body.getUserBankcardId(), !StringUtils.isEmpty(card.getCardNo()), wasFrozen);
 	}
 
 	/** cardFreeze：更新本地冻结状态 */
@@ -274,6 +306,12 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 		persistWebhookCardNo(body, card);
 		walletBankcardDao.updateCardStatus(card.getId(),
 				WalletCardStatusEnums.FREEZE.getCode(), WalletCardStatusEnums.FREEZE.getLabel());
+		WalletUserEntity user = walletUserDao.findByWalletUid(card.getWalletUid());
+		String reasonSuffix = StringUtils.isEmpty(body.getReason()) ? "" : ("：" + body.getReason());
+		walletNotifyService.notify(user, WalletNotifyEventEnums.CARD_FREEZE,
+				"wallet:card:freeze:" + card.getUserBankcardId()
+						+ (StringUtils.isEmpty(body.getEventId()) ? "" : (":" + body.getEventId())),
+				WalletNotifyConstants.JUMP_CARD, String.valueOf(card.getId()), reasonSuffix);
 		log.info("wallet webhook card frozen userBankcardId={} reason={}",
 				card.getUserBankcardId(), body.getReason());
 	}
@@ -409,15 +447,30 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 		if (Integer.valueOf(WalletLogStatusEnums.POSTED.getIntCode()).equals(row.getOrderState())) {
 			syncCardBalance(card);
 		}
+		WalletUserEntity user = walletUserDao.findByWalletUid(card.getWalletUid());
+		String titleText = row.getTitle() == null ? tx.getTransactionId() : row.getTitle();
+		walletNotifyService.notify(user, WalletNotifyEventEnums.CARD_TXN,
+				"wallet:txn:" + tx.getTransactionId(), WalletNotifyConstants.JUMP_CARD,
+				String.valueOf(card.getId()), titleText);
 		log.info("wallet webhook transaction inserted transactionId={} userBankcardId={}",
 				tx.getTransactionId(), body.getUserBankcardId());
 	}
 
-	/** 3DS 授权：记录日志并确认接收（推送由前端/消息通道扩展） */
+	/** 3DS 授权：系统消息 + 极光提醒 */
 	private void handle3ds(WalletWebhookNotifyRequest body) {
 		log.info("wallet webhook 3ds eventId={} userBankcardId={} authId={} hasOtp={}",
 				body.getEventId(), body.getUserBankcardId(), body.getAuthId(),
 				!StringUtils.isEmpty(body.getOtp()));
+		WalletBankcardEntity card = body.getUserBankcardId() == null
+				? null : walletBankcardDao.findByUserBankcardId(body.getUserBankcardId());
+		if (card == null) {
+			return;
+		}
+		WalletUserEntity user = walletUserDao.findByWalletUid(card.getWalletUid());
+		String bizId = "wallet:3ds:"
+				+ (StringUtils.isEmpty(body.getAuthId()) ? body.getEventId() : body.getAuthId());
+		walletNotifyService.notify(user, WalletNotifyEventEnums.CARD_3DS, bizId,
+				WalletNotifyConstants.JUMP_CARD, String.valueOf(card.getId()));
 	}
 
 	/** 商户充值：审计日志即可 */

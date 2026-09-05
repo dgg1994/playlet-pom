@@ -3,7 +3,7 @@ package com.playlet.oversea.service.support;
 import java.util.Date;
 
 /**
- * OnePay 绑定落库：C 端账号 / 作家资料各自实现。
+ * OnePay 绑定落库（作家资料）。
  */
 public interface OnePayBindOps {
 

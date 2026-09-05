@@ -10,6 +10,7 @@ import com.playlet.oversea.base.ResponseBase;
 import com.playlet.oversea.config.heard.LanguageContext;
 import com.playlet.oversea.constants.Constants;
 import com.playlet.oversea.constants.WalletConstants;
+import com.playlet.oversea.constants.WalletNotifyConstants;
 import com.playlet.oversea.constants.WalletKycApiStatus;
 import com.playlet.oversea.dao.wallet.*;
 import com.playlet.oversea.entity.wallet.*;
@@ -20,6 +21,7 @@ import com.playlet.oversea.enums.WalletLogOperateTypeEnums;
 import com.playlet.oversea.enums.WalletLogStatusEnums;
 import com.playlet.oversea.enums.WalletLogTradeTypeEnums;
 import com.playlet.oversea.enums.WalletLogisticsStateEnums;
+import com.playlet.oversea.enums.WalletNotifyEventEnums;
 import com.playlet.oversea.exception.BaseException;
 import com.playlet.oversea.query.pub.PageQueryHelperEntity;
 import com.playlet.oversea.service.MediaUrlService;
@@ -28,6 +30,7 @@ import com.playlet.oversea.service.support.WalletCardProductService;
 import com.playlet.oversea.service.support.WalletCardholderService;
 import com.playlet.oversea.service.support.WalletOpenCardSettlementService;
 import com.playlet.oversea.service.support.WalletPhysicalCardFulfillService;
+import com.playlet.oversea.service.support.WalletNotifyService;
 import com.playlet.oversea.utils.I18nUtil;
 import com.playlet.oversea.utils.KycFieldNormalizeUtil;
 import com.playlet.oversea.utils.OrderCodeFactory;
@@ -99,6 +102,8 @@ public class WalletUserService extends BaseApiService {
 	private WalletCardAccountMailingDao walletCardAccountMailingDao;
 	@Autowired
 	private MediaUrlService mediaUrlService;
+	@Autowired
+	private WalletNotifyService walletNotifyService;
 
 	/**
 	 * 本地账号注册成功后调用：开通 U 卡三方用户并写入 P0 表。
@@ -1215,6 +1220,9 @@ public class WalletUserService extends BaseApiService {
 			if (WalletConstants.TOPUP_TYPE_WALLET == payType) {
 				refundAvailableBalance(account.getId(), totalAmount, requestOrderId);
 			}
+			walletNotifyService.notify(user, WalletNotifyEventEnums.CARD_RECHARGE_FAIL,
+					"wallet:recharge:fail:" + requestOrderId, WalletNotifyConstants.JUMP_CARD,
+					String.valueOf(card.getId()));
 			return setResultError(e.getMessage());
 		} catch (Exception e) {
 			log.error("wallet card topUp error walletUid={} requestOrderId={}",
@@ -1222,6 +1230,9 @@ public class WalletUserService extends BaseApiService {
 			if (WalletConstants.TOPUP_TYPE_WALLET == payType) {
 				refundAvailableBalance(account.getId(), totalAmount, requestOrderId);
 			}
+			walletNotifyService.notify(user, WalletNotifyEventEnums.CARD_RECHARGE_FAIL,
+					"wallet:recharge:fail:" + requestOrderId, WalletNotifyConstants.JUMP_CARD,
+					String.valueOf(card.getId()));
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 		insertRechargeTransaction(user, card, query, targetAmount, handlingFees, payType);
@@ -2241,6 +2252,8 @@ public class WalletUserService extends BaseApiService {
 		}
 		log.info("wallet pay password bound walletUserId={} localUid={} userType={}",
 				user.getId(), localUid, userType);
+		walletNotifyService.notify(userType, localUid, WalletNotifyEventEnums.PAY_PASSWORD_BOUND,
+				"wallet:paypwd:" + user.getId(), WalletNotifyConstants.JUMP_HOME, null);
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 

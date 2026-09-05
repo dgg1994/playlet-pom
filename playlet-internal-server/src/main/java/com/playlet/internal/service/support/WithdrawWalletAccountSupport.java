@@ -1,6 +1,7 @@
 package com.playlet.internal.service.support;
 
 import com.playlet.internal.constants.WalletConstants;
+import com.playlet.internal.constants.WalletNotifyConstants;
 import com.playlet.internal.dao.wallet.WalletAccountDao;
 import com.playlet.internal.dao.wallet.WalletLogDao;
 import com.playlet.internal.dao.wallet.WalletUserDao;
@@ -11,6 +12,7 @@ import com.playlet.internal.enums.WalletKycStateEnums;
 import com.playlet.internal.enums.WalletLogOperateTypeEnums;
 import com.playlet.internal.enums.WalletLogStatusEnums;
 import com.playlet.internal.enums.WalletLogTradeTypeEnums;
+import com.playlet.internal.enums.WalletNotifyEventEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.utils.I18nUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +38,8 @@ public class WithdrawWalletAccountSupport {
 	private WalletAccountDao walletAccountDao;
 	@Autowired
 	private WalletLogDao walletLogDao;
+	@Autowired
+	private WalletNotifyService walletNotifyService;
 
 	/** 是否已开通钱包账户（wallet_user + wallet_account） */
 	public boolean isReady(Integer userType, Integer localUid) {
@@ -65,6 +69,9 @@ public class WithdrawWalletAccountSupport {
 		}
 		BigDecimal balanceAfter = balanceBefore.add(actualAmt);
 		insertCoinWithdrawWalletLog(user, balanceBefore, actualAmt, feeAmt, points, orderNo);
+		walletNotifyService.notify(userType, localUid, WalletNotifyEventEnums.COIN_TO_WALLET_SUCCESS,
+				"wallet:coin2wallet:" + orderNo, WalletNotifyConstants.JUMP_WITHDRAW, orderNo,
+				points, actualAmt.toPlainString(), WalletConstants.DEFAULT_CURRENCY);
 		log.info("withdraw credited walletAccountId={} orderNo={} withdrawOrderId={} amount={} balanceAfter={}",
 				account.getId(), orderNo, withdrawOrderId, actualAmt, balanceAfter);
 		return balanceAfter;

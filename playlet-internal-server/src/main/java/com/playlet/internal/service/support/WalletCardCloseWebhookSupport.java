@@ -2,6 +2,7 @@ package com.playlet.internal.service.support;
 
 import com.playlet.internal.api.request.WalletWebhookNotifyRequest;
 import com.playlet.internal.constants.WalletConstants;
+import com.playlet.internal.constants.WalletNotifyConstants;
 import com.playlet.internal.dao.wallet.WalletAccountDao;
 import com.playlet.internal.dao.wallet.WalletBankcardDao;
 import com.playlet.internal.dao.wallet.WalletCardCloseDao;
@@ -17,6 +18,7 @@ import com.playlet.internal.enums.WalletCardStatusEnums;
 import com.playlet.internal.enums.WalletLogOperateTypeEnums;
 import com.playlet.internal.enums.WalletLogStatusEnums;
 import com.playlet.internal.enums.WalletLogTradeTypeEnums;
+import com.playlet.internal.enums.WalletNotifyEventEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.OrderCodeFactory;
@@ -48,6 +50,8 @@ public class WalletCardCloseWebhookSupport {
 	private WalletLogDao walletLogDao;
 	@Autowired
 	private WalletBankcardSyncSupport walletBankcardSyncSupport;
+	@Autowired
+	private WalletNotifyService walletNotifyService;
 
 	/**
 	 * 卡片关闭回调：更新卡状态、余额退回钱包并落流水。
@@ -73,11 +77,17 @@ public class WalletCardCloseWebhookSupport {
 		if (refund.compareTo(BigDecimal.ZERO) <= 0 || user == null) {
 			log.info("wallet webhook card close no refund userBankcardId={} refund={}",
 					card.getUserBankcardId(), refund);
+			walletNotifyService.notify(user, WalletNotifyEventEnums.CARD_CLOSE,
+					"wallet:card:close:" + card.getUserBankcardId(),
+					WalletNotifyConstants.JUMP_CARD, String.valueOf(card.getId()));
 			return;
 		}
 		WalletAccountEntity account = walletAccountDao.findByWalletUserId(user.getId());
 		if (account == null) {
 			log.warn("wallet webhook card close account missing walletUserId={}", user.getId());
+			walletNotifyService.notify(user, WalletNotifyEventEnums.CARD_CLOSE,
+					"wallet:card:close:" + card.getUserBankcardId(),
+					WalletNotifyConstants.JUMP_CARD, String.valueOf(card.getId()));
 			return;
 		}
 		BigDecimal walletBefore = nz(account.getAvailableBalance());
@@ -88,6 +98,9 @@ public class WalletCardCloseWebhookSupport {
 		String orderNo = OrderCodeFactory.getOrderCode(card.getUserBankcardId());
 		insertCloseCardTransaction(card, refund, cardBalanceBefore, orderNo);
 		insertCloseWalletLog(user, account, card, refund, walletBefore, orderNo);
+		walletNotifyService.notify(user, WalletNotifyEventEnums.CARD_CLOSE,
+				"wallet:card:close:" + card.getUserBankcardId(),
+				WalletNotifyConstants.JUMP_CARD, String.valueOf(card.getId()));
 		log.info("wallet webhook card close refunded userBankcardId={} refund={} walletUserId={}",
 				card.getUserBankcardId(), refund, user.getId());
 	}

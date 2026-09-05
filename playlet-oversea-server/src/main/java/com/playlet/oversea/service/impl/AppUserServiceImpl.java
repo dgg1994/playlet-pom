@@ -1,6 +1,5 @@
 package com.playlet.oversea.service.impl;
 import com.playlet.oversea.aop.SysLogAnnotation;
-import com.playlet.oversea.api.request.OnePayBindVerifyRequest;
 import com.playlet.oversea.api.request.UserRegisterEntity;
 import com.playlet.oversea.base.BaseApiService;
 import com.playlet.oversea.base.ResponseBase;
@@ -25,8 +24,6 @@ import com.playlet.oversea.query.account.PushSwitchQuery;
 import com.playlet.oversea.query.account.UpdatePwdEntity;
 import com.playlet.oversea.service.AppUserService;
 import com.playlet.oversea.service.MediaUrlService;
-import com.playlet.oversea.service.support.AppOnePayBindOps;
-import com.playlet.oversea.service.support.OnePayBindService;
 import com.playlet.oversea.service.support.UserActiveStatService;
 import com.playlet.oversea.service.support.UserOnlineHeartbeatService;
 import com.playlet.oversea.service.third.WalletUserService;
@@ -85,12 +82,6 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 
 	@Autowired
 	private UserDramaLikeDao UserDramaLikeDao;
-
-	@Autowired
-	private OnePayBindService onePayBindService;
-
-	@Autowired
-	private AppOnePayBindOps appOnePayBindOps;
 
 	@Autowired
 	private UserOnlineHeartbeatService userOnlineHeartbeatService;
@@ -523,35 +514,6 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		}
 		appAccountDao.updateProfileById(update);
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
-	}
-
-	@Override
-	public ResponseBase bindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request) {
-		Integer uid = AppTokenUtil.resolveUid(request);
-		if (uid == null) {
-			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
-		}
-		AppAccountEntity account = appAccountDao.findByUid(uid);
-		if (account == null) {
-			return setResultError(I18nUtil.getMessage("user.not_null"));
-		}
-		return onePayBindService.bind(uid, query, resolveLoginEmail(account),
-				RedisKeyConstants.EMAIL_CODE_KEY, account.getOnepayBindStatus(), appOnePayBindOps);
-	}
-
-	@Override
-	public ResponseBase unBindOnePay(@RequestBody OnePayBindVerifyRequest query, HttpServletRequest request) {
-		Integer uid = AppTokenUtil.resolveUid(request);
-		if (uid == null) {
-			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
-		}
-		AppAccountEntity account = appAccountDao.findByUid(uid);
-		if (account == null) {
-			return setResultError(I18nUtil.getMessage("user.not_null"));
-		}
-		return onePayBindService.unbind(uid, query, resolveLoginEmail(account),
-				RedisKeyConstants.EMAIL_CODE_KEY, account.getOnepayBindStatus(),
-				account.getOnepayAccount(), appOnePayBindOps);
 	}
 
 	@Override

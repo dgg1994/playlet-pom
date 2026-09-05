@@ -10,7 +10,9 @@ public enum SystemMessageTypeEnums {
 	DRAMA_ONLINE("DRAMA_ONLINE", "剧上线"),
 	WITHDRAW("WITHDRAW", "提现"),
 	MEDAL("MEDAL", "勋章"),
-	ACCOUNT("ACCOUNT", "账户");
+	ACCOUNT("ACCOUNT", "账户"),
+	/** 钱包交易 / 卡操作等 */
+	WALLET("WALLET", "钱包");
 
 	private final String code;
 	private final String desc;

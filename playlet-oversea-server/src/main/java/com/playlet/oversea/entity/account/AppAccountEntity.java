@@ -112,22 +112,6 @@ public class AppAccountEntity extends PageQueryHelperEntity {
 	@TableField("birth_month")
 	@ApiModelProperty(name = "birthMonth", value = "出生年月 yyyy-MM", required = false, dataType = "String")
 	private String birthMonth;
-
-	@TableField("onepay_account")
-	@ApiModelProperty(name = "onepayAccount", value = "OnePay 账号", required = false, dataType = "String")
-	private String onepayAccount;
-
-	@TableField("onepay_open_id")
-	@ApiModelProperty(name = "onepayOpenId", value = "OnePay 侧用户ID", required = false, dataType = "String")
-	private String onepayOpenId;
-
-	@TableField("onepay_bind_status")
-	@ApiModelProperty(name = "onepayBindStatus", value = "OnePay 绑定 0未绑定 1已绑定", required = false, dataType = "Integer")
-	private Integer onepayBindStatus;
-
-	@TableField("onepay_bind_time")
-	@ApiModelProperty(name = "onepayBindTime", value = "OnePay 绑定成功时间", required = false, dataType = "Date")
-	private Date onepayBindTime;
 	
 	@TableField("setTime")
 	@ApiModelProperty(name = "setTime",value = "注册时间",required = false,dataType = "Date")

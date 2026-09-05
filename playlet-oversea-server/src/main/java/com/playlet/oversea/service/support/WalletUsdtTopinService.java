@@ -27,7 +27,9 @@ import com.playlet.oversea.enums.NoticeStateEnums;
 import com.playlet.oversea.enums.WalletLogOperateTypeEnums;
 import com.playlet.oversea.enums.WalletLogStatusEnums;
 import com.playlet.oversea.enums.WalletLogTradeTypeEnums;
+import com.playlet.oversea.enums.WalletNotifyEventEnums;
 import com.playlet.oversea.exception.BaseException;
+import com.playlet.oversea.constants.WalletNotifyConstants;
 import com.playlet.oversea.service.third.UsdtTopinClient;
 import com.playlet.oversea.utils.GenericityUtil;
 import com.playlet.oversea.utils.I18nUtil;
@@ -67,6 +69,8 @@ public class WalletUsdtTopinService extends BaseApiService {
 	private SysInfoDao sysInfoDao;
 	@Autowired
 	private UsdtTopinClient usdtTopinClient;
+	@Autowired
+	private WalletNotifyService walletNotifyService;
 	@Autowired
 	private UsdtTopinProperties usdtTopinProperties;
 	@Autowired
@@ -184,6 +188,8 @@ public class WalletUsdtTopinService extends BaseApiService {
 		}
 		log.info("usdt topin credited walletUid={} hash={} amount={} balanceAfter={}",
 				user.getWalletUid(), txHash, amount, after);
+		walletNotifyService.notify(user, WalletNotifyEventEnums.USDT_TOPIN_SUCCESS,
+				"wallet:usdt:" + txHash, WalletNotifyConstants.JUMP_LOG, txHash, amount.toPlainString());
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 

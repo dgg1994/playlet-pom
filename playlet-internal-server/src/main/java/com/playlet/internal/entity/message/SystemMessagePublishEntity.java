@@ -24,7 +24,7 @@ public class SystemMessagePublishEntity extends PageQueryHelperEntity {
 	private Long id;
 
 	@TableField("message_type")
-	@ApiModelProperty("NOTICE/ACTIVITY/VERSION/DRAMA_ONLINE/WITHDRAW/MEDAL/ACCOUNT")
+	@ApiModelProperty("NOTICE/ACTIVITY/VERSION/DRAMA_ONLINE/WITHDRAW/MEDAL/ACCOUNT/WALLET")
 	private String messageType;
 
 	@TableField("default_langue")

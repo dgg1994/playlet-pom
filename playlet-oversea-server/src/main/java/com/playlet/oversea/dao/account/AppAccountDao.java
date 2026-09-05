@@ -7,7 +7,6 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 import org.springframework.stereotype.Repository;
 
-import java.util.Date;
 import java.util.List;
 
 @Repository
@@ -74,24 +73,11 @@ public interface AppAccountDao extends BaseMapper<AppAccountEntity> {
 	@Update("update app_account set push_langue = #{langue}, gmtModified = now() where id = #{uid}")
 	int updatePushLangue(@Param("uid") Integer uid, @Param("langue") String langue);
 
-	/** 绑定 OnePay：写入账号、openId、状态、时间 */
-	@Update("update app_account set onepay_account = #{onepayAccount}, onepay_open_id = #{onepayOpenId}, "
-			+ "onepay_bind_status = #{bindStatus}, onepay_bind_time = #{bindTime}, gmtModified = now() "
-			+ "where id = #{uid}")
-	int updateOnePayBind(@Param("uid") Integer uid, @Param("onepayAccount") String onepayAccount,
-			@Param("onepayOpenId") String onepayOpenId, @Param("bindStatus") Integer bindStatus,
-			@Param("bindTime") Date bindTime);
-
-	/** 解绑：清空 OnePay 字段（updateById 不会写 null） */
-	@Update("update app_account set onepay_account = null, onepay_open_id = null, "
-			+ "onepay_bind_status = #{bindStatus}, onepay_bind_time = null, gmtModified = now() "
-			+ "where id = #{uid}")
-	int clearOnePayBind(@Param("uid") Integer uid, @Param("bindStatus") Integer bindStatus);
-
 	@Select("<script>"
 			+ "select a.id, cast(a.id as char) as uid, a.user_account as userAccount, a.user_email as userEmail, "
 			+ "a.mobile_number as mobileNumber, a.mobile_prefix as mobilePrefix, a.user_state as userState, "
 			+ "a.invitation_code as invitationCode, a.setTime, a.gmtModified, "
+			+ "wa.wallet_uid as walletUid, "
 			+ "wa.available_balance as walletBalance, wa.freeze_balance as freezeBalance, "
 			+ "wa.open_freeze_balance as openFreezeBalance, wa.kyc_state as kycState, "
 			+ "wa.kyc_state_name as kycStateName, wa.kyc_audit_result as kycAuditResult, "

@@ -2,6 +2,7 @@ package com.playlet.oversea.service.support;
 
 import com.playlet.oversea.api.request.BankcardRechargeRequest;
 import com.playlet.oversea.constants.WalletConstants;
+import com.playlet.oversea.constants.WalletNotifyConstants;
 import com.playlet.oversea.dao.wallet.WalletAccountDao;
 import com.playlet.oversea.dao.wallet.WalletCardApplyDao;
 import com.playlet.oversea.dao.wallet.WalletCardTransactionDao;
@@ -19,6 +20,7 @@ import com.playlet.oversea.enums.WalletLogOperateTypeEnums;
 import com.playlet.oversea.enums.WalletLogStatusEnums;
 import com.playlet.oversea.enums.WalletLogTradeTypeEnums;
 import com.playlet.oversea.enums.WalletLogisticsStateEnums;
+import com.playlet.oversea.enums.WalletNotifyEventEnums;
 import com.playlet.oversea.exception.BaseException;
 import com.playlet.oversea.service.third.ThirdService;
 import com.playlet.oversea.utils.I18nUtil;
@@ -56,6 +58,8 @@ public class WalletOpenCardSettlementService {
 	private WalletUserDao walletUserDao;
 	@Autowired
 	private ThirdService thirdService;
+	@Autowired
+	private WalletNotifyService walletNotifyService;
 
 	/**
 	 * 开卡成功后的预存首充（不重复扣 available_balance，费用已在申请时冻结）。
@@ -180,6 +184,9 @@ public class WalletOpenCardSettlementService {
 		}
 		WalletAccountEntity accountAfter = walletAccountDao.findByWalletUserId(apply.getWalletUserId());
 		insertOpenCardThawWalletLog(user, accountAfter, total, thawOutOrderNo);
+		walletNotifyService.notify(user, WalletNotifyEventEnums.CARD_OPEN_FAIL,
+				"wallet:open:fail:" + apply.getId(), WalletNotifyConstants.JUMP_APPLY,
+				String.valueOf(apply.getId()));
 		log.info("wallet unfreeze open card success applyId={} walletUserId={} amount={}",
 				apply.getId(), apply.getWalletUserId(), total);
 	}

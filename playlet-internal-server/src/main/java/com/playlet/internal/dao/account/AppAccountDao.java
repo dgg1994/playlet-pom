@@ -77,6 +77,7 @@ public interface AppAccountDao extends BaseMapper<AppAccountEntity> {
 			+ "select a.id, cast(a.id as char) as uid, a.user_account as userAccount, a.user_email as userEmail, "
 			+ "a.mobile_number as mobileNumber, a.mobile_prefix as mobilePrefix, a.user_state as userState, "
 			+ "a.invitation_code as invitationCode, a.setTime, a.gmtModified, "
+			+ "wa.wallet_uid as walletUid, "
 			+ "wa.available_balance as walletBalance, wa.freeze_balance as freezeBalance, "
 			+ "wa.open_freeze_balance as openFreezeBalance, wa.kyc_state as kycState, "
 			+ "wa.kyc_state_name as kycStateName, wa.kyc_audit_result as kycAuditResult, "

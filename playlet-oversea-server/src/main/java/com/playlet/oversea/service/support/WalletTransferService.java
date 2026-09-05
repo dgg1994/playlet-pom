@@ -7,6 +7,7 @@ import com.playlet.oversea.api.response.WalletTransferReadingResp;
 import com.playlet.oversea.base.ResponseBase;
 import com.playlet.oversea.constants.Constants;
 import com.playlet.oversea.constants.WalletConstants;
+import com.playlet.oversea.constants.WalletNotifyConstants;
 import com.playlet.oversea.dao.wallet.WalletAccountDao;
 import com.playlet.oversea.dao.wallet.WalletLogDao;
 import com.playlet.oversea.dao.wallet.WalletTransfetListDao;
@@ -20,6 +21,7 @@ import com.playlet.oversea.entity.wallet.WalletUserEntity;
 import com.playlet.oversea.enums.WalletLogOperateTypeEnums;
 import com.playlet.oversea.enums.WalletLogStatusEnums;
 import com.playlet.oversea.enums.WalletLogTradeTypeEnums;
+import com.playlet.oversea.enums.WalletNotifyEventEnums;
 import com.playlet.oversea.exception.BaseException;
 import com.playlet.oversea.service.third.WalletUserService;
 import com.playlet.oversea.utils.I18nUtil;
@@ -61,6 +63,8 @@ public class WalletTransferService {
 	private WalletLogDao walletLogDao;
 	@Autowired
 	private WalletUserService walletUserService;
+	@Autowired
+	private WalletNotifyService walletNotifyService;
 
 	/**
 	 * 内部转账：登录用户为发送方，不信任客户端 sendUid。
@@ -146,6 +150,14 @@ public class WalletTransferService {
 
 			log.info("wallet internal transfer orderNo={} sendWalletUid={} recipientWalletUid={} sendMoney={} actualMoney={}",
 					orderNo, senderUser.getWalletUid(), recipientUser.getWalletUid(), sendMoney, actualMoney);
+			String amountText = sendMoney.toPlainString() + " " + WalletConstants.DEFAULT_CURRENCY;
+			String actualText = actualMoney.toPlainString() + " " + WalletConstants.DEFAULT_CURRENCY;
+			walletNotifyService.notify(senderUser, WalletNotifyEventEnums.TRANSFER_OUT_SUCCESS,
+					"wallet:transfer:out:" + orderNo, WalletNotifyConstants.JUMP_TRANSFER, orderNo,
+					maskEmail(recipientUser.getEmail()), amountText);
+			walletNotifyService.notify(recipientUser, WalletNotifyEventEnums.TRANSFER_IN_SUCCESS,
+					"wallet:transfer:in:" + orderNo, WalletNotifyConstants.JUMP_TRANSFER, orderNo,
+					maskEmail(senderUser.getEmail()), actualText);
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (BaseException e) {
 			log.error("wallet transfer biz error userType={} localUid={}", userType, localUid, e);
@@ -325,6 +337,20 @@ public class WalletTransferService {
 
 	private static BigDecimal nz(BigDecimal value) {
 		return value == null ? BigDecimal.ZERO : value;
+	}
+
+	/** 通知文案邮箱脱敏 */
+	private static String maskEmail(String email) {
+		if (StringUtils.isEmpty(email) || !email.contains("@")) {
+			return email == null ? "" : email;
+		}
+		int at = email.indexOf('@');
+		String name = email.substring(0, at);
+		String domain = email.substring(at);
+		if (name.length() <= 2) {
+			return name.charAt(0) + "*" + domain;
+		}
+		return name.substring(0, 2) + "***" + domain;
 	}
 
 	private static void stampNow(WalletTransfetListEntity entity) {

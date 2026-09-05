@@ -9,6 +9,7 @@ import com.playlet.oversea.api.response.WalletLogisticsEventResp;
 import com.playlet.oversea.base.ResponseBase;
 import com.playlet.oversea.constants.EmsTrackingConstants;
 import com.playlet.oversea.constants.WalletConstants;
+import com.playlet.oversea.constants.WalletNotifyConstants;
 import com.playlet.oversea.dao.wallet.WalletAccountDao;
 import com.playlet.oversea.dao.wallet.WalletBankcardDao;
 import com.playlet.oversea.dao.wallet.WalletCardApplyDao;
@@ -29,6 +30,7 @@ import com.playlet.oversea.enums.WalletCardApplyStateEnums;
 import com.playlet.oversea.enums.WalletCardStatusEnums;
 import com.playlet.oversea.enums.WalletKycStateEnums;
 import com.playlet.oversea.enums.WalletLogisticsStateEnums;
+import com.playlet.oversea.enums.WalletNotifyEventEnums;
 import com.playlet.oversea.exception.BaseException;
 import com.playlet.oversea.service.support.WalletOpenCardSettlementService;
 import com.playlet.oversea.service.third.ThirdService;
@@ -79,6 +81,8 @@ public class WalletPhysicalCardFulfillService {
 	private EmsTrackingService emsTrackingService;
 	@Autowired
 	private WalletOpenCardSettlementService walletOpenCardSettlementService;
+	@Autowired
+	private WalletNotifyService walletNotifyService;
 
 	/**
 	 * 实体卡分配激活：绑定卡号并调三方激活。
@@ -193,6 +197,10 @@ public class WalletPhysicalCardFulfillService {
 		}
 		// 发货时核销开卡冻结（费用已在申请时冻结，不再重复扣 available_balance）
 		walletOpenCardSettlementService.settleApplyFreeze(apply);
+		WalletUserEntity user = walletUserDao.selectById(apply.getWalletUserId());
+		walletNotifyService.notify(user, WalletNotifyEventEnums.CARD_SHIPPING,
+				"wallet:shipping:" + apply.getId(), WalletNotifyConstants.JUMP_APPLY,
+				String.valueOf(apply.getId()), logisticsNum);
 		log.info("physical card shipping success applyId={} logisticsNum={}", apply.getId(), logisticsNum);
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}

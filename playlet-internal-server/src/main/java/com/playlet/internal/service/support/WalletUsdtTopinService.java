@@ -27,7 +27,9 @@ import com.playlet.internal.enums.NoticeStateEnums;
 import com.playlet.internal.enums.WalletLogOperateTypeEnums;
 import com.playlet.internal.enums.WalletLogStatusEnums;
 import com.playlet.internal.enums.WalletLogTradeTypeEnums;
+import com.playlet.internal.enums.WalletNotifyEventEnums;
 import com.playlet.internal.exception.BaseException;
+import com.playlet.internal.constants.WalletNotifyConstants;
 import com.playlet.internal.service.third.UsdtTopinClient;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
@@ -67,6 +69,8 @@ public class WalletUsdtTopinService extends BaseApiService {
 	private SysInfoDao sysInfoDao;
 	@Autowired
 	private UsdtTopinClient usdtTopinClient;
+	@Autowired
+	private WalletNotifyService walletNotifyService;
 	@Autowired
 	private UsdtTopinProperties usdtTopinProperties;
 	@Autowired
@@ -184,6 +188,8 @@ public class WalletUsdtTopinService extends BaseApiService {
 		}
 		log.info("usdt topin credited walletUid={} hash={} amount={} balanceAfter={}",
 				user.getWalletUid(), txHash, amount, after);
+		walletNotifyService.notify(user, WalletNotifyEventEnums.USDT_TOPIN_SUCCESS,
+				"wallet:usdt:" + txHash, WalletNotifyConstants.JUMP_LOG, txHash, amount.toPlainString());
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 

@@ -52,6 +52,9 @@ public class AppUserInfoReqEntity {
 	
 	@ApiModelProperty(name = "walletState",value = "钱包开启状态；ture开启；false关闭",required = false,dataType = "String")
 	private Boolean walletState;
+
+	@ApiModelProperty(name = "walletUid", value = "钱包三方 uid（wallet_account.wallet_uid）", required = false, dataType = "Long")
+	private Long walletUid;
 	
 	@ApiModelProperty(name = "walletBalance",value = "钱包余额",required = false,dataType = "Double")
 	private Double walletBalance;
