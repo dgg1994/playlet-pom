@@ -26,10 +26,10 @@ public class AppUserInfoReqEntity {
 	@ApiModelProperty(name = "userEmail",value = "邮箱",required = true,dataType = "String")
 	private String userEmail;
 	
-	@ApiModelProperty(name = "mobileNumber",value = "手机号",required = false,dataType = "String")
+	@ApiModelProperty(name = "mobileNumber", value = "手机号（账号→钱包用户→持卡人）", required = false, dataType = "String")
 	private String mobileNumber;
 	
-	@ApiModelProperty(name = "mobilePrefix",value = "国家代码",required = false,dataType = "String")
+	@ApiModelProperty(name = "mobilePrefix", value = "手机区号（账号→钱包用户→持卡人）", required = false, dataType = "String")
 	private String mobilePrefix;
 	
 	@ApiModelProperty(name = "googleSecretkey",value = "谷歌密钥",required = false,dataType = "String")

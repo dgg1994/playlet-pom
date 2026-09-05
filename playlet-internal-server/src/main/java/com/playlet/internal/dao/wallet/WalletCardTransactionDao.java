@@ -54,10 +54,17 @@ public interface WalletCardTransactionDao extends BaseMapper<WalletCardTransacti
 	int updateOrderState(@Param("id") Long id, @Param("orderState") Integer orderState,
 			@Param("orderStateName") String orderStateName, @Param("thirdOrderNum") String thirdOrderNum);
 
-	/** 管理端卡交易流水（关联用户邮箱） */
+	/** 管理端卡交易流水（关联用户邮箱、银行卡类型 VIRTUAL/PHYSICAL） */
 	@Select("<script>"
-			+ "select t.*, wu.email as userEmail from wallet_card_transaction t "
-			+ "left join wallet_user wu on t.wallet_user_id = wu.id where 1=1 "
+			+ "select t.*, wu.email as user_email, "
+			+ "coalesce(nullif(b.bankcard_nature,''), nullif(b.card_type,''), "
+			+ "nullif(p.bankcard_nature,''), nullif(a.card_type,'')) as card_type "
+			+ "from wallet_card_transaction t "
+			+ "left join wallet_user wu on t.wallet_user_id = wu.id "
+			+ "left join wallet_bankcard b on b.user_bankcard_id = t.user_bankcard_id "
+			+ "left join wallet_card_product p on p.id = coalesce(t.card_product_id, b.card_product_id) "
+			+ "left join wallet_card_apply a on a.id = b.card_apply_id "
+			+ "where 1=1 "
 			+ "<if test='transType != null and transType != \"\"'> "
 			+ "and (t.trans_type = #{transType} or t.biz_type = #{transType}) </if>"
 			+ "<if test='cardNo != null and cardNo != \"\"'> and t.card_no like concat('%', #{cardNo}, '%') </if>"

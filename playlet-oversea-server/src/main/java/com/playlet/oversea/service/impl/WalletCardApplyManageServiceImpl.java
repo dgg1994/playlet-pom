@@ -318,12 +318,13 @@ public class WalletCardApplyManageServiceImpl implements WalletCardApplyManageSe
 		card.setUserBankcardId(third.getUserBankcardId());
 		card.setCardNo(third.getCardNo());
 		card.setBankcardNature(product == null ? null : product.getBankcardNature());
+		card.setCardType(product == null ? null : product.getBankcardNature());
 		card.setCardBrand(product == null ? null : product.getCardBrand());
 		card.setCurrency(WalletConstants.DEFAULT_CURRENCY);
-		// 虚拟卡 KYC 已通过开卡：直接正常；实体卡待绑卡
+		// 虚拟卡：激活中等回调；实体卡：待激活
 		if (product != null && WalletConstants.BANKCARD_NATURE_VIRTUAL.equalsIgnoreCase(product.getBankcardNature())) {
-			card.setCardStatus(WalletCardStatusEnums.ACTIVE.getCode());
-			card.setCardStatusName(WalletCardStatusEnums.ACTIVE.getLabel());
+			card.setCardStatus(WalletCardStatusEnums.ACTIVATING.getCode());
+			card.setCardStatusName(WalletCardStatusEnums.ACTIVATING.getLabel());
 		} else {
 			card.setCardStatus(WalletCardStatusEnums.WAIT_ACTIVE.getCode());
 			card.setCardStatusName(WalletCardStatusEnums.WAIT_ACTIVE.getLabel());

@@ -111,7 +111,8 @@ public interface WithdrawService {
 			+ "requestOrderId 可选（不传服务端自动生成 CA 前缀单号），同单号幂等；"
 			+ "校验通过后落申请单(待激活)并冻结开卡总费用(月费+开卡费+预存费+邮费)；"
 			+ "KYC 未通过时可后补 /wallet/kyc/applyByCardApply 或 /wallet/kyc/apply；"
-			+ "KYC 已通过时虚拟卡自动调三方发卡并首充，申请单直接为激活成功(applyState=3)；返回 applyId/费用明细/kycState 等")
+			+ "KYC 已通过时虚拟卡自动调三方发卡并首充，申请单/卡状态为激活中(applyState=2)，"
+			+ "待三方 cardActive 回调确认后再变为激活成功；返回 applyId/费用明细/kycState 等")
 	ResponseBase applyCard(@RequestBody WalletApplyCardRequest query, HttpServletRequest request);
 
 	@PostMapping("/cardholder/add")

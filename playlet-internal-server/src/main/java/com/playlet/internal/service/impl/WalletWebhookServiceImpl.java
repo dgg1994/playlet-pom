@@ -12,16 +12,19 @@ import com.playlet.internal.constants.WalletNotifyConstants;
 import com.playlet.internal.constants.WalletWebhookConstants;
 import com.playlet.internal.dao.welfare.UserWithdrawOrderDao;
 import com.playlet.internal.dao.wallet.WalletBankcardDao;
+import com.playlet.internal.dao.wallet.WalletCardApplyDao;
 import com.playlet.internal.dao.wallet.WalletCardTransactionDao;
 import com.playlet.internal.dao.wallet.WalletLogDao;
 import com.playlet.internal.dao.wallet.WalletUserDao;
 import com.playlet.internal.dao.wallet.WalletWebhookEventDao;
 import com.playlet.internal.entity.welfare.UserWithdrawOrderEntity;
 import com.playlet.internal.entity.wallet.WalletBankcardEntity;
+import com.playlet.internal.entity.wallet.WalletCardApplyEntity;
 import com.playlet.internal.entity.wallet.WalletCardTransactionEntity;
 import com.playlet.internal.entity.wallet.WalletLogEntity;
 import com.playlet.internal.entity.wallet.WalletUserEntity;
 import com.playlet.internal.entity.wallet.WalletWebhookEventEntity;
+import com.playlet.internal.enums.WalletCardApplyStateEnums;
 import com.playlet.internal.enums.WalletCardStatusEnums;
 import com.playlet.internal.enums.WalletKycStateEnums;
 import com.playlet.internal.enums.WalletLogStatusEnums;
@@ -74,6 +77,8 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 	private WalletUserDao walletUserDao;
 	@Autowired
 	private WalletBankcardDao walletBankcardDao;
+	@Autowired
+	private WalletCardApplyDao walletCardApplyDao;
 	@Autowired
 	private WalletCardTransactionDao walletCardTransactionDao;
 	@Autowired
@@ -276,11 +281,23 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 				card.getUserBankcardId(), status.getLabel());
 	}
 
-	/** cardActive：轮询确认激活 + 回写卡号 + 核销冻结 */
+	/**
+	 * cardActive：轮询确认三方已 ACTIVE 后再落本地成功；仍激活中则保持本地激活中并失败回执以便三方重试
+	 *（对齐 onetoken WebhookServiceImpl.activeCard）。
+	 */
 	private void handleCardActiveWebhook(WalletWebhookNotifyRequest body, WalletBankcardEntity card) {
+		boolean alreadyActive = card.getCardStatus() != null
+				&& card.getCardStatus() == WalletCardStatusEnums.ACTIVE.getCode();
+		if (alreadyActive) {
+			persistWebhookCardNo(body, card);
+			log.info("wallet webhook card active idempotent userBankcardId={}", body.getUserBankcardId());
+			return;
+		}
 		boolean wasFrozen = card.getCardStatus() != null
 				&& card.getCardStatus() == WalletCardStatusEnums.FREEZE.getCode();
 		if (!confirmThirdPartyCardActive(card)) {
+			// 本地维持激活中，不核销冻结；抛错让三方重推，待真正 ACTIVE 再成功
+			ensureLocalActivating(card);
 			throw new BaseException("card not active after retry userBankcardId=" + body.getUserBankcardId());
 		}
 		persistWebhookCardNo(body, card);
@@ -299,6 +316,34 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 				WalletNotifyConstants.JUMP_CARD, String.valueOf(card.getId()));
 		log.info("wallet webhook card activated userBankcardId={} cardNoPresent={} wasFrozen={}",
 				body.getUserBankcardId(), !StringUtils.isEmpty(card.getCardNo()), wasFrozen);
+	}
+
+	/** 回调确认失败时确保本地为激活中（避免误标成功） */
+	private void ensureLocalActivating(WalletBankcardEntity card) {
+		if (card == null || card.getId() == null) {
+			return;
+		}
+		boolean activating = card.getCardStatus() != null
+				&& card.getCardStatus() == WalletCardStatusEnums.ACTIVATING.getCode();
+		if (activating) {
+			return;
+		}
+		walletBankcardDao.updateCardStatus(card.getId(),
+				WalletCardStatusEnums.ACTIVATING.getCode(), WalletCardStatusEnums.ACTIVATING.getLabel());
+		card.setCardStatus(WalletCardStatusEnums.ACTIVATING.getCode());
+		card.setCardStatusName(WalletCardStatusEnums.ACTIVATING.getLabel());
+		if (card.getCardApplyId() != null) {
+			WalletCardApplyEntity apply = walletCardApplyDao.selectById(card.getCardApplyId());
+			if (apply != null
+					&& !Integer.valueOf(WalletCardApplyStateEnums.SUCCESS_ACTIVATION.getCode())
+					.equals(apply.getApplyState())
+					&& !Integer.valueOf(WalletCardApplyStateEnums.ERROR_ACTIVATION.getCode())
+					.equals(apply.getApplyState())) {
+				walletCardApplyDao.updateApplyState(apply.getId(),
+						WalletCardApplyStateEnums.PROCESS_ACTIVATION.getCode(),
+						WalletCardApplyStateEnums.PROCESS_ACTIVATION.getLabel(), null);
+			}
+		}
 	}
 
 	/** cardFreeze：更新本地冻结状态 */

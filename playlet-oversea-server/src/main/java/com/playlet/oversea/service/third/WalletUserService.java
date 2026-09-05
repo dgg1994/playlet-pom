@@ -337,7 +337,7 @@ public class WalletUserService extends BaseApiService {
 
 	/**
 	 * 申请开卡（对齐 onetoken openCardApply）：支付密码 → 校验产品/持卡人/KYC 资料 → 计算费用并冻结余额
-	 * → 落申请单 → KYC 已通过时虚拟卡自动三方发卡并标记激活成功。
+	 * → 落申请单 → KYC 已通过时虚拟卡自动三方发卡并置「激活中」，成功依赖 cardActive 回调。
 	 */
 	@Transactional(rollbackFor = Exception.class)
 	public ResponseBase applyCard(Integer userType, Integer localUid, WalletApplyCardRequest query) {
@@ -409,7 +409,7 @@ public class WalletUserService extends BaseApiService {
 		boolean kycApproved = isKycApproved(account);
 		// 落申请单 + 持卡人/KYC/邮寄地址快照（对齐 onetoken addApply）
 		WalletCardApplyEntity apply = buildApplyEntity(user, account, product, query, holder.getId(),
-				requestOrderId, topupType, physicalCard, false, fees, now);
+				requestOrderId, topupType, physicalCard, fees, now);
 		try {
 			walletCardApplyDao.insert(apply);
 			persistApplySnapshots(user, apply.getId(), holder, query, now);
@@ -707,7 +707,7 @@ public class WalletUserService extends BaseApiService {
 
 	private static WalletCardApplyEntity buildApplyEntity(WalletUserEntity user, WalletAccountEntity account,
 			WalletCardProductEntity product, WalletApplyCardRequest query, Long holderId, String requestOrderId,
-			int topupType, boolean physicalCard, boolean autoIssued, OpenCardFeeBundle fees, Date now) {
+			int topupType, boolean physicalCard, OpenCardFeeBundle fees, Date now) {
 		WalletCardApplyEntity apply = new WalletCardApplyEntity();
 		apply.setWalletUserId(user.getId());
 		apply.setWalletUid(user.getWalletUid());
@@ -720,13 +720,9 @@ public class WalletUserService extends BaseApiService {
 		apply.setPreSaveCost(fees.preSaveCost);
 		apply.setLogisticsMonery(fees.logisticsMonery);
 		apply.setOpenCardTotal(fees.openCardTotal);
-		if (autoIssued) {
-			apply.setApplyState(WalletCardApplyStateEnums.SUCCESS_ACTIVATION.getCode());
-			apply.setApplyStateName(WalletCardApplyStateEnums.SUCCESS_ACTIVATION.getLabel());
-		} else {
-			apply.setApplyState(WalletCardApplyStateEnums.WAIT_ACTIVATION.getCode());
-			apply.setApplyStateName(WalletCardApplyStateEnums.WAIT_ACTIVATION.getLabel());
-		}
+		// 申请落单均为待激活；虚拟卡自动发卡后由 finalize 改为激活中，真正成功靠 webhook
+		apply.setApplyState(WalletCardApplyStateEnums.WAIT_ACTIVATION.getCode());
+		apply.setApplyStateName(WalletCardApplyStateEnums.WAIT_ACTIVATION.getLabel());
 		apply.setKycState(account.getKycState());
 		apply.setKycStateName(account.getKycStateName());
 		apply.setKycAuditResult(account.getKycAuditResult());
@@ -1532,12 +1528,16 @@ public class WalletUserService extends BaseApiService {
 		}
 	}
 
-	/** 虚拟卡 KYC 已通过且三方开卡成功：首充、回写卡号、标记激活成功并核销冻结 */
+	/**
+	 * 虚拟卡三方开卡成功：首充 + 本地置「激活中」，等 cardActive 回调确认后再成功
+	 *（对齐 onetoken CardApplyServiceImpl.openCard）。
+	 */
 	public void finalizeVirtualCardAfterAutoIssue(WalletUserEntity user, WalletCardApplyEntity apply,
 			WalletBankcardEntity card, ThirdBankcardApplyResp third) {
 		if (user == null || apply == null || card == null) {
 			return;
 		}
+		// 首充走三方，费用仍在开卡冻结中，待回调激活成功再核销
 		walletOpenCardSettlementService.afterVirtualCardIssued(user, apply, card);
 		if (third != null && !StringUtils.isEmpty(third.getCardNo())) {
 			walletBankcardDao.updateCardNo(card.getId(), third.getCardNo());
@@ -1545,13 +1545,21 @@ public class WalletUserService extends BaseApiService {
 		}
 		walletBankcardSyncSupport.syncCardNo(card);
 		walletBankcardDao.updateCardStatus(card.getId(),
-				WalletCardStatusEnums.ACTIVE.getCode(), WalletCardStatusEnums.ACTIVE.getLabel());
-		card.setCardStatus(WalletCardStatusEnums.ACTIVE.getCode());
-		card.setCardStatusName(WalletCardStatusEnums.ACTIVE.getLabel());
-		walletOpenCardSettlementService.onCardActivated(card);
-		apply.setApplyState(WalletCardApplyStateEnums.SUCCESS_ACTIVATION.getCode());
-		apply.setApplyStateName(WalletCardApplyStateEnums.SUCCESS_ACTIVATION.getLabel());
-		log.info("wallet virtual card finalized applyId={} userBankcardId={}",
+				WalletCardStatusEnums.ACTIVATING.getCode(), WalletCardStatusEnums.ACTIVATING.getLabel());
+		card.setCardStatus(WalletCardStatusEnums.ACTIVATING.getCode());
+		card.setCardStatusName(WalletCardStatusEnums.ACTIVATING.getLabel());
+		try {
+			walletCardApplyDao.updateApplyState(apply.getId(),
+					WalletCardApplyStateEnums.PROCESS_ACTIVATION.getCode(),
+					WalletCardApplyStateEnums.PROCESS_ACTIVATION.getLabel(), null);
+		} catch (Exception e) {
+			log.error("wallet virtual card mark activating failed applyId={} userBankcardId={}",
+					apply.getId(), card.getUserBankcardId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+		apply.setApplyState(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getCode());
+		apply.setApplyStateName(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getLabel());
+		log.info("wallet virtual card issued wait active applyId={} userBankcardId={}",
 				apply.getId(), card.getUserBankcardId());
 	}
 
@@ -1566,12 +1574,14 @@ public class WalletUserService extends BaseApiService {
 		card.setUserBankcardId(third.getUserBankcardId());
 		card.setCardNo(third.getCardNo());
 		card.setBankcardNature(product == null ? null : product.getBankcardNature());
+		// card_type 与 bankcard_nature 同步，便于管理端交易列表展示
+		card.setCardType(product == null ? null : product.getBankcardNature());
 		card.setCardBrand(product == null ? null : product.getCardBrand());
 		card.setCurrency(WalletConstants.DEFAULT_CURRENCY);
-		// 虚拟卡三方开卡后：KYC 已通过则直接标记正常，否则激活中
+		// 虚拟卡：激活中，等 webhook；实体卡：待激活/绑卡
 		if (isVirtualCardProduct(product)) {
-			card.setCardStatus(WalletCardStatusEnums.ACTIVE.getCode());
-			card.setCardStatusName(WalletCardStatusEnums.ACTIVE.getLabel());
+			card.setCardStatus(WalletCardStatusEnums.ACTIVATING.getCode());
+			card.setCardStatusName(WalletCardStatusEnums.ACTIVATING.getLabel());
 		} else {
 			card.setCardStatus(WalletCardStatusEnums.WAIT_ACTIVE.getCode());
 			card.setCardStatusName(WalletCardStatusEnums.WAIT_ACTIVE.getLabel());

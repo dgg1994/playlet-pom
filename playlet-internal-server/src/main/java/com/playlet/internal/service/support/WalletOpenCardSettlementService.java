@@ -63,6 +63,7 @@ public class WalletOpenCardSettlementService {
 
 	/**
 	 * 开卡成功后的预存首充（不重复扣 available_balance，费用已在申请时冻结）。
+	 * 交易流水拆开：到账金额=预存费，手续费=开卡费（对齐 onetoken firstTopUp）。
 	 */
 	public void firstTopUpAfterOpenCard(WalletUserEntity user, WalletCardApplyEntity apply,
 			WalletBankcardEntity card) {
@@ -73,6 +74,7 @@ public class WalletOpenCardSettlementService {
 		if (preSave.compareTo(BigDecimal.ZERO) <= 0) {
 			return;
 		}
+		BigDecimal openCardFee = apply.getOpenCardCost() == null ? BigDecimal.ZERO : apply.getOpenCardCost();
 		String requestOrderId = buildFirstTopUpOrderId(apply);
 		WalletCardTransactionEntity existed = walletCardTransactionDao.findByRequestOrderId(requestOrderId);
 		if (existed != null) {
@@ -88,8 +90,13 @@ public class WalletOpenCardSettlementService {
 		}
 		BankcardRechargeRequest req = new BankcardRechargeRequest();
 		req.setUserBankcardId(card.getUserBankcardId());
+		// 到卡金额=预存；开卡费记手续费字段
 		req.setAmount(preSave);
+		req.setTargetAmount(preSave);
+		req.setHandlingFees(openCardFee);
+		req.setPayType(apply.getTopupType() == null ? WalletConstants.TOPUP_TYPE_WALLET : apply.getTopupType());
 		req.setRequestOrderId(requestOrderId);
+		req.setType(Boolean.FALSE);
 		try {
 			thirdService.rechargeBankcard(user.getWalletUid(), req);
 		} catch (BaseException e) {
@@ -102,9 +109,9 @@ public class WalletOpenCardSettlementService {
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 		insertFirstTopUpTransaction(user, card, req);
-		upsertFirstTopUpWalletLog(user, apply, card, req, preSave);
-		log.info("wallet first topup submitted applyId={} walletUid={} userBankcardId={} amount={}",
-				apply.getId(), user.getWalletUid(), card.getUserBankcardId(), preSave);
+		upsertFirstTopUpWalletLog(user, apply, card, req, preSave, openCardFee);
+		log.info("wallet first topup submitted applyId={} walletUid={} userBankcardId={} amount={} handlingFees={}",
+				apply.getId(), user.getWalletUid(), card.getUserBankcardId(), preSave, openCardFee);
 	}
 
 	/** 虚拟卡开卡成功后：首充 */
@@ -338,7 +345,8 @@ public class WalletOpenCardSettlementService {
 	private void insertFirstTopUpTransaction(WalletUserEntity user, WalletBankcardEntity card,
 			BankcardRechargeRequest query) {
 		Date now = new Date();
-		BigDecimal amount = query.getAmount();
+		BigDecimal amount = query.getAmount() == null ? BigDecimal.ZERO : query.getAmount();
+		BigDecimal handlingFees = query.getHandlingFees() == null ? BigDecimal.ZERO : query.getHandlingFees();
 		String currency = StringUtils.isEmpty(card.getCurrency())
 				? WalletConstants.DEFAULT_CURRENCY : card.getCurrency();
 		WalletCardTransactionEntity txn = new WalletCardTransactionEntity();
@@ -352,12 +360,15 @@ public class WalletOpenCardSettlementService {
 		txn.setRequestOrderId(query.getRequestOrderId());
 		txn.setBizType(WalletConstants.BIZ_RECHARGE);
 		txn.setTransType(WalletConstants.TRANS_TOPUP);
+		txn.setPayType(query.getPayType());
 		txn.setOrderState(WalletLogStatusEnums.PROCESSING.getIntCode());
 		txn.setOrderStateName(WalletLogStatusEnums.PROCESSING.getLabel());
 		txn.setLocalCurrency(currency);
+		// 拆开：到账=预存，手续费=开卡费
 		txn.setLocalCurrencyAmt(amount);
 		txn.setTransCurrency(currency);
 		txn.setTransCurrencyAmt(amount);
+		txn.setHandlingFees(handlingFees);
 		txn.setTitle("开卡首充");
 		txn.setSetTime(now);
 		txn.setGmtModified(now);
@@ -373,14 +384,16 @@ public class WalletOpenCardSettlementService {
 
 	/**
 	 * 开卡首充账变：优先更新申请时「开卡冻结」记录为「开卡」，否则新增（对齐 onetoken firstTopUp）。
+	 * realMoney=预存到账，serviceCharge=开卡费。
 	 */
 	private void upsertFirstTopUpWalletLog(WalletUserEntity user, WalletCardApplyEntity apply,
-			WalletBankcardEntity card, BankcardRechargeRequest query, BigDecimal amount) {
+			WalletBankcardEntity card, BankcardRechargeRequest query, BigDecimal amount, BigDecimal openCardFee) {
 		if (user == null || apply == null || query == null) {
 			return;
 		}
 		Date now = new Date();
-		BigDecimal realMoney = amount;
+		BigDecimal realMoney = amount == null ? BigDecimal.ZERO : amount;
+		BigDecimal serviceCharge = openCardFee == null ? BigDecimal.ZERO : openCardFee;
 		WalletLogEntity existed = walletLogDao.findByOutOrderNo(String.valueOf(apply.getId()));
 		if (existed != null) {
 			existed.setOrderNo(OrderCodeFactory.getOrderCode(user.getWalletUid()));
@@ -389,7 +402,7 @@ public class WalletOpenCardSettlementService {
 			existed.setTitle(I18nUtil.getMessage("wallet.log.open_card"));
 			existed.setStatus(WalletLogStatusEnums.PROCESSING.getCode());
 			existed.setRealMoney(realMoney);
-			existed.setServiceCharge(BigDecimal.ZERO);
+			existed.setServiceCharge(serviceCharge);
 			if (card != null) {
 				existed.setWalletBankcardId(card.getId());
 				existed.setToName(card.getCardNo());
@@ -414,7 +427,7 @@ public class WalletOpenCardSettlementService {
 		logEntity.setTitle(I18nUtil.getMessage("wallet.log.open_card"));
 		logEntity.setPrimevalMoneyUnit(WalletConstants.DEFAULT_CURRENCY);
 		logEntity.setRealMoney(realMoney);
-		logEntity.setServiceCharge(BigDecimal.ZERO);
+		logEntity.setServiceCharge(serviceCharge);
 		logEntity.setFormName(user.getEmail());
 		logEntity.setFormAccount(String.valueOf(user.getWalletUid()));
 		if (card != null) {

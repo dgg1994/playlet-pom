@@ -119,6 +119,10 @@ public class WalletCardTransactionEntity {
 	private String userEmail;
 
 	@TableField(exist = false)
+	@ApiModelProperty(name = "cardType", value = "银行卡类型 VIRTUAL/PHYSICAL")
+	private String cardType;
+
+	@TableField(exist = false)
 	private String transTypeLabel;
 
 	@TableField(exist = false)

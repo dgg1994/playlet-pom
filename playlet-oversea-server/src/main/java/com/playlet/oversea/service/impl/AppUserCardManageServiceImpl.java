@@ -6,11 +6,12 @@ import com.playlet.oversea.aop.SysLogAnnotation;
 import com.playlet.oversea.api.request.BankcardUpdateStatusRequest;
 import com.playlet.oversea.api.response.WalletBankcardAdminResp;
 import com.playlet.oversea.base.ResponseBase;
-import com.playlet.oversea.constants.WalletConstants;
 import com.playlet.oversea.dao.wallet.WalletBankcardDao;
+import com.playlet.oversea.dao.wallet.WalletCardApplyManDao;
 import com.playlet.oversea.dao.wallet.WalletCardProductDao;
 import com.playlet.oversea.dao.wallet.WalletCardTransactionDao;
 import com.playlet.oversea.entity.wallet.WalletBankcardEntity;
+import com.playlet.oversea.entity.wallet.WalletCardApplyManEntity;
 import com.playlet.oversea.entity.wallet.WalletCardProductEntity;
 import com.playlet.oversea.entity.wallet.WalletCardTransactionEntity;
 import com.playlet.oversea.enums.WalletCardStatusEnums;
@@ -21,6 +22,7 @@ import com.playlet.oversea.query.wallet.WalletCardTransactionAdminQuery;
 import com.playlet.oversea.service.AppUserCardManageService;
 import com.playlet.oversea.service.third.ThirdService;
 import com.playlet.oversea.utils.I18nUtil;
+import com.playlet.oversea.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +50,8 @@ public class AppUserCardManageServiceImpl implements AppUserCardManageService {
 	private WalletBankcardDao walletBankcardDao;
 	@Autowired
 	private WalletCardProductDao walletCardProductDao;
+	@Autowired
+	private WalletCardApplyManDao walletCardApplyManDao;
 	@Autowired
 	private WalletCardTransactionDao walletCardTransactionDao;
 	@Autowired
@@ -85,6 +89,11 @@ public class AppUserCardManageServiceImpl implements AppUserCardManageService {
 				WalletCardProductEntity product = walletCardProductDao.findById(row.getCardId());
 				row.setCardData(product);
 			}
+			// 持卡人：开卡申请快照（对齐 onetoken manData）
+			if (row.getApplyId() != null) {
+				WalletCardApplyManEntity man = walletCardApplyManDao.findByApplyId(row.getApplyId());
+				row.setManData(man);
+			}
 		}
 		return setResultSuccess(new PageInfo<>(list), I18nUtil.getMessage("base_success"));
 	}
@@ -111,8 +120,44 @@ public class AppUserCardManageServiceImpl implements AppUserCardManageService {
 			BigDecimal fee = row.getHandlingFees() == null ? BigDecimal.ZERO : row.getHandlingFees();
 			row.setTotalManey(amt.add(fee));
 			row.setTransTypeLabel(row.getTransType() != null ? row.getTransType() : row.getBizType());
+			// SQL 未带出时再按卡/产品补全银行卡类型
+			fillCardTypeIfAbsent(row);
 		}
 		return setResultSuccess(new PageInfo<>(list), I18nUtil.getMessage("base_success"));
+	}
+
+	/** 补全交易流水的银行卡类型（VIRTUAL/PHYSICAL） */
+	private void fillCardTypeIfAbsent(WalletCardTransactionEntity row) {
+		if (row == null || !StringUtils.isEmpty(row.getCardType())) {
+			return;
+		}
+		WalletBankcardEntity card = null;
+		if (row.getWalletBankcardId() != null) {
+			card = walletBankcardDao.selectById(row.getWalletBankcardId());
+		}
+		if (card == null && row.getUserBankcardId() != null) {
+			card = walletBankcardDao.findByUserBankcardId(row.getUserBankcardId());
+		}
+		if (card != null) {
+			if (!StringUtils.isEmpty(card.getBankcardNature())) {
+				row.setCardType(card.getBankcardNature());
+				return;
+			}
+			if (!StringUtils.isEmpty(card.getCardType())) {
+				row.setCardType(card.getCardType());
+				return;
+			}
+		}
+		Integer productId = row.getCardProductId();
+		if (productId == null && card != null) {
+			productId = card.getCardProductId();
+		}
+		if (productId != null) {
+			WalletCardProductEntity product = walletCardProductDao.findById(productId);
+			if (product != null && !StringUtils.isEmpty(product.getBankcardNature())) {
+				row.setCardType(product.getBankcardNature());
+			}
+		}
 	}
 
 	@Override

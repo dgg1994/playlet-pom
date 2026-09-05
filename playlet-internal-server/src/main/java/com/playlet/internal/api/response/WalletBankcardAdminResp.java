@@ -1,5 +1,6 @@
 package com.playlet.internal.api.response;
 
+import com.playlet.internal.entity.wallet.WalletCardApplyManEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -33,4 +34,7 @@ public class WalletBankcardAdminResp {
 
 	@ApiModelProperty("卡产品信息")
 	private Object cardData;
+
+	@ApiModelProperty("持卡人信息（开卡申请快照）")
+	private WalletCardApplyManEntity manData;
 }
