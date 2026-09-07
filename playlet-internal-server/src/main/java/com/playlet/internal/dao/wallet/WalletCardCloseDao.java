@@ -2,6 +2,7 @@ package com.playlet.internal.dao.wallet;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.playlet.internal.entity.wallet.WalletCardCloseEntity;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.springframework.stereotype.Repository;
 
@@ -22,4 +23,9 @@ public interface WalletCardCloseDao extends BaseMapper<WalletCardCloseEntity> {
 			+ " order by c.setTime desc"
 			+ "</script>")
 	List<WalletCardCloseEntity> findList(WalletCardCloseEntity entity);
+
+	/** 按三方卡 id 查最新销卡申请（用户发起时写入，webhook 回写状态） */
+	@Select("select * from wallet_card_close where user_bankcard_id = #{userBankcardId} "
+			+ "order by id desc limit 1")
+	WalletCardCloseEntity findByUserBankcardId(@Param("userBankcardId") Long userBankcardId);
 }

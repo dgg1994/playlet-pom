@@ -14,6 +14,7 @@ import com.playlet.oversea.entity.wallet.WalletCardCloseEntity;
 import com.playlet.oversea.entity.wallet.WalletCardTransactionEntity;
 import com.playlet.oversea.entity.wallet.WalletLogEntity;
 import com.playlet.oversea.entity.wallet.WalletUserEntity;
+import com.playlet.oversea.enums.WalletCardCloseReviewStatusEnums;
 import com.playlet.oversea.enums.WalletCardStatusEnums;
 import com.playlet.oversea.enums.WalletLogOperateTypeEnums;
 import com.playlet.oversea.enums.WalletLogStatusEnums;
@@ -54,7 +55,7 @@ public class WalletCardCloseWebhookSupport {
 	private WalletNotifyService walletNotifyService;
 
 	/**
-	 * 卡片关闭回调：更新卡状态、余额退回钱包并落流水。
+	 * 卡片关闭回调：更新销卡记录为成功、卡状态注销、余额退回钱包并落流水。
 	 */
 	@Transactional(rollbackFor = Exception.class)
 	public void handleCardClose(WalletWebhookNotifyRequest body, WalletBankcardEntity card,
@@ -62,18 +63,24 @@ public class WalletCardCloseWebhookSupport {
 		if (card == null) {
 			return;
 		}
-		if (Integer.valueOf(WalletCardStatusEnums.CLOSED.getCode()).equals(card.getCardStatus())) {
+		persistCardNo(body, card);
+		BigDecimal refund = resolveRefundAmount(body, card);
+		String requestOrderId = orderNoFromBody(body);
+		boolean alreadyClosed = Integer.valueOf(WalletCardStatusEnums.CLOSED.getCode())
+				.equals(card.getCardStatus());
+		if (alreadyClosed) {
+			// 幂等：仅补齐销卡记录成功态，避免重复退款
+			markCloseRecordSuccess(user, card, refund, requestOrderId);
 			log.info("wallet webhook card close skip already closed userBankcardId={}",
 					card.getUserBankcardId());
 			return;
 		}
-		persistCardNo(body, card);
-		BigDecimal refund = resolveRefundAmount(body, card);
 		BigDecimal cardBalanceBefore = nz(card.getBalance());
 		walletBankcardDao.updateBalance(card.getId(), BigDecimal.ZERO);
 		walletBankcardDao.updateCardStatus(card.getId(),
 				WalletCardStatusEnums.CLOSED.getCode(), WalletCardStatusEnums.CLOSED.getLabel());
-		insertCardCloseRecord(user, card, refund, orderNoFromBody(body));
+		// 用户发起时已写入处理中记录，此处改为成功
+		markCloseRecordSuccess(user, card, refund, requestOrderId);
 		if (refund.compareTo(BigDecimal.ZERO) <= 0 || user == null) {
 			log.info("wallet webhook card close no refund userBankcardId={} refund={}",
 					card.getUserBankcardId(), refund);
@@ -193,31 +200,62 @@ public class WalletCardCloseWebhookSupport {
 		return value == null ? BigDecimal.ZERO : value;
 	}
 
-	/** 销卡 Webhook 落库 wallet_card_close，供管理端 cardClose/findList 查询 */
-	private void insertCardCloseRecord(WalletUserEntity user, WalletBankcardEntity card,
+	/**
+	 * Webhook 成功：将发起时的「处理中」记录改为成功；若缺失则补插（兼容历史数据）。
+	 */
+	private void markCloseRecordSuccess(WalletUserEntity user, WalletBankcardEntity card,
 			BigDecimal refund, String requestOrderId) {
-		if (user == null || card == null) {
+		if (card == null || card.getUserBankcardId() == null) {
 			return;
 		}
 		Date now = new Date();
-		WalletCardCloseEntity close = new WalletCardCloseEntity();
-		close.setWalletUserId(user.getId());
-		close.setWalletUid(user.getWalletUid());
-		close.setCardProductId(card.getCardProductId());
-		close.setCardUuid(card.getCardUuid());
-		close.setCardType(card.getBankcardNature());
-		close.setCardNo(card.getCardNo());
-		close.setUserBankcardId(card.getUserBankcardId());
-		close.setBalance(card.getBalance());
+		WalletCardCloseEntity close = walletCardCloseDao.findByUserBankcardId(card.getUserBankcardId());
+		if (close == null) {
+			if (user == null) {
+				log.warn("wallet card close record missing and user null userBankcardId={}",
+						card.getUserBankcardId());
+				return;
+			}
+			close = new WalletCardCloseEntity();
+			close.setWalletUserId(user.getId());
+			close.setWalletUid(user.getWalletUid());
+			close.setCardProductId(card.getCardProductId());
+			close.setCardUuid(card.getCardUuid());
+			close.setCardType(card.getBankcardNature());
+			close.setCardNo(card.getCardNo());
+			close.setUserBankcardId(card.getUserBankcardId());
+			close.setBalance(card.getBalance());
+			close.setRefundAmt(refund);
+			close.setRequestOrderId(requestOrderId);
+			close.setReviewStatus(WalletCardCloseReviewStatusEnums.SUCCESS.getIndex());
+			close.setSetTime(now);
+			close.setGmtModified(now);
+			try {
+				walletCardCloseDao.insert(close);
+			} catch (Exception e) {
+				log.error("wallet card close record insert failed userBankcardId={}",
+						card.getUserBankcardId(), e);
+				throw new BaseException(I18nUtil.getMessage("base_error"), e);
+			}
+			return;
+		}
+		if (WalletCardCloseReviewStatusEnums.SUCCESS.getIndex().equals(close.getReviewStatus())) {
+			return;
+		}
 		close.setRefundAmt(refund);
-		close.setRequestOrderId(requestOrderId);
-		close.setReviewStatus(2);
-		close.setSetTime(now);
+		if (!StringUtils.isEmpty(requestOrderId)) {
+			close.setRequestOrderId(requestOrderId);
+		}
+		if (!StringUtils.isEmpty(card.getCardNo())) {
+			close.setCardNo(card.getCardNo());
+		}
+		close.setReviewStatus(WalletCardCloseReviewStatusEnums.SUCCESS.getIndex());
 		close.setGmtModified(now);
 		try {
-			walletCardCloseDao.insert(close);
+			walletCardCloseDao.updateById(close);
 		} catch (Exception e) {
-			log.error("wallet card close record insert failed userBankcardId={}", card.getUserBankcardId(), e);
+			log.error("wallet card close record update failed id={} userBankcardId={}",
+					close.getId(), card.getUserBankcardId(), e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 	}

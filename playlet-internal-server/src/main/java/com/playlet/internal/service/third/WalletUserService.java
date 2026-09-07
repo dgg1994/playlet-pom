@@ -15,6 +15,7 @@ import com.playlet.internal.constants.WalletKycApiStatus;
 import com.playlet.internal.dao.wallet.*;
 import com.playlet.internal.entity.wallet.*;
 import com.playlet.internal.enums.WalletCardApplyStateEnums;
+import com.playlet.internal.enums.WalletCardCloseReviewStatusEnums;
 import com.playlet.internal.enums.WalletCardStatusEnums;
 import com.playlet.internal.enums.WalletKycStateEnums;
 import com.playlet.internal.enums.WalletLogOperateTypeEnums;
@@ -80,6 +81,8 @@ public class WalletUserService extends BaseApiService {
 	private WalletUserHolderDao walletUserHolderDao;
 	@Autowired
 	private WalletCardTransactionDao walletCardTransactionDao;
+	@Autowired
+	private WalletCardCloseDao walletCardCloseDao;
 	@Autowired
 	private WalletCardProductDao walletCardProductDao;
 	@Autowired
@@ -1394,7 +1397,7 @@ public class WalletUserService extends BaseApiService {
 	}
 
 	/**
-	 * 注销银行卡。
+	 * 注销银行卡：调三方后落销卡记录（处理中），卡状态置为注销前，等 webhook 成功后再改成功并退款。
 	 */
 	@Transactional(rollbackFor = Exception.class)
 	public ResponseBase closeCard(Integer userType, Integer localUid, BankcardCloseRequest query) {
@@ -1419,6 +1422,16 @@ public class WalletUserService extends BaseApiService {
 		if (card == null) {
 			return setResultError(I18nUtil.getMessage("wallet.card_not_found"));
 		}
+		// 仅正常卡可销卡（对齐 onetoken）
+		if (!Integer.valueOf(WalletCardStatusEnums.ACTIVE.getCode()).equals(card.getCardStatus())) {
+			return setResultError(I18nUtil.getMessage("card_no_active"));
+		}
+		WalletCardCloseEntity existing = walletCardCloseDao.findByUserBankcardId(query.getUserBankcardId());
+		if (existing != null
+				&& WalletCardCloseReviewStatusEnums.PROCESSING.getIndex().equals(existing.getReviewStatus())) {
+			return setResultError(I18nUtil.getMessage("card_no_active"));
+		}
+		String requestOrderId = OrderCodeFactory.getOrderCode(query.getUserBankcardId());
 		try {
 			thirdService.closeBankcard(user.getWalletUid(), query.getUserBankcardId());
 		} catch (BaseException e) {
@@ -1430,11 +1443,43 @@ public class WalletUserService extends BaseApiService {
 					user.getWalletUid(), query.getUserBankcardId(), e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
+		// 三方受理成功：写入处理中记录，卡置注销前，等待 cardClose webhook
+		insertProcessingCloseRecord(user, card, requestOrderId);
 		walletBankcardDao.updateCardStatus(card.getId(),
-				WalletCardStatusEnums.CLOSED.getCode(), WalletCardStatusEnums.CLOSED.getLabel());
-		log.info("wallet card close success walletUserId={} userBankcardId={}",
-				user.getId(), query.getUserBankcardId());
-		return setResultSuccess(I18nUtil.getMessage("base_success"));
+				WalletCardStatusEnums.PRE_CLOSE.getCode(), WalletCardStatusEnums.PRE_CLOSE.getLabel());
+		log.info("wallet card close submitted walletUserId={} userBankcardId={} requestOrderId={}",
+				user.getId(), query.getUserBankcardId(), requestOrderId);
+		BigDecimal balance = card.getBalance() == null ? BigDecimal.ZERO : card.getBalance();
+		if (balance.compareTo(BigDecimal.ZERO) > 0) {
+			return setResultSuccess(I18nUtil.getMessage("close_card_msg_money"));
+		}
+		return setResultSuccess(I18nUtil.getMessage("close_card_msg"));
+	}
+
+	/** 用户点击销卡后落库：review_status=处理中 */
+	private void insertProcessingCloseRecord(WalletUserEntity user, WalletBankcardEntity card,
+			String requestOrderId) {
+		WalletCardCloseEntity close = new WalletCardCloseEntity();
+		close.setWalletUserId(user.getId());
+		close.setWalletUid(user.getWalletUid());
+		close.setCardProductId(card.getCardProductId());
+		close.setCardUuid(card.getCardUuid());
+		close.setCardType(card.getBankcardNature());
+		close.setCardNo(card.getCardNo());
+		close.setUserBankcardId(card.getUserBankcardId());
+		close.setBalance(card.getBalance());
+		close.setRefundAmt(null);
+		close.setRequestOrderId(requestOrderId);
+		close.setReviewStatus(WalletCardCloseReviewStatusEnums.PROCESSING.getIndex());
+		Date now = new Date();
+		close.setSetTime(now);
+		close.setGmtModified(now);
+		try {
+			walletCardCloseDao.insert(close);
+		} catch (Exception e) {
+			log.error("wallet card close record insert failed userBankcardId={}", card.getUserBankcardId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
 	}
 
 	/**

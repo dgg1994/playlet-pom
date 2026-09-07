@@ -6,6 +6,7 @@ import com.playlet.oversea.aop.SysLogAnnotation;
 import com.playlet.oversea.base.ResponseBase;
 import com.playlet.oversea.dao.wallet.WalletCardCloseDao;
 import com.playlet.oversea.entity.wallet.WalletCardCloseEntity;
+import com.playlet.oversea.enums.WalletCardCloseReviewStatusEnums;
 import com.playlet.oversea.service.CardCloseManageService;
 import com.playlet.oversea.utils.I18nUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -27,10 +28,6 @@ import static com.playlet.oversea.base.BaseApiService.setResultSuccess;
 @CrossOrigin
 public class CardCloseManageServiceImpl implements CardCloseManageService {
 
-	private static final String REVIEW_PROCESSING = "审核中";
-	private static final String REVIEW_SUCCESS = "审核成功";
-	private static final String REVIEW_FAIL = "审核失败";
-
 	@Autowired
 	private WalletCardCloseDao walletCardCloseDao;
 
@@ -46,24 +43,8 @@ public class CardCloseManageServiceImpl implements CardCloseManageService {
 			list = new ArrayList<>();
 		}
 		for (WalletCardCloseEntity row : list) {
-			row.setReviewStatusName(resolveReviewName(row.getReviewStatus()));
+			row.setReviewStatusName(WalletCardCloseReviewStatusEnums.getName(row.getReviewStatus()));
 		}
 		return setResultSuccess(new PageInfo<>(list), I18nUtil.getMessage("base_success"));
-	}
-
-	private static String resolveReviewName(Integer status) {
-		if (status == null) {
-			return null;
-		}
-		if (status == 1) {
-			return REVIEW_PROCESSING;
-		}
-		if (status == 2) {
-			return REVIEW_SUCCESS;
-		}
-		if (status == 3) {
-			return REVIEW_FAIL;
-		}
-		return String.valueOf(status);
 	}
 }
