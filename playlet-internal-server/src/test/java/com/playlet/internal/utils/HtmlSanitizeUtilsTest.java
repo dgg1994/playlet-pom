@@ -50,4 +50,15 @@ class HtmlSanitizeUtilsTest {
 		String out = HtmlSanitizeUtils.rich("<img src=x onerror=alert(1)>");
 		assertFalse(out.toLowerCase().contains("onerror"));
 	}
+
+	@Test
+	void stripParagraphTagsRemovesPKeepContent() {
+		assertNull(HtmlSanitizeUtils.stripParagraphTags(null));
+		assertEquals("", HtmlSanitizeUtils.stripParagraphTags(""));
+		String out = HtmlSanitizeUtils.stripParagraphTags("<p style=\"x\">充值说明</p><p>第二段</p>");
+		assertFalse(out.contains("<p"));
+		assertFalse(out.contains("</p>"));
+		assertTrue(out.contains("充值说明"));
+		assertTrue(out.contains("第二段"));
+	}
 }

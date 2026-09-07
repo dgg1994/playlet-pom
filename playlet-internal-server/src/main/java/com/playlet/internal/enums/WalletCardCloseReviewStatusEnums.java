@@ -5,9 +5,9 @@ package com.playlet.internal.enums;
  */
 public enum WalletCardCloseReviewStatusEnums {
 
-	PROCESSING(1, "审核中"),
-	SUCCESS(2, "审核成功"),
-	FAIL(3, "审核失败");
+	PROCESSING(1, "注销中"),
+	SUCCESS(2, "注销成功"),
+	FAIL(3, "注销失败");
 
 	private final Integer index;
 	private final String name;

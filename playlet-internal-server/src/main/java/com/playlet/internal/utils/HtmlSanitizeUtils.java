@@ -64,4 +64,16 @@ public final class HtmlSanitizeUtils {
 		cleaned = DANGEROUS_SCHEME.matcher(cleaned).replaceAll("$1$2#$2");
 		return cleaned;
 	}
+
+	/**
+	 * 去掉 p 标签，保留内部文案（链上充值 countInfo 等客户端直出场景）。
+	 */
+	public static String stripParagraphTags(String html) {
+		if (html == null || html.isEmpty()) {
+			return html;
+		}
+		String out = html.replaceAll("(?i)<p\\b[^>]*>", "");
+		out = out.replaceAll("(?i)</p\\s*>", "");
+		return out.trim();
+	}
 }

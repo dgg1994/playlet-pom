@@ -33,6 +33,7 @@ import com.playlet.internal.constants.WalletNotifyConstants;
 import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.service.third.UsdtTopinClient;
 import com.playlet.internal.utils.GenericityUtil;
+import com.playlet.internal.utils.HtmlSanitizeUtils;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.IpUtil;
 import com.playlet.internal.utils.OrderCodeFactory;
@@ -239,7 +240,7 @@ public class WalletUsdtTopinService extends BaseApiService {
 	private List<WalletTopinAddressItemResp> formatAddress(WalletWeb3AddressEntity row) {
 		List<WalletTopinAddressItemResp> list = new ArrayList<>();
 		SysInfoEntity config = loadWalletCenterConfig();
-		String countInfo = config == null ? null : config.getConfigContent();
+		String countInfo = config == null ? null : HtmlSanitizeUtils.stripParagraphTags(config.getConfigContent());
 		String countUrl = config == null ? null : mediaUrlService.sign(config.getConfigUrl());
 		if (!StringUtils.isEmpty(row.getTronAddress())) {
 			list.add(buildAddressItem(row.getTronAddress(), WalletNetworkTypeConstants.TRON, countInfo, countUrl));
