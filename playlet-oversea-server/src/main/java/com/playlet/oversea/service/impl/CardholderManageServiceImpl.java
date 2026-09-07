@@ -2,7 +2,6 @@ package com.playlet.oversea.service.impl;
 
 import com.playlet.oversea.aop.SysLogAnnotation;
 import com.playlet.oversea.base.ResponseBase;
-import com.playlet.oversea.constants.WalletConstants;
 import com.playlet.oversea.dao.wallet.WalletUserDao;
 import com.playlet.oversea.dao.wallet.WalletUserHolderDao;
 import com.playlet.oversea.entity.wallet.WalletUserEntity;
@@ -32,17 +31,18 @@ public class CardholderManageServiceImpl implements CardholderManageService {
 
 	@Override
 	@SysLogAnnotation(module = "持卡人管理", type = "GET", remark = "按uid查持卡人")
-	public ResponseBase findByUid(String uid) {
-		if (StringUtils.isEmpty(uid)) {
+	public ResponseBase findByUid(String walletUid) {
+		if (StringUtils.isEmpty(walletUid)) {
 			return setResultError(I18nUtil.getMessage("parameter_error"));
 		}
-		Integer localUid;
+		// 管理端入参为钱包三方 uid，走 findByWalletUid，勿占用 findByLocal(local_uid)
+		Long parsedWalletUid;
 		try {
-			localUid = Integer.parseInt(uid.trim());
+			parsedWalletUid = Long.parseLong(walletUid.trim());
 		} catch (NumberFormatException e) {
 			return setResultError(I18nUtil.getMessage("parameter_error"));
 		}
-		WalletUserEntity user = walletUserDao.findByLocal(WalletConstants.USER_TYPE_APP, localUid);
+		WalletUserEntity user = walletUserDao.findByWalletUid(parsedWalletUid);
 		if (user == null) {
 			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
 		}

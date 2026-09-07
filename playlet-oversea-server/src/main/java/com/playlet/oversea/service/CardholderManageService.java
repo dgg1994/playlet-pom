@@ -15,5 +15,5 @@ public interface CardholderManageService {
 
 	@GetMapping("/findByUid")
 	@ApiOperation(value = "按 uid 查询持卡人")
-	ResponseBase findByUid(String uid);
+	ResponseBase findByUid(String walletUid);
 }

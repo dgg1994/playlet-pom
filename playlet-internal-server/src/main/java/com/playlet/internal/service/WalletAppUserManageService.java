@@ -21,5 +21,5 @@ public interface WalletAppUserManageService {
 
 	@GetMapping("/findKycFile")
 	@ApiOperation(value = "KYC证件文件")
-	ResponseBase findKycFile(String uid);
+	ResponseBase findKycFile(String walletUid);
 }
