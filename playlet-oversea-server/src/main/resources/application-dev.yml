@@ -102,5 +102,5 @@ usdt-topin:
   connect-timeout-ms: 10000
   read-timeout-ms: 30000
   callback-ip-whitelist:
-    - 127.0.0.1
-    - 111.36.101.89
+    - 16.163.151.103
+

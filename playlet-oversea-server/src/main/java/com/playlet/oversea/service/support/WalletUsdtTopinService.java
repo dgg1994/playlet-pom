@@ -5,7 +5,6 @@ import com.playlet.oversea.api.response.WalletTopinAddressItemResp;
 import com.playlet.oversea.api.response.Web3AddressCreateResp;
 import com.playlet.oversea.base.BaseApiService;
 import com.playlet.oversea.base.ResponseBase;
-import com.playlet.oversea.config.UsdtTopinProperties;
 import com.playlet.oversea.config.heard.LanguageContext;
 import com.playlet.oversea.constants.UsdtTopinConstants;
 import com.playlet.oversea.constants.WalletConstants;
@@ -35,7 +34,6 @@ import com.playlet.oversea.service.third.UsdtTopinClient;
 import com.playlet.oversea.utils.GenericityUtil;
 import com.playlet.oversea.utils.HtmlSanitizeUtils;
 import com.playlet.oversea.utils.I18nUtil;
-import com.playlet.oversea.utils.IpUtil;
 import com.playlet.oversea.utils.OrderCodeFactory;
 import com.playlet.oversea.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -73,10 +71,6 @@ public class WalletUsdtTopinService extends BaseApiService {
 	private UsdtTopinClient usdtTopinClient;
 	@Autowired
 	private WalletNotifyService walletNotifyService;
-	@Autowired
-	private UsdtTopinProperties usdtTopinProperties;
-	@Autowired
-	private IpUtil ipUtil;
 	@Autowired
 	private MediaUrlService mediaUrlService;
 
@@ -119,34 +113,28 @@ public class WalletUsdtTopinService extends BaseApiService {
 		}
 	}
 
-	/** USDT 充值回调：验签 + 幂等 + 增加可用余额 + 记钱包账变 */
+	/**
+	 * USDT 充值回调：对齐 onetoken topinUsdtNotify（验签 → 幂等 → type/coin → 入账）。
+	 * IP 白名单校验与 onetoken 一致：不启用。
+	 */
 	@Transactional(rollbackFor = Exception.class)
 	public ResponseBase handleNotify(UsdtTopinNotifyRequest body, HttpServletRequest request) {
 		if (body == null || StringUtils.isEmpty(body.getHash()) || StringUtils.isEmpty(body.getAmount())) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
 		String txHash = body.getHash().trim();
-		// 非转入类型直接忽略（对齐 onetoken topinUsdtNotify）
-		if (!StringUtils.isEmpty(body.getType())
-				&& !UsdtTopinConstants.NOTIFY_TYPE_IN.equalsIgnoreCase(body.getType().trim())) {
-			log.info("usdt topin notify skip non-in type={} hash={}", body.getType(), txHash);
-			return setResultSuccess(I18nUtil.getMessage("base_success"));
-		}
-		if (!StringUtils.isEmpty(body.getCoin()) && !isSupportedTopinCoin(body.getCoin())) {
-			log.info("usdt topin notify skip unsupported coin={} hash={}", body.getCoin(), txHash);
-			return setResultSuccess(I18nUtil.getMessage("base_success"));
-		}
-		String clientIp = ipUtil.getClientIp(request);
-		if (!isCallbackIpAllowed(clientIp)) {
-			log.warn("usdt topin notify ip denied ip={} hash={}", clientIp, txHash);
-			return setResultError(I18nUtil.getMessage("base_error"));
-		}
+		// 验签（对齐 onetoken：先取 sign 再置空后 Verification）
 		String sign = body.getSign();
 		body.setSign(null);
+		if (StringUtils.isEmpty(sign)) {
+			log.warn("usdt topin notify sign missing hash={} uid={}", txHash, body.getUid());
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
 		if (!usdtTopinClient.verifySign(body, sign)) {
 			log.warn("usdt topin notify sign failed hash={} uid={}", txHash, body.getUid());
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
+		// 幂等：hash 已入账则拒绝
 		WalletUsdtTopupEntity existed = walletUsdtTopupDao.findByTxHash(txHash);
 		if (existed != null) {
 			log.info("usdt topin notify duplicate hash={}", txHash);
@@ -156,6 +144,17 @@ public class WalletUsdtTopinService extends BaseApiService {
 			log.info("usdt topin notify duplicate wallet log hash={}", txHash);
 			return setResultError(I18nUtil.getMessage("wallet.usdt_topup_duplicate"));
 		}
+		// 非转入直接成功忽略（对齐 onetoken !"in".equals(type)）
+		if (!UsdtTopinConstants.NOTIFY_TYPE_IN.equals(body.getType())) {
+			log.info("usdt topin notify skip non-in type={} hash={}", body.getType(), txHash);
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		}
+		// 仅 USDT/USDC 入账（对齐 onetoken TokenTypeEnums 小写名）
+		if (!isSupportedTopinCoin(body.getCoin())) {
+			log.info("usdt topin notify skip unsupported coin={} hash={}", body.getCoin(), txHash);
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		}
+		// 用户：优先 uid（对齐 onetoken findByUid）；兼容按充值地址反查
 		WalletUserEntity user = resolveUser(body);
 		if (user == null) {
 			log.warn("usdt topin notify user not found uid={} inaddress={}", body.getUid(), body.getInaddress());
@@ -306,7 +305,7 @@ public class WalletUsdtTopinService extends BaseApiService {
 		row.setUserType(user.getUserType());
 		row.setLocalUid(user.getLocalUid());
 		row.setTxHash(body.getHash().trim());
-		row.setOrderNo(body.getOrder_no());
+		row.setOrderNo(firstNonEmpty(body.getOrderNo(), body.getRequestOrderNum()));
 		row.setCoin(StringUtils.isEmpty(body.getCoin()) ? UsdtTopinConstants.COIN_USDT : body.getCoin());
 		row.setAmount(amount);
 		row.setOutAddress(body.getOutaddress());
@@ -326,20 +325,22 @@ public class WalletUsdtTopinService extends BaseApiService {
 		String inAddress = StringUtils.isEmpty(body.getInaddress())
 				? account.getTronUsdtAddress() : body.getInaddress();
 		WalletLogEntity logEntity = new WalletLogEntity();
-		logEntity.setOrderNo(StringUtils.isEmpty(body.getOrder_no())
-				? OrderCodeFactory.getOrderCode(user.getWalletUid()) : body.getOrder_no());
+		String orderNo = firstNonEmpty(body.getOrderNo(), body.getRequestOrderNum());
+		logEntity.setOrderNo(StringUtils.isEmpty(orderNo)
+				? OrderCodeFactory.getOrderCode(user.getWalletUid()) : orderNo);
 		logEntity.setOutOrderNo(txHash);
 		logEntity.setWalletUserId(user.getId());
 		logEntity.setWalletUid(user.getWalletUid());
 		logEntity.setTradeType(WalletLogTradeTypeEnums.INCOME.getCode());
 		logEntity.setTitle(I18nUtil.getMessage("wallet.log.wallet_top_up"));
-		logEntity.setNetworkType(body.getAddress());
+		// 网络类型对齐 onetoken：取 chain
+		logEntity.setNetworkType(body.getChain());
 		logEntity.setPrimevalMoney(balanceAfter);
 		logEntity.setPrimevalMoneyUnit(WalletConstants.DEFAULT_CURRENCY);
 		logEntity.setRealMoney(amount);
 		logEntity.setServiceCharge(BigDecimal.ZERO);
 		logEntity.setFormAccount(body.getOutaddress());
-		logEntity.setToName(user.getEmail());
+		logEntity.setToName(StringUtils.isEmpty(body.getEmail()) ? user.getEmail() : body.getEmail());
 		logEntity.setToAccount(inAddress);
 		logEntity.setTranHash(txHash);
 		logEntity.setStatus(WalletLogStatusEnums.POSTED.getCode());
@@ -354,16 +355,21 @@ public class WalletUsdtTopinService extends BaseApiService {
 			return false;
 		}
 		String normalized = coin.trim();
+		// 对齐 onetoken TokenTypeEnums：usdt / usdc（大小写不敏感）
 		return UsdtTopinConstants.COIN_USDT.equalsIgnoreCase(normalized)
 				|| UsdtTopinConstants.COIN_USDC.equalsIgnoreCase(normalized);
 	}
 
-	private boolean isCallbackIpAllowed(String clientIp) {
-		List<String> whitelist = usdtTopinProperties.getCallbackIpWhitelist();
-		if (whitelist == null || whitelist.isEmpty()) {
-			return true;
+	private static String firstNonEmpty(String... values) {
+		if (values == null) {
+			return null;
 		}
-		return whitelist.contains(clientIp);
+		for (String value : values) {
+			if (!StringUtils.isEmpty(value)) {
+				return value.trim();
+			}
+		}
+		return null;
 	}
 
 	private static BigDecimal nvl(BigDecimal value) {
