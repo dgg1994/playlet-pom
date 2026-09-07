@@ -55,7 +55,7 @@ public class WalletCardCloseWebhookSupport {
 	private WalletNotifyService walletNotifyService;
 
 	/**
-	 * 卡片关闭回调：更新销卡记录为成功、卡状态注销、余额退回钱包并落流水。
+	 * 卡片关闭回调：退款金额取销卡申请时快照 balance（对齐 onetoken），回写 refundAmt 后入钱包。
 	 */
 	@Transactional(rollbackFor = Exception.class)
 	public void handleCardClose(WalletWebhookNotifyRequest body, WalletBankcardEntity card,
@@ -64,23 +64,24 @@ public class WalletCardCloseWebhookSupport {
 			return;
 		}
 		persistCardNo(body, card);
-		BigDecimal refund = resolveRefundAmount(body, card);
+		WalletCardCloseEntity close = walletCardCloseDao.findByUserBankcardId(card.getUserBankcardId());
+		// 对齐 onetoken：refundAmt = 申请记录 balance，不用 webhook.refundAmount
+		BigDecimal refund = resolveRefundFromCloseSnapshot(close, card);
 		String requestOrderId = orderNoFromBody(body);
 		boolean alreadyClosed = Integer.valueOf(WalletCardStatusEnums.CLOSED.getCode())
 				.equals(card.getCardStatus());
 		if (alreadyClosed) {
 			// 幂等：仅补齐销卡记录成功态，避免重复退款
-			markCloseRecordSuccess(user, card, refund, requestOrderId);
+			markCloseRecordSuccess(user, card, close, refund, requestOrderId);
 			log.info("wallet webhook card close skip already closed userBankcardId={}",
 					card.getUserBankcardId());
 			return;
 		}
-		BigDecimal cardBalanceBefore = nz(card.getBalance());
 		walletBankcardDao.updateBalance(card.getId(), BigDecimal.ZERO);
 		walletBankcardDao.updateCardStatus(card.getId(),
 				WalletCardStatusEnums.CLOSED.getCode(), WalletCardStatusEnums.CLOSED.getLabel());
-		// 用户发起时已写入处理中记录，此处改为成功
-		markCloseRecordSuccess(user, card, refund, requestOrderId);
+		// 用户发起时已写入处理中记录：refundAmt=balance，状态成功
+		markCloseRecordSuccess(user, card, close, refund, requestOrderId);
 		if (refund.compareTo(BigDecimal.ZERO) <= 0 || user == null) {
 			log.info("wallet webhook card close no refund userBankcardId={} refund={}",
 					card.getUserBankcardId(), refund);
@@ -103,7 +104,7 @@ public class WalletCardCloseWebhookSupport {
 			throw new BaseException(I18nUtil.getMessage("base_error"));
 		}
 		String orderNo = OrderCodeFactory.getOrderCode(card.getUserBankcardId());
-		insertCloseCardTransaction(card, refund, cardBalanceBefore, orderNo);
+		insertCloseCardTransaction(card, refund, orderNo);
 		insertCloseWalletLog(user, account, card, refund, walletBefore, orderNo);
 		walletNotifyService.notify(user, WalletNotifyEventEnums.CARD_CLOSE,
 				"wallet:card:close:" + card.getUserBankcardId(),
@@ -121,16 +122,18 @@ public class WalletCardCloseWebhookSupport {
 		walletBankcardSyncSupport.syncCardNo(card);
 	}
 
-	private static BigDecimal resolveRefundAmount(WalletWebhookNotifyRequest body, WalletBankcardEntity card) {
-		BigDecimal refund = parseAmount(body.getRefundAmount());
-		if (refund != null && refund.compareTo(BigDecimal.ZERO) > 0) {
-			return refund;
+	/**
+	 * 退款金额：优先销卡申请快照 balance（onetoken）；无申请记录时回退当前卡余额。
+	 */
+	private static BigDecimal resolveRefundFromCloseSnapshot(WalletCardCloseEntity close,
+			WalletBankcardEntity card) {
+		if (close != null && close.getBalance() != null) {
+			return nz(close.getBalance());
 		}
-		return nz(card.getBalance());
+		return nz(card == null ? null : card.getBalance());
 	}
 
-	private void insertCloseCardTransaction(WalletBankcardEntity card, BigDecimal refund,
-			BigDecimal cardBalanceBefore, String orderNo) {
+	private void insertCloseCardTransaction(WalletBankcardEntity card, BigDecimal refund, String orderNo) {
 		Date now = new Date();
 		String currency = StringUtils.isEmpty(card.getCurrency())
 				? WalletConstants.DEFAULT_CURRENCY : card.getCurrency();
@@ -185,31 +188,19 @@ public class WalletCardCloseWebhookSupport {
 		walletLogDao.insert(logEntity);
 	}
 
-	private static BigDecimal parseAmount(String amount) {
-		if (StringUtils.isEmpty(amount)) {
-			return null;
-		}
-		try {
-			return new BigDecimal(amount.trim());
-		} catch (Exception e) {
-			return null;
-		}
-	}
-
 	private static BigDecimal nz(BigDecimal value) {
 		return value == null ? BigDecimal.ZERO : value;
 	}
 
 	/**
-	 * Webhook 成功：将发起时的「处理中」记录改为成功；若缺失则补插（兼容历史数据）。
+	 * Webhook 成功：refundAmt = 申请快照 balance，状态改为成功（对齐 onetoken）。
 	 */
 	private void markCloseRecordSuccess(WalletUserEntity user, WalletBankcardEntity card,
-			BigDecimal refund, String requestOrderId) {
+			WalletCardCloseEntity close, BigDecimal refund, String requestOrderId) {
 		if (card == null || card.getUserBankcardId() == null) {
 			return;
 		}
 		Date now = new Date();
-		WalletCardCloseEntity close = walletCardCloseDao.findByUserBankcardId(card.getUserBankcardId());
 		if (close == null) {
 			if (user == null) {
 				log.warn("wallet card close record missing and user null userBankcardId={}",
@@ -224,7 +215,7 @@ public class WalletCardCloseWebhookSupport {
 			close.setCardType(card.getBankcardNature());
 			close.setCardNo(card.getCardNo());
 			close.setUserBankcardId(card.getUserBankcardId());
-			close.setBalance(card.getBalance());
+			close.setBalance(refund);
 			close.setRefundAmt(refund);
 			close.setRequestOrderId(requestOrderId);
 			close.setReviewStatus(WalletCardCloseReviewStatusEnums.SUCCESS.getIndex());
@@ -242,6 +233,7 @@ public class WalletCardCloseWebhookSupport {
 		if (WalletCardCloseReviewStatusEnums.SUCCESS.getIndex().equals(close.getReviewStatus())) {
 			return;
 		}
+		// 对齐 onetoken：setRefundAmt(cardCloseEntity.getBalance())
 		close.setRefundAmt(refund);
 		if (!StringUtils.isEmpty(requestOrderId)) {
 			close.setRequestOrderId(requestOrderId);
