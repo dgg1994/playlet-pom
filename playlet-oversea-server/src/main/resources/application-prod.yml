@@ -95,12 +95,10 @@ third-party:
 # USDT 链上监听（对齐 worldpay monitor.*）
 usdt-topin:
   gateway-url: "https://mornitor.worldpay.club"
-  api-key: "ak_29debf8cc86841c63f2b81cf"
-  sign-key: "ca5c741083d0cf3a8b8aa7c9d34d18188232163aa54d23cadb9db6749f19c6f0"
+  api-key: "ak_5b29c7158c0c9567c319ed32"
+  sign-key: "2b0a7ba6a74083475083a7010afdee0a30ba4fd9c325622ea673bf0fcd5b9e56"
   connect-timeout-ms: 10000
   read-timeout-ms: 30000
   callback-ip-whitelist:
-    - 43.198.8.29
-    - 43.198.127.163
-    - 127.0.0.1
+    - 16.163.151.103
 
