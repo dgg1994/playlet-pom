@@ -17,6 +17,9 @@ public class WalletBankcardAdminQuery extends PageQueryHelperEntity {
 	@ApiModelProperty("C 端 uid（app_account.id）")
 	private String uid;
 
+	@ApiModelProperty("钱包三方 uid（wallet_user.wallet_uid）")
+	private Long walletUid;
+
 	private Integer status;
 	private String cardType;
 	private String cardNo;

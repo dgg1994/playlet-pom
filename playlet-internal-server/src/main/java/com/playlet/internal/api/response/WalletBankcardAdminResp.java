@@ -17,6 +17,8 @@ public class WalletBankcardAdminResp {
 
 	private Long id;
 	private String uid;
+	@ApiModelProperty("钱包三方 uid")
+	private Long walletUid;
 	private Integer cardId;
 	private String cardUuid;
 	private Long applyId;

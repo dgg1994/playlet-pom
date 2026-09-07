@@ -20,6 +20,7 @@ import com.playlet.oversea.exception.BaseException;
 import com.playlet.oversea.query.wallet.WalletBankcardAdminQuery;
 import com.playlet.oversea.query.wallet.WalletCardTransactionAdminQuery;
 import com.playlet.oversea.service.AppUserCardManageService;
+import com.playlet.oversea.service.MediaUrlService;
 import com.playlet.oversea.service.third.ThirdService;
 import com.playlet.oversea.utils.I18nUtil;
 import com.playlet.oversea.utils.StringUtils;
@@ -56,6 +57,8 @@ public class AppUserCardManageServiceImpl implements AppUserCardManageService {
 	private WalletCardTransactionDao walletCardTransactionDao;
 	@Autowired
 	private ThirdService thirdService;
+	@Autowired
+	private MediaUrlService mediaUrlService;
 
 	@Override
 	@SysLogAnnotation(module = "用户持卡", type = "POST", remark = "持卡列表")
@@ -87,6 +90,8 @@ public class AppUserCardManageServiceImpl implements AppUserCardManageService {
 			}
 			if (row.getCardId() != null) {
 				WalletCardProductEntity product = walletCardProductDao.findById(row.getCardId());
+				// cardData 图片字段出参七牛签名
+				signCardProductImages(product);
 				row.setCardData(product);
 			}
 			// 持卡人：开卡申请快照（对齐 onetoken manData）
@@ -96,6 +101,15 @@ public class AppUserCardManageServiceImpl implements AppUserCardManageService {
 			}
 		}
 		return setResultSuccess(new PageInfo<>(list), I18nUtil.getMessage("base_success"));
+	}
+
+	/** 卡产品展示图 / 列表图七牛签名 */
+	private void signCardProductImages(WalletCardProductEntity product) {
+		if (product == null) {
+			return;
+		}
+		product.setCardImg(mediaUrlService.sign(product.getCardImg()));
+		product.setCardListImg(mediaUrlService.sign(product.getCardListImg()));
 	}
 
 	@Override

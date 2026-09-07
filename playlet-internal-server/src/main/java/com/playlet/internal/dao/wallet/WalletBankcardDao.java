@@ -72,7 +72,8 @@ public interface WalletBankcardDao extends BaseMapper<WalletBankcardEntity> {
 
 	/** 管理端：用户持卡分页列表（关联 wallet_user / 申请持卡人） */
 	@Select("<script>"
-			+ "select b.id, cast(wu.local_uid as char) as uid, b.card_product_id as cardId, b.card_uuid as cardUuid, "
+			+ "select b.id, cast(wu.local_uid as char) as uid, b.wallet_uid as walletUid, "
+			+ "b.card_product_id as cardId, b.card_uuid as cardUuid, "
 			+ "b.card_apply_id as applyId, b.bankcard_nature as cardType, b.card_no as cardNo, "
 			+ "b.user_bankcard_id as userBankcardId, b.card_status as status, b.card_status_name as statusName, "
 			+ "b.balance, b.tag_name as tagName, wu.email as userEmail, wu.mobile_number as userTel, "
@@ -90,6 +91,7 @@ public interface WalletBankcardDao extends BaseMapper<WalletBankcardEntity> {
 			+ "and (m.user_name like concat('%', #{userName}, '%') or m.user_surname like concat('%', #{userName}, '%')) "
 			+ "</if>"
 			+ "<if test='uid != null and uid != \"\"'> and wu.local_uid = #{uid} and wu.user_type = 1 </if>"
+			+ "<if test='walletUid != null'> and b.wallet_uid = #{walletUid} </if>"
 			+ " order by b.balance desc, b.id desc"
 			+ "</script>")
 	java.util.List<com.playlet.internal.api.response.WalletBankcardAdminResp> findAdminList(
