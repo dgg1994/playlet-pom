@@ -28,7 +28,7 @@ public class SysInfoApiServiceImpl implements SysInfoApiService {
     private SysInfoDao SysInfoDao;
 
     @Override
-    @SysLogAnnotation(module = "配置接口", type = "get", remark = "查询配置（1：用户协议；2：隐私协议；3：关于我们；4：联系我们；5：客服；7：帮助中心）")
+    @SysLogAnnotation(module = "配置接口", type = "get", remark = "查询配置（1：用户协议；2：隐私协议；3：关于我们；4：联系我们；5：客服；8：钱包充值介绍）")
     public ResponseBase findConfigInfo(Integer configType) {
         String language = LanguageContext.getLanguage();
         SysInfoEntity entity = SysInfoDao.findContent(configType, NoticeStateEnums.NORMAL.getIndex(),language);

@@ -17,9 +17,9 @@ public class WalletTopinAddressItemResp {
 	@ApiModelProperty("充值地址")
 	private String address;
 
-	@ApiModelProperty("充值说明文案")
+	@ApiModelProperty("充值说明文案（sys_info 钱包充值介绍 configContent）")
 	private String countInfo;
 
-	@ApiModelProperty("充值说明链接")
+	@ApiModelProperty("充值说明链接（sys_info 钱包充值介绍 configUrl 签名后）")
 	private String countUrl;
 }

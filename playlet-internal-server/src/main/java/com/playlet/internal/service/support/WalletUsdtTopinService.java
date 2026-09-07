@@ -30,6 +30,7 @@ import com.playlet.internal.enums.WalletLogTradeTypeEnums;
 import com.playlet.internal.enums.WalletNotifyEventEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.constants.WalletNotifyConstants;
+import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.service.third.UsdtTopinClient;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
@@ -75,6 +76,8 @@ public class WalletUsdtTopinService extends BaseApiService {
 	private UsdtTopinProperties usdtTopinProperties;
 	@Autowired
 	private IpUtil ipUtil;
+	@Autowired
+	private MediaUrlService mediaUrlService;
 
 	/**
 	 * 获取 USDT 充值地址列表。
@@ -232,12 +235,12 @@ public class WalletUsdtTopinService extends BaseApiService {
 		walletAccountDao.updateTronUsdtAddress(account.getId(), tronAddress);
 	}
 
-	/** 组装返回列表：当前启用 TRON + BNB，与 worldpay 一致 */
+	/** 组装返回列表：当前启用 TRON + BNB，与 worldpay 一致；countInfo/countUrl 来自钱包充值介绍配置 */
 	private List<WalletTopinAddressItemResp> formatAddress(WalletWeb3AddressEntity row) {
 		List<WalletTopinAddressItemResp> list = new ArrayList<>();
 		SysInfoEntity config = loadWalletCenterConfig();
 		String countInfo = config == null ? null : config.getConfigContent();
-		String countUrl = config == null ? null : config.getConfigUrl();
+		String countUrl = config == null ? null : mediaUrlService.sign(config.getConfigUrl());
 		if (!StringUtils.isEmpty(row.getTronAddress())) {
 			list.add(buildAddressItem(row.getTronAddress(), WalletNetworkTypeConstants.TRON, countInfo, countUrl));
 		}

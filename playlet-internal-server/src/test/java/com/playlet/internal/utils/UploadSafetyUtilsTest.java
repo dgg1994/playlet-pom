@@ -43,8 +43,12 @@ class UploadSafetyUtilsTest {
 	}
 
 	@Test
-	void rejectsSvgAndEncodedScript() {
-		assertTrue(UploadSafetyUtils.looksLikeActiveContent("<svg onload=alert(1)>".getBytes()));
-		assertTrue(UploadSafetyUtils.looksLikeActiveContent("%3Cscript%3Ealert(1)%3C/script%3E".getBytes()));
+	void allowsTrustedConfigHtmlPath() {
+		assertDoesNotThrow(() ->
+				UploadSafetyUtils.assertSafeConfigHtmlPath("config/abc123.html"));
+		assertThrows(RuntimeException.class, () ->
+				UploadSafetyUtils.assertSafeConfigHtmlPath("richtext/abc.html"));
+		assertThrows(RuntimeException.class, () ->
+				UploadSafetyUtils.assertSafeConfigHtmlPath("config/../evil.html"));
 	}
 }

@@ -19,7 +19,11 @@ public enum SysConfigTypeEnums {
 	CONTACT_US(4, "contact_us", "联系我们", 1, "联系我们", "Contact Us", "聯絡我們", "Contact Us", "お問い合わせ", "Bize Ulaşın",
 			"Contate-nos"),
 	SUPPORT(5, "support", "客服", 2, "客服", "customer service", "客服", "customer service", "カスタマーサービス",
-			"Müşteri Hizmetleri", "atendimento ao Cliente");
+			"Müşteri Hizmetleri", "atendimento ao Cliente"),
+	/** 链上充值简介：供 /wallet/topinUsdtAddress 的 countInfo / countUrl（对齐 onetoken/worldpay） */
+	WALLET_CENTER(8, "wallet_center", "钱包充值介绍", 1, "钱包充值介绍", "Wallet Top-up Introduction", "錢包儲值介紹",
+			"Wallet Top-up Introduction", "ウォレットチャージの紹介", "Cüzdan Yükleme Tanıtımı",
+			"Introdução à recarga de carteira");
 
 	private Integer index;
 

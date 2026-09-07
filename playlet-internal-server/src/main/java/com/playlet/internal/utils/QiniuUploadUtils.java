@@ -6,6 +6,7 @@ import com.playlet.internal.config.QiniuConfig;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.RedisKeyConstants;
 import com.playlet.internal.api.response.DramaVideoUploadRespEntity;
+import com.playlet.internal.enums.FilePathEnums;
 import com.qiniu.http.Response;
 import com.qiniu.storage.BucketManager;
 import com.qiniu.storage.Configuration;
@@ -102,6 +103,14 @@ public class QiniuUploadUtils {
 
 	public static String upload(InputStream inputStream, String fileName, String dir) {
 		return getInstance().doUpload(inputStream, fileName, dir);
+	}
+
+	/**
+	 * 管理端协议配置 HTML 上传（可信内容）。通用 {@link #upload} 禁止 html，此处单独放行 config/ 路径。
+	 * @return 七牛对象 key
+	 */
+	public static String uploadConfigHtml(byte[] data, String fileName) {
+		return getInstance().doUploadConfigHtml(data, fileName, FilePathEnums.CONFIG.getName());
 	}
 
 	public static String uploadWithFullPath(MultipartFile file, String fullPath) {
@@ -263,6 +272,31 @@ public class QiniuUploadUtils {
 			throw e;
 		} catch (Exception e) {
 			log.error("上传失败", e);
+			throw new RuntimeException("上传失败", e);
+		}
+	}
+
+	/** 协议配置 HTML：跳过通用扩展名拦截，仅校验 config/*.html 路径 */
+	private String doUploadConfigHtml(byte[] data, String fileName, String dir) {
+		if (data == null || data.length == 0) {
+			throw new RuntimeException("文件数据为空");
+		}
+		try {
+			String fullFileName = generateFileName(fileName);
+			String fullPath = buildFullPath(fullFileName, dir);
+			UploadSafetyUtils.assertSafeConfigHtmlPath(fullPath);
+			String upToken = qiniuAuth.uploadToken(qiniuConfig.getBucket());
+			Response response = qiniuUploadManager.put(data, fullPath, upToken);
+			if (response.isOK()) {
+				log.info("配置 HTML 上传成功 key={}", fullPath);
+				return fullPath;
+			}
+			log.error("配置 HTML 上传失败: {}", response.bodyString());
+			throw new RuntimeException("上传失败: " + response.bodyString());
+		} catch (RuntimeException e) {
+			throw e;
+		} catch (Exception e) {
+			log.error("配置 HTML 上传失败", e);
 			throw new RuntimeException("上传失败", e);
 		}
 	}

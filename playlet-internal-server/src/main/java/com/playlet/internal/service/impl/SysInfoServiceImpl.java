@@ -16,10 +16,14 @@ import com.playlet.internal.entity.system.SysInfoEntity;
 import com.playlet.internal.enums.LanguageEnums;
 import com.playlet.internal.enums.NoticeStateEnums;
 import com.playlet.internal.enums.SysConfigTypeEnums;
+import com.playlet.internal.constants.WalletSysConfigConstants;
 import com.playlet.internal.service.SysInfoService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.HtmlSanitizeUtils;
 import com.playlet.internal.utils.I18nUtil;
+import com.playlet.internal.utils.QiniuUploadUtils;
+import com.playlet.internal.utils.StringUtils;
+import com.playlet.internal.utils.SysConfigHtmlUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -122,15 +126,8 @@ public class SysInfoServiceImpl extends BaseApiService implements SysInfoService
 				return setResultError(I18nUtil.getMessage("config_type_isExist"));
 			}
 			for (ContentItemEntity contentItem : configContent) {
-				SysInfoEntity sysInfoEntity = new SysInfoEntity();
-				sysInfoEntity.setConfigType(entity.getConfigType());
-				sysInfoEntity.setConfigTypeName(SysConfigTypeEnums.getName(entity.getConfigType()));
-				sysInfoEntity.setConfigLable(SysConfigTypeEnums.getLable(entity.getConfigType()));
-				sysInfoEntity.setStatus(NoticeStateEnums.NORMAL.getIndex());
-				sysInfoEntity.setConfigName(HtmlSanitizeUtils.plain(contentItem.getConfigName()));
-				sysInfoEntity.setConfigContent(HtmlSanitizeUtils.rich(contentItem.getConfigContent()));
-				sysInfoEntity.setConfigUrl(contentItem.getConfigUrl());
-				sysInfoEntity.setLanguage(contentItem.getLanguage());
+				SysInfoEntity sysInfoEntity = buildSysInfoRow(entity.getConfigType(), contentItem,
+						NoticeStateEnums.NORMAL.getIndex());
 				GenericityUtil.setDate(sysInfoEntity);
 				sysInfoDao.insert(sysInfoEntity);
 			}
@@ -159,15 +156,7 @@ public class SysInfoServiceImpl extends BaseApiService implements SysInfoService
 					: NoticeStateEnums.NORMAL.getIndex();
 			sysInfoDao.deleteByConfigType(entity.getConfigType());
 			for (ContentItemEntity contentItem : configContent) {
-				SysInfoEntity row = new SysInfoEntity();
-				row.setConfigType(entity.getConfigType());
-				row.setConfigTypeName(SysConfigTypeEnums.getName(entity.getConfigType()));
-				row.setConfigLable(SysConfigTypeEnums.getLable(entity.getConfigType()));
-				row.setStatus(status);
-				row.setConfigName(HtmlSanitizeUtils.plain(contentItem.getConfigName()));
-				row.setConfigContent(HtmlSanitizeUtils.rich(contentItem.getConfigContent()));
-				row.setConfigUrl(contentItem.getConfigUrl());
-				row.setLanguage(contentItem.getLanguage());
+				SysInfoEntity row = buildSysInfoRow(entity.getConfigType(), contentItem, status);
 				GenericityUtil.setDate(row);
 				sysInfoDao.insert(row);
 			}
@@ -195,6 +184,39 @@ public class SysInfoServiceImpl extends BaseApiService implements SysInfoService
 			log.error("service error", e);
 			throw new RuntimeException(e);
 		}
+	}
+
+	/**
+	 * 组装 sys_info 行：协议类配置自动生成 HTML 上传七牛（对齐 onetoken），供 countInfo/countUrl。
+	 */
+	private SysInfoEntity buildSysInfoRow(Integer configType, ContentItemEntity contentItem, Integer status) {
+		SysInfoEntity row = new SysInfoEntity();
+		row.setConfigType(configType);
+		row.setConfigTypeName(SysConfigTypeEnums.getName(configType));
+		row.setConfigLable(SysConfigTypeEnums.getLable(configType));
+		row.setStatus(status);
+		String configName = contentItem.getConfigName();
+		if (StringUtils.isEmpty(configName)) {
+			configName = SysConfigTypeEnums.getLanguageName(configType, contentItem.getLanguage());
+		}
+		row.setConfigName(HtmlSanitizeUtils.plain(configName));
+		String sanitized = HtmlSanitizeUtils.rich(contentItem.getConfigContent());
+		row.setConfigContent(sanitized);
+		row.setLanguage(contentItem.getLanguage());
+		// 钱包充值介绍：包装完整 HTML 上传七牛，供 topinUsdtAddress 的 countInfo/countUrl（对齐 onetoken）
+		boolean walletCenter = WalletSysConfigConstants.WALLET_CENTER_CONFIG_TYPE == configType;
+		if (walletCenter && !StringUtils.isEmpty(sanitized)) {
+			String typeName = SysConfigTypeEnums.getType(configType);
+			String lang = contentItem.getLanguage() == null ? "" : contentItem.getLanguage();
+			String fileName = typeName + "_" + lang + ".html";
+			byte[] htmlBytes = SysConfigHtmlUtils.toFullHtmlBytes(sanitized);
+			String key = QiniuUploadUtils.uploadConfigHtml(htmlBytes, fileName);
+			row.setConfigUrl(key);
+			log.info("sys config html uploaded configType={} language={} key={}", configType, lang, key);
+		} else {
+			row.setConfigUrl(contentItem.getConfigUrl());
+		}
+		return row;
 	}
 
 }

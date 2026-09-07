@@ -73,6 +73,27 @@ public final class UploadSafetyUtils {
 		assertExtensionAllowed(extractExtension(normalized));
 	}
 
+	/**
+	 * 管理端协议配置 HTML 专用路径校验（通用上传仍禁止 html）。
+	 * 仅允许 config/ 下、无穿越、扩展名为 html。
+	 */
+	public static void assertSafeConfigHtmlPath(String path) {
+		if (path == null || path.isEmpty()) {
+			throw new RuntimeException("上传路径为空");
+		}
+		String normalized = path.replace('\\', '/');
+		if (normalized.contains("..") || normalized.startsWith("/") || normalized.contains("://")) {
+			throw new RuntimeException("非法上传路径");
+		}
+		if (!normalized.startsWith("config/")) {
+			throw new RuntimeException("配置 HTML 必须放在 config/ 目录");
+		}
+		String ext = extractExtension(normalized);
+		if (!"html".equals(ext)) {
+			throw new RuntimeException("配置文件仅支持 .html");
+		}
+	}
+
 	public static void assertExtensionAllowed(String ext) {
 		if (ext == null || ext.isEmpty()) {
 			throw new RuntimeException("文件缺少扩展名");
