@@ -77,6 +77,9 @@ public final class WalletConstants {
 	/** 卡性质：实体卡 */
 	public static final String BANKCARD_NATURE_PHYSICAL = "PHYSICAL";
 
+	/** 三方激活失败文案片段：卡片已被绑定（需本地补偿） */
+	public static final String THIRD_MSG_CARD_ALREADY_BOUND = "已被绑定";
+
 	/** 开卡充值方式：钱包余额 */
 	public static final int TOPUP_TYPE_WALLET = 1;
 	/** 开卡充值方式：银行卡 */

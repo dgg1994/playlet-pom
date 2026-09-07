@@ -5,6 +5,7 @@ import com.playlet.oversea.api.request.BankcardSetPinRequest;
 import com.playlet.oversea.api.request.WalletCardShippingRequest;
 import com.playlet.oversea.api.response.EmsTrackingInfoResp;
 import com.playlet.oversea.api.response.ThirdBankcardActiveResp;
+import com.playlet.oversea.api.response.ThirdUserBankcardResp;
 import com.playlet.oversea.api.response.WalletLogisticsEventResp;
 import com.playlet.oversea.base.ResponseBase;
 import com.playlet.oversea.constants.EmsTrackingConstants;
@@ -86,6 +87,7 @@ public class WalletPhysicalCardFulfillService {
 
 	/**
 	 * 实体卡分配激活：绑定卡号并调三方激活。
+	 * 三方已绑定但本地未落库时，拉卡列表匹配卡号补偿本地状态，避免一直卡在待激活。
 	 */
 	@Transactional(rollbackFor = Exception.class)
 	public ResponseBase cardBinding(Long applyId, String cardNumber, String pinNum) {
@@ -111,13 +113,36 @@ public class WalletPhysicalCardFulfillService {
 		if (product == null) {
 			return setResultError(I18nUtil.getMessage("bank_card_null"));
 		}
-		BankcardActiveRequest activeReq = buildActiveRequest(apply, product, cardNumber.trim());
+		String normalizedCardNo = cardNumber.trim();
+		BankcardActiveRequest activeReq = buildActiveRequest(apply, product, normalizedCardNo);
 		ThirdBankcardActiveResp third;
+		Integer thirdCardStatus = null;
+		boolean recoveredAlreadyBound = false;
 		try {
 			third = thirdService.activeBankcard(user.getWalletUid(), activeReq);
 		} catch (BaseException e) {
-			log.error("physical card binding third failed applyId={} walletUid={}", applyId, user.getWalletUid(), e);
-			return setResultError(e.getMessage());
+			// 三方已绑定：列表匹配卡号后继续落本地
+			if (!isCardAlreadyBoundError(e)) {
+				log.error("physical card binding third failed applyId={} walletUid={}", applyId, user.getWalletUid(), e);
+				return setResultError(e.getMessage());
+			}
+			ThirdUserBankcardResp matched = findAlreadyBoundThirdCard(user.getWalletUid(), normalizedCardNo);
+			if (matched == null || matched.getUserBankcardId() == null) {
+				log.error("physical card binding already-bound but list miss applyId={} walletUid={} cardTail={}",
+						applyId, user.getWalletUid(), maskCardTail(normalizedCardNo), e);
+				return setResultError(e.getMessage());
+			}
+			WalletBankcardEntity existed = walletBankcardDao.findByUserBankcardId(matched.getUserBankcardId());
+			if (existed != null) {
+				log.warn("physical card binding already-bound local exists applyId={} userBankcardId={} existedApplyId={}",
+						applyId, matched.getUserBankcardId(), existed.getCardApplyId());
+				return setResultError(I18nUtil.getMessage("bank_card_binding"));
+			}
+			third = toActiveResp(matched, normalizedCardNo);
+			thirdCardStatus = matched.getStatus();
+			recoveredAlreadyBound = true;
+			log.info("physical card binding recover already-bound applyId={} walletUid={} userBankcardId={}",
+					applyId, user.getWalletUid(), matched.getUserBankcardId());
 		} catch (Exception e) {
 			log.error("physical card binding third error applyId={}", applyId, e);
 			return setResultError(I18nUtil.getMessage("base_error"));
@@ -126,20 +151,12 @@ public class WalletPhysicalCardFulfillService {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
 		Date now = new Date();
-		insertPhysicalBankcard(user, apply, product, third, cardNumber.trim(), now);
-		setPinAfterBinding(user, third.getUserBankcardId(), pinNum.trim());
-		apply.setApplyState(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getCode());
-		apply.setApplyStateName(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getLabel());
-		apply.setGmtModified(now);
-		try {
-			walletCardApplyDao.updateById(apply);
-			walletAccountDao.markActivated(user.getId());
-		} catch (Exception e) {
-			log.error("physical card binding update apply failed applyId={}", applyId, e);
-			throw new BaseException(I18nUtil.getMessage("base_error"), e);
-		}
-		log.info("physical card binding success applyId={} walletUid={} userBankcardId={}",
-				applyId, user.getWalletUid(), third.getUserBankcardId());
+		insertPhysicalBankcard(user, apply, product, third, normalizedCardNo, now);
+		// 补偿场景下 PIN 可能已设置，失败不阻断本地回写
+		setPinAfterBinding(user, third.getUserBankcardId(), pinNum.trim(), recoveredAlreadyBound);
+		finalizePhysicalBindingState(user, apply, third.getUserBankcardId(), thirdCardStatus, now);
+		log.info("physical card binding success applyId={} walletUid={} userBankcardId={} recovered={}",
+				applyId, user.getWalletUid(), third.getUserBankcardId(), recoveredAlreadyBound);
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
@@ -374,9 +391,9 @@ public class WalletPhysicalCardFulfillService {
 				|| apply.getKycState() != WalletKycStateEnums.SUCCESS_APPROVE.getCode()) {
 			return setResultError(I18nUtil.getMessage("user_kyc_state"));
 		}
-		// 实体卡绑卡须已发货（对齐 onetoken entityCardActiva）
+		// 实体卡绑卡须已发货及之后物流态（对齐 onetoken entityCardActiva）
 		if (apply.getShippingState() == null
-				|| apply.getShippingState() != WalletLogisticsStateEnums.ALREADY_SHIPPING.getCode()) {
+				|| apply.getShippingState() < WalletLogisticsStateEnums.ALREADY_SHIPPING.getCode()) {
 			return setResultError(I18nUtil.getMessage("shipping_not"));
 		}
 		if (Integer.valueOf(WalletCardApplyStateEnums.SUCCESS_ACTIVATION.getCode()).equals(apply.getApplyState())) {
@@ -450,7 +467,8 @@ public class WalletPhysicalCardFulfillService {
 		}
 	}
 
-	private void setPinAfterBinding(WalletUserEntity user, Long userBankcardId, String pinNum) {
+	private void setPinAfterBinding(WalletUserEntity user, Long userBankcardId, String pinNum,
+			boolean softFailOnError) {
 		BankcardSetPinRequest pinReq = new BankcardSetPinRequest();
 		pinReq.setUserBankcardId(userBankcardId);
 		pinReq.setPin(pinNum);
@@ -461,10 +479,106 @@ public class WalletPhysicalCardFulfillService {
 				walletBankcardDao.updatePinSet(card.getId(), 1);
 			}
 		} catch (Exception e) {
+			if (softFailOnError) {
+				log.warn("physical card set pin soft-fail walletUid={} userBankcardId={}",
+						user.getWalletUid(), userBankcardId, e);
+				return;
+			}
 			log.error("physical card set pin failed walletUid={} userBankcardId={}",
 					user.getWalletUid(), userBankcardId, e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
+	}
+
+	/** 绑卡成功后回写申请态；三方已正常则直接激活成功 */
+	private void finalizePhysicalBindingState(WalletUserEntity user, WalletCardApplyEntity apply,
+			Long userBankcardId, Integer thirdCardStatus, Date now) {
+		WalletCardStatusEnums mapped = WalletCardStatusEnums.fromThirdPartyCode(thirdCardStatus);
+		boolean alreadyActive = WalletCardStatusEnums.ACTIVE.equals(mapped);
+		WalletBankcardEntity card = walletBankcardDao.findByUserBankcardId(userBankcardId);
+		if (alreadyActive && card != null) {
+			try {
+				walletBankcardDao.updateCardStatus(card.getId(),
+						WalletCardStatusEnums.ACTIVE.getCode(), WalletCardStatusEnums.ACTIVE.getLabel());
+				card.setCardStatus(WalletCardStatusEnums.ACTIVE.getCode());
+				card.setCardStatusName(WalletCardStatusEnums.ACTIVE.getLabel());
+				walletAccountDao.markActivated(user.getId());
+			} catch (Exception e) {
+				log.error("physical card binding mark active failed applyId={} userBankcardId={}",
+						apply.getId(), userBankcardId, e);
+				throw new BaseException(I18nUtil.getMessage("base_error"), e);
+			}
+			walletOpenCardSettlementService.onCardActivated(card);
+			return;
+		}
+		apply.setApplyState(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getCode());
+		apply.setApplyStateName(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getLabel());
+		apply.setGmtModified(now);
+		try {
+			walletCardApplyDao.updateById(apply);
+			walletAccountDao.markActivated(user.getId());
+		} catch (Exception e) {
+			log.error("physical card binding update apply failed applyId={}", apply.getId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+	}
+
+	private ThirdUserBankcardResp findAlreadyBoundThirdCard(Long walletUid, String cardNumber) {
+		List<ThirdUserBankcardResp> list;
+		try {
+			list = thirdService.listUserCards(walletUid);
+		} catch (BaseException e) {
+			log.error("physical card already-bound list failed walletUid={}", walletUid, e);
+			return null;
+		} catch (Exception e) {
+			log.error("physical card already-bound list error walletUid={}", walletUid, e);
+			return null;
+		}
+		if (list == null || list.isEmpty()) {
+			return null;
+		}
+		for (ThirdUserBankcardResp item : list) {
+			if (item == null || item.getUserBankcardId() == null) {
+				continue;
+			}
+			if (cardNumberEquals(cardNumber, item.getCardNumber())) {
+				return item;
+			}
+		}
+		return null;
+	}
+
+	private static ThirdBankcardActiveResp toActiveResp(ThirdUserBankcardResp matched, String fallbackCardNo) {
+		ThirdBankcardActiveResp resp = new ThirdBankcardActiveResp();
+		resp.setUserBankcardId(matched.getUserBankcardId());
+		resp.setCardNo(StringUtils.isEmpty(matched.getCardNumber()) ? fallbackCardNo : matched.getCardNumber());
+		return resp;
+	}
+
+	private static boolean isCardAlreadyBoundError(BaseException e) {
+		if (e == null || StringUtils.isEmpty(e.getMessage())) {
+			return false;
+		}
+		return e.getMessage().contains(WalletConstants.THIRD_MSG_CARD_ALREADY_BOUND);
+	}
+
+	private static boolean cardNumberEquals(String left, String right) {
+		if (StringUtils.isEmpty(left) || StringUtils.isEmpty(right)) {
+			return false;
+		}
+		return normalizeCardNo(left).equalsIgnoreCase(normalizeCardNo(right));
+	}
+
+	private static String normalizeCardNo(String cardNo) {
+		return cardNo.replace(" ", "").trim();
+	}
+
+	private static String maskCardTail(String cardNo) {
+		String normalized = normalizeCardNo(cardNo);
+		if (normalized.length() <= 4) {
+			return "****";
+		}
+		return "****" + normalized.substring(normalized.length() - 4);
 	}
 
 	private static WalletCardShippingEntity buildShippingEntity(WalletCardShippingRequest request,
