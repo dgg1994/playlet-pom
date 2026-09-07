@@ -50,8 +50,15 @@ public interface WalletCardApplyDao extends BaseMapper<WalletCardApplyEntity> {
 	List<WalletCardApplyEntity> findByWalletUserIdAndKycState(@Param("walletUserId") Long walletUserId,
 			@Param("kycState") Integer kycState);
 
+	/**
+	 * KYC 通过回写：待激活申请更新 KYC；发货状态仅实体卡且当前为空/待发货时写入，避免覆盖已发货及后续物流态。
+	 */
 	@Update("update wallet_card_apply set kyc_state = #{kycState}, kyc_state_name = #{kycStateName}, "
-			+ "shipping_state = #{shippingState}, shipping_state_name = #{shippingStateName}, gmtModified = now() "
+			+ "shipping_state = if(upper(ifnull(card_type,'')) = 'PHYSICAL' "
+			+ "and (shipping_state is null or shipping_state = 1), #{shippingState}, shipping_state), "
+			+ "shipping_state_name = if(upper(ifnull(card_type,'')) = 'PHYSICAL' "
+			+ "and (shipping_state is null or shipping_state = 1), #{shippingStateName}, shipping_state_name), "
+			+ "gmtModified = now() "
 			+ "where wallet_user_id = #{walletUserId} and apply_state = 1")
 	int updateKycAndShippingByWalletUserId(@Param("walletUserId") Long walletUserId,
 			@Param("kycState") Integer kycState, @Param("kycStateName") String kycStateName,

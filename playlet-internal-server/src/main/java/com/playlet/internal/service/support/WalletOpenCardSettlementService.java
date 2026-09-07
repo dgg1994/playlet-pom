@@ -218,7 +218,7 @@ public class WalletOpenCardSettlementService {
 		markApplySuccessActivation(apply.getId());
 	}
 
-	/** KYC 通过：实体卡申请单进入待发货 */
+	/** KYC 通过：待激活实体卡进入待发货（已发货及后续物流态不回写） */
 	public void markPhysicalWaitShippingOnKycSuccess(Long walletUserId) {
 		if (walletUserId == null) {
 			return;
