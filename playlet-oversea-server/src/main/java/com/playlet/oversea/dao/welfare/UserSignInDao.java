@@ -26,4 +26,12 @@ public interface UserSignInDao extends BaseMapper<UserSignInEntity> {
 			+ "gmtModified = now() where uid = #{uid}")
 	int updateMakeupBuyStat(@Param("uid") String uid, @Param("buyMonth") String buyMonth,
 			@Param("buyCount") Integer buyCount);
+
+	/** 回写新手进度 */
+	@Update("update user_sign_in set newbie_start_date = #{startDate}, newbie_sign_count = #{signCount}, "
+			+ "newbie_finished = #{finished}, newbie_end_reason = #{endReason}, gmtModified = now() "
+			+ "where uid = #{uid}")
+	int updateNewbieProgress(@Param("uid") String uid, @Param("startDate") String startDate,
+			@Param("signCount") Integer signCount, @Param("finished") Integer finished,
+			@Param("endReason") Integer endReason);
 }

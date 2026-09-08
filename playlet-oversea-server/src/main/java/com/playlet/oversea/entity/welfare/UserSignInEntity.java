@@ -47,6 +47,26 @@ public class UserSignInEntity {
 	@ApiModelProperty(name = "makeupBuyCount", value = "该月已购补签卡张数", dataType = "Integer")
 	private Integer makeupBuyCount;
 
+	/** 新手期起始业务日 yyyy-MM-dd */
+	@TableField("newbie_start_date")
+	@ApiModelProperty(name = "newbieStartDate", value = "新手期起始日 yyyy-MM-dd", dataType = "String")
+	private String newbieStartDate;
+
+	/** 新手期内已签次数 */
+	@TableField("newbie_sign_count")
+	@ApiModelProperty(name = "newbieSignCount", value = "新手期内已签次数", dataType = "Integer")
+	private Integer newbieSignCount;
+
+	/** 新手是否已结束：1是 0否 */
+	@TableField("newbie_finished")
+	@ApiModelProperty(name = "newbieFinished", value = "新手是否已结束 1是 0否", dataType = "Integer")
+	private Integer newbieFinished;
+
+	/** 结束原因：1=FULL 2=EXPIRED */
+	@TableField("newbie_end_reason")
+	@ApiModelProperty(name = "newbieEndReason", value = "结束原因 1满次数 2窗口过期", dataType = "Integer")
+	private Integer newbieEndReason;
+
 	@TableField("setTime")
 	@ApiModelProperty(name = "setTime", value = "创建时间", dataType = "Date")
 	private Date setTime;

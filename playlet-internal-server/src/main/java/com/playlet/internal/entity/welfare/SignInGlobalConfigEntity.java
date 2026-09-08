@@ -68,6 +68,31 @@ public class SignInGlobalConfigEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "status", value = "1启用 0停用", dataType = "Integer")
 	private Integer status;
 
+	/** 新手签到开关：1开 0关 */
+	@TableField("newbie_enabled")
+	@ApiModelProperty(name = "newbieEnabled", value = "新手签到开关 1开 0关", dataType = "Integer")
+	private Integer newbieEnabled;
+
+	/** 日常连续签到开关：1开 0关 */
+	@TableField("daily_enabled")
+	@ApiModelProperty(name = "dailyEnabled", value = "日常连续签到开关 1开 0关", dataType = "Integer")
+	private Integer dailyEnabled;
+
+	/** 新手窗口天数 */
+	@TableField("newbie_window_days")
+	@ApiModelProperty(name = "newbieWindowDays", value = "新手窗口天数", dataType = "Integer")
+	private Integer newbieWindowDays;
+
+	/** 新手窗口内最多签到次数 */
+	@TableField("newbie_max_times")
+	@ApiModelProperty(name = "newbieMaxTimes", value = "新手最多签到次数", dataType = "Integer")
+	private Integer newbieMaxTimes;
+
+	/** 新手期是否禁止补签：1禁 0允许 */
+	@TableField("newbie_forbid_makeup")
+	@ApiModelProperty(name = "newbieForbidMakeup", value = "新手期禁止补签 1禁 0允许", dataType = "Integer")
+	private Integer newbieForbidMakeup;
+
 	@TableField("setTime")
 	@ApiModelProperty(name = "setTime", value = "创建时间", dataType = "Date")
 	private Date setTime;

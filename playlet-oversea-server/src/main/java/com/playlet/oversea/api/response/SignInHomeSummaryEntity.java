@@ -16,6 +16,30 @@ public class SignInHomeSummaryEntity {
 	@ApiModelProperty("今日是否已签")
 	private Boolean todaySigned;
 
+	@ApiModelProperty("当前签到模式 NEWBIE / DAILY；无可签模式时为 null")
+	private String signMode;
+
+	@ApiModelProperty("全局是否开启新手签到")
+	private Boolean newbieEnabled;
+
+	@ApiModelProperty("全局是否开启日常签到")
+	private Boolean dailyEnabled;
+
+	@ApiModelProperty("当前用户新手是否已结束")
+	private Boolean newbieFinished;
+
+	@ApiModelProperty("新手已签次数")
+	private Integer newbieSignCount;
+
+	@ApiModelProperty("新手最多可签次数")
+	private Integer newbieMaxTimes;
+
+	@ApiModelProperty("新手剩余可签次数")
+	private Integer newbieRemainCount;
+
+	@ApiModelProperty("新手窗口截止日 yyyy-MM-dd")
+	private String newbieWindowEndDate;
+
 	@ApiModelProperty("当前连续天数")
 	private Integer streakDays;
 

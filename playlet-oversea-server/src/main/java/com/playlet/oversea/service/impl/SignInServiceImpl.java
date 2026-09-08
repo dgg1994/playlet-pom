@@ -4,6 +4,7 @@ import com.playlet.oversea.api.response.*;
 import com.playlet.oversea.base.BaseApiService;
 import com.playlet.oversea.base.ResponseBase;
 import com.playlet.oversea.constants.Constants;
+import com.playlet.oversea.constants.SignInConstants;
 import com.playlet.oversea.dao.account.AppAccountDao;
 import com.playlet.oversea.dao.welfare.*;
 import com.playlet.oversea.entity.account.AppAccountEntity;
@@ -33,7 +34,7 @@ import java.time.format.DateTimeParseException;
 import java.util.*;
 
 /**
- * 连续签到实现（补签消耗补签卡）。
+ * 签到实现：支持新手强激励 + 日常连续（双开关可全关）。
  *
  * @author GeminiSun
  */
@@ -102,7 +103,7 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
             return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
         }
         SignInGlobalConfigEntity config = signInGlobalConfigDao.findEnabledOne();
-        if (config == null) {
+        if (config == null || !isAnyModeEnabled(config)) {
             return setResultError(I18nUtil.getMessage("sign_in_disabled"));
         }
         try {
@@ -130,7 +131,8 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
     public SignInHomeSummaryEntity buildHomeSummary(Integer uid) {
         SignInGlobalConfigEntity config = signInGlobalConfigDao.findEnabledOne();
         List<SignInRewardConfigEntity> rewardConfigs = signInRewardConfigDao.findEnabledList();
-        if (config == null || rewardConfigs == null || rewardConfigs.isEmpty()) {
+        // 配置未启用，或新手/日常双关 → 不展示签到
+        if (config == null || rewardConfigs == null || rewardConfigs.isEmpty() || !isAnyModeEnabled(config)) {
             return null;
         }
         return buildHomeSummaryInternal(uid, config, rewardConfigs);
@@ -153,7 +155,7 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
     private SignInOpResult doSignIn(Integer uid) {
         SignInGlobalConfigEntity config = signInGlobalConfigDao.findEnabledOne();
         List<SignInRewardConfigEntity> rewardConfigs = signInRewardConfigDao.findEnabledList();
-        if (config == null || rewardConfigs == null || rewardConfigs.isEmpty()) {
+        if (config == null || rewardConfigs == null || rewardConfigs.isEmpty() || !isAnyModeEnabled(config)) {
             return SignInOpResult.fail("sign_in_disabled");
         }
 
@@ -168,13 +170,85 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
         }
 
         UserSignInEntity userSign = userSignInDao.findByUid(uidStr);
+        // 懒过期：窗口已过且未标记结束时落库
+        userSign = lazyExpireNewbieIfNeeded(uidStr, userSign, config, todayDate);
+
+        String mode = resolveSignMode(config, userSign, todayDate);
+        if (mode == null) {
+            if (isNewbieEnabled(config) && isNewbieFinished(userSign) && !isDailyEnabled(config)) {
+                return SignInOpResult.fail("sign_in_newbie_finished");
+            }
+            return SignInOpResult.fail("sign_in_disabled");
+        }
+
+        if (SignInConstants.MODE_NEWBIE.equals(mode)) {
+            return doNewbieSignIn(uid, uidStr, userSign, config, rewardConfigs, todayDate, today, yesterday);
+        }
+        return doDailySignIn(uid, uidStr, userSign, config, rewardConfigs, today, yesterday);
+    }
+
+    /** 新手签到：按次数取 1～N 档奖励，满次数后关闭该用户新手 */
+    private SignInOpResult doNewbieSignIn(Integer uid, String uidStr, UserSignInEntity userSign,
+            SignInGlobalConfigEntity config, List<SignInRewardConfigEntity> rewardConfigs,
+            LocalDate todayDate, String today, String yesterday) {
+        int maxTimes = resolveNewbieMaxTimes(config);
+        int signedCount = userSign == null || userSign.getNewbieSignCount() == null
+                ? 0 : userSign.getNewbieSignCount();
+        if (signedCount >= maxTimes) {
+            return SignInOpResult.fail("sign_in_newbie_finished");
+        }
+        // 已开窗则校验未过期（首次签到当天开窗）
+        if (userSign != null && !StringUtils.isEmpty(userSign.getNewbieStartDate())) {
+            LocalDate end = resolveNewbieWindowEnd(userSign.getNewbieStartDate(), config);
+            if (end != null && todayDate.isAfter(end)) {
+                markNewbieFinished(uidStr, userSign, SignInConstants.NEWBIE_END_EXPIRED);
+                return SignInOpResult.fail("sign_in_newbie_expired");
+            }
+        }
+
+        String startDate = userSign == null || StringUtils.isEmpty(userSign.getNewbieStartDate())
+                ? today : userSign.getNewbieStartDate();
+        int nextCount = signedCount + 1;
+        int dayIndex = resolveNewbieDayIndex(nextCount, rewardConfigs);
+        int rewardCoin = resolveRewardCoin(dayIndex, rewardConfigs);
+        int streakDays = userSign == null || userSign.getStreakDays() == null ? 0 : userSign.getStreakDays();
+        String lastSignDate = userSign == null ? null : userSign.getLastSignDate();
+        int nextStreak = resolveNextStreak(lastSignDate, yesterday, streakDays);
+        boolean finished = nextCount >= maxTimes;
+
+        try {
+            ensureUserSignRow(uidStr);
+            insertSignLog(uidStr, today, SignInTypeEnums.NORMAL.getCode(), nextStreak, dayIndex, rewardCoin, 0, 0);
+            creditCoin(uid, rewardCoin, CoinBizTypeEnums.SIGN_IN.getName(), BIZ_ID_SIGN_PREFIX + today,
+                    WelfareTaskCodeEnums.SIGN_IN.getCode(), 0, "sign in newbie " + today);
+            userSign = userSignInDao.findByUid(uidStr);
+            upsertUserSignIn(uidStr, userSign, nextStreak, today, 1);
+            userSignInDao.updateNewbieProgress(uidStr, startDate, nextCount,
+                    finished ? SignInConstants.SWITCH_ON : SignInConstants.SWITCH_OFF,
+                    finished ? SignInConstants.NEWBIE_END_FULL : null);
+            log.info("signIn newbie success uid={} count={}/{} dayIndex={} finished={}",
+                    uid, nextCount, maxTimes, dayIndex, finished);
+        } catch (DuplicateKeyException e) {
+            TransactionUtils.markRollbackOnly();
+            return SignInOpResult.fail("sign_in_already");
+        } catch (Exception e) {
+            log.error("signIn newbie failed uid={}", uid, e);
+            throw new RuntimeException(e);
+        }
+        return SignInOpResult.success(buildHomeSummaryInternal(uid, config, rewardConfigs), rewardCoin, 0);
+    }
+
+    /** 日常连续签到（原逻辑） */
+    private SignInOpResult doDailySignIn(Integer uid, String uidStr, UserSignInEntity userSign,
+            SignInGlobalConfigEntity config, List<SignInRewardConfigEntity> rewardConfigs,
+            String today, String yesterday) {
         int streakDays = userSign == null || userSign.getStreakDays() == null ? 0 : userSign.getStreakDays();
         String lastSignDate = userSign == null ? null : userSign.getLastSignDate();
         int nextStreak = resolveNextStreak(lastSignDate, yesterday, streakDays);
         int dayIndex = resolveDayIndex(nextStreak, config, rewardConfigs);
         int rewardCoin = resolveRewardCoin(dayIndex, rewardConfigs);
 
-		try {
+        try {
             insertSignLog(uidStr, today, SignInTypeEnums.NORMAL.getCode(), nextStreak, dayIndex, rewardCoin, 0, 0);
             creditCoin(uid, rewardCoin, CoinBizTypeEnums.SIGN_IN.getName(), BIZ_ID_SIGN_PREFIX + today,
                     WelfareTaskCodeEnums.SIGN_IN.getCode(), 0, "sign in " + today);
@@ -199,7 +273,7 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
         }
         SignInGlobalConfigEntity config = signInGlobalConfigDao.findEnabledOne();
         List<SignInRewardConfigEntity> rewardConfigs = signInRewardConfigDao.findEnabledList();
-        if (config == null || rewardConfigs == null || rewardConfigs.isEmpty()) {
+        if (config == null || rewardConfigs == null || rewardConfigs.isEmpty() || !isAnyModeEnabled(config)) {
             return SignInOpResult.fail("sign_in_disabled");
         }
         if (config.getMakeupEnabled() == null || config.getMakeupEnabled() != 1) {
@@ -208,6 +282,18 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
 
         ZoneId zone = resolveZone(config.getTimezone());
         LocalDate todayDate = LocalDate.now(zone);
+        String uidStr = String.valueOf(uid);
+        UserSignInEntity userSign = userSignInDao.findByUid(uidStr);
+        userSign = lazyExpireNewbieIfNeeded(uidStr, userSign, config, todayDate);
+        // 新手进行中且禁止补签
+        if (isNewbieForbidMakeup(config) && isUserInActiveNewbie(config, userSign, todayDate)) {
+            return SignInOpResult.fail("sign_in_makeup_disabled");
+        }
+        // 仅新手且已结束、日常关闭：不可补签
+        if (resolveSignMode(config, userSign, todayDate) == null) {
+            return SignInOpResult.fail("sign_in_disabled");
+        }
+
         LocalDate targetDate;
         try {
             targetDate = LocalDate.parse(bizDate.trim(), DATE_FMT);
@@ -223,7 +309,6 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
             return SignInOpResult.fail("sign_in_makeup_out_of_window");
         }
 
-        String uidStr = String.valueOf(uid);
         if (userSignInLogDao.findOne(uidStr, target) != null) {
             return SignInOpResult.fail("sign_in_makeup_already");
         }
@@ -249,7 +334,7 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
             creditCoin(uid, rewardCoin, CoinBizTypeEnums.SIGN_IN.getName(), BIZ_ID_SIGN_PREFIX + target,
                     WelfareTaskCodeEnums.SIGN_IN.getCode(), 0, "sign in makeup " + target);
 
-            UserSignInEntity userSign = userSignInDao.findByUid(uidStr);
+            userSign = userSignInDao.findByUid(uidStr);
             int newStreak = calcStreakEndingAt(uidStr, resolveLastSignedDate(uidStr, todayDate), todayDate, false);
             String lastSignDate = resolveLastSignedDateStr(uidStr, todayDate);
             upsertUserSignIn(uidStr, userSign, newStreak, lastSignDate, 1);
@@ -270,8 +355,12 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
         }
         SignInGlobalConfigEntity config = signInGlobalConfigDao.findEnabledOne();
         List<SignInRewardConfigEntity> rewardConfigs = signInRewardConfigDao.findEnabledList();
-        if (config == null) {
+        if (config == null || !isAnyModeEnabled(config)) {
             return SignInOpResult.fail("sign_in_disabled");
+        }
+        // 仅新手且禁止补签时不开放购卡
+        if (!isDailyEnabled(config) && isNewbieEnabled(config) && isNewbieForbidMakeup(config)) {
+            return SignInOpResult.fail("sign_in_makeup_buy_disabled");
         }
         int price = config.getMakeupBuyPriceCoin() == null ? 0 : config.getMakeupBuyPriceCoin();
         if (price <= 0) {
@@ -380,6 +469,7 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
         String uidStr = String.valueOf(uid);
 
         UserSignInEntity userSign = userSignInDao.findByUid(uidStr);
+        userSign = lazyExpireNewbieIfNeeded(uidStr, userSign, config, todayDate);
         UserSignInLogEntity todayLog = userSignInLogDao.findOne(uidStr, today);
         boolean todaySigned = todayLog != null;
 
@@ -394,9 +484,24 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
             }
         }
 
+        String signMode = resolveSignMode(config, userSign, todayDate);
         int todayRewardDayIndex;
         int todayRewardCoin;
-        if (todaySigned) {
+        if (SignInConstants.MODE_NEWBIE.equals(signMode)) {
+            int signedCount = userSign == null || userSign.getNewbieSignCount() == null
+                    ? 0 : userSign.getNewbieSignCount();
+            if (todaySigned) {
+                todayRewardDayIndex = todayLog.getRewardDayIndex() == null
+                        ? resolveNewbieDayIndex(signedCount, rewardConfigs)
+                        : todayLog.getRewardDayIndex();
+                todayRewardCoin = todayLog.getRewardCoin() == null
+                        ? resolveRewardCoin(todayRewardDayIndex, rewardConfigs)
+                        : todayLog.getRewardCoin();
+            } else {
+                todayRewardDayIndex = resolveNewbieDayIndex(signedCount + 1, rewardConfigs);
+                todayRewardCoin = resolveRewardCoin(todayRewardDayIndex, rewardConfigs);
+            }
+        } else if (todaySigned) {
             todayRewardDayIndex = todayLog.getRewardDayIndex() == null
                     ? resolveDayIndex(streakDays, config, rewardConfigs)
                     : todayLog.getRewardDayIndex();
@@ -409,14 +514,36 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
             todayRewardCoin = resolveRewardCoin(todayRewardDayIndex, rewardConfigs);
         }
 
+        boolean inActiveNewbie = isUserInActiveNewbie(config, userSign, todayDate);
+        boolean makeupEnabled = config.getMakeupEnabled() != null && config.getMakeupEnabled() == 1
+                && !(isNewbieForbidMakeup(config) && inActiveNewbie)
+                && signMode != null;
+
         SignInHomeSummaryEntity summary = new SignInHomeSummaryEntity();
         summary.setToday(today);
         summary.setTodaySigned(todaySigned);
+        summary.setSignMode(signMode);
+        summary.setNewbieEnabled(isNewbieEnabled(config));
+        summary.setDailyEnabled(isDailyEnabled(config));
+        summary.setNewbieFinished(isNewbieFinished(userSign));
+        int newbieCount = userSign == null || userSign.getNewbieSignCount() == null ? 0 : userSign.getNewbieSignCount();
+        int newbieMax = resolveNewbieMaxTimes(config);
+        summary.setNewbieSignCount(newbieCount);
+        summary.setNewbieMaxTimes(newbieMax);
+        summary.setNewbieRemainCount(Math.max(newbieMax - newbieCount, 0));
+        if (userSign != null && !StringUtils.isEmpty(userSign.getNewbieStartDate())) {
+            LocalDate end = resolveNewbieWindowEnd(userSign.getNewbieStartDate(), config);
+            summary.setNewbieWindowEndDate(end == null ? null : end.format(DATE_FMT));
+        } else if (SignInConstants.MODE_NEWBIE.equals(signMode)) {
+            // 尚未开窗：按今天起算展示截止日
+            LocalDate end = todayDate.plusDays(resolveNewbieWindowDays(config) - 1L);
+            summary.setNewbieWindowEndDate(end.format(DATE_FMT));
+        }
         summary.setStreakDays(displayStreak);
         summary.setTotalSignDays(totalSignDays);
         summary.setTodayRewardDayIndex(todayRewardDayIndex);
         summary.setTodayRewardCoin(todayRewardCoin);
-        summary.setMakeupEnabled(config.getMakeupEnabled() != null && config.getMakeupEnabled() == 1);
+        summary.setMakeupEnabled(makeupEnabled);
         if (config.getMakeupMonthLimit() == null || config.getMakeupMonthLimit() <= 0) {
             summary.setMakeupRemainCount(null);
         } else {
@@ -460,6 +587,8 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
             row.setTotalSignDays(total);
             row.setMakeupCardBalance(0);
             row.setMakeupBuyCount(0);
+            row.setNewbieSignCount(0);
+            row.setNewbieFinished(SignInConstants.SWITCH_OFF);
             GenericityUtil.setDate(row);
             userSignInDao.insert(row);
         } else {
@@ -481,6 +610,8 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
         row.setTotalSignDays(0);
         row.setMakeupCardBalance(0);
         row.setMakeupBuyCount(0);
+        row.setNewbieSignCount(0);
+        row.setNewbieFinished(SignInConstants.SWITCH_OFF);
         GenericityUtil.setDate(row);
         try {
             userSignInDao.insert(row);
@@ -721,5 +852,131 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
             log.warn("invalid sign-in timezone: {}", timezone);
         }
         return ZoneId.of("Asia/Shanghai");
+    }
+
+    /** 新手或日常任一开启 */
+    private static boolean isAnyModeEnabled(SignInGlobalConfigEntity config) {
+        return isNewbieEnabled(config) || isDailyEnabled(config);
+    }
+
+    private static boolean isNewbieEnabled(SignInGlobalConfigEntity config) {
+        return config != null && Integer.valueOf(SignInConstants.SWITCH_ON).equals(config.getNewbieEnabled());
+    }
+
+    private static boolean isDailyEnabled(SignInGlobalConfigEntity config) {
+        // 兼容未跑迁移：daily_enabled 为空时视为开启（保持旧行为）
+        if (config == null) {
+            return false;
+        }
+        if (config.getDailyEnabled() == null) {
+            return true;
+        }
+        return Integer.valueOf(SignInConstants.SWITCH_ON).equals(config.getDailyEnabled());
+    }
+
+    private static boolean isNewbieForbidMakeup(SignInGlobalConfigEntity config) {
+        if (config == null || config.getNewbieForbidMakeup() == null) {
+            return true;
+        }
+        return Integer.valueOf(SignInConstants.SWITCH_ON).equals(config.getNewbieForbidMakeup());
+    }
+
+    private static boolean isNewbieFinished(UserSignInEntity userSign) {
+        return userSign != null && Integer.valueOf(SignInConstants.SWITCH_ON).equals(userSign.getNewbieFinished());
+    }
+
+    /**
+     * 解析当前用户应走的签到模式：未完成的新手优先，否则日常；都不可用返回 null。
+     */
+    private String resolveSignMode(SignInGlobalConfigEntity config, UserSignInEntity userSign, LocalDate todayDate) {
+        if (isNewbieEnabled(config) && isUserInActiveNewbie(config, userSign, todayDate)) {
+            return SignInConstants.MODE_NEWBIE;
+        }
+        if (isDailyEnabled(config)) {
+            return SignInConstants.MODE_DAILY;
+        }
+        return null;
+    }
+
+    /** 新手进行中：已开窗未结束且未过期，或尚未开窗（视为可进入） */
+    private boolean isUserInActiveNewbie(SignInGlobalConfigEntity config, UserSignInEntity userSign,
+            LocalDate todayDate) {
+        if (!isNewbieEnabled(config) || isNewbieFinished(userSign)) {
+            return false;
+        }
+        if (userSign == null || StringUtils.isEmpty(userSign.getNewbieStartDate())) {
+            return true;
+        }
+        LocalDate end = resolveNewbieWindowEnd(userSign.getNewbieStartDate(), config);
+        return end == null || !todayDate.isAfter(end);
+    }
+
+    private UserSignInEntity lazyExpireNewbieIfNeeded(String uid, UserSignInEntity userSign,
+            SignInGlobalConfigEntity config, LocalDate todayDate) {
+        if (!isNewbieEnabled(config) || userSign == null || isNewbieFinished(userSign)) {
+            return userSign;
+        }
+        if (StringUtils.isEmpty(userSign.getNewbieStartDate())) {
+            return userSign;
+        }
+        LocalDate end = resolveNewbieWindowEnd(userSign.getNewbieStartDate(), config);
+        if (end != null && todayDate.isAfter(end)) {
+            markNewbieFinished(uid, userSign, SignInConstants.NEWBIE_END_EXPIRED);
+            return userSignInDao.findByUid(uid);
+        }
+        return userSign;
+    }
+
+    private void markNewbieFinished(String uid, UserSignInEntity userSign, int endReason) {
+        String start = userSign == null ? null : userSign.getNewbieStartDate();
+        int count = userSign == null || userSign.getNewbieSignCount() == null ? 0 : userSign.getNewbieSignCount();
+        try {
+            userSignInDao.updateNewbieProgress(uid, start, count, SignInConstants.SWITCH_ON, endReason);
+            log.info("signIn newbie finished uid={} reason={} count={}", uid, endReason, count);
+        } catch (Exception e) {
+            log.error("signIn mark newbie finished failed uid={}", uid, e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static int resolveNewbieWindowDays(SignInGlobalConfigEntity config) {
+        if (config == null || config.getNewbieWindowDays() == null || config.getNewbieWindowDays() <= 0) {
+            return SignInConstants.DEFAULT_NEWBIE_WINDOW_DAYS;
+        }
+        return config.getNewbieWindowDays();
+    }
+
+    private static int resolveNewbieMaxTimes(SignInGlobalConfigEntity config) {
+        if (config == null || config.getNewbieMaxTimes() == null || config.getNewbieMaxTimes() <= 0) {
+            return SignInConstants.DEFAULT_NEWBIE_MAX_TIMES;
+        }
+        return config.getNewbieMaxTimes();
+    }
+
+    private LocalDate resolveNewbieWindowEnd(String startDate, SignInGlobalConfigEntity config) {
+        if (StringUtils.isEmpty(startDate)) {
+            return null;
+        }
+        try {
+            LocalDate start = LocalDate.parse(startDate.trim(), DATE_FMT);
+            return start.plusDays(resolveNewbieWindowDays(config) - 1L);
+        } catch (DateTimeParseException e) {
+            return null;
+        }
+    }
+
+    /** 新手奖励档位：按第几次签到映射 dayIndex */
+    private int resolveNewbieDayIndex(int signCount, List<SignInRewardConfigEntity> rewardConfigs) {
+        int maxDay = 0;
+        for (SignInRewardConfigEntity cfg : rewardConfigs) {
+            if (cfg.getDayIndex() != null && cfg.getDayIndex() > maxDay) {
+                maxDay = cfg.getDayIndex();
+            }
+        }
+        int safe = Math.max(signCount, 1);
+        if (maxDay <= 0) {
+            return safe;
+        }
+        return Math.min(safe, maxDay);
     }
 }

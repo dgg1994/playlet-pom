@@ -144,6 +144,24 @@ public class SignInConfigManageServiceImpl implements SignInConfigManageService 
 		if (entity.getMakeupCostCoin() != null && entity.getMakeupCostCoin() < 0) {
 			return "makeupCostCoin 须 >= 0";
 		}
+		if (entity.getNewbieEnabled() != null
+				&& entity.getNewbieEnabled() != 0 && entity.getNewbieEnabled() != 1) {
+			return "newbieEnabled 仅支持 0/1";
+		}
+		if (entity.getDailyEnabled() != null
+				&& entity.getDailyEnabled() != 0 && entity.getDailyEnabled() != 1) {
+			return "dailyEnabled 仅支持 0/1";
+		}
+		if (entity.getNewbieForbidMakeup() != null
+				&& entity.getNewbieForbidMakeup() != 0 && entity.getNewbieForbidMakeup() != 1) {
+			return "newbieForbidMakeup 仅支持 0/1";
+		}
+		if (entity.getNewbieWindowDays() != null && entity.getNewbieWindowDays() < 1) {
+			return "newbieWindowDays 须 >= 1";
+		}
+		if (entity.getNewbieMaxTimes() != null && entity.getNewbieMaxTimes() < 1) {
+			return "newbieMaxTimes 须 >= 1";
+		}
 		return null;
 	}
 
