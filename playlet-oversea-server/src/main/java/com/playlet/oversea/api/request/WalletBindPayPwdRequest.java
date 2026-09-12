@@ -5,10 +5,10 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 /**
- * 钱包支付密码绑定入参。
+ * 钱包支付密码绑定/修改入参。
  */
 @Data
-@ApiModel(value = "钱包支付密码绑定", description = "首次设置支付密码")
+@ApiModel(value = "钱包支付密码绑定", description = "未设置则绑定；已设置则修改")
 public class WalletBindPayPwdRequest {
 
 	@ApiModelProperty(value = "支付密码，6位数字", required = true)

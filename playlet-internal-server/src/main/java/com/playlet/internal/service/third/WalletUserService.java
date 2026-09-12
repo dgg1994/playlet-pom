@@ -2270,7 +2270,7 @@ public class WalletUserService extends BaseApiService {
 	}
 
 	/**
-	 * 首次绑定支付密码。
+	 * 绑定/修改支付密码：未设置则绑定，已设置则直接更新（入参不变）。
 	 */
 	public ResponseBase bindPayPassword(Integer userType, Integer localUid, WalletBindPayPwdRequest query) {
 		if (query == null || StringUtils.isEmpty(query.getPayPassword())
@@ -2291,22 +2291,25 @@ public class WalletUserService extends BaseApiService {
 		if (account == null) {
 			return setResultError(I18nUtil.getMessage("wallet.not_opened"));
 		}
-		if (!StringUtils.isEmpty(account.getPayPassword())) {
-			return setResultError(I18nUtil.getMessage("wallet.pay_password_already_set"));
-		}
+		boolean alreadySet = !StringUtils.isEmpty(account.getPayPassword());
 		String hashed = PasswordHashUtils.encode(query.getPayPassword());
 		int rows;
 		try {
-			rows = walletAccountDao.bindPayPassword(account.getId(), hashed);
+			rows = alreadySet
+					? walletAccountDao.updatePayPassword(account.getId(), hashed)
+					: walletAccountDao.bindPayPassword(account.getId(), hashed);
 		} catch (Exception e) {
-			log.error("wallet bind pay password failed walletUserId={} localUid={}", user.getId(), localUid, e);
+			log.error("wallet bind/update pay password failed walletUserId={} localUid={} alreadySet={}",
+					user.getId(), localUid, alreadySet, e);
 			throw new BaseException("操作失败", e);
 		}
 		if (rows <= 0) {
-			return setResultError(I18nUtil.getMessage("wallet.pay_password_already_set"));
+			return setResultError(alreadySet
+					? I18nUtil.getMessage("base_error")
+					: I18nUtil.getMessage("wallet.pay_password_already_set"));
 		}
-		log.info("wallet pay password bound walletUserId={} localUid={} userType={}",
-				user.getId(), localUid, userType);
+		log.info("wallet pay password {} walletUserId={} localUid={} userType={}",
+				alreadySet ? "updated" : "bound", user.getId(), localUid, userType);
 		walletNotifyService.notify(userType, localUid, WalletNotifyEventEnums.PAY_PASSWORD_BOUND,
 				"wallet:paypwd:" + user.getId(), WalletNotifyConstants.JUMP_HOME, null);
 		return setResultSuccess(I18nUtil.getMessage("base_success"));

@@ -39,6 +39,11 @@ public interface WalletAccountDao extends BaseMapper<WalletAccountEntity> {
 			+ "gmtModified = now() where id = #{id} and pay_password is null")
 	int bindPayPassword(@Param("id") Long id, @Param("payPassword") String payPassword);
 
+	/** 修改支付密码（已设置时） */
+	@Update("update wallet_account set pay_password = #{payPassword}, pay_password_set_time = now(), "
+			+ "gmtModified = now() where id = #{id}")
+	int updatePayPassword(@Param("id") Long id, @Param("payPassword") String payPassword);
+
 	/** 同步账户余额缓存（三方查询/回调后写入） */
 	@Update("update wallet_account set available_balance = #{availableBalance}, freeze_balance = #{freezeBalance}, "
 			+ "open_freeze_balance = #{openFreezeBalance}, currency = #{currency}, "

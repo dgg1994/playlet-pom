@@ -44,7 +44,7 @@ public interface WithdrawService {
 	ResponseBase withdrawRecords(PageQueryHelperEntity page, HttpServletRequest request);
 
 	@PostMapping("/user/bindPayPwd")
-	@ApiOperation(value = "绑定支付密码", notes = "首次设置，6位数字；需登录。已设置不可重复绑定。")
+	@ApiOperation(value = "绑定/修改支付密码", notes = "6位数字；需登录。未设置则绑定；已设置则直接修改。入参不变。")
 	ResponseBase bindPayPwd(@RequestBody WalletBindPayPwdRequest query, HttpServletRequest request);
 
 	@PostMapping("/user/checkPayPwd")
