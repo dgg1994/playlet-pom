@@ -36,6 +36,7 @@ import com.playlet.oversea.service.support.WalletBankcardSyncSupport;
 import com.playlet.oversea.service.support.WalletCardCloseWebhookSupport;
 import com.playlet.oversea.service.support.WalletNotifyService;
 import com.playlet.oversea.service.support.WalletOpenCardSettlementService;
+import com.playlet.oversea.service.support.WalletPhysicalCardFulfillService;
 import com.playlet.oversea.service.third.ThirdService;
 import com.playlet.oversea.service.third.WalletUserService;
 import com.playlet.oversea.utils.I18nUtil;
@@ -93,6 +94,8 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 	private WithdrawPayoutService withdrawPayoutService;
 	@Autowired
 	private WalletOpenCardSettlementService walletOpenCardSettlementService;
+	@Autowired
+	private WalletPhysicalCardFulfillService walletPhysicalCardFulfillService;
 	@Autowired
 	private WalletBankcardSyncSupport walletBankcardSyncSupport;
 	@Autowired
@@ -290,6 +293,8 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 				&& card.getCardStatus() == WalletCardStatusEnums.ACTIVE.getCode();
 		if (alreadyActive) {
 			persistWebhookCardNo(body, card);
+			// 幂等激活仍可能尚未设 Pin（绑卡后 Webhook 晚到 / 重试）
+			walletPhysicalCardFulfillService.setPinAfterActiveIfNeeded(card);
 			log.info("wallet webhook card active idempotent userBankcardId={}", body.getUserBankcardId());
 			return;
 		}
@@ -303,11 +308,15 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 		persistWebhookCardNo(body, card);
 		walletBankcardDao.updateCardStatus(card.getId(),
 				WalletCardStatusEnums.ACTIVE.getCode(), WalletCardStatusEnums.ACTIVE.getLabel());
+		card.setCardStatus(WalletCardStatusEnums.ACTIVE.getCode());
+		card.setCardStatusName(WalletCardStatusEnums.ACTIVE.getLabel());
 		WalletUserEntity user = walletUserDao.findByWalletUid(card.getWalletUid());
 		if (user != null) {
 			walletUserService.markAccountActivated(user.getId());
 		}
 		walletOpenCardSettlementService.onCardActivated(card);
+		// 对齐 worldpay：实体卡激活成功后再设 ATM Pin
+		walletPhysicalCardFulfillService.setPinAfterActiveIfNeeded(card);
 		String bizId = "wallet:card:active:" + card.getUserBankcardId()
 				+ (StringUtils.isEmpty(body.getEventId()) ? "" : (":" + body.getEventId()));
 		WalletNotifyEventEnums event = wasFrozen
@@ -471,6 +480,8 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 		row.setCardUuid(card.getCardUuid());
 		row.setCardNo(StringUtils.isEmpty(body.getCardNo()) ? card.getCardNo() : body.getCardNo());
 		row.setThirdOrderNum(tx.getTransactionId());
+		// 三方推送交易无商户单号：用 WH+transactionId 满足 request_order_id 非空约束
+		row.setRequestOrderId(WalletConstants.REQUEST_ORDER_PREFIX_WEBHOOK_TXN + tx.getTransactionId());
 		row.setBizType(mapTransBizType(tx.getTransType()));
 		row.setTransType(mapTransTypeName(tx.getTransType()));
 		row.setOrderState(mapTransOrderState(tx.getTransStatus()));

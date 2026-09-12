@@ -8,6 +8,7 @@ import com.playlet.internal.api.response.ThirdBankcardActiveResp;
 import com.playlet.internal.api.response.ThirdUserBankcardResp;
 import com.playlet.internal.api.response.WalletLogisticsEventResp;
 import com.playlet.internal.base.ResponseBase;
+import com.playlet.internal.config.ThirdPartyProperties;
 import com.playlet.internal.constants.EmsTrackingConstants;
 import com.playlet.internal.constants.WalletConstants;
 import com.playlet.internal.constants.WalletNotifyConstants;
@@ -35,6 +36,7 @@ import com.playlet.internal.enums.WalletNotifyEventEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.support.WalletOpenCardSettlementService;
 import com.playlet.internal.service.third.ThirdService;
+import com.playlet.internal.utils.AesUtils;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.OrderCodeFactory;
 import com.playlet.internal.utils.StringUtils;
@@ -78,6 +80,8 @@ public class WalletPhysicalCardFulfillService {
 	private WalletAccountDao walletAccountDao;
 	@Autowired
 	private ThirdService thirdService;
+	@Autowired
+	private ThirdPartyProperties thirdPartyProperties;
 	@Autowired
 	private EmsTrackingService emsTrackingService;
 	@Autowired
@@ -151,9 +155,9 @@ public class WalletPhysicalCardFulfillService {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
 		Date now = new Date();
-		insertPhysicalBankcard(user, apply, product, third, normalizedCardNo, now);
-		// 补偿场景下 PIN 可能已设置，失败不阻断本地回写
-		setPinAfterBinding(user, third.getUserBankcardId(), pinNum.trim(), recoveredAlreadyBound);
+		// 对齐 worldpay：绑卡只落本地 PIN，等 cardActive 后再调三方 setPin
+		String pendingPin = encryptPendingPin(pinNum.trim());
+		insertPhysicalBankcard(user, apply, product, third, normalizedCardNo, pendingPin, now);
 		finalizePhysicalBindingState(user, apply, third.getUserBankcardId(), thirdCardStatus, now);
 		log.info("physical card binding success applyId={} walletUid={} userBankcardId={} recovered={}",
 				applyId, user.getWalletUid(), third.getUserBankcardId(), recoveredAlreadyBound);
@@ -434,7 +438,8 @@ public class WalletPhysicalCardFulfillService {
 	}
 
 	private void insertPhysicalBankcard(WalletUserEntity user, WalletCardApplyEntity apply,
-			WalletCardProductEntity product, ThirdBankcardActiveResp third, String cardNumber, Date now) {
+			WalletCardProductEntity product, ThirdBankcardActiveResp third, String cardNumber,
+			String pendingPinCipher, Date now) {
 		WalletBankcardEntity card = new WalletBankcardEntity();
 		card.setWalletUserId(user.getId());
 		card.setWalletUid(user.getWalletUid());
@@ -451,6 +456,8 @@ public class WalletPhysicalCardFulfillService {
 		card.setCardStatusName(WalletCardStatusEnums.WAIT_ACTIVE.getLabel());
 		card.setBalance(BigDecimal.ZERO);
 		card.setPinSet(0);
+		// 暂存 PIN，等 cardActive 后再调三方
+		card.setPinNum(pendingPinCipher);
 		card.setIsDefault(WalletConstants.CARD_DEFAULT_NO);
 		card.setLogisticsNum(apply.getLogisticsNum());
 		card.setShippingState(apply.getShippingState());
@@ -467,25 +474,50 @@ public class WalletPhysicalCardFulfillService {
 		}
 	}
 
-	private void setPinAfterBinding(WalletUserEntity user, Long userBankcardId, String pinNum,
-			boolean softFailOnError) {
+	/**
+	 * 卡已 ACTIVE 后补调三方 setPin（对齐 worldpay Webhook）。
+	 * 失败只记日志，不阻断激活主流程。
+	 */
+	public void setPinAfterActiveIfNeeded(WalletBankcardEntity card) {
+		if (card == null || card.getId() == null || card.getUserBankcardId() == null) {
+			return;
+		}
+		if (!WalletConstants.BANKCARD_NATURE_PHYSICAL.equalsIgnoreCase(
+				card.getBankcardNature() == null ? "" : card.getBankcardNature())) {
+			return;
+		}
+		if (card.getPinSet() != null && card.getPinSet() == 1) {
+			return;
+		}
+		if (StringUtils.isEmpty(card.getPinNum())) {
+			log.info("physical card skip setPin: empty pin_num userBankcardId={}", card.getUserBankcardId());
+			return;
+		}
 		BankcardSetPinRequest pinReq = new BankcardSetPinRequest();
-		pinReq.setUserBankcardId(userBankcardId);
-		pinReq.setPin(pinNum);
+		pinReq.setUserBankcardId(card.getUserBankcardId());
+		pinReq.setPin(card.getPinNum());
 		try {
-			thirdService.setBankcardPin(user.getWalletUid(), pinReq);
-			WalletBankcardEntity card = walletBankcardDao.findByUserBankcardId(userBankcardId);
-			if (card != null) {
-				walletBankcardDao.updatePinSet(card.getId(), 1);
-			}
+			thirdService.setBankcardPin(card.getWalletUid(), pinReq);
+			walletBankcardDao.updatePinState(card.getId(), 1, card.getPinNum());
+			card.setPinSet(1);
+			log.info("physical card setPin after active success userBankcardId={}", card.getUserBankcardId());
 		} catch (Exception e) {
-			if (softFailOnError) {
-				log.warn("physical card set pin soft-fail walletUid={} userBankcardId={}",
-						user.getWalletUid(), userBankcardId, e);
-				return;
-			}
-			log.error("physical card set pin failed walletUid={} userBankcardId={}",
-					user.getWalletUid(), userBankcardId, e);
+			log.warn("physical card setPin after active failed userBankcardId={}",
+					card.getUserBankcardId(), e);
+		}
+	}
+
+	/** AES 加密待设 PIN；未配置 aesKey 时明文落库（仅本地联调） */
+	private String encryptPendingPin(String pinNum) {
+		String aesKey = thirdPartyProperties.getAesKey();
+		if (StringUtils.isEmpty(aesKey)) {
+			log.warn("third-party.aes-key empty, store physical pin as plain text");
+			return pinNum;
+		}
+		try {
+			return AesUtils.encrypt(pinNum, aesKey);
+		} catch (Exception e) {
+			log.error("encrypt physical pin failed", e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 	}
@@ -509,6 +541,8 @@ public class WalletPhysicalCardFulfillService {
 				throw new BaseException(I18nUtil.getMessage("base_error"), e);
 			}
 			walletOpenCardSettlementService.onCardActivated(card);
+			// 三方已是 ACTIVE（补偿绑卡）时不会再等 Webhook，此处补设 Pin
+			setPinAfterActiveIfNeeded(card);
 			return;
 		}
 		apply.setApplyState(WalletCardApplyStateEnums.PROCESS_ACTIVATION.getCode());

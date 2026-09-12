@@ -92,6 +92,8 @@ third-party:
   webhook-sign-verify-enabled: true
   ems-api-key: ""
   #ems-api-key: "981CB608C26F9E8B175637A08230317A"
+  # 实体卡 PIN 落库加密（对齐 worldpay）
+  aes-key: "vsHszOqfI2Duhk6tdBKsjQlYsPvAgK/YR9t8t3V8mtk="
 # USDT 链上监听（对齐 worldpay monitor.*）
 usdt-topin:
   gateway-url: "https://mornitor.worldpay.club"

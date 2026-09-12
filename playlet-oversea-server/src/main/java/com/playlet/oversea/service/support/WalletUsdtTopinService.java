@@ -178,10 +178,15 @@ public class WalletUsdtTopinService extends BaseApiService {
 		BigDecimal after = before.add(amount);
 		try {
 			walletAccountDao.updateAvailableBalance(account.getId(), after);
-			WalletUsdtTopupEntity row = buildTopupLog(user, account, body, amount, before, after);
+			// 对齐 onetoken addCallbackLog：本地生成订单号，网络类型取 chain
+			String orderNo = OrderCodeFactory.getOrderCode(user.getWalletUid());
+			String networkType = WalletNetworkTypeConstants.resolve(body.getChain(),
+					body.getInaddress(), body.getOutaddress());
+			WalletUsdtTopupEntity row = buildTopupLog(user, account, body, amount, before, after,
+					orderNo, networkType);
 			GenericityUtil.setDate(row);
 			walletUsdtTopupDao.insert(row);
-			insertWalletTopUpLog(user, account, body, amount, after, txHash);
+			insertWalletTopUpLog(user, account, body, amount, after, txHash, orderNo, networkType);
 		} catch (DuplicateKeyException e) {
 			log.warn("usdt topin notify concurrent duplicate hash={}", txHash, e);
 			return setResultError(I18nUtil.getMessage("wallet.usdt_topup_duplicate"));
@@ -298,14 +303,17 @@ public class WalletUsdtTopinService extends BaseApiService {
 	}
 
 	private WalletUsdtTopupEntity buildTopupLog(WalletUserEntity user, WalletAccountEntity account,
-			UsdtTopinNotifyRequest body, BigDecimal amount, BigDecimal before, BigDecimal after) {
+			UsdtTopinNotifyRequest body, BigDecimal amount, BigDecimal before, BigDecimal after,
+			String orderNo, String networkType) {
 		WalletUsdtTopupEntity row = new WalletUsdtTopupEntity();
 		row.setWalletUserId(user.getId());
 		row.setWalletUid(user.getWalletUid());
 		row.setUserType(user.getUserType());
 		row.setLocalUid(user.getLocalUid());
 		row.setTxHash(body.getHash().trim());
-		row.setOrderNo(firstNonEmpty(body.getOrderNo(), body.getRequestOrderNum()));
+		// 对齐 onetoken：本地生成 orderNo，不依赖回调 orderNo/requestOrderNum
+		row.setOrderNo(orderNo);
+		row.setNetworkType(networkType);
 		row.setCoin(StringUtils.isEmpty(body.getCoin()) ? UsdtTopinConstants.COIN_USDT : body.getCoin());
 		row.setAmount(amount);
 		row.setOutAddress(body.getOutaddress());
@@ -320,21 +328,20 @@ public class WalletUsdtTopinService extends BaseApiService {
 
 	/** USDT 链上充值账变（对齐 onetoken addCallbackLog / WALLET_TOP_UP） */
 	private void insertWalletTopUpLog(WalletUserEntity user, WalletAccountEntity account,
-			UsdtTopinNotifyRequest body, BigDecimal amount, BigDecimal balanceAfter, String txHash) {
+			UsdtTopinNotifyRequest body, BigDecimal amount, BigDecimal balanceAfter, String txHash,
+			String orderNo, String networkType) {
 		Date now = new Date();
 		String inAddress = StringUtils.isEmpty(body.getInaddress())
 				? account.getTronUsdtAddress() : body.getInaddress();
 		WalletLogEntity logEntity = new WalletLogEntity();
-		String orderNo = firstNonEmpty(body.getOrderNo(), body.getRequestOrderNum());
-		logEntity.setOrderNo(StringUtils.isEmpty(orderNo)
-				? OrderCodeFactory.getOrderCode(user.getWalletUid()) : orderNo);
+		// 与充值流水共用同一订单号（对齐 onetoken 本地生成）
+		logEntity.setOrderNo(orderNo);
 		logEntity.setOutOrderNo(txHash);
 		logEntity.setWalletUserId(user.getId());
 		logEntity.setWalletUid(user.getWalletUid());
 		logEntity.setTradeType(WalletLogTradeTypeEnums.INCOME.getCode());
 		logEntity.setTitle(I18nUtil.getMessage("wallet.log.wallet_top_up"));
-		// 网络类型对齐 onetoken：取 chain
-		logEntity.setNetworkType(body.getChain());
+		logEntity.setNetworkType(networkType);
 		logEntity.setPrimevalMoney(balanceAfter);
 		logEntity.setPrimevalMoneyUnit(WalletConstants.DEFAULT_CURRENCY);
 		logEntity.setRealMoney(amount);
@@ -358,18 +365,6 @@ public class WalletUsdtTopinService extends BaseApiService {
 		// 对齐 onetoken TokenTypeEnums：usdt / usdc（大小写不敏感）
 		return UsdtTopinConstants.COIN_USDT.equalsIgnoreCase(normalized)
 				|| UsdtTopinConstants.COIN_USDC.equalsIgnoreCase(normalized);
-	}
-
-	private static String firstNonEmpty(String... values) {
-		if (values == null) {
-			return null;
-		}
-		for (String value : values) {
-			if (!StringUtils.isEmpty(value)) {
-				return value.trim();
-			}
-		}
-		return null;
 	}
 
 	private static BigDecimal nvl(BigDecimal value) {

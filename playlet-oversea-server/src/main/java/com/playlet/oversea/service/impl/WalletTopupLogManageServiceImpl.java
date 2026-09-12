@@ -47,9 +47,13 @@ public class WalletTopupLogManageServiceImpl implements WalletTopupLogManageServ
 			list = new ArrayList<>();
 		}
 		for (WalletUsdtTopupEntity row : list) {
-			// networkType 优先列值，否则从 out_address 推断 TRON
-			if (StringUtils.isEmpty(row.getNetworkType()) && !StringUtils.isEmpty(row.getOutAddress())) {
-				row.setNetworkType(WalletNetworkTypeConstants.TRON);
+			// 历史脏数据：network_type 为空时按转入/转出地址前缀推断（T→TRON，0x→BSC）
+			if (StringUtils.isEmpty(row.getNetworkType())) {
+				String inferred = WalletNetworkTypeConstants.resolve(null,
+						row.getInAddress(), row.getOutAddress());
+				if (!StringUtils.isEmpty(inferred)) {
+					row.setNetworkType(inferred);
+				}
 			}
 		}
 		return setResultSuccess(new PageInfo<>(list), I18nUtil.getMessage("base_success"));

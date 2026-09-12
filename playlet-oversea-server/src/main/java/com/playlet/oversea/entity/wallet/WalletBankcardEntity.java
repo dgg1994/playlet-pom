@@ -83,6 +83,11 @@ public class WalletBankcardEntity {
 	@ApiModelProperty(name = "pinSet", value = "是否已设 PIN")
 	private Integer pinSet;
 
+	/** 绑卡时暂存，Webhook 激活成功后再调三方 setPin（对齐 worldpay） */
+	@TableField("pin_num")
+	@ApiModelProperty(name = "pinNum", value = "待设置的 ATM PIN（AES 密文）")
+	private String pinNum;
+
 	@TableField("tag_name")
 	@ApiModelProperty(name = "tagName", value = "自定义标签")
 	private String tagName;

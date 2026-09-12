@@ -36,4 +36,7 @@ public class ThirdPartyProperties {
 	/** 17track 物流 API Key（对齐 worldpay EMS_API_KEY） */
 	private String emsApiKey = "";
 
+	/** AES Key（Base64），实体卡 PIN 落库加密，对齐 worldpay third-party.aesKey */
+	private String aesKey = "";
+
 }

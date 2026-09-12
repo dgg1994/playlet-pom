@@ -33,6 +33,9 @@ public final class WalletConstants {
 	/** 开卡首充幂等单号前缀（无申请单号时） */
 	public static final String REQUEST_ORDER_PREFIX_FIRST_TOPUP = "FT";
 
+	/** WebHook 推送卡交易落库单号前缀（无商户单号时用 WH+transactionId） */
+	public static final String REQUEST_ORDER_PREFIX_WEBHOOK_TXN = "WH";
+
 	/** 开卡解冻账变 outOrderNo 后缀（与申请单 id 拼接，幂等） */
 	public static final String WALLET_LOG_OUT_ORDER_THAW_SUFFIX = "-THAW";
 
