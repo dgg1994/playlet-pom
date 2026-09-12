@@ -60,5 +60,7 @@ class HtmlSanitizeUtilsTest {
 		assertFalse(out.contains("</p>"));
 		assertTrue(out.contains("充值说明"));
 		assertTrue(out.contains("第二段"));
+		// 段与段之间保留换行，供 TextView 直出
+		assertEquals("充值说明\n第二段", out);
 	}
 }

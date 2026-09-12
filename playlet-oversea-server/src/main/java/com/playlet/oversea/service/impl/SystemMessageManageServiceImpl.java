@@ -397,15 +397,17 @@ public class SystemMessageManageServiceImpl implements SystemMessageManageServic
 	}
 
 	/**
-	 * 截取推送内容
-	 * @param content
-	 * @return
+	 * 截取推送内容：富文本先转纯文本换行，避免推送里出现 &lt;p&gt; 或段落粘连。
 	 */
 	private static String truncatePushBody(String content) {
 		if (content == null) {
 			return "";
 		}
-		String text = content.trim();
+		String text = HtmlSanitizeUtils.stripParagraphTags(content);
+		if (text == null) {
+			return "";
+		}
+		text = text.trim();
 		if (text.length() <= 120) {
 			return text;
 		}

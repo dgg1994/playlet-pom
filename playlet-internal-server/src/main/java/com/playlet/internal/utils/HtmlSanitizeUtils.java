@@ -66,14 +66,22 @@ public final class HtmlSanitizeUtils {
 	}
 
 	/**
-	 * 去掉 p 标签，保留内部文案（链上充值 countInfo 等客户端直出场景）。
+	 * 将 p/br 转为换行后去标签，供客户端 TextView 直出（保留段落换行）。
+	 * 链上充值 countInfo 等场景：库内为 &lt;p&gt; 富文本，手机不解析 HTML，必须返回 \\n。
 	 */
 	public static String stripParagraphTags(String html) {
 		if (html == null || html.isEmpty()) {
 			return html;
 		}
-		String out = html.replaceAll("(?i)<p\\b[^>]*>", "");
-		out = out.replaceAll("(?i)</p\\s*>", "");
+		String out = html;
+		// br / 段末 → 换行，避免去标签后段落粘连
+		out = out.replaceAll("(?i)<br\\s*/?>", "\n");
+		out = out.replaceAll("(?i)</p\\s*>", "\n");
+		out = out.replaceAll("(?i)<p\\b[^>]*>", "");
+		// 兜底去掉其它残留标签
+		out = out.replaceAll("(?i)</?[^>]+>", "");
+		out = out.replace("\r\n", "\n").replace('\r', '\n');
+		out = out.replaceAll("\n{3,}", "\n\n");
 		return out.trim();
 	}
 }

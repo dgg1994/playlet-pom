@@ -46,7 +46,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 import java.util.*;
 
-import cn.hutool.http.HtmlUtil;
 import com.alibaba.fastjson.JSON;
 
 import static com.playlet.internal.base.BaseApiService.setResultError;
@@ -467,13 +466,12 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
         return bizId.toString();
     }
 
-    /** 邮件 HTML 转站内信纯文本。 */
+    /** 邮件 HTML 转站内信纯文本（p/br → 换行，避免段落粘连）。 */
     private static String toInboxPlain(String htmlContent) {
         if (StringUtils.isEmpty(htmlContent)) {
             return htmlContent;
         }
-        String text = htmlContent.replace("<br/>", "").replace("<br />", "").replace("<br>", "");
-        return HtmlUtil.cleanHtmlTag(text).trim();
+        return HtmlSanitizeUtils.stripParagraphTags(htmlContent);
     }
 
     private static String resolveCreatorDisplayName(CreatorAccountEntity creator) {
