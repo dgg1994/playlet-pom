@@ -305,6 +305,10 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			return setResultError(I18nUtil.getMessage("user.account_null"));
 		}
 
+		// 一键登录成功后开通钱包三方用户（幂等；覆盖已有邮箱账号未开钱包的场景）
+		walletUserService.registerOnSignUp(WithdrawUserTypeEnums.APP.getCode(), account.getId(),
+				account.getUserEmail(), account.getMobilePrefix(), account.getMobileNumber());
+
 		if (binding == null) {
 			AppOauthAccountEntity row = new AppOauthAccountEntity();
 			row.setProvider(provider);
