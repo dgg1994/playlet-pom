@@ -57,7 +57,7 @@ public class MessageFormatUtils {
           .append("<body>")
           .append("<div class=\"container\">")
           .append("<div class=\"content\">")
-          .append("<p><img src=\"https://onetokenapp.s3.ap-east-1.amazonaws.com/richtext/1789369883143.jpg\"></p>")
+          .append("<p><img src=\"https://onetokenapp.s3.ap-east-1.amazonaws.com/richtext/1789545336182.png\"></p>")
           .append(htmlContent == null ? "" : htmlContent) // 这里替换动态内容
           .append("</div>")
           .append("<div class=\"footer\">BerryV</div>")

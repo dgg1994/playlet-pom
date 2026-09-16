@@ -144,6 +144,13 @@ public class QiniuConfig {
 	 * 入参可为 key 或历史完整 URL。
 	 */
 	public String toAccessUrl(String keyOrUrl, Long expireSeconds, Auth auth) {
+		return toAccessUrl(keyOrUrl, expireSeconds, auth, null);
+	}
+
+	/**
+	 * 读时访问地址；imageFop 非空时在签名前拼接（如 imageView2），私有空间须带参签名。
+	 */
+	public String toAccessUrl(String keyOrUrl, Long expireSeconds, Auth auth, String imageFop) {
 		if (keyOrUrl == null || keyOrUrl.isEmpty()) {
 			return keyOrUrl;
 		}
@@ -152,6 +159,10 @@ public class QiniuConfig {
 			return keyOrUrl;
 		}
 		String publicUrl = buildPublicUrl(key);
+		// 图片处理参数须拼在签名前
+		if (imageFop != null && !imageFop.isEmpty()) {
+			publicUrl = appendQuery(publicUrl, imageFop);
+		}
 		if (!privateEnabled) {
 			return publicUrl;
 		}
@@ -159,6 +170,15 @@ public class QiniuConfig {
 				? urlExpireSeconds
 				: expireSeconds;
 		return auth.privateDownloadUrl(publicUrl, expire);
+	}
+
+	/** 追加查询串：无 ? 用 ?，已有查询用 & */
+	private static String appendQuery(String url, String query) {
+		if (url == null || query == null || query.isEmpty()) {
+			return url;
+		}
+		String q = query.startsWith("?") || query.startsWith("&") ? query.substring(1) : query;
+		return url.contains("?") ? url + "&" + q : url + "?" + q;
 	}
 
 	/**
