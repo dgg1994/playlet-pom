@@ -4,18 +4,25 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.playlet.oversea.query.pub.PageQueryHelperEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.util.Date;
 
+/**
+ * 观影礼奖励阶梯配置。
+ */
 @Data
+@EqualsAndHashCode(callSuper = true)
 @TableName("watch_gift_reward_config")
-@ApiModel("观影礼奖励阶梯")
-public class WatchGiftRewardConfigEntity {
+@ApiModel(value = "观影礼奖励阶梯", description = "观影达标档位奖励配置")
+public class WatchGiftRewardConfigEntity extends PageQueryHelperEntity {
 
 	@TableId(type = IdType.AUTO)
+	@ApiModelProperty("主键")
 	private Integer id;
 
 	@TableField("gear_index")
@@ -35,11 +42,14 @@ public class WatchGiftRewardConfigEntity {
 	private Integer status;
 
 	@TableField("remark")
+	@ApiModelProperty("备注")
 	private String remark;
 
 	@TableField("setTime")
+	@ApiModelProperty("创建时间")
 	private Date setTime;
 
 	@TableField("gmtModified")
+	@ApiModelProperty("更新时间")
 	private Date gmtModified;
 }

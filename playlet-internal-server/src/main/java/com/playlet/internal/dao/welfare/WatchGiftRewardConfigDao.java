@@ -16,4 +16,11 @@ public interface WatchGiftRewardConfigDao extends BaseMapper<WatchGiftRewardConf
 
 	@Select("select * from watch_gift_reward_config where status = 1 and gear_index = #{gearIndex} limit 1")
 	WatchGiftRewardConfigEntity findEnabledByGear(@Param("gearIndex") Integer gearIndex);
+
+	/** 管理端：同 gear_index 是否已存在（排除自身） */
+	@Select("<script>"
+			+ "select count(1) from watch_gift_reward_config where gear_index = #{gearIndex} "
+			+ "<if test='excludeId != null'> and id &lt;&gt; #{excludeId} </if>"
+			+ "</script>")
+	int countByGearIndex(@Param("gearIndex") Integer gearIndex, @Param("excludeId") Integer excludeId);
 }

@@ -19,4 +19,12 @@ public interface SignInRewardConfigDao extends BaseMapper<SignInRewardConfigEnti
 
 	@Select("select ifnull(max(day_index), 0) from sign_in_reward_config where status = 1")
 	int findMaxDayIndex();
+
+	/** 管理端：同 day_index 是否已存在（排除自身，用于唯一校验） */
+	@Select("<script>"
+			+ "select count(1) from sign_in_reward_config where day_index = #{dayIndex} "
+			+ "<if test='excludeId != null'> and id &lt;&gt; #{excludeId} </if>"
+			+ "</script>")
+	int countByDayIndex(@Param("dayIndex") Integer dayIndex, @Param("excludeId") Integer excludeId);
 }
+

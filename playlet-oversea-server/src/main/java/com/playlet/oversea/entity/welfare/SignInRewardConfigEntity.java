@@ -4,16 +4,22 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.playlet.oversea.query.pub.PageQueryHelperEntity;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.util.Date;
 
+/**
+ * 签到奖励阶梯配置（连续第 N 天奖励）。
+ */
 @Data
+@EqualsAndHashCode(callSuper = true)
 @TableName("sign_in_reward_config")
 @ApiModel(value = "签到奖励阶梯", description = "连续第N天奖励配置")
-public class SignInRewardConfigEntity {
+public class SignInRewardConfigEntity extends PageQueryHelperEntity {
 
 	@TableId(type = IdType.AUTO)
 	@ApiModelProperty(name = "id", value = "主键", dataType = "Integer")
