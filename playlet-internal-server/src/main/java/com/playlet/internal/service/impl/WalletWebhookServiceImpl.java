@@ -29,9 +29,13 @@ import com.playlet.internal.enums.WalletCardStatusEnums;
 import com.playlet.internal.enums.WalletKycStateEnums;
 import com.playlet.internal.enums.WalletLogStatusEnums;
 import com.playlet.internal.enums.WalletNotifyEventEnums;
+import com.playlet.internal.enums.LanguageEnums;
+import com.playlet.internal.enums.MessageEnums;
+import com.playlet.internal.enums.RobotRoleEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.WalletWebhookService;
 import com.playlet.internal.service.WithdrawPayoutService;
+import com.playlet.internal.service.support.TelegramRobotNotifyService;
 import com.playlet.internal.service.support.WalletBankcardSyncSupport;
 import com.playlet.internal.service.support.WalletCardCloseWebhookSupport;
 import com.playlet.internal.service.support.WalletNotifyService;
@@ -102,6 +106,8 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 	private WalletCardCloseWebhookSupport walletCardCloseWebhookSupport;
 	@Autowired
 	private WalletNotifyService walletNotifyService;
+	@Autowired
+	private TelegramRobotNotifyService telegramRobotNotifyService;
 
 	@Lazy
 	@Autowired
@@ -190,10 +196,25 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 			if (WalletKycStateEnums.SUCCESS_APPROVE.equals(localState)) {
 				walletNotifyService.notify(user, WalletNotifyEventEnums.KYC_PASS, bizId,
 						WalletNotifyConstants.JUMP_KYC, null);
+				// 飞机：KYC 通过
+				String email = StringUtils.isEmpty(user.getEmail()) ? "-" : user.getEmail();
+				telegramRobotNotifyService.robotSendAsync(
+						MessageEnums.ROBOT_KYC_SUCCESS_ZH.getIndex(),
+						LanguageEnums.ZH_CN.getName(),
+						RobotRoleEnums.CUSTOMER_SERVICE.getIndex(),
+						email,
+						String.valueOf(body.getUid()));
 			} else if (WalletKycStateEnums.ERROR_APPROVE.equals(localState)) {
 				String reason = StringUtils.isEmpty(failedReason) ? "-" : failedReason;
 				walletNotifyService.notify(user, WalletNotifyEventEnums.KYC_REJECT, bizId,
 						WalletNotifyConstants.JUMP_KYC, null, reason);
+				// 飞机：KYC 失败
+				telegramRobotNotifyService.robotSendAsync(
+						MessageEnums.ROBOT_KYC_ERROR_ZH.getIndex(),
+						LanguageEnums.ZH_CN.getName(),
+						RobotRoleEnums.CUSTOMER_SERVICE.getIndex(),
+						String.valueOf(body.getUid()),
+						reason);
 			}
 		}
 		log.info("wallet webhook kyc synced walletUid={} status={}", body.getUid(), apiStatus);
@@ -529,10 +550,20 @@ public class WalletWebhookServiceImpl implements WalletWebhookService {
 				WalletNotifyConstants.JUMP_CARD, String.valueOf(card.getId()));
 	}
 
-	/** 商户充值：审计日志即可 */
+	/** 商户充值：审计日志 + 飞机通知 */
 	private void handleMerchantRecharge(WalletWebhookNotifyRequest body) {
 		log.info("wallet webhook merchantRecharge eventId={} amount={} txHash={}",
 				body.getEventId(), body.getAmount(), body.getTxHash());
+		Object amount = body.getAmount() == null ? "-" : body.getAmount();
+		String txHash = StringUtils.isEmpty(body.getTxHash()) ? "-" : body.getTxHash();
+		String txTime = StringUtils.isEmpty(body.getTxTime()) ? "-" : body.getTxTime();
+		telegramRobotNotifyService.robotSendAsync(
+				MessageEnums.ROBOT_RECHARGE_HISTORY_ZH.getIndex(),
+				LanguageEnums.ZH_CN.getName(),
+				RobotRoleEnums.CUSTOMER_SERVICE.getIndex(),
+				amount,
+				txHash,
+				txTime);
 	}
 
 	/** 充值成功：账变由处理中 → 已入账 */

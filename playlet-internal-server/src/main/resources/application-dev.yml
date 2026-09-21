@@ -56,6 +56,11 @@ jpush:
 withdraw:
   mock-success: true
 
+#飞机消息（对齐 worldpay telegram.*）
+telegram:
+  mornitor_bot_token: '8931320158:AAHvOdGbghcCEvuHCJLRy98dWbejjrDSvSU'
+  notice_group_id: '-1003786742166'
+
 #邮件发送
 yunmail:
   host: smtp.ezmail.vip  # 改为正确的 SMTP 服务器

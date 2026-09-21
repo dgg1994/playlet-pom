@@ -32,6 +32,10 @@ import com.playlet.internal.service.support.WalletCardholderService;
 import com.playlet.internal.service.support.WalletOpenCardSettlementService;
 import com.playlet.internal.service.support.WalletPhysicalCardFulfillService;
 import com.playlet.internal.service.support.WalletNotifyService;
+import com.playlet.internal.service.support.TelegramRobotNotifyService;
+import com.playlet.internal.enums.LanguageEnums;
+import com.playlet.internal.enums.MessageEnums;
+import com.playlet.internal.enums.RobotRoleEnums;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.KycFieldNormalizeUtil;
 import com.playlet.internal.utils.OrderCodeFactory;
@@ -107,6 +111,8 @@ public class WalletUserService extends BaseApiService {
 	private MediaUrlService mediaUrlService;
 	@Autowired
 	private WalletNotifyService walletNotifyService;
+	@Autowired
+	private TelegramRobotNotifyService telegramRobotNotifyService;
 
 	/**
 	 * 本地账号注册成功后调用：开通 U 卡三方用户并写入 P0 表。
@@ -878,10 +884,12 @@ public class WalletUserService extends BaseApiService {
 		}
 		WalletCardApplyManEntity man = walletCardApplyManDao.findByApplyId(applyId);
 		if (man == null) {
+			notifyKycSubmitFail(user, I18nUtil.getMessage("holder_null"));
 			return setResultError(I18nUtil.getMessage("holder_null"));
 		}
 		WalletCardApplyKycEntity kyc = walletCardApplyKycDao.findByApplyId(applyId);
 		if (kyc == null) {
+			notifyKycSubmitFail(user, I18nUtil.getMessage("kyc_info_null"));
 			return setResultError(I18nUtil.getMessage("kyc_info_null"));
 		}
 		KycApplyRequest kycReq = buildKycApplyFromCardApply(user, man, kyc);
@@ -890,10 +898,12 @@ public class WalletUserService extends BaseApiService {
 		} catch (BaseException e) {
 			log.error("wallet kyc apply by cardApply third failed applyId={} walletUid={}",
 					applyId, user.getWalletUid(), e);
+			notifyKycSubmitFail(user, e.getMessage());
 			return setResultError(e.getMessage());
 		} catch (Exception e) {
 			log.error("wallet kyc apply by cardApply third error applyId={} walletUid={}",
 					applyId, user.getWalletUid(), e);
+			notifyKycSubmitFail(user, I18nUtil.getMessage("base_error"));
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
 		Date now = new Date();
@@ -1198,6 +1208,11 @@ public class WalletUserService extends BaseApiService {
 			BigDecimal available = nvlBalance(account.getAvailableBalance());
 			if (available.compareTo(BigDecimal.ZERO) <= 0 || available.compareTo(totalAmount) < 0) {
 				return setResult(Constants.HTTP_RES_CODE_601, I18nUtil.getMessage("wallet_Balance_null"), null);
+			}
+			// 校验三方商户余额；不足则飞机通知财务
+			ResponseBase merchantCheck = ensureMerchantBalanceEnough(totalAmount);
+			if (!Constants.HTTP_RES_CODE_200.equals(merchantCheck.getCode())) {
+				return merchantCheck;
 			}
 		}
 		BigDecimal balanceBefore = nvlBalance(account.getAvailableBalance());
@@ -1985,9 +2000,11 @@ public class WalletUserService extends BaseApiService {
 		} catch (BaseException e) {
 			log.error("wallet kyc apply third failed walletUid={} nationCode={}",
 					user.getWalletUid(), query.getNationCode(), e);
+			notifyKycSubmitFail(user, e.getMessage());
 			return setResultError(e.getMessage());
 		} catch (Exception e) {
 			log.error("wallet kyc apply third error walletUid={}", user.getWalletUid(), e);
+			notifyKycSubmitFail(user, I18nUtil.getMessage("base_error"));
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
 
@@ -2140,6 +2157,52 @@ public class WalletUserService extends BaseApiService {
 	/** 支付密码校验（对齐 onetoken checkPayPasswrod） */
 	public ResponseBase verifyPayPassword(WalletAccountEntity account, String password) {
 		return checkPayPassword(account, password);
+	}
+
+	/**
+	 * KYC 提交失败飞机通知（对齐 worldpay ROBOT_KYC_NULL）。
+	 */
+	private void notifyKycSubmitFail(WalletUserEntity user, String reason) {
+		if (user == null) {
+			return;
+		}
+		String uid = user.getWalletUid() == null ? String.valueOf(user.getId()) : String.valueOf(user.getWalletUid());
+		String msg = StringUtils.isEmpty(reason) ? "-" : reason;
+		telegramRobotNotifyService.robotSendAsync(
+				MessageEnums.ROBOT_KYC_NULL_ZH.getIndex(),
+				LanguageEnums.ZH_CN.getName(),
+				RobotRoleEnums.CUSTOMER_SERVICE.getIndex(),
+				uid,
+				msg);
+	}
+
+	/**
+	 * 卡充值前校验商户可用余额；不足则飞机通知财务。
+	 */
+	private ResponseBase ensureMerchantBalanceEnough(BigDecimal consume) {
+		try {
+			MerchantAssetsResp assets = thirdService.getMerchantBalance();
+			if (assets != null && assets.getAvailableAmount() != null) {
+				BigDecimal available = BigDecimal.valueOf(assets.getAvailableAmount());
+				if (available.compareTo(consume) <= 0) {
+					telegramRobotNotifyService.robotSendAsync(
+							MessageEnums.ROBOT_MERCHANT_ZH.getIndex(),
+							LanguageEnums.ZH_CN.getName(),
+							RobotRoleEnums.FINANCE.getIndex(),
+							assets.getAvailableAmount(),
+							consume);
+					return setResult(Constants.HTTP_RES_CODE_500,
+							I18nUtil.getMessage("Merchants_money_scarcity"), null);
+				}
+			}
+			return setResultSuccess();
+		} catch (BaseException e) {
+			log.error("wallet merchant balance check biz failed consume={}", consume, e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("wallet merchant balance check failed consume={}", consume, e);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
 	}
 
 	/** 支付密码校验（对齐 onetoken checkPayPasswrod） */

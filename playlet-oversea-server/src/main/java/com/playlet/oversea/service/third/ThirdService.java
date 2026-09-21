@@ -17,6 +17,7 @@ import com.playlet.oversea.api.request.RegisterRequest;
 import com.playlet.oversea.api.request.WalletMailingAddressAddRequest;
 import com.playlet.oversea.api.request.WalletMailingAddressUpdateRequest;
 import com.playlet.oversea.api.request.WalletMailingRegionRequest;
+import com.playlet.oversea.api.response.MerchantAssetsResp;
 import com.playlet.oversea.api.response.KycCountryResp;
 import com.playlet.oversea.api.response.KycStatusResp;
 import com.playlet.oversea.api.response.WalletKycFileUploadResp;
@@ -205,6 +206,19 @@ public class ThirdService {
 				uid, body.getNationCode(), body.getCountryCode());
 		exchange(HttpMethod.POST, url, body, String.valueOf(uid), "提交KYC信息");
 		log.info("third party kyc apply success uid={}", uid);
+	}
+
+	/**
+	 * 查询商户可用余额。文档：POST /api/merchant/balance。
+	 */
+	public MerchantAssetsResp getMerchantBalance() {
+		String url = thirdPartyProperties.getBaseUrl() + WalletApiPaths.MERCHANT_BALANCE_PATH;
+		log.info("third party merchant balance start");
+		JsonNode data = exchange(HttpMethod.POST, url, null, null, "商户资产余额");
+		MerchantAssetsResp resp = treeToValue(data, MerchantAssetsResp.class, "商户资产余额");
+		log.info("third party merchant balance success availableAmount={}",
+				resp == null ? null : resp.getAvailableAmount());
+		return resp;
 	}
 
 	/**
