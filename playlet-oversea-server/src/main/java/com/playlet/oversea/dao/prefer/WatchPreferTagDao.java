@@ -1,7 +1,6 @@
 package com.playlet.oversea.dao.prefer;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.playlet.oversea.api.response.WatchPreferTagRespEntity;
 import com.playlet.oversea.entity.prefer.WatchPreferTagEntity;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -52,7 +51,4 @@ public interface WatchPreferTagDao extends BaseMapper<WatchPreferTagEntity> {
 			+ "where group_id = #{groupId} and langue = #{langue} limit 1")
 	WatchPreferTagEntity findByGroupIdAndLangue(@Param("groupId") String groupId,
 			@Param("langue") String langue);
-
-	@Select("select group_id as groupId,tag_name as tagName from dic_watch_prefer_tag where category_code = #{categoryCode}")
-    List<WatchPreferTagRespEntity> selectListByCode(@Param("categoryCode") String categoryCode);
 }
