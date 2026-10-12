@@ -50,7 +50,10 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 			+ "</script>")
 	List<DramaEntity> findAdminList(DramaEntity entity);
 
-	/** C端剧场搜索：标题模糊 + 标签分组精确，仅已上架；条件可单独或组合 */
+	/**
+	 * C端剧场搜索：标题模糊 + 标签分组精确，仅已上架；
+	 * preferTagGroupIds 非空时偏好命中优先（soft boost），不做硬过滤。
+	 */
 	@Select("<script>"
 			+ "select distinct d.* from drama d "
 			+ "where d.verify_status = 1 and ifnull(d.delete_state, 0) = 0 "
@@ -63,9 +66,40 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 			+ "    where r.drama_id = d.id and r.tag_group_id = #{entity.tagGroupId} "
 			+ "  ) "
 			+ "</if>"
-			+ "order by ifnull(d.hot_score, 0) desc, d.id desc"
+			+ "<choose>"
+			+ "  <when test='preferTagGroupIds != null and preferTagGroupIds.size() &gt; 0'>"
+			+ "    order by ("
+			+ "      case when exists ("
+			+ "        select 1 from drama_tag_rel pr "
+			+ "        where pr.drama_id = d.id and pr.tag_group_id in "
+			+ "        <foreach collection='preferTagGroupIds' item='tg' open='(' separator=',' close=')'>#{tg}</foreach>"
+			+ "      ) then 1 else 0 end"
+			+ "    ) desc, ifnull(d.hot_score, 0) desc, d.id desc"
+			+ "  </when>"
+			+ "  <otherwise>"
+			+ "    order by ifnull(d.hot_score, 0) desc, d.id desc"
+			+ "  </otherwise>"
+			+ "</choose>"
 			+ "</script>")
-	List<DramaEntity> searchOnline(@Param("entity") DramaEntity entity);
+	List<DramaEntity> searchOnline(@Param("entity") DramaEntity entity,
+			@Param("preferTagGroupIds") List<String> preferTagGroupIds);
+
+	/**
+	 * 首页猜你喜欢：命中偏好标签的在架剧，按热度排序。
+	 */
+	@Select("<script>"
+			+ "select d.* from drama d "
+			+ "where d.verify_status = 1 and ifnull(d.delete_state, 0) = 0 "
+			+ "and exists ("
+			+ "  select 1 from drama_tag_rel r "
+			+ "  where r.drama_id = d.id and r.tag_group_id in "
+			+ "  <foreach collection='preferTagGroupIds' item='tg' open='(' separator=',' close=')'>#{tg}</foreach>"
+			+ ") "
+			+ "order by ifnull(d.hot_score, 0) desc, d.id desc "
+			+ "limit #{limit}"
+			+ "</script>")
+	List<DramaEntity> findOnlineByPreferTags(@Param("preferTagGroupIds") List<String> preferTagGroupIds,
+			@Param("limit") int limit);
 
 	/**
 	 * 管理端短剧列表：producerFirm 取 creator_account.nickname（按 belong_user 关联）。
@@ -132,32 +166,74 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 	@Update("update drama set hot_score = ifnull(hot_score,0) + #{delta}, gmtModified = now() where id = #{dramaId}")
 	int incrHotScore(@Param("dramaId") Integer dramaId, @Param("delta") long delta);
 
-	@Select("SELECT * FROM drama WHERE delete_state = #{deleteState} AND verify_status = #{verifyStatus} "
-			+ "ORDER BY CRC32(CONCAT(id, #{seed})), id")
-	List<RecommendDramaRespEntity> recommendList(RecommendDramaQuery entity);
+	/**
+	 * 推荐流：无偏好时按 seed 打散；有偏好时命中优先再 seed。
+	 */
+	@Select("<script>"
+			+ "SELECT d.* FROM drama d "
+			+ "WHERE d.delete_state = #{entity.deleteState} AND d.verify_status = #{entity.verifyStatus} "
+			+ "<choose>"
+			+ "  <when test='preferTagGroupIds != null and preferTagGroupIds.size() &gt; 0'>"
+			+ "    ORDER BY ("
+			+ "      case when exists ("
+			+ "        select 1 from drama_tag_rel pr "
+			+ "        where pr.drama_id = d.id and pr.tag_group_id in "
+			+ "        <foreach collection='preferTagGroupIds' item='tg' open='(' separator=',' close=')'>#{tg}</foreach>"
+			+ "      ) then 1 else 0 end"
+			+ "    ) desc, ifnull(d.hot_score, 0) desc, CRC32(CONCAT(d.id, #{entity.seed})), d.id"
+			+ "  </when>"
+			+ "  <otherwise>"
+			+ "    ORDER BY CRC32(CONCAT(d.id, #{entity.seed})), d.id"
+			+ "  </otherwise>"
+			+ "</choose>"
+			+ "</script>")
+	List<RecommendDramaRespEntity> recommendList(@Param("entity") RecommendDramaQuery entity,
+			@Param("preferTagGroupIds") List<String> preferTagGroupIds);
 
 	@Select("SELECT * from drama where id = (SELECT drama_id from drama_asset where id = #{id})")
 	DramaEntity findByVideoId(@Param("id") Integer id);
 
 	@Update("update drama set share_score = ifnull(share_score,0) + 1, gmtModified = now() where id = #{dramaId}")
 	void incrShareScore(@Param("dramaId") Integer dramaId);
-	@Select("SELECT d.* "
-	        + "FROM drama d "
-	        + "WHERE d.delete_state = #{deleteState} "
-	        + "  AND d.verify_status = #{verifyStatus} "
-	        + "  AND d.id != #{id} "
-	        + "  AND EXISTS ("
-	        + "      SELECT 1 "
-	        + "      FROM drama_tag_rel dtr "
-	        + "      WHERE dtr.drama_id = d.id "
-	        + "        AND dtr.tag_group_id IN ( "
-	        + "            SELECT tag_group_id "
-	        + "            FROM drama_tag_rel "
-	        + "            WHERE drama_id = #{id} "
-	        + "        )"
-	        + "  ) "
-	        + "LIMIT 20")
-	List<RecommendDramaRespEntity> relatedWork(@Param("id") Integer id,@Param("deleteState") Integer deleteState,@Param("verifyStatus") Integer verifyStatus);
+	/**
+	 * 相关作品：同标签；preferTagGroupIds 非空时在同标签集合内偏好加权。
+	 */
+	@Select("<script>"
+			+ "SELECT d.* "
+			+ "FROM drama d "
+			+ "WHERE d.delete_state = #{deleteState} "
+			+ "  AND d.verify_status = #{verifyStatus} "
+			+ "  AND d.id != #{id} "
+			+ "  AND EXISTS ("
+			+ "      SELECT 1 "
+			+ "      FROM drama_tag_rel dtr "
+			+ "      WHERE dtr.drama_id = d.id "
+			+ "        AND dtr.tag_group_id IN ( "
+			+ "            SELECT tag_group_id "
+			+ "            FROM drama_tag_rel "
+			+ "            WHERE drama_id = #{id} "
+			+ "        )"
+			+ "  ) "
+			+ "<choose>"
+			+ "  <when test='preferTagGroupIds != null and preferTagGroupIds.size() &gt; 0'>"
+			+ "    ORDER BY ("
+			+ "      case when exists ("
+			+ "        select 1 from drama_tag_rel pr "
+			+ "        where pr.drama_id = d.id and pr.tag_group_id in "
+			+ "        <foreach collection='preferTagGroupIds' item='tg' open='(' separator=',' close=')'>#{tg}</foreach>"
+			+ "      ) then 1 else 0 end"
+			+ "    ) desc, ifnull(d.hot_score, 0) desc, d.id desc"
+			+ "  </when>"
+			+ "  <otherwise>"
+			+ "    ORDER BY ifnull(d.hot_score, 0) desc, d.id desc"
+			+ "  </otherwise>"
+			+ "</choose>"
+			+ "LIMIT 20"
+			+ "</script>")
+	List<RecommendDramaRespEntity> relatedWork(@Param("id") Integer id,
+			@Param("deleteState") Integer deleteState,
+			@Param("verifyStatus") Integer verifyStatus,
+			@Param("preferTagGroupIds") List<String> preferTagGroupIds);
 
 	@Select("select * from drama where id = #{id}")
 	RecommendDramaRespEntity findById(@Param("id") Integer id);

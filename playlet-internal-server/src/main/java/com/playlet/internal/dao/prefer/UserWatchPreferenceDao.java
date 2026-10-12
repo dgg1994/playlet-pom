@@ -51,4 +51,14 @@ public interface UserWatchPreferenceDao extends BaseMapper<UserWatchPreferenceEn
 	 */
 	@Select("select count(1) from user_watch_preference where uid = #{uid}")
 	int countByUid(@Param("uid") Integer uid);
+
+	/**
+	 * 用户偏好映射到剧标签 group_id（去重；无映射的选项忽略）。
+	 */
+	@Select("select distinct t.drama_tag_group_id "
+			+ "from user_watch_preference u "
+			+ "inner join dic_watch_prefer_tag t on t.group_id = u.prefer_group_id "
+			+ "where u.uid = #{uid} and t.status = #{status} "
+			+ "and t.drama_tag_group_id is not null and t.drama_tag_group_id != ''")
+	List<String> findDramaTagGroupIdsByUid(@Param("uid") Integer uid, @Param("status") Integer status);
 }

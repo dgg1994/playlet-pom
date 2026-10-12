@@ -24,8 +24,8 @@ import javax.servlet.http.HttpServletRequest;
 public interface TheaterApiService {
 
 	@GetMapping("/home")
-	@ApiOperation(value = "剧场首页")
-	ResponseBase home();
+	@ApiOperation(value = "剧场首页", notes = "公共轮播/榜单按语言缓存；登录且有偏好映射时追加「猜你喜欢」区块")
+	ResponseBase home(HttpServletRequest request);
 
 	@PostMapping("/findList")
 	@ApiOperation("榜单定义分页")

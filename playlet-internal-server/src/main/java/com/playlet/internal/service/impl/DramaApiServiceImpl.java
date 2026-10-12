@@ -46,6 +46,7 @@ import com.playlet.internal.api.response.RecommendPageRespEntity;
 import com.playlet.internal.api.response.RecommendVidoeRespEntity;
 import com.playlet.internal.service.DramaApiService;
 import com.playlet.internal.service.MediaUrlService;
+import com.playlet.internal.service.support.WatchPreferMatchSupport;
 import com.playlet.internal.utils.AppTokenUtil;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.QiniuUploadUtils;
@@ -78,6 +79,9 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
     @Autowired
     private MediaUrlService mediaUrlService;
 
+    @Autowired
+    private WatchPreferMatchSupport watchPreferMatchSupport;
+
     @Override
     public ResponseBase recommend(@RequestBody RecommendDramaQuery entity, HttpServletRequest request) {
         try {
@@ -88,7 +92,9 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             int deleteState = DeleteStateEnum.NORMAL.getIndex();
             entity.setDeleteState(deleteState);
             entity.setVerifyStatus(VerifyStateEnums.AVAILABLE_NOW.getIndex());
-            List<RecommendDramaRespEntity> list = dramaDao.recommendList(entity);
+            // 有偏好映射时命中优先，否则保持 seed 打散
+            List<String> preferTagGroupIds = watchPreferMatchSupport.resolveDramaTagGroupIds(uid);
+            List<RecommendDramaRespEntity> list = dramaDao.recommendList(entity, preferTagGroupIds);
             if (list != null && !list.isEmpty()) {
                 // 获取资源id列表
                 List<Integer> dramaIds = list.stream().map(RecommendDramaRespEntity::getId).collect(Collectors.toList());
@@ -464,9 +470,14 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
     }
 
     @Override
-    public ResponseBase relatedWork(Integer id) {
+    public ResponseBase relatedWork(Integer id, HttpServletRequest request) {
         try {
-            List<RecommendDramaRespEntity> list = dramaDao.relatedWork(id, DeleteStateEnum.NORMAL.getIndex(), VerifyStateEnums.AVAILABLE_NOW.getIndex());
+            Integer uid = AppTokenUtil.resolveUid(request);
+            List<String> preferTagGroupIds = watchPreferMatchSupport.resolveDramaTagGroupIds(uid);
+            List<RecommendDramaRespEntity> list = dramaDao.relatedWork(id,
+                    DeleteStateEnum.NORMAL.getIndex(),
+                    VerifyStateEnums.AVAILABLE_NOW.getIndex(),
+                    preferTagGroupIds);
             if (list != null) {
                 for (RecommendDramaRespEntity item : list) {
                     item.setCoverUrl(mediaUrlService.sign(item.getCoverUrl()));

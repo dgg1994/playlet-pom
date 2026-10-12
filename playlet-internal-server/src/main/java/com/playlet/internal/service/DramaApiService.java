@@ -65,12 +65,11 @@ public interface DramaApiService {
 	ResponseBase workInfo(Integer id);
 	
 	/**
-	 * @category 相关作品
-	 * @param id
-	 * @return
+	 * @category 相关作品（同标签；登录有偏好时同标签内加权）
+	 * @param id 短剧ID
 	 */
 	@GetMapping("/relatedWork")
-	ResponseBase relatedWork(Integer id);
+	ResponseBase relatedWork(Integer id, HttpServletRequest request);
 	
 	/**
 	 * @category 开始播放查询第一集播放地址
