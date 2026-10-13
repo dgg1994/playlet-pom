@@ -329,7 +329,9 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	}
 
 	@Override
-	public ResponseBase shareDrama(@RequestParam("dramaId") Integer dramaId, HttpServletRequest request) {
+	public ResponseBase shareDrama(@RequestParam("dramaId") Integer dramaId,
+			@RequestParam(value = "channel", required = false) String channel,
+			HttpServletRequest request) {
         try {
         	Integer uid = AppTokenUtil.resolveUid(request);
             if (uid == null) {
@@ -341,6 +343,8 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
             if (dramaDao.findOnlineByDramaId(dramaId) == null && dramaDao.findByDramaId(dramaId) == null) {
                 return setResultError(I18nUtil.getMessage("drama_null"));
             }
+			// channel 仅日志，不参与冷却与计数
+			log.info("share drama report uid={} dramaId={} channel={}", uid, dramaId, channel);
             String cdKey = SHARE_CD_UID_DRAMA + uid + ":" + dramaId;
             try {
                 if (redisUtil.hasKey(cdKey)) {

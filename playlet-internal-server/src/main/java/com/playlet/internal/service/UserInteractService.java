@@ -98,7 +98,10 @@ public interface UserInteractService {
 	ResponseBase interactMessageUnreadCount(HttpServletRequest request);
 
 	@PostMapping("/share/drama")
-	@ApiImplicitParam(name = "dramaId", value = "短剧ID", required = true, dataType = "int", paramType = "query")
-	@ApiOperation(value = "分享上报", notes = "需登录；同一用户同一剧 60 秒内只计一次")
-	ResponseBase shareDrama(Integer dramaId, HttpServletRequest request);
+	@ApiImplicitParams({
+			@ApiImplicitParam(name = "dramaId", value = "短剧ID", required = true, dataType = "int", paramType = "query"),
+			@ApiImplicitParam(name = "channel", value = "渠道：system/wechat/copy，仅日志", dataType = "string", paramType = "query")
+	})
+	@ApiOperation(value = "分享上报", notes = "需登录；同一用户同一剧冷却内只计一次；channel 可选仅打日志")
+	ResponseBase shareDrama(Integer dramaId, String channel, HttpServletRequest request);
 }

@@ -54,7 +54,7 @@ public class MedalProgressServiceImpl implements MedalProgressService {
 	@Override
 	@Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
 	public void onAction(Integer uid, WelfareActionTypeEnums action, int delta, String triggerRef) {
-		if (uid == null || action == null || delta <= 0 || !action.isAutoProgress()) {
+		/*if (uid == null || action == null || delta <= 0 || !action.isAutoProgress()) {
 			return;
 		}
 		try {
@@ -76,7 +76,7 @@ public class MedalProgressServiceImpl implements MedalProgressService {
 		} catch (Exception e) {
 			log.warn("medal onAction failed uid={} action={}: {}", uid, action, e.getMessage());
 			TransactionUtils.markRollbackOnly();
-		}
+		}*/
 	}
 
 	/**
