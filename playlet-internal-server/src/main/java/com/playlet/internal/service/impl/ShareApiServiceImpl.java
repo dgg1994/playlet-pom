@@ -2,11 +2,14 @@ package com.playlet.internal.service.impl;
 
 import com.playlet.internal.api.response.ShareInfoResp;
 import com.playlet.internal.base.ResponseBase;
+import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.constants.ShareConstants;
 import com.playlet.internal.dao.drama.DramaAssetDao;
 import com.playlet.internal.dao.drama.DramaDao;
+import com.playlet.internal.dao.drama.TagDao;
 import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
+import com.playlet.internal.entity.drama.TagEntity;
 import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.service.ShareApiService;
 import com.playlet.internal.utils.I18nUtil;
@@ -18,11 +21,17 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+
 import static com.playlet.internal.base.BaseApiService.setResultError;
 import static com.playlet.internal.base.BaseApiService.setResultSuccess;
 
 /**
- * 播放页内容分享：下发分享素材与落地链接。
+ * 播放页内容分享：下发分享素材与落地链接，不返回播放地址。
  */
 @Slf4j
 @RestController
@@ -32,10 +41,15 @@ public class ShareApiServiceImpl implements ShareApiService {
 	@Value("${playlet.share.h5-base:}")
 	private String h5Base;
 
+	@Value("${playlet.share.default-region:}")
+	private String defaultRegion;
+
 	@Autowired
 	private DramaDao dramaDao;
 	@Autowired
 	private DramaAssetDao dramaAssetDao;
+	@Autowired
+	private TagDao tagDao;
 	@Autowired
 	private MediaUrlService mediaUrlService;
 
@@ -82,17 +96,47 @@ public class ShareApiServiceImpl implements ShareApiService {
 			return setResultError(I18nUtil.getMessage("drama_null"));
 		}
 
+		String rawIntro = drama.getDescriptionInfo();
 		ShareInfoResp resp = new ShareInfoResp();
 		resp.setDramaId(drama.getId());
 		resp.setVideoId(resolvedVideoId);
 		resp.setTitle(resolveTitle(drama.getDramaTitle()));
-		resp.setDesc(resolveDesc(drama.getDescriptionInfo(), setNum));
+		resp.setDesc(resolveDesc(rawIntro, setNum, true));
+		resp.setDetail(resolveDesc(rawIntro, setNum, false));
+		resp.setSlogan(resolveSlogan(rawIntro, resp.getTitle()));
 		resp.setCoverUrl(mediaUrlService.sign(drama.getCoverUrl()));
 		resp.setShareUrl(buildShareUrl(base, drama.getId(), resolvedVideoId));
+		resp.setTags(resolveTagNames(drama.getId()));
+		resp.setTotalEpisodes(drama.getTotalEpisodes());
+		resp.setYear(resolveYear(drama.getShelfTime() != null ? drama.getShelfTime() : drama.getSetTime()));
+		resp.setRegion(StringUtils.isBlank(defaultRegion) ? null : defaultRegion.trim());
 		resp.setShareScore(drama.getShareScore() == null ? 0L : drama.getShareScore());
 
 		log.info("share info ok dramaId={} videoId={}", drama.getId(), resolvedVideoId);
 		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
+	}
+
+	private List<String> resolveTagNames(Integer dramaId) {
+		List<TagEntity> tagList = tagDao.findGroupLang(LanguageContext.getLanguage(), dramaId);
+		if (tagList == null || tagList.isEmpty()) {
+			return Collections.emptyList();
+		}
+		List<String> names = new ArrayList<>();
+		for (TagEntity tag : tagList) {
+			if (tag != null && StringUtils.isNotBlank(tag.getTagName())) {
+				names.add(tag.getTagName().trim());
+			}
+		}
+		return names;
+	}
+
+	private static Integer resolveYear(Date date) {
+		if (date == null) {
+			return null;
+		}
+		Calendar calendar = Calendar.getInstance();
+		calendar.setTime(date);
+		return calendar.get(Calendar.YEAR);
 	}
 
 	private static String resolveTitle(String dramaTitle) {
@@ -102,15 +146,29 @@ public class ShareApiServiceImpl implements ShareApiService {
 		return I18nUtil.getMessage("share_default_title");
 	}
 
-	/** 简介截断；有集号时前置「第N集」 */
-	private static String resolveDesc(String descriptionInfo, Integer setNum) {
+	private static String resolveSlogan(String descriptionInfo, String title) {
+		if (StringUtils.isNotBlank(descriptionInfo)) {
+			String plain = descriptionInfo.trim();
+			if (plain.length() > ShareConstants.SLOGAN_MAX_LEN) {
+				plain = plain.substring(0, ShareConstants.SLOGAN_MAX_LEN);
+			}
+			return plain;
+		}
+		if (StringUtils.isNotBlank(title)) {
+			return title;
+		}
+		return I18nUtil.getMessage("share_default_desc");
+	}
+
+	/** 有集号时前置「第N集」；truncate=true 时截断给分享卡片 */
+	private static String resolveDesc(String descriptionInfo, Integer setNum, boolean truncate) {
 		StringBuilder sb = new StringBuilder();
 		if (setNum != null) {
 			sb.append(I18nUtil.getMessage("share_episode_fmt", setNum));
 		}
 		if (StringUtils.isNotBlank(descriptionInfo)) {
 			String plain = descriptionInfo.trim();
-			if (plain.length() > ShareConstants.DESC_MAX_LEN) {
+			if (truncate && plain.length() > ShareConstants.DESC_MAX_LEN) {
 				plain = plain.substring(0, ShareConstants.DESC_MAX_LEN);
 			}
 			if (sb.length() > 0) {

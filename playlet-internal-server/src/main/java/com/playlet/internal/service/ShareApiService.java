@@ -21,7 +21,7 @@ public interface ShareApiService {
 			@ApiImplicitParam(name = "dramaId", value = "短剧ID，与 videoId 至少传一个", dataType = "int", paramType = "query"),
 			@ApiImplicitParam(name = "videoId", value = "集ID，播放页建议传；非法时降级为整剧", dataType = "int", paramType = "query")
 	})
-	@ApiOperation(value = "分享素材", notes = "可不登录；返回 title/desc/coverUrl/shareUrl，供播放页分享面板使用")
+	@ApiOperation(value = "分享素材", notes = "可不登录；落地展示字段一并返回；不含视频播放地址，播放请走 /api/drama/getVideoUrl")
 	ResponseBase info(@RequestParam(value = "dramaId", required = false) Integer dramaId,
 			@RequestParam(value = "videoId", required = false) Integer videoId);
 }

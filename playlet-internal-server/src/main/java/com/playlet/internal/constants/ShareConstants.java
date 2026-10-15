@@ -8,8 +8,11 @@ public final class ShareConstants {
 	private ShareConstants() {
 	}
 
-	/** 简介截断最大字数 */
+	/** 简介截断最大字数（分享卡片） */
 	public static final int DESC_MAX_LEN = 80;
+
+	/** 封面宣传语最大字数 */
+	public static final int SLOGAN_MAX_LEN = 22;
 
 	/** 落地页 path */
 	public static final String H5_PLAY_PATH = "/play";
