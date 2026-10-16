@@ -24,8 +24,14 @@ import javax.servlet.http.HttpServletRequest;
 public interface TheaterApiService {
 
 	@GetMapping("/home")
-	@ApiOperation(value = "剧场首页", notes = "公共轮播/榜单按语言缓存；登录且有偏好映射时追加「猜你喜欢」区块")
-	ResponseBase home(HttpServletRequest request);
+	@ApiImplicitParams({
+			@ApiImplicitParam(name = "tab", value = "hot热榜 / playlist剧单 / recommend推荐；空默认推荐", dataType = "string", paramType = "query"),
+			@ApiImplicitParam(name = "pageNumber", value = "推荐分页页码，默认1", dataType = "int", paramType = "query"),
+			@ApiImplicitParam(name = "pageSize", value = "推荐分页大小", dataType = "int", paramType = "query"),
+			@ApiImplicitParam(name = "seed", value = "推荐会话种子；首页可空，翻页原样回传", dataType = "string", paramType = "query")
+	})
+	@ApiOperation(value = "剧场首页", notes = "同一接口按 tab 返回热榜/剧单/推荐；推荐登录且有偏好映射时加权，否则保持 seed 打散")
+	ResponseBase home(String tab, Integer pageNumber, Integer pageSize, String seed, HttpServletRequest request);
 
 	@PostMapping("/findList")
 	@ApiOperation("榜单定义分页")
@@ -39,6 +45,15 @@ public interface TheaterApiService {
 	@ApiImplicitParam(name = "groupId", value = "榜单分组ID", required = true, dataType = "string", paramType = "query")
 	@ApiOperation(value = "榜单分页", notes = "读 rank_list，仅 status=1；data=TheaterRankPageRespEntity")
 	ResponseBase rank(String groupId, RankListEntity entity);
+
+	@GetMapping("/playlist")
+	@ApiImplicitParams({
+			@ApiImplicitParam(name = "groupId", value = "剧单 groupId（首页 blocks.groupId）", required = true, dataType = "string", paramType = "query"),
+			@ApiImplicitParam(name = "pageNumber", value = "页码，默认1", dataType = "int", paramType = "query"),
+			@ApiImplicitParam(name = "pageSize", value = "页大小", dataType = "int", paramType = "query")
+	})
+	@ApiOperation(value = "剧单分页", notes = "点进首页剧单块后拉完整列表；按 match_mode + 绑定标签捞在架剧；data=TheaterPlaylistPageRespEntity")
+	ResponseBase playlist(String groupId, Integer pageNumber, Integer pageSize);
 
 	@PostMapping("/search")
 	@ApiOperation(value = "剧场搜索", notes = "按 dramaTitle 模糊；按 tagId（标签主键，内部转 groupId）或 tagGroupId 精确筛选已上架剧；可单独或组合")

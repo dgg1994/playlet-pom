@@ -102,6 +102,55 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 			@Param("limit") int limit);
 
 	/**
+	 * 剧单 AND：须命中全部 tag_group_id 的在架剧，按热度排序。
+	 */
+	@Select("<script>"
+			+ "select d.* from drama d "
+			+ "where d.verify_status = 1 and ifnull(d.delete_state, 0) = 0 "
+			+ "<foreach collection='tagGroupIds' item='tg'>"
+			+ "  and exists ("
+			+ "    select 1 from drama_tag_rel r "
+			+ "    where r.drama_id = d.id and r.tag_group_id = #{tg}"
+			+ "  )"
+			+ "</foreach>"
+			+ "order by ifnull(d.hot_score, 0) desc, d.id desc "
+			+ "limit #{limit}"
+			+ "</script>")
+	List<DramaEntity> findOnlineByAllTags(@Param("tagGroupIds") List<String> tagGroupIds,
+			@Param("limit") int limit);
+
+	/**
+	 * 剧单分页 OR：命中任一标签（配合 PageHelper，无 limit）。
+	 */
+	@Select("<script>"
+			+ "select d.* from drama d "
+			+ "where d.verify_status = 1 and ifnull(d.delete_state, 0) = 0 "
+			+ "and exists ("
+			+ "  select 1 from drama_tag_rel r "
+			+ "  where r.drama_id = d.id and r.tag_group_id in "
+			+ "  <foreach collection='tagGroupIds' item='tg' open='(' separator=',' close=')'>#{tg}</foreach>"
+			+ ") "
+			+ "order by ifnull(d.hot_score, 0) desc, d.id desc"
+			+ "</script>")
+	List<DramaEntity> pageOnlineByPreferTags(@Param("tagGroupIds") List<String> tagGroupIds);
+
+	/**
+	 * 剧单分页 AND：须命中全部标签（配合 PageHelper，无 limit）。
+	 */
+	@Select("<script>"
+			+ "select d.* from drama d "
+			+ "where d.verify_status = 1 and ifnull(d.delete_state, 0) = 0 "
+			+ "<foreach collection='tagGroupIds' item='tg'>"
+			+ "  and exists ("
+			+ "    select 1 from drama_tag_rel r "
+			+ "    where r.drama_id = d.id and r.tag_group_id = #{tg}"
+			+ "  )"
+			+ "</foreach>"
+			+ "order by ifnull(d.hot_score, 0) desc, d.id desc"
+			+ "</script>")
+	List<DramaEntity> pageOnlineByAllTags(@Param("tagGroupIds") List<String> tagGroupIds);
+
+	/**
 	 * 管理端短剧列表：producerFirm 取 creator_account.nickname（按 belong_user 关联）。
 	 */
 	@Select("<script>"

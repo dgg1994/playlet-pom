@@ -35,7 +35,7 @@ public class RankBoardEntity extends PageQueryHelperEntity {
 	private String boardName;
 
 	@TableField("board_type")
-	@ApiModelProperty(name = "boardType", value = "1算法2人工", dataType = "Integer")
+	@ApiModelProperty(name = "boardType", value = "1算法 2人工；3为遗留剧单勿再用", dataType = "Integer")
 	private Integer boardType;
 
 	@TableField("top_n")

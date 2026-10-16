@@ -17,7 +17,7 @@ public class TheaterRankBlockEntity {
 	@ApiModelProperty("榜展示名")
 	private String boardName;
 
-	@ApiModelProperty("1算法 2人工")
+	@ApiModelProperty("1算法 2人工 3剧单（剧单数据来自 drama_playlist）")
 	private Integer boardType;
 
 	@ApiModelProperty("预览条目（联查 drama）")

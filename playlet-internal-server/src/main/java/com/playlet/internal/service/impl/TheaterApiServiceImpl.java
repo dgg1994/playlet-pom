@@ -8,15 +8,19 @@ import com.playlet.internal.api.response.*;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
+import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.RankBoardGroupConstants;
 import com.playlet.internal.constants.TheaterConstants;
-import com.playlet.internal.constants.WatchPreferConstants;
 import com.playlet.internal.dao.drama.*;
 import com.playlet.internal.entity.drama.*;
 import com.playlet.internal.enums.DeleteStateEnum;
+import com.playlet.internal.enums.PlaylistMatchModeEnums;
+import com.playlet.internal.enums.RankBoardTypeEnums;
 import com.playlet.internal.enums.RecommendedCarouselEnums;
+import com.playlet.internal.enums.TheaterHomeTabEnums;
 import com.playlet.internal.enums.VerifyStateEnums;
 import com.playlet.internal.enums.WelfareActionTypeEnums;
+import com.playlet.internal.query.drama.RecommendDramaQuery;
 import com.playlet.internal.service.*;
 import com.playlet.internal.service.support.UserActiveStatService;
 import com.playlet.internal.service.support.WatchPreferMatchSupport;
@@ -32,6 +36,7 @@ import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 import static com.playlet.internal.constants.RedisKeyConstants.*;
 
@@ -70,25 +75,44 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 	private UserActiveStatService userActiveStatService;
 	@Autowired
 	private WatchPreferMatchSupport watchPreferMatchSupport;
+	@Autowired
+	private DramaPlaylistDao dramaPlaylistDao;
+	@Autowired
+	private DramaPlaylistTagDao dramaPlaylistTagDao;
 
 	@Override
-	public ResponseBase home(HttpServletRequest request) {
-		String langue = LanguageContext.getLanguage();
-		// 公共首页：按语言缓存（不含个性化）
-		TheaterHomeRespEntity publicHome = theaterHomeCacheHelper.get(langue);
-		if (publicHome == null) {
-			publicHome = buildPublicHome(langue);
-			theaterHomeCacheHelper.put(langue, publicHome);
+	public ResponseBase home(@RequestParam(value = "tab", required = false) String tab,
+			@RequestParam(value = "pageNumber", required = false) Integer pageNumber,
+			@RequestParam(value = "pageSize", required = false) Integer pageSize,
+			@RequestParam(value = "seed", required = false) String seed,
+			HttpServletRequest request) {
+		TheaterHomeTabEnums tabEnum = TheaterHomeTabEnums.ofCode(tab);
+		if (tabEnum == null) {
+			return setResultError(I18nUtil.getMessage("param_not_null"));
 		}
-		// 登录且有偏好映射时追加「猜你喜欢」，不写回公共缓存
-		TheaterHomeRespEntity resp = appendPreferBlockIfNeeded(publicHome, request);
+		String langue = LanguageContext.getLanguage();
+		TheaterHomeRespEntity resp;
+		if (TheaterHomeTabEnums.PLAYLIST.equals(tabEnum)) {
+			resp = buildPlaylistHome(langue);
+		} else if (TheaterHomeTabEnums.HOT.equals(tabEnum)) {
+			resp = buildHotHome(langue);
+		} else {
+			resp = buildRecommendHome(pageNumber, pageSize, seed, request);
+		}
+		resp.setTab(tabEnum.getCode());
+		if (resp.getPreferApplied() == null) {
+			resp.setPreferApplied(Boolean.FALSE);
+		}
+		log.info("theater home tab={} preferApplied={}", tabEnum.getCode(), resp.getPreferApplied());
 		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
 	}
 
-	/**
-	 * 组装语言维度公共首页（轮播 + 运营榜预览）。
-	 */
-	private TheaterHomeRespEntity buildPublicHome(String langue) {
+	/** 热榜：轮播 + 算法/人工榜预览（不含剧单、不含猜你喜欢）。 */
+	private TheaterHomeRespEntity buildHotHome(String langue) {
+		TheaterHomeRespEntity cached = theaterHomeCacheHelper.get(langue);
+		if (cached != null) {
+			return copyHome(cached);
+		}
 		TheaterHomeRespEntity resp = new TheaterHomeRespEntity();
 		List<DramaEntity> carouselDramas = dramaDao.selectList(new QueryWrapper<DramaEntity>()
 				.eq("delete_state", DeleteStateEnum.NORMAL.getIndex())
@@ -109,8 +133,10 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 		Integer verifyStatus = VerifyStateEnums.AVAILABLE_NOW.getIndex();
 		Integer deleteState = DeleteStateEnum.NORMAL.getIndex();
 		for (RankBoardEntity board : boards) {
-			int limit = board.getTopN() == null ? TheaterConstants.HOME_RANK_PREVIEW_MAX
-					: Math.min(TheaterConstants.HOME_RANK_PREVIEW_MAX, board.getTopN());
+			if (RankBoardTypeEnums.isPlaylist(board.getBoardType())) {
+				continue;
+			}
+			int limit = previewLimit(board.getTopN());
 			List<RankListItemEntity> preview = rankListDao.findEnabledWithDramaLimit(
 					board.getGroupId(), verifyStatus, deleteState, limit);
 			if (preview == null) {
@@ -119,47 +145,115 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 			for (RankListItemEntity item : preview) {
 				item.setCoverUrl(mediaUrlService.sign(item.getCoverUrl()));
 			}
-			TheaterRankBlockEntity block = new TheaterRankBlockEntity();
-			block.setGroupId(board.getGroupId());
-			block.setBoardName(board.getBoardName());
-			block.setBoardType(board.getBoardType());
-			block.setItems(preview);
-			resp.getBlocks().add(block);
+			resp.getBlocks().add(toBlock(board, preview));
+		}
+		theaterHomeCacheHelper.put(langue, resp);
+		return copyHome(resp);
+	}
+
+	/** 剧单：读 drama_playlist + drama_playlist_tag，按 match_mode 捞在架剧。 */
+	private TheaterHomeRespEntity buildPlaylistHome(String langue) {
+		TheaterHomeRespEntity resp = new TheaterHomeRespEntity();
+		List<DramaPlaylistEntity> playlists = dramaPlaylistDao.findEnabledByLangue(langue);
+		if (playlists == null || playlists.isEmpty()) {
+			return resp;
+		}
+		for (DramaPlaylistEntity playlist : playlists) {
+			List<String> tagGroupIds = dramaPlaylistTagDao.findTagGroupIds(playlist.getGroupId());
+			List<DramaEntity> dramas = Collections.emptyList();
+			if (tagGroupIds != null && !tagGroupIds.isEmpty()) {
+				int limit = previewLimit(playlist.getTopN());
+				// AND 须全部命中；默认 OR 命中任一标签
+				if (PlaylistMatchModeEnums.isAnd(playlist.getMatchMode())) {
+					dramas = dramaDao.findOnlineByAllTags(tagGroupIds, limit);
+				} else {
+					dramas = dramaDao.findOnlineByPreferTags(tagGroupIds, limit);
+				}
+			}
+			resp.getBlocks().add(toPlaylistBlock(playlist, toRankItems(playlist.getGroupId(), dramas)));
 		}
 		return resp;
 	}
 
-	/**
-	 * 有偏好映射时在 blocks 末尾追加猜你喜欢；无则原样返回公共首页。
-	 */
-	private TheaterHomeRespEntity appendPreferBlockIfNeeded(TheaterHomeRespEntity publicHome,
+	/** 推荐：有偏好映射则命中优先，否则 seed 打散。 */
+	private TheaterHomeRespEntity buildRecommendHome(Integer pageNumber, Integer pageSize, String seed,
 			HttpServletRequest request) {
+		RecommendDramaQuery query = new RecommendDramaQuery();
+		query.setPageNumber(pageNumber == null ? Constants.PAGENUMBER : pageNumber);
+		query.setPageSize(pageSize == null ? Constants.PAGESIZE : pageSize);
+		query.setSeed(seed);
+		ensureRecommendSeed(query);
+		query.setDeleteState(DeleteStateEnum.NORMAL.getIndex());
+		query.setVerifyStatus(VerifyStateEnums.AVAILABLE_NOW.getIndex());
+
 		Integer uid = AppTokenUtil.resolveUid(request);
 		List<String> preferTagGroupIds = watchPreferMatchSupport.resolveDramaTagGroupIds(uid);
-		if (preferTagGroupIds.isEmpty()) {
-			return publicHome;
+		boolean preferApplied = preferTagGroupIds != null && !preferTagGroupIds.isEmpty();
+		PageHelper.startPage(query.getPageNumber(), query.getPageSize());
+		List<RecommendDramaRespEntity> list = dramaDao.recommendList(query, preferTagGroupIds);
+		if (list != null) {
+			for (RecommendDramaRespEntity item : list) {
+				item.setCoverUrl(mediaUrlService.sign(item.getCoverUrl()));
+			}
 		}
-		List<DramaEntity> preferDramas = dramaDao.findOnlineByPreferTags(preferTagGroupIds,
-				WatchPreferConstants.HOME_PREFER_LIMIT);
-		if (preferDramas == null || preferDramas.isEmpty()) {
-			return publicHome;
-		}
-		// 浅拷贝 blocks，避免污染缓存对象
+		RecommendPageRespEntity feed = new RecommendPageRespEntity();
+		feed.setSeed(query.getSeed());
+		feed.setPage(new PageInfo<>(list == null ? Collections.emptyList() : list));
+
 		TheaterHomeRespEntity resp = new TheaterHomeRespEntity();
-		resp.setCarousels(publicHome.getCarousels());
-		List<TheaterRankBlockEntity> blocks = new ArrayList<>();
-		if (publicHome.getBlocks() != null) {
-			blocks.addAll(publicHome.getBlocks());
+		resp.setPreferApplied(preferApplied);
+		resp.setFeed(feed);
+		return resp;
+	}
+
+	private static void ensureRecommendSeed(RecommendDramaQuery entity) {
+		String seed = entity.getSeed() == null ? null : entity.getSeed().trim();
+		if (StringUtils.isEmpty(seed)) {
+			entity.setSeed(UUID.randomUUID().toString().replace("-", ""));
+			return;
 		}
-		TheaterRankBlockEntity preferBlock = new TheaterRankBlockEntity();
-		preferBlock.setGroupId(WatchPreferConstants.HOME_PREFER_BLOCK_GROUP_ID);
-		preferBlock.setBoardName(WatchPreferConstants.HOME_PREFER_BLOCK_NAME);
-		preferBlock.setBoardType(1);
+		if (seed.length() > 64) {
+			seed = seed.substring(0, 64);
+		}
+		entity.setSeed(seed);
+	}
+
+	private static int previewLimit(Integer topN) {
+		if (topN == null) {
+			return TheaterConstants.HOME_RANK_PREVIEW_MAX;
+		}
+		return Math.min(TheaterConstants.HOME_RANK_PREVIEW_MAX, topN);
+	}
+
+	private static TheaterRankBlockEntity toBlock(RankBoardEntity board, List<RankListItemEntity> items) {
+		TheaterRankBlockEntity block = new TheaterRankBlockEntity();
+		block.setGroupId(board.getGroupId());
+		block.setBoardName(board.getBoardName());
+		block.setBoardType(board.getBoardType());
+		block.setItems(items == null ? new ArrayList<RankListItemEntity>() : items);
+		return block;
+	}
+
+	/** 剧单分块：boardType 仍回 3，兼容客户端既有枚举。 */
+	private static TheaterRankBlockEntity toPlaylistBlock(DramaPlaylistEntity playlist,
+			List<RankListItemEntity> items) {
+		TheaterRankBlockEntity block = new TheaterRankBlockEntity();
+		block.setGroupId(playlist.getGroupId());
+		block.setBoardName(playlist.getPlaylistName());
+		block.setBoardType(RankBoardTypeEnums.PLAYLIST.getIndex());
+		block.setItems(items == null ? new ArrayList<RankListItemEntity>() : items);
+		return block;
+	}
+
+	private List<RankListItemEntity> toRankItems(String boardGroupId, List<DramaEntity> dramas) {
 		List<RankListItemEntity> items = new ArrayList<>();
+		if (dramas == null) {
+			return items;
+		}
 		int rankNo = 1;
-		for (DramaEntity drama : preferDramas) {
+		for (DramaEntity drama : dramas) {
 			RankListItemEntity item = new RankListItemEntity();
-			item.setBoardGroupId(WatchPreferConstants.HOME_PREFER_BLOCK_GROUP_ID);
+			item.setBoardGroupId(boardGroupId);
 			item.setRankNo(rankNo++);
 			item.setDramaId(drama.getId() == null ? null : String.valueOf(drama.getId()));
 			item.setTitle(drama.getDramaTitle());
@@ -171,10 +265,18 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 			item.setStatus(1);
 			items.add(item);
 		}
-		preferBlock.setItems(items);
-		blocks.add(preferBlock);
+		return items;
+	}
+
+	/** 热榜缓存对象不可被调用方改 tab 字段污染。 */
+	private static TheaterHomeRespEntity copyHome(TheaterHomeRespEntity src) {
+		TheaterHomeRespEntity resp = new TheaterHomeRespEntity();
+		resp.setCarousels(src.getCarousels());
+		List<TheaterRankBlockEntity> blocks = new ArrayList<>();
+		if (src.getBlocks() != null) {
+			blocks.addAll(src.getBlocks());
+		}
 		resp.setBlocks(blocks);
-		log.info("theater home prefer block uid={} size={}", uid, items.size());
 		return resp;
 	}
 
@@ -235,6 +337,56 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 		resp.setGroupId(board.getGroupId());
 		resp.setBoardName(board.getBoardName());
 		resp.setPage(info);
+		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
+	}
+
+	/** 剧单二级页：与热榜 /rank 对称，按标签规则分页。 */
+	@Override
+	public ResponseBase playlist(@RequestParam(value = "groupId", required = false) String groupId,
+			@RequestParam(value = "pageNumber", required = false) Integer pageNumber,
+			@RequestParam(value = "pageSize", required = false) Integer pageSize) {
+		if (StringUtils.isEmpty(groupId)) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		groupId = groupId.trim();
+		String langue = LanguageContext.getLanguage();
+		DramaPlaylistEntity playlist = dramaPlaylistDao.findEnabledByGroupIdAndLangue(groupId, langue);
+		if (playlist == null) {
+			playlist = dramaPlaylistDao.findOneEnabledByGroupId(groupId);
+		}
+		if (playlist == null) {
+			return setResultError(I18nUtil.getMessage("base_data_null"));
+		}
+		List<String> tagGroupIds = dramaPlaylistTagDao.findTagGroupIds(groupId);
+		int pn = pageNumber == null || pageNumber < 1 ? Constants.PAGENUMBER : pageNumber;
+		int ps = pageSize == null || pageSize < 1 ? Constants.PAGESIZE : Math.min(pageSize, Constants.MAX_PAGESIZE);
+
+		List<DramaEntity> dramas;
+		if (tagGroupIds == null || tagGroupIds.isEmpty()) {
+			dramas = Collections.emptyList();
+		} else {
+			PageHelper.startPage(pn, ps);
+			if (PlaylistMatchModeEnums.isAnd(playlist.getMatchMode())) {
+				dramas = dramaDao.pageOnlineByAllTags(tagGroupIds);
+			} else {
+				dramas = dramaDao.pageOnlineByPreferTags(tagGroupIds);
+			}
+		}
+		if (dramas == null) {
+			dramas = Collections.emptyList();
+		}
+		for (DramaEntity drama : dramas) {
+			List<TagEntity> tags = tagDao.selectListTagByDramaId(drama.getId(), langue);
+			drama.setTagList(tags);
+			drama.setCoverUrl(mediaUrlService.sign(drama.getCoverUrl()));
+		}
+		TheaterPlaylistPageRespEntity resp = new TheaterPlaylistPageRespEntity();
+		resp.setGroupId(playlist.getGroupId());
+		resp.setPlaylistName(playlist.getPlaylistName());
+		resp.setMatchMode(playlist.getMatchMode());
+		resp.setCoverUrl(mediaUrlService.sign(playlist.getCoverUrl()));
+		resp.setPage(new PageInfo<>(dramas));
+		log.info("theater playlist page groupId={} pageNumber={} size={}", groupId, pn, dramas.size());
 		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
 	}
 
