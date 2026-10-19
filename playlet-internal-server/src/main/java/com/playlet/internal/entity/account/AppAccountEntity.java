@@ -105,6 +105,10 @@ public class AppAccountEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "frozenCoinBalance", value = "冻结金币", required = false, dataType = "Long")
 	private Long frozenCoinBalance;
 
+	@TableField("last_login_time")
+	@ApiModelProperty(name = "lastLoginTime", value = "最近登录时间，用于久未登录清币", required = false, dataType = "Date")
+	private Date lastLoginTime;
+
 	@TableField("gender")
 	@ApiModelProperty(name = "gender", value = "性别：0未知 1男 2女", required = false, dataType = "Integer")
 	private Integer gender;

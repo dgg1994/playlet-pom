@@ -17,6 +17,7 @@ public enum CoinBizTypeEnums {
 	WATCH_GIFT("WATCH_GIFT", "观影礼"),
 	RECHARGE("RECHARGE", "充值"),
 	CONSUME("CONSUME", "消费"),
+	MEMBER_BUY("MEMBER_BUY", "购买会员"),
 	WITHDRAW_FREEZE("WITHDRAW_FREEZE", "提现冻结"),
 	WITHDRAW("WITHDRAW", "提现"),
 	WITHDRAW_REFUND("WITHDRAW_REFUND", "提现退回"),

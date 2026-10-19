@@ -10,6 +10,7 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.math.BigDecimal;
 import java.util.Date;
 
 @Data
@@ -69,6 +70,18 @@ public class DramaAssetEntity extends PageQueryHelperEntity {
 	@TableField("duration_seconds")
 	@ApiModelProperty(name = "durationSeconds", value = "视频时长（秒）", required = false, dataType = "Integer")
 	private Integer durationSeconds;
+
+	@TableField("unlock_type")
+	@ApiModelProperty(name = "unlockType", value = "0免费 1广告解锁 2付费解锁", required = false, dataType = "Integer")
+	private Integer unlockType;
+
+	@TableField("price_coin")
+	@ApiModelProperty(name = "priceCoin", value = "付费解锁金币价", required = false, dataType = "Integer")
+	private Integer priceCoin;
+
+	@TableField("price_yuan")
+	@ApiModelProperty(name = "priceYuan", value = "付费解锁现金价(元)", required = false, dataType = "BigDecimal")
+	private BigDecimal priceYuan;
 
 	@TableField("exposure_count")
 	@ApiModelProperty(name = "exposureCount", value = "曝光量", required = false, dataType = "Long")

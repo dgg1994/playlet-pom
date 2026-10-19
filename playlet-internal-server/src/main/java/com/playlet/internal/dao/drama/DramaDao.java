@@ -160,6 +160,7 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 	        + "  d.verify_status, d.audit_status, d.shelf_status, d.audit_reject_reason, d.audit_pass_time,"
 	        + "  d.appeal_status, d.appeal_reason, d.appeal_time, d.shelf_time, d.delete_state,"
 	        + "  d.recommended_carousel, d.offline_reason, d.remark_info, d.belong_user, d.is_ai,"
+	        + "  d.is_member_drama,"
 	        + "  d.setTime, d.gmtModified,"
 	        + "  ca.nickname as producer_firm"
 	        + " from drama d"

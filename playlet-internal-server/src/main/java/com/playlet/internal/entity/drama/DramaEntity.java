@@ -149,6 +149,10 @@ public class DramaEntity extends PageQueryHelperEntity {
 	@TableField("is_ai")
 	@ApiModelProperty(name = "isAi",value = "是否ai生成 1是0否",required = false,dataType = "Integer")
 	private Integer isAi;
+
+	@TableField("is_member_drama")
+	@ApiModelProperty(name = "isMemberDrama", value = "是否会员短剧 0否 1是", required = false, dataType = "Integer")
+	private Integer isMemberDrama;
 	
 	@TableField("setTime")
 	@ApiModelProperty(name = "setTime",value = "创建时间",required = false,dataType = "Date")
