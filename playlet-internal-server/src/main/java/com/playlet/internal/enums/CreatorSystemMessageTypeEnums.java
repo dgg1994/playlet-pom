@@ -5,9 +5,7 @@ package com.playlet.internal.enums;
  */
 public enum CreatorSystemMessageTypeEnums {
 	AUDIT("AUDIT", "评审通知"),
-	SITE("SITE", "站务通知"),
-	/** 钱包交易 / 卡操作等 */
-	WALLET("WALLET", "钱包");
+	SITE("SITE", "站务通知");
 
 	private final String code;
 	private final String desc;
@@ -36,15 +34,6 @@ public enum CreatorSystemMessageTypeEnums {
 			}
 			if (lang == LanguageEnums.ZH_TW) {
 				return "評審通知";
-			}
-			return desc;
-		}
-		if (this == WALLET) {
-			if (lang == LanguageEnums.EN_US) {
-				return "Wallet";
-			}
-			if (lang == LanguageEnums.ZH_TW) {
-				return "錢包";
 			}
 			return desc;
 		}

@@ -83,12 +83,6 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
                 .antMatchers("/configuration/security").permitAll()
                 .antMatchers( "/*.html","/**/*.html","/**/*.css", "/**/*.js","/webSocket/**").permitAll()
                
-                .antMatchers("/wallet/webhook/**").permitAll()
-                .antMatchers("/webhook/**").permitAll()
-                .antMatchers("/wallet/topinUsdtAddress").permitAll()
-                .antMatchers("/wallet/topinUsdtNotify").permitAll()
-                .antMatchers("/creator/wallet/topinUsdtAddress").permitAll()
-                .antMatchers("/wallet/withdraw/home").permitAll()
                 .antMatchers("/sysNavigateConfig/find").permitAll()
                 .anyRequest().authenticated()
                 .and()

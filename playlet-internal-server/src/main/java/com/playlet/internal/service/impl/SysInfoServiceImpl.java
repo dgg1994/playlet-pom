@@ -16,14 +16,11 @@ import com.playlet.internal.entity.system.SysInfoEntity;
 import com.playlet.internal.enums.LanguageEnums;
 import com.playlet.internal.enums.NoticeStateEnums;
 import com.playlet.internal.enums.SysConfigTypeEnums;
-import com.playlet.internal.constants.WalletSysConfigConstants;
 import com.playlet.internal.service.SysInfoService;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.HtmlSanitizeUtils;
 import com.playlet.internal.utils.I18nUtil;
-import com.playlet.internal.utils.QiniuUploadUtils;
 import com.playlet.internal.utils.StringUtils;
-import com.playlet.internal.utils.SysConfigHtmlUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -203,19 +200,7 @@ public class SysInfoServiceImpl extends BaseApiService implements SysInfoService
 		String sanitized = HtmlSanitizeUtils.rich(contentItem.getConfigContent());
 		row.setConfigContent(sanitized);
 		row.setLanguage(contentItem.getLanguage());
-		// 钱包充值介绍：包装完整 HTML 上传七牛，供 topinUsdtAddress 的 countInfo/countUrl（对齐 onetoken）
-		boolean walletCenter = WalletSysConfigConstants.WALLET_CENTER_CONFIG_TYPE == configType;
-		if (walletCenter && !StringUtils.isEmpty(sanitized)) {
-			String typeName = SysConfigTypeEnums.getType(configType);
-			String lang = contentItem.getLanguage() == null ? "" : contentItem.getLanguage();
-			String fileName = typeName + "_" + lang + ".html";
-			byte[] htmlBytes = SysConfigHtmlUtils.toFullHtmlBytes(sanitized);
-			String key = QiniuUploadUtils.uploadConfigHtml(htmlBytes, fileName);
-			row.setConfigUrl(key);
-			log.info("sys config html uploaded configType={} language={} key={}", configType, lang, key);
-		} else {
-			row.setConfigUrl(contentItem.getConfigUrl());
-		}
+		row.setConfigUrl(contentItem.getConfigUrl());
 		return row;
 	}
 

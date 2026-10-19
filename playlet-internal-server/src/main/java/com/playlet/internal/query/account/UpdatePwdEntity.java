@@ -19,10 +19,7 @@ public class UpdatePwdEntity {
 	
 	@ApiModelProperty(name = "newPassword",value = "新密码",required = true,dataType = "String")
     private String newPassword;
-	
-	@ApiModelProperty(name = "payPassword",value = "支付密码",required = true,dataType = "String")
-    private String payPassword;
-	
+
 	@ApiModelProperty(name = "emailCode",value = "邮箱验证码",required = true,dataType = "String")
 	private String emailCode;
 	

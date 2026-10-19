@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
-import com.playlet.internal.api.response.WalletUserInfoResp;
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -28,12 +27,6 @@ public class AppAccountEntity extends PageQueryHelperEntity {
 	@com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
 	@com.alibaba.fastjson.annotation.JSONField(serialize = false)
 	private String userPassword;
-	
-	@TableField("pay_password")
-	@ApiModelProperty(name = "payPassword",value = "支付密码",required = false,dataType = "String")
-	@com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
-	@com.alibaba.fastjson.annotation.JSONField(serialize = false)
-	private String payPassword;
 	
 	@TableField("user_account")
 	@ApiModelProperty(name = "userAccount",value = "账号",required = true,dataType = "String")
@@ -164,14 +157,5 @@ public class AppAccountEntity extends PageQueryHelperEntity {
 	@TableField(exist = false)
 	@ApiModelProperty(name = "likeCount",value = "获赞数",required = false,dataType = "Long")
 	private Long likeCount;
-
-	/** findToken 附带：U 卡钱包概要；未开通时为 null */
-	@TableField(exist = false)
-	@ApiModelProperty(name = "walletInfo", value = "钱包概要（余额/KYC/开卡/支付密码是否已设）", required = false)
-	private WalletUserInfoResp walletInfo;
-
-	/** 管理端 APP 用户列表：KYC 状态筛选 */
-	@TableField(exist = false)
-	private Integer kycState;
 
 }

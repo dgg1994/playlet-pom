@@ -16,6 +16,9 @@ import lombok.EqualsAndHashCode;
 
 import java.util.Date;
 
+/**
+ * 导航开启隐藏配置；库内 1/2，接口布尔仅 1 为 true。
+ */
 @Data
 @TableName("sys_navigate_config")
 @EqualsAndHashCode(callSuper = true)
@@ -34,23 +37,11 @@ public class SysNavigateConfigEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "deviceType", value = "设备类型", required = false, dataType = "String")
 	private String deviceType;
 
-	@TableField("wallet_state")
-	@JsonSerialize(using = OneAsTrueJsonSerializer.class)
-	@JsonDeserialize(using = OneAsTrueJsonDeserializer.class)
-	@ApiModelProperty(name = "walletState", value = "钱包：库值1→true，其它→false", required = false, dataType = "Boolean")
-	private Integer walletState;
-
 	@TableField("welfare_state")
 	@JsonSerialize(using = OneAsTrueJsonSerializer.class)
 	@JsonDeserialize(using = OneAsTrueJsonDeserializer.class)
 	@ApiModelProperty(name = "welfareState", value = "福利：库值1→true，其它→false", required = false, dataType = "Boolean")
 	private Integer welfareState;
-
-	@TableField("payPassword_state")
-	@JsonSerialize(using = OneAsTrueJsonSerializer.class)
-	@JsonDeserialize(using = OneAsTrueJsonDeserializer.class)
-	@ApiModelProperty(name = "payPasswordState", value = "支付密码：库值1→true，其它→false", required = false, dataType = "Boolean")
-	private Integer payPasswordState;
 
 	@TableField("site_state")
 	@JsonSerialize(using = OneAsTrueJsonSerializer.class)

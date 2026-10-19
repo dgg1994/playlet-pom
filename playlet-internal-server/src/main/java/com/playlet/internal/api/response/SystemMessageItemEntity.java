@@ -22,7 +22,7 @@ public class SystemMessageItemEntity {
 	@ApiModelProperty("发布单ID，业务直发可空")
 	private Long publishId;
 
-	@ApiModelProperty("消息类型 NOTICE/ACTIVITY/VERSION/DRAMA_ONLINE/WITHDRAW/MEDAL/ACCOUNT/WALLET")
+	@ApiModelProperty("消息类型 NOTICE/ACTIVITY/VERSION/DRAMA_ONLINE/MEDAL/ACCOUNT")
 	private String messageType;
 
 	@ApiModelProperty("标题")

@@ -55,7 +55,7 @@ public interface CreatorAuthService {
 	ResponseBase update(CreatorUpdateInfoQuery query, HttpServletRequest request);
 
 	@GetMapping("/findInfo")
-	@ApiOperation(value = "当前登录作家资料", notes = "含钱包概要 walletInfo（未开通为 null）")
+	@ApiOperation(value = "当前登录作家资料", notes = "当前登录作家资料")
 	ResponseBase findInfo(HttpServletRequest request);
 
 	@GetMapping("/signOut")

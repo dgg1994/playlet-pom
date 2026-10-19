@@ -53,9 +53,7 @@ public class SysNavigateConfigServiceImpl extends BaseApiService implements SysN
 			return setResultSuccess(configEntity, I18nUtil.getMessage("base_success"));
 		}
 		SysNavigateConfigEntity entity = new SysNavigateConfigEntity();
-		entity.setWalletState(2);
 		entity.setWelfareState(2);
-		entity.setPayPasswordState(2);
 		entity.setSiteState(2);
 		return setResultSuccess(entity, I18nUtil.getMessage("base_success"));
 	}

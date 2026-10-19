@@ -7,12 +7,10 @@ import com.playlet.internal.api.response.CreatorAccountManageItemEntity;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.creator.CreatorAccountDao;
-import com.playlet.internal.dao.welfare.UserWithdrawOrderDao;
 import com.playlet.internal.entity.creator.CreatorAccountEntity;
 import com.playlet.internal.enums.CreatorIdentityTypeEnums;
 import com.playlet.internal.enums.CreatorProfileAuditStatusEnums;
 import com.playlet.internal.enums.UserStateEnums;
-import com.playlet.internal.enums.WithdrawUserTypeEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.query.creator.CreatorAccountManageQuery;
 import com.playlet.internal.service.CreatorAccountManageService;
@@ -47,8 +45,6 @@ public class CreatorAccountManageServiceImpl implements CreatorAccountManageServ
 
 	@Autowired
 	private CreatorAccountDao creatorAccountDao;
-	@Autowired
-	private UserWithdrawOrderDao userWithdrawOrderDao;
 	@Autowired
 	private MediaUrlService mediaUrlService;
 
@@ -93,10 +89,6 @@ public class CreatorAccountManageServiceImpl implements CreatorAccountManageServ
 			long frozen = account.getFrozenCoinBalance() == null ? 0L : account.getFrozenCoinBalance();
 			if (frozen > 0) {
 				return setResultError(I18nUtil.getMessage("creator_account_frozen_balance"));
-			}
-			int pending = userWithdrawOrderDao.countProcessingByUid(id, WithdrawUserTypeEnums.CREATOR.getCode());
-			if (pending > 0) {
-				return setResultError(I18nUtil.getMessage("creator_account_withdraw_pending"));
 			}
 			int rows = creatorAccountDao.updateUserState(id, UserStateEnums.LOGOUT.getIndex());
 			if (rows <= 0) {

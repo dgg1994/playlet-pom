@@ -27,7 +27,6 @@ import com.playlet.internal.service.AppUserService;
 import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.service.support.UserActiveStatService;
 import com.playlet.internal.service.support.UserOnlineHeartbeatService;
-import com.playlet.internal.service.third.WalletUserService;
 import com.playlet.internal.utils.*;
 import com.playlet.internal.utils.oidc.OidcIdTokenPayload;
 import com.playlet.internal.utils.oidc.OidcTokenVerifier;
@@ -91,9 +90,6 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	@Autowired
 	private UserActiveStatService userActiveStatService;
 
-	@Autowired
-	private WalletUserService walletUserService;
-
 	@SuppressWarnings("deprecation")
 	@Override
 	public ResponseBase signUp(@RequestBody AppAccountEntity entity) {
@@ -133,9 +129,6 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
             account.setSetTime(new Date());
             account.setGmtModified(new Date());
             appAccountDao.insert(account);
-            // 本地账号落库后开通钱包三方用户（P0：wallet_user / wallet_account）
-            walletUserService.registerOnSignUp(WithdrawUserTypeEnums.APP.getCode(), account.getId(),
-                    account.getUserEmail(), account.getMobilePrefix(), account.getMobileNumber());
             upsertPushBind(account.getId(), account.getRegistrationId(), account.getDeviceName());
             String token = Jwts.builder()
                     // 设置主题
@@ -305,10 +298,6 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			return setResultError(I18nUtil.getMessage("user.account_null"));
 		}
 
-		// 一键登录成功后开通钱包三方用户（幂等；覆盖已有邮箱账号未开钱包的场景）
-		walletUserService.registerOnSignUp(WithdrawUserTypeEnums.APP.getCode(), account.getId(),
-				account.getUserEmail(), account.getMobilePrefix(), account.getMobileNumber());
-
 		if (binding == null) {
 			AppOauthAccountEntity row = new AppOauthAccountEntity();
 			row.setProvider(provider);
@@ -367,9 +356,6 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			//entity.setInvitationCode(RandomSuffixInviteCodeUtil.generateUniqueCode(Long.parseLong(entity.getId().toString()), 4, 6));
 			GenericityUtil.setDate(entity);
 			appAccountDao.insert(entity);
-			// 一键登录新建账号同样开通钱包
-			walletUserService.registerOnSignUp(WithdrawUserTypeEnums.APP.getCode(), entity.getId(),
-					entity.getUserEmail(), entity.getMobilePrefix(), entity.getMobileNumber());
 		} catch (Exception e) {
 			log.error("service error", e);
 			throw new RuntimeException(e);
@@ -393,7 +379,6 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			String username = userData.getName();
 			AppAccountEntity entity = appAccountDao.findByAccount(username);
 			entity.setUserPassword(null);
-			entity.setPayPassword(null);
 			entity.setGoogleSecretkey(null);
 			entity.setFollowCount(userFollowDao.countFollowing(entity.getId()));
 			entity.setFansCount(userFollowDao.countFans(entity.getId()));
@@ -405,9 +390,6 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			}
 			String avatar = entity.getAvatar();
 			entity.setAvatar(mediaUrlService.sign(avatar));
-			// C 端钱包概要并入 findToken，未开通则为 null
-			entity.setWalletInfo(walletUserService.getInfoOrNull(
-					WithdrawUserTypeEnums.APP.getCode(), entity.getId()));
 			return setResultSuccess(entity);
 		} catch (Exception e) {
 			log.error("service error", e);
