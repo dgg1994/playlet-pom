@@ -139,6 +139,8 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
                     .signWith(SignatureAlgorithm.HS512, Constants.SIGNING_KEY).compact();
             redisUtil.set(Constants.APP_PACKAGE_NAME + entity.getUserAccount(),
                     Constants.AUTH_HEADER_START_WITH + token, Constants.USER_REDIS_EXPIRE_TIME / 1000);
+			// 注册即登录：写入 last_login_time，避免久未登录清币误伤
+			appAccountDao.touchLastLoginTime(account.getId());
             return setResultSuccess(Constants.AUTH_HEADER_START_WITH + token,
                     I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
@@ -201,6 +203,8 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 				} else {
 					userActiveStatService.markActive(appUserEntity.getId());
 				}
+				// 刷新最近登录，供久未登录清币判定
+				appAccountDao.touchLastLoginTime(appUserEntity.getId());
 				return setResultSuccess(Constants.AUTH_HEADER_START_WITH + token, I18nUtil.getMessage("base_success"));
 			} else {
 				return setResultError(I18nUtil.getMessage("user.password_error"));
@@ -338,6 +342,8 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		} else {
 			userActiveStatService.markActive(account.getId());
 		}
+		// 刷新最近登录，供久未登录清币判定
+		appAccountDao.touchLastLoginTime(account.getId());
 		return setResultSuccess(Constants.AUTH_HEADER_START_WITH + token, I18nUtil.getMessage("base_success"));
 	}
 

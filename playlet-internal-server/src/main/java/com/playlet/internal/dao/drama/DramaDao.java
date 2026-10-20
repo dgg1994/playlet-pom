@@ -245,6 +245,10 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 
 	@Update("update drama set share_score = ifnull(share_score,0) + 1, gmtModified = now() where id = #{dramaId}")
 	void incrShareScore(@Param("dramaId") Integer dramaId);
+
+	/** 管理端：设置是否会员短剧 */
+	@Update("update drama set is_member_drama = #{isMemberDrama}, gmtModified = now() where id = #{dramaId}")
+	int updateMemberDrama(@Param("dramaId") Integer dramaId, @Param("isMemberDrama") Integer isMemberDrama);
 	/**
 	 * 相关作品：同标签；preferTagGroupIds 非空时在同标签集合内偏好加权。
 	 */

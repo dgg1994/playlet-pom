@@ -21,4 +21,7 @@ public interface UserPlayDailyDao extends BaseMapper<UserPlayDailyEntity> {
 	@Select("select ifnull(sum(play_seconds), 0) from user_play_daily "
 			+ "where biz_date >= #{startDate} and biz_date <= #{endDate}")
 	long sumPlaySeconds(@Param("startDate") String startDate, @Param("endDate") String endDate);
+
+	@Select("select ifnull(sum(play_seconds), 0) from user_play_daily where uid = #{uid}")
+	long sumPlaySecondsByUid(@Param("uid") Integer uid);
 }

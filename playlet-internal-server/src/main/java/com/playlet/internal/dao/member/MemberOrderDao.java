@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -29,4 +30,12 @@ public interface MemberOrderDao extends BaseMapper<MemberOrderEntity> {
 			+ "order by id desc"
 			+ "</script>")
 	List<MemberOrderEntity> findAdminList(MemberOrderEntity entity);
+
+	@Select("select ifnull(sum(pay_amount), 0) from member_order "
+			+ "where uid = #{uid} and pay_status = 1")
+	BigDecimal sumPaidAmountByUid(@Param("uid") Integer uid);
+
+	@Select("select * from member_order where uid = #{uid} and pay_status = 1 "
+			+ "order by id desc")
+	List<MemberOrderEntity> findPaidByUid(@Param("uid") Integer uid);
 }

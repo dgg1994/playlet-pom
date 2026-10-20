@@ -86,6 +86,10 @@ public class AppAccountEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "nickname",value = "昵称",required = false,dataType = "String")
 	private String nickname;
 
+	@TableField("real_name")
+	@ApiModelProperty(name = "realName", value = "实名姓名", required = false, dataType = "String")
+	private String realName;
+
 	@TableField("avatar")
 	@ApiModelProperty(name = "avatar",value = "头像URL",required = false,dataType = "String")
 	private String avatar;
@@ -101,6 +105,10 @@ public class AppAccountEntity extends PageQueryHelperEntity {
 	@TableField("last_login_time")
 	@ApiModelProperty(name = "lastLoginTime", value = "最近登录时间，用于久未登录清币", required = false, dataType = "Date")
 	private Date lastLoginTime;
+
+	@TableField("mute_until")
+	@ApiModelProperty(name = "muteUntil", value = "禁言截止时间；空=未禁言", required = false, dataType = "Date")
+	private Date muteUntil;
 
 	@TableField("gender")
 	@ApiModelProperty(name = "gender", value = "性别：0未知 1男 2女", required = false, dataType = "Integer")

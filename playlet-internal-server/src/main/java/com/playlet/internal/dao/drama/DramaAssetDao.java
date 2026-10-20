@@ -121,6 +121,26 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 			+ "and ifnull(delete_state, 0) = 0 and shelf_status = 1 and video_status = 1 limit 1")
 	DramaAssetEntity findOnShelfById(@Param("id") Integer id);
 
+	/** 管理端：配置单集解锁类型与价格 */
+	@Update("update drama_asset set unlock_type = #{unlockType}, "
+			+ "price_coin = #{priceCoin}, price_yuan = #{priceYuan}, gmtModified = now() "
+			+ "where id = #{id} and ifnull(delete_state, 0) = 0")
+	int updateUnlockConfig(@Param("id") Integer id,
+			@Param("unlockType") Integer unlockType,
+			@Param("priceCoin") Integer priceCoin,
+			@Param("priceYuan") java.math.BigDecimal priceYuan);
+
+	/** 管理端：按剧+集序号批量配置解锁 */
+	@Update("update drama_asset set unlock_type = #{unlockType}, "
+			+ "price_coin = #{priceCoin}, price_yuan = #{priceYuan}, gmtModified = now() "
+			+ "where drama_id = #{dramaId} and ifnull(delete_state, 0) = 0 "
+			+ "and set_num >= #{fromSetNum}")
+	int batchUpdateUnlockFromSetNum(@Param("dramaId") Integer dramaId,
+			@Param("fromSetNum") Integer fromSetNum,
+			@Param("unlockType") Integer unlockType,
+			@Param("priceCoin") Integer priceCoin,
+			@Param("priceYuan") java.math.BigDecimal priceYuan);
+
 	/** C 端下载：仅已上架集 */
 	@Select("<script>"
 			+ "select id, video_url as videoUrl from drama_asset where id in "
