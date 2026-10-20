@@ -71,6 +71,10 @@ public class MemberProductManageServiceImpl implements MemberProductManageServic
 			if (entity.getPriceCoin() == null) {
 				entity.setPriceCoin(0);
 			}
+			// 未填原价时默认与售价一致，列表仍可展示划线价
+			if (entity.getOriginalPrice() == null && entity.getPriceYuan() != null) {
+				entity.setOriginalPrice(entity.getPriceYuan());
+			}
 			GenericityUtil.setDate(entity);
 			try {
 				memberProductDao.insert(entity);
@@ -176,6 +180,14 @@ public class MemberProductManageServiceImpl implements MemberProductManageServic
 		}
 		if (entity.getPriceYuan() != null && entity.getPriceYuan().compareTo(BigDecimal.ZERO) < 0) {
 			return "priceYuan 不能为负";
+		}
+		if (entity.getOriginalPrice() != null && entity.getOriginalPrice().compareTo(BigDecimal.ZERO) < 0) {
+			return "originalPrice 不能为负";
+		}
+		// 有原价且有售价时，原价须 >= 售价
+		boolean bothPricePresent = entity.getOriginalPrice() != null && entity.getPriceYuan() != null;
+		if (bothPricePresent && entity.getOriginalPrice().compareTo(entity.getPriceYuan()) < 0) {
+			return "originalPrice 不能小于 priceYuan";
 		}
 		if (entity.getPriceCoin() != null && entity.getPriceCoin() < 0) {
 			return "priceCoin 不能为负";

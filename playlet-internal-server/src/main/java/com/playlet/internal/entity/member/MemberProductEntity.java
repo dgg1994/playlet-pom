@@ -38,6 +38,10 @@ public class MemberProductEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "durationDays", value = "有效天数", dataType = "Integer")
 	private Integer durationDays;
 
+	@TableField("original_price")
+	@ApiModelProperty(name = "originalPrice", value = "划线原价(元)", dataType = "BigDecimal")
+	private BigDecimal originalPrice;
+
 	@TableField("price_yuan")
 	@ApiModelProperty(name = "priceYuan", value = "现金售价(元)", dataType = "BigDecimal")
 	private BigDecimal priceYuan;
