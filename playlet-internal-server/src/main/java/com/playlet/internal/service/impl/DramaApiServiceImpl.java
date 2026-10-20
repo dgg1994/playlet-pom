@@ -29,6 +29,7 @@ import com.playlet.internal.api.response.VideoPlayUrlResp;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
+import com.playlet.internal.constants.EpisodeUnlockConstants;
 import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.TagEntity;
@@ -46,6 +47,8 @@ import com.playlet.internal.api.response.RecommendPageRespEntity;
 import com.playlet.internal.api.response.RecommendVidoeRespEntity;
 import com.playlet.internal.service.DramaApiService;
 import com.playlet.internal.service.MediaUrlService;
+import com.playlet.internal.service.support.EpisodePlayAccessResult;
+import com.playlet.internal.service.support.EpisodePlayAccessSupport;
 import com.playlet.internal.service.support.WatchPreferMatchSupport;
 import com.playlet.internal.utils.AppTokenUtil;
 import com.playlet.internal.utils.I18nUtil;
@@ -81,6 +84,9 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
 
     @Autowired
     private WatchPreferMatchSupport watchPreferMatchSupport;
+
+    @Autowired
+    private EpisodePlayAccessSupport episodePlayAccessSupport;
 
     @Override
     public ResponseBase recommend(@RequestBody RecommendDramaQuery entity, HttpServletRequest request) {
@@ -220,6 +226,8 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
                 for (DramaAssetRespEntity item : list) {
                     item.setIsLike(PublicEnums.ZERO.getIndex());
                     item.setIsCollect(PublicEnums.ZERO.getIndex());
+                    // 未登录也回填播放策略（免费可播，其余标 NEED_LOGIN）
+                    fillPlayAccessOnSelection(item, null);
                 }
                 return setResultSuccess(list, I18nUtil.getMessage("base_success"));
             }
@@ -239,6 +247,7 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
                 item.setIsLike(likedEpisodeIds.contains(String.valueOf(item.getId()))
                         ? PublicEnums.ONE.getIndex() : PublicEnums.ZERO.getIndex());
                 item.setIsCollect(isCollect);
+                fillPlayAccessOnSelection(item, uid);
             }
             return setResultSuccess(list, I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
@@ -248,10 +257,15 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
     }
 
     @Override
-    public ResponseBase getVideoUrl(Integer id) {
+    public ResponseBase getVideoUrl(Integer id, HttpServletRequest request) {
         try {
             if (id == null) {
                 return setResultError(I18nUtil.getMessage("base_error"));
+            }
+            Integer uid = AppTokenUtil.resolveUid(request);
+            EpisodePlayAccessResult access = episodePlayAccessSupport.resolve(uid, id);
+            if (!access.isCanPlay()) {
+                return setResultError(resolvePlayBlockMessage(access.getBlockReason()));
             }
             String keyOrUrl = dramaAssetDao.findVideoUrl(id);
             if (StringUtils.isEmpty(keyOrUrl)) {
@@ -266,7 +280,8 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
     }
 
     @Override
-    public ResponseBase getVideoDownloadUrl(@Valid @RequestBody BatchVideoDownloadQuery query) {
+    public ResponseBase getVideoDownloadUrl(@Valid @RequestBody BatchVideoDownloadQuery query,
+            HttpServletRequest request) {
         try {
             if (query == null || query.getIds() == null || query.getIds().isEmpty()
                     || StringUtils.isEmpty(query.getDefinition())) {
@@ -276,6 +291,7 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             if (definition == null) {
                 return setResultError(I18nUtil.getMessage("video_definition_invalid"));
             }
+            Integer uid = AppTokenUtil.resolveUid(request);
             // 去重并保持入参顺序
             List<Integer> ids = new ArrayList<>();
             for (Integer id : query.getIds()) {
@@ -299,6 +315,11 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             for (Integer id : ids) {
                 String keyOrUrl = urlMap.get(id);
                 if (StringUtils.isEmpty(keyOrUrl)) {
+                    continue;
+                }
+                // 未解锁不签发下载地址
+                EpisodePlayAccessResult access = episodePlayAccessSupport.resolve(uid, id);
+                if (!access.isCanPlay()) {
                     continue;
                 }
                 VideoDownloadUrlResp item = buildDownloadUrlByDefinition(id, keyOrUrl, definition);
@@ -491,16 +512,23 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
     }
 
     @Override
-    public ResponseBase playVideo(Integer id) {
+    public ResponseBase playVideo(Integer id, HttpServletRequest request) {
         try {
+            Integer uid = AppTokenUtil.resolveUid(request);
             RecommendDramaRespEntity dramaRes = dramaDao.findById(id);
             if (dramaRes != null) {
                 dramaRes.setCoverUrl(mediaUrlService.sign(dramaRes.getCoverUrl()));
                 RecommendVidoeRespEntity vidoeRes = dramaAssetDao.findDramaIdOne(dramaRes.getId(), DeleteStateEnum.NORMAL.getIndex());
-                vidoeRes.setCollectScore(dramaRes.getCollectScore());
-                vidoeRes.setShareScore(dramaRes.getShareScore());
-                if (vidoeRes.getVideoUrl() != null) {
-                    vidoeRes.setVideoUrl(mediaUrlService.signVideo(vidoeRes.getVideoUrl()));
+                if (vidoeRes != null) {
+                    vidoeRes.setCollectScore(dramaRes.getCollectScore());
+                    vidoeRes.setShareScore(dramaRes.getShareScore());
+                    // 未解锁不签发播放地址
+                    EpisodePlayAccessResult access = episodePlayAccessSupport.resolve(uid, vidoeRes.getId());
+                    if (access.isCanPlay() && vidoeRes.getVideoUrl() != null) {
+                        vidoeRes.setVideoUrl(mediaUrlService.signVideo(vidoeRes.getVideoUrl()));
+                    } else {
+                        vidoeRes.setVideoUrl(null);
+                    }
                 }
                 dramaRes.setVidoeRes(vidoeRes);
             }
@@ -509,6 +537,40 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             log.error("service error", e);
             throw new RuntimeException(e);
         }
+    }
+
+    /** 选集列表回填 canPlay / blockReason */
+    private void fillPlayAccessOnSelection(DramaAssetRespEntity item, Integer uid) {
+        if (item == null || item.getId() == null) {
+            return;
+        }
+        DramaAssetEntity probe = new DramaAssetEntity();
+        probe.setId(item.getId());
+        probe.setDramaId(item.getDramaId());
+        probe.setSetNum(item.getSetNum());
+        probe.setUnlockType(item.getUnlockType());
+        probe.setPriceCoin(item.getPriceCoin());
+        probe.setPriceYuan(item.getPriceYuan());
+        EpisodePlayAccessResult access = episodePlayAccessSupport.resolve(uid, probe);
+        item.setCanPlay(access.isCanPlay());
+        item.setUnlocked(access.isUnlocked());
+        item.setBlockReason(access.getBlockReason());
+    }
+
+    private String resolvePlayBlockMessage(String blockReason) {
+        if (EpisodeUnlockConstants.BLOCK_NEED_LOGIN.equals(blockReason)) {
+            return I18nUtil.getMessage("login_required");
+        }
+        if (EpisodeUnlockConstants.BLOCK_NEED_MEMBER.equals(blockReason)) {
+            return I18nUtil.getMessage("episode.need_member");
+        }
+        if (EpisodeUnlockConstants.BLOCK_NEED_AD.equals(blockReason)) {
+            return I18nUtil.getMessage("episode.need_ad");
+        }
+        if (EpisodeUnlockConstants.BLOCK_NEED_PAY.equals(blockReason)) {
+            return I18nUtil.getMessage("episode.need_pay");
+        }
+        return I18nUtil.getMessage("video_not_up");
     }
 
 

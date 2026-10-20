@@ -1,10 +1,14 @@
 package com.playlet.internal.api.response;
 
+import java.math.BigDecimal;
 import java.util.Date;
 
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
+/**
+ * C 端选集/集列表项。
+ */
 @Data
 public class DramaAssetRespEntity {
 
@@ -76,5 +80,22 @@ public class DramaAssetRespEntity {
 	
 	@ApiModelProperty(name = "isCollect",value = "是否收藏 1是0否",required = true,dataType = "String")
 	private Integer isCollect;
-	
+
+	@ApiModelProperty(name = "unlockType", value = "0免费 1广告解锁 2付费解锁", required = false, dataType = "Integer")
+	private Integer unlockType;
+
+	@ApiModelProperty(name = "priceCoin", value = "付费解锁金币价", required = false, dataType = "Integer")
+	private Integer priceCoin;
+
+	@ApiModelProperty(name = "priceYuan", value = "付费解锁现金价(元)", required = false, dataType = "BigDecimal")
+	private BigDecimal priceYuan;
+
+	@ApiModelProperty(name = "canPlay", value = "当前用户是否可播", required = false, dataType = "Boolean")
+	private Boolean canPlay;
+
+	@ApiModelProperty(name = "unlocked", value = "是否已解锁", required = false, dataType = "Boolean")
+	private Boolean unlocked;
+
+	@ApiModelProperty(name = "blockReason", value = "不可播原因 NEED_LOGIN/NEED_MEMBER/NEED_AD/NEED_PAY", required = false)
+	private String blockReason;
 }

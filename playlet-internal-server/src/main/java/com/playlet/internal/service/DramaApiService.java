@@ -42,19 +42,19 @@ public interface DramaApiService {
 	/**
 	 * @category 获取视频播放地址（多码率）
 	 * @param id drama_asset.id
-	 * @return data.streams 为 360/480/720/1080 各路签名地址；默认播 defaultDefinition
+	 * @return data.streams 为 360/480/720/1080 各路签名地址；默认播 defaultDefinition；未解锁不返回地址
 	 */
 	@GetMapping("/getVideoUrl")
-	ResponseBase getVideoUrl(Integer id);
+	ResponseBase getVideoUrl(Integer id, HttpServletRequest request);
 
 	/**
 	 * @category 批量获取指定分辨率视频下载地址
-	 * @return data 为数组，每项含 assetId + path + downloadUrl
+	 * @return data 为数组，每项含 assetId + path + downloadUrl；仅返回当前用户可播的集
 	 */
 	@PostMapping("/getVideoDownloadUrl")
 	@ApiOperation(value = "批量获取指定分辨率下载地址",
-			notes = "body: {\"ids\":[1,2,3],\"definition\":\"720\"}；命名约定 {prefix}_{definition}.mp4")
-	ResponseBase getVideoDownloadUrl(BatchVideoDownloadQuery query);
+			notes = "body: {\"ids\":[1,2,3],\"definition\":\"720\"}；命名约定 {prefix}_{definition}.mp4；未解锁集会被过滤")
+	ResponseBase getVideoDownloadUrl(BatchVideoDownloadQuery query, HttpServletRequest request);
 	
 	/**
 	 * @category 作品详情
@@ -72,12 +72,11 @@ public interface DramaApiService {
 	ResponseBase relatedWork(Integer id, HttpServletRequest request);
 	
 	/**
-	 * @category 开始播放查询第一集播放地址
-	 * @param id
-	 * @return
+	 * @category 开始播放查询第一集播放地址（未解锁则不签发 videoUrl）
+	 * @param id 剧ID
 	 */
 	@GetMapping("/playVideo")
-	ResponseBase playVideo(Integer id);
+	ResponseBase playVideo(Integer id, HttpServletRequest request);
 	
 	/**
 	 * @category 获取视频详情
