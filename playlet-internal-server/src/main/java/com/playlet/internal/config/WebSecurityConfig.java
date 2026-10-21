@@ -82,8 +82,6 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
                 .antMatchers("/configuration/ui").permitAll()
                 .antMatchers("/configuration/security").permitAll()
                 .antMatchers( "/*.html","/**/*.html","/**/*.css", "/**/*.js","/webSocket/**").permitAll()
-               
-                .antMatchers("/sysNavigateConfig/find").permitAll()
                 .anyRequest().authenticated()
                 .and()
                 .logout()
