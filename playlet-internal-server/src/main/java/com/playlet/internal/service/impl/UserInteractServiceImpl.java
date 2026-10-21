@@ -31,7 +31,6 @@ import com.playlet.internal.enums.PublicEnums;
 import com.playlet.internal.query.drama.InteractMessageQuery;
 import com.playlet.internal.service.DramaRankStatService;
 import com.playlet.internal.service.MediaUrlService;
-import com.playlet.internal.service.MedalProgressService;
 import com.playlet.internal.service.PushNotifyService;
 import com.playlet.internal.service.UserInteractService;
 import com.playlet.internal.service.WelfareTaskService;
@@ -93,8 +92,6 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 	@Autowired
 	private MediaUrlService mediaUrlService;
 	@Autowired
-	private MedalProgressService medalProgressService;
-	@Autowired
 	private PushNotifyService pushNotifyService;
 	@Autowired
 	private DramaVideoCommentDao dramaVideoCommentDao;
@@ -126,11 +123,6 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 			dramaDao.incrCollectScore(dramaId);
 			dramaRankStatService.onCollect(dramaId, 1);
 			cacheCollect(uid, dramaId, true);
-			try {
-				medalProgressService.onAction(uid, WelfareActionTypeEnums.COLLECT, 1, String.valueOf(dramaId));
-			} catch (Exception e) {
-				log.warn("medal collect progress failed: {}", e.getMessage());
-			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -365,11 +357,6 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
             } catch (Exception e) {
                 log.warn("welfare share progress failed: {}", e.getMessage());
             }
-            try {
-                medalProgressService.onAction(uid, WelfareActionTypeEnums.SHARE, 1, String.valueOf(dramaId));
-            } catch (Exception e) {
-                log.warn("medal share progress failed: {}", e.getMessage());
-            }
             return setResultSuccess(I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -424,12 +411,6 @@ public class UserInteractServiceImpl extends BaseApiService implements UserInter
 			}
 			pushLikeInteractMessage(uid, drama, likeType, ep);
 			cacheLike(uid, dramaId, likeType, ep, true);
-			try {
-				medalProgressService.onAction(uid, WelfareActionTypeEnums.LIKE, 1,
-						dramaId + ":" + likeType + ":" + ep);
-			} catch (Exception e) {
-				log.warn("medal like progress failed: {}", e.getMessage());
-			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			throw new RuntimeException(e);

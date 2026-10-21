@@ -31,14 +31,7 @@ public enum PushTemplateEnums {
 	INTERACT_DEFAULT(
 			t("{0} 与你互动了", "{0} interacted with you", "{0} 與你互動了", "{0} seninle etkileşime geçti",
 					"{0}님이 회원님과 상호작용했습니다", "{0}さんがあなたと交流しました",
-					"{0} আপনার সাথে ইন্টারঅ্যাক্ট করেছেন", "{0} interagiu com você")),
-	MEDAL_TITLE(
-			t("勋章解锁", "Medal Unlocked", "勳章解鎖", "Madalya Açıldı",
-					"메달 해제", "メダル解除", "পদক আনলক", "Medalha Desbloqueada")),
-	MEDAL_UNLOCK(
-			t("恭喜解锁勋章：{0}", "Unlocked medal: {0}", "恭喜解鎖勳章：{0}", "Madalya açıldı: {0}",
-					"메달을 해제했습니다: {0}", "メダルを解除しました：{0}",
-					"পদক আনলক হয়েছে: {0}", "Medalha desbloqueada: {0}"));
+					"{0} আপনার সাথে ইন্টারঅ্যাক্ট করেছেন", "{0} interagiu com você"));
 
 	private final Map<LanguageEnums, String> texts;
 

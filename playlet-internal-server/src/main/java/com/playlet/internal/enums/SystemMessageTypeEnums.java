@@ -8,7 +8,6 @@ public enum SystemMessageTypeEnums {
 	ACTIVITY("ACTIVITY", "活动"),
 	VERSION("VERSION", "版本说明"),
 	DRAMA_ONLINE("DRAMA_ONLINE", "剧上线"),
-	MEDAL("MEDAL", "勋章"),
 	ACCOUNT("ACCOUNT", "账户");
 
 	private final String code;

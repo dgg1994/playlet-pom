@@ -66,7 +66,7 @@ public interface AppUserService {
 
     @PostMapping("/bindPush")
     @ApiOperation(value = "绑定极光推送", notes = "无需登录。App 启动后上报 cid 或 registrationId；可选 deviceName。"
-			+ "已登录时会同时写入账号 registration_id，并从请求头 language 写入 push_langue，便于互动/勋章/系统消息按接收人语言推送。", response = ResponseBase.class)
+			+ "已登录时会同时写入账号 registration_id，并从请求头 language 写入 push_langue，便于互动/系统消息按接收人语言推送。", response = ResponseBase.class)
     ResponseBase bindPush(BindPushQuery entity, HttpServletRequest request);
 
 	@GetMapping("/getPushSwitch")
@@ -76,7 +76,7 @@ public interface AppUserService {
 
 	@PostMapping("/setPushSwitch")
 	@ApiOperation(value = "设置极光推送开关", notes = "无需登录。body: {\"registrationId\"|\"cid\", \"enabled\":1|0}。"
-			+ "按极光设备 ID 写入 app_push_device.push_enabled；关闭后该设备不再收互动/勋章/系统消息等极光通知。",
+			+ "按极光设备 ID 写入 app_push_device.push_enabled；关闭后该设备不再收互动/系统消息等极光通知。",
 			response = ResponseBase.class)
 	ResponseBase setPushSwitch(PushSwitchQuery entity) throws InvocationTargetException, IllegalAccessException;
 

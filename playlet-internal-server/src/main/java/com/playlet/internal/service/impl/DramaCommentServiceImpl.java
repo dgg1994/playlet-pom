@@ -53,8 +53,6 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 	@Autowired
 	private DramaCommentLikeDao dramaCommentLikeDao;
 	@Autowired
-	private MedalProgressService medalProgressService;
-	@Autowired
 	private UserInteractMessageDao userInteractMessageDao;
 	@Autowired
 	private PushNotifyService pushNotifyService;
@@ -136,12 +134,6 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 					entity.getCommentInfo(),
 					"comment:" + entity.getId());
 			refreshDramaScoreNum(createPay.getDramaId());
-			try {
-				medalProgressService.onAction(createPay.getUserId(), WelfareActionTypeEnums.COMMENT, 1,
-						"review:" + entity.getId());
-			} catch (Exception e) {
-				throw new RuntimeException(e);
-			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			log.error("service error", e);
@@ -201,12 +193,6 @@ public class DramaCommentServiceImpl extends BaseApiService implements DramaComm
 					entity.getDramaId(),
 					entity.getCommentInfo(),
 					"reply:" + entity.getId());
-			try {
-				medalProgressService.onAction(createPay.getUserId(), WelfareActionTypeEnums.COMMENT, 1,
-						String.valueOf(entity.getId()));
-			} catch (Exception e) {
-				// ignore medal failure
-			}
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			log.error("service error", e);

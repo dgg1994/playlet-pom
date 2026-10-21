@@ -35,8 +35,4 @@ public interface PushNotifyService {
 	void notifyInteract(Integer toUid, Integer fromUid, String messageType,
 			Long messageId, Integer dramaId, String episodeId);
 
-	/**
-	 * 勋章解锁推送（文案按接收人 push_langue + PushTemplateEnums）
-	 */
-	void notifyMedalUnlock(Integer toUid, Integer medalId, String medalName);
 }

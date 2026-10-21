@@ -13,9 +13,7 @@ import com.playlet.internal.enums.CommentTypeEnums;
 import com.playlet.internal.enums.DeleteStateEnum;
 import com.playlet.internal.enums.InteractMessageTypeEnums;
 import com.playlet.internal.enums.PublicEnums;
-import com.playlet.internal.enums.WelfareActionTypeEnums;
 import com.playlet.internal.service.CommentModerationService;
-import com.playlet.internal.service.MedalProgressService;
 import com.playlet.internal.service.PushNotifyService;
 import com.playlet.internal.utils.GenericityUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -42,8 +40,6 @@ public class CommentModerationServiceImpl implements CommentModerationService {
 	private UserInteractMessageDao userInteractMessageDao;
 	@Autowired
 	private PushNotifyService pushNotifyService;
-	@Autowired
-	private MedalProgressService medalProgressService;
 
 	@Override
 	public void approveHiddenComment(IllegalCommentRecordEntity record) throws Exception {
@@ -75,8 +71,6 @@ public class CommentModerationServiceImpl implements CommentModerationService {
 						comment.getId(), null, comment.getDramaId(), null,
 						comment.getCommentInfo(), "comment:" + comment.getId());
 				refreshDramaScoreNum(comment.getDramaId());
-				medalProgressService.onAction(comment.getUserId(), WelfareActionTypeEnums.COMMENT, 1,
-						"review:" + comment.getId());
 			} else {
 				incrementParentReplyCount(comment.getParentId());
 				DramaVideoCommentEntity parent = dramaVideoCommentDao.selectById(comment.getParentId());
@@ -85,8 +79,6 @@ public class CommentModerationServiceImpl implements CommentModerationService {
 						InteractMessageTypeEnums.REPLY_DRAMA.getCode(),
 						comment.getId(), parent == null ? null : parent.getId(),
 						comment.getDramaId(), null, comment.getCommentInfo(), "reply:" + comment.getId());
-				medalProgressService.onAction(comment.getUserId(), WelfareActionTypeEnums.COMMENT, 1,
-						String.valueOf(comment.getId()));
 			}
 			return;
 		}
@@ -94,14 +86,12 @@ public class CommentModerationServiceImpl implements CommentModerationService {
 		addDiscussScoreForVideo(comment);
 		if (isTopLevel) {
 			DramaEntity drama = dramaDao.selectById(comment.getDramaId());
-				pushInteractMessage(comment.getUserId(),
-						drama == null ? null : drama.getBelongUser(),
-						InteractMessageTypeEnums.COMMENT_VIDEO.getCode(),
-						comment.getId(), null, comment.getDramaId(),
-						toEpisodeId(comment.getVideoId()),
-						comment.getCommentInfo(), "video_comment:" + comment.getId());
-			medalProgressService.onAction(comment.getUserId(), WelfareActionTypeEnums.COMMENT, 1,
-					String.valueOf(comment.getId()));
+			pushInteractMessage(comment.getUserId(),
+					drama == null ? null : drama.getBelongUser(),
+					InteractMessageTypeEnums.COMMENT_VIDEO.getCode(),
+					comment.getId(), null, comment.getDramaId(),
+					toEpisodeId(comment.getVideoId()),
+					comment.getCommentInfo(), "video_comment:" + comment.getId());
 		} else {
 			incrementParentReplyCount(comment.getParentId());
 			DramaVideoCommentEntity parent = dramaVideoCommentDao.selectById(comment.getParentId());
@@ -111,8 +101,6 @@ public class CommentModerationServiceImpl implements CommentModerationService {
 					comment.getId(), parent == null ? null : parent.getId(),
 					comment.getDramaId(), toEpisodeId(comment.getVideoId()),
 					comment.getCommentInfo(), "video_reply:" + comment.getId());
-			medalProgressService.onAction(comment.getUserId(), WelfareActionTypeEnums.COMMENT, 1,
-					String.valueOf(comment.getId()));
 		}
 	}
 

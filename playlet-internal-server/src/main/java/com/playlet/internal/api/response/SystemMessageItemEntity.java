@@ -37,7 +37,7 @@ public class SystemMessageItemEntity {
 	@ApiModelProperty("关联短剧ID，无则空")
 	private Integer dramaId;
 
-	@ApiModelProperty("跳转类型 none/drama/url/page/withdraw/medal")
+	@ApiModelProperty("跳转类型 none/drama/url/page/withdraw")
 	private String jumpType;
 
 	@ApiModelProperty("跳转参数 JSON，如 {\"dramaId\":100}")

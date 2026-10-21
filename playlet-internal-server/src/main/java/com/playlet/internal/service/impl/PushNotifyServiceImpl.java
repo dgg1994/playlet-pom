@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 
 import static com.playlet.internal.constants.PushConstants.BIZ_INTERACT;
-import static com.playlet.internal.constants.PushConstants.BIZ_MEDAL;
 import static com.playlet.internal.constants.PushConstants.JPUSH_REG_BATCH;
 
 @Slf4j
@@ -188,29 +187,6 @@ public class PushNotifyServiceImpl implements PushNotifyService {
 		sendToRegistrationIds(Collections.singletonList(registrationId), title, content, extras);
 	}
 
-	@Override
-	public void notifyMedalUnlock(Integer toUid, Integer medalId, String medalName) {
-		if (toUid == null || medalId == null) {
-			return;
-		}
-		AppAccountEntity toAccount = appAccountDao.findByUid(toUid);
-		String langue = resolvePushLangue(toAccount);
-		String name = StringUtils.isEmpty(medalName) ? "" : medalName;
-		String title = PushTemplateEnums.MEDAL_TITLE.format(langue);
-		String content = PushTemplateEnums.MEDAL_UNLOCK.format(langue, name);
-		Map<String, Object> extras = new HashMap<>();
-		extras.put("bizType", BIZ_MEDAL);
-		extras.put("medalId", String.valueOf(medalId));
-		String registrationId = resolveRegistrationId(toUid, toAccount);
-		if (StringUtils.isEmpty(registrationId)) {
-			return;
-		}
-		if (!isDevicePushEnabled(registrationId)) {
-			log.debug("skip medal push: device disabled, toUid={}", toUid);
-			return;
-		}
-		sendToRegistrationIds(Collections.singletonList(registrationId), title, content, extras);
-	}
 
 	/**
 	 * 构建互动消息内容

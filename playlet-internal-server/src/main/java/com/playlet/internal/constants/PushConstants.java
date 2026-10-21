@@ -10,8 +10,6 @@ public final class PushConstants {
 
 	/** extras.bizType：互动消息 */
 	public static final String BIZ_INTERACT = "INTERACT";
-	/** extras.bizType：勋章 */
-	public static final String BIZ_MEDAL = "MEDAL";
 	/** extras.bizType：系统消息 */
 	public static final String BIZ_SYSTEM = "SYSTEM";
 

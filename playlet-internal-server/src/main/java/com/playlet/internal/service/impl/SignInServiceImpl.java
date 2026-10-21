@@ -10,7 +10,6 @@ import com.playlet.internal.dao.welfare.*;
 import com.playlet.internal.entity.account.AppAccountEntity;
 import com.playlet.internal.entity.welfare.*;
 import com.playlet.internal.enums.*;
-import com.playlet.internal.service.MedalProgressService;
 import com.playlet.internal.service.SignInService;
 import com.playlet.internal.utils.AppTokenUtil;
 import com.playlet.internal.utils.GenericityUtil;
@@ -61,8 +60,6 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
     private UserCoinLedgerDao userCoinLedgerDao;
     @Autowired
     private AppAccountDao appAccountDao;
-    @Autowired
-    private MedalProgressService medalProgressService;
 
     @Override
     public ResponseBase signIn(HttpServletRequest request) {
@@ -73,12 +70,6 @@ public class SignInServiceImpl extends BaseApiService implements SignInService {
         SignInOpResult result = doSignIn(uid);
         if (!result.isOk()) {
             return setResultError(I18nUtil.getMessage(result.getMsgKey()));
-        }
-        try {
-            medalProgressService.onAction(uid, WelfareActionTypeEnums.SIGN_IN, 1,
-                    java.time.LocalDate.now().toString());
-        } catch (Exception e) {
-            log.warn("medal signIn progress failed: {}", e.getMessage());
         }
         return setResultSuccess(result.getSummary(), I18nUtil.getMessage("base_success"));
     }
