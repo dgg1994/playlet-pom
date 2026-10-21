@@ -6,6 +6,7 @@ import com.playlet.internal.dao.security.IllegalCommentRecordDao;
 import com.playlet.internal.entity.security.IllegalCommentRecordEntity;
 import com.playlet.internal.security.sensitive.SensitiveMatch;
 import com.playlet.internal.service.SensitiveRecordService;
+import com.playlet.internal.utils.GenericityUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,9 +45,12 @@ public class SensitiveRecordServiceImpl implements SensitiveRecordService {
 			entity.setRiskLevel(result.getLevel());
 			entity.setStatus(0);
 			entity.setSourceType(dto.getSourceType());
+			// 补齐创建/更新时间
+			GenericityUtil.setDate(entity);
 			illegalCommentRecordDao.insert(entity);
 		} catch (Exception e) {
-			log.warn("save illegal comment record failed: {}", e.getMessage());
+			log.error("save illegal comment record failed userId={} dramaId={}",
+					dto.getUserId(), dto.getDramaId(), e);
 		}
 	}
 }

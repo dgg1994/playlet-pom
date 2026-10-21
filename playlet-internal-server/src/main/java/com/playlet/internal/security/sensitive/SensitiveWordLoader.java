@@ -1,6 +1,5 @@
 package com.playlet.internal.security.sensitive;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.playlet.internal.dao.security.SensitiveWordDao;
 import com.playlet.internal.entity.security.SensitiveWordEntity;
 import lombok.extern.slf4j.Slf4j;
@@ -11,7 +10,7 @@ import javax.annotation.Resource;
 import java.util.List;
 
 /**
- * 从数据库加载敏感词，构建 DFA Trie。
+ * 从数据库加载「已生效」敏感词，构建 DFA Trie。
  */
 @Slf4j
 @Component
@@ -22,7 +21,8 @@ public class SensitiveWordLoader {
 
 	public SensitiveNode load() {
 		SensitiveNode root = new SensitiveNode();
-		List<SensitiveWordEntity> list = sensitiveWordDao.selectList(new QueryWrapper<>());
+		// 仅 status=已生效 进生产词库，待审/驳回/禁用不参与过滤
+		List<SensitiveWordEntity> list = sensitiveWordDao.findActiveList();
 		int count = 0;
 		if (list != null) {
 			for (SensitiveWordEntity entity : list) {
