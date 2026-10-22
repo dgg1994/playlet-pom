@@ -19,4 +19,7 @@ public class ProductReqEntity {
 
 	@ApiModelProperty(value = "现金渠道：WECHAT / ALIPAY / BANK；payType=CASH 时必填")
 	private String payChannel;
+
+	@ApiModelProperty(value = "用户持券ID（user_coupon.id）；可选，不传则原价")
+	private Integer userCouponId;
 }

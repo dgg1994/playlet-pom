@@ -55,4 +55,10 @@ public class UserCouponItemEntity {
 
 	@ApiModelProperty("领取时间")
 	private Date setTime;
+
+	@ApiModelProperty("本单可减免（仅 available 接口）")
+	private BigDecimal discountAmt;
+
+	@ApiModelProperty("本单应付（仅 available 接口）")
+	private BigDecimal payAmount;
 }

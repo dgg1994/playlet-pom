@@ -58,6 +58,14 @@ public class MemberOrderEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "payCoin", value = "金币实付数量", dataType = "Integer")
 	private Integer payCoin;
 
+	@TableField("user_coupon_id")
+	@ApiModelProperty(name = "userCouponId", value = "使用的持券ID", dataType = "Integer")
+	private Integer userCouponId;
+
+	@TableField("discount_amt")
+	@ApiModelProperty(name = "discountAmt", value = "优惠减免（元或金币，与 payType 一致）", dataType = "BigDecimal")
+	private BigDecimal discountAmt;
+
 	@TableField("pay_channel")
 	@ApiModelProperty(name = "payChannel", value = "现金渠道 WECHAT/ALIPAY/BANK；金币支付可空", dataType = "String")
 	private String payChannel;

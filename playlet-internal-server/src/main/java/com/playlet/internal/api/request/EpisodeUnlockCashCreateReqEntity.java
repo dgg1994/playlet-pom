@@ -16,4 +16,7 @@ public class EpisodeUnlockCashCreateReqEntity {
 
 	@ApiModelProperty(value = "支付渠道 WECHAT/ALIPAY/BANK", required = true)
 	private String payChannel;
+
+	@ApiModelProperty(value = "用户持券ID；可选，须为 YUAN 币种且适用 COIN_CONSUME/ALL")
+	private Integer userCouponId;
 }

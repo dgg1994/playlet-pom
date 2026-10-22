@@ -18,11 +18,15 @@ import com.playlet.internal.entity.member.MemberProductEntity;
 import com.playlet.internal.entity.member.UserMemberEntity;
 import com.playlet.internal.entity.welfare.UserCoinLedgerEntity;
 import com.playlet.internal.enums.CoinBizTypeEnums;
+import com.playlet.internal.enums.CouponCurrencyEnums;
+import com.playlet.internal.enums.CouponScopeEnums;
 import com.playlet.internal.enums.MemberPayChannelEnums;
 import com.playlet.internal.enums.MemberPayStatusEnums;
 import com.playlet.internal.enums.MemberPayTypeEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.MemberApiService;
+import com.playlet.internal.service.support.CouponRedeemResult;
+import com.playlet.internal.service.support.CouponRedeemSupport;
 import com.playlet.internal.utils.AppTokenUtil;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
@@ -66,6 +70,8 @@ public class MemberApiServiceImpl implements MemberApiService {
 	private AppAccountDao appAccountDao;
 	@Autowired
 	private UserCoinLedgerDao userCoinLedgerDao;
+	@Autowired
+	private CouponRedeemSupport couponRedeemSupport;
 
 	@Override
 	public ResponseBase status(HttpServletRequest request) {
@@ -129,23 +135,35 @@ public class MemberApiServiceImpl implements MemberApiService {
 			GenericityUtil.setDate(order);
 
 			if (MemberPayTypeEnums.COIN == payType) {
-				// 金币：校验价格 → 扣币 → 订单直接已支付并开通
+				// 金币：校验价格 → 用券算价 → 扣币 → 订单直接已支付并开通 → 核销券
 				int priceCoin = product.getPriceCoin() == null ? 0 : product.getPriceCoin();
 				if (priceCoin <= 0) {
 					return setResultError("该套餐不支持金币购买");
 				}
-				order.setPayCoin(priceCoin);
+				CouponRedeemResult redeem = couponRedeemSupport.resolve(uid, productReqEntity.getUserCouponId(),
+						CouponScopeEnums.MEMBER.getCode(), CouponCurrencyEnums.COIN, BigDecimal.valueOf(priceCoin));
+				int payCoin = redeem.getPayCoin() == null ? priceCoin : redeem.getPayCoin();
+				order.setPayCoin(payCoin);
 				order.setPayAmount(BigDecimal.ZERO);
+				order.setDiscountAmt(redeem.getDiscountAmt());
+				order.setUserCouponId(redeem.hasCoupon() ? redeem.getCoupon().getId() : null);
 				order.setPayChannel(null);
 				order.setPayStatus(MemberPayStatusEnums.PAID.getIndex());
 				order.setPayTime(new Date());
 				order.setThirdTradeNo(order.getOrderNo());
 				memberOrderDao.insert(order);
-				deductMemberCoin(uid, priceCoin, order.getOrderNo());
+				if (payCoin > 0) {
+					deductMemberCoin(uid, payCoin, order.getOrderNo());
+				}
 				grantOrRenewMember(order);
-				log.info("member order coin ok uid={} orderNo={} payCoin={}", uid, order.getOrderNo(), priceCoin);
+				if (redeem.hasCoupon()) {
+					couponRedeemSupport.confirmUsed(uid, redeem.getCoupon().getId(),
+							redeem.getCoupon().getTemplateId(), order.getOrderNo());
+				}
+				log.info("member order coin ok uid={} orderNo={} payCoin={} couponId={}",
+						uid, order.getOrderNo(), payCoin, order.getUserCouponId());
 			} else {
-				// 现金：必须选微信/支付宝/银行卡，待支付，回调后开通
+				// 现金：必须选渠道，待支付；用券后写折后实付，支付成功 notify 再核销
 				String channel = productReqEntity.getPayChannel() == null
 						? null : productReqEntity.getPayChannel().trim();
 				if (!MemberPayChannelEnums.isValid(channel)) {
@@ -154,13 +172,17 @@ public class MemberApiServiceImpl implements MemberApiService {
 				if (product.getPriceYuan() == null || product.getPriceYuan().compareTo(BigDecimal.ZERO) <= 0) {
 					return setResultError(I18nUtil.getMessage("base_error"));
 				}
+				CouponRedeemResult redeem = couponRedeemSupport.resolve(uid, productReqEntity.getUserCouponId(),
+						CouponScopeEnums.MEMBER.getCode(), CouponCurrencyEnums.YUAN, product.getPriceYuan());
 				order.setPayChannel(MemberPayChannelEnums.ofCode(channel).getCode());
-				order.setPayAmount(product.getPriceYuan());
+				order.setPayAmount(redeem.getPayAmount());
+				order.setDiscountAmt(redeem.getDiscountAmt());
+				order.setUserCouponId(redeem.hasCoupon() ? redeem.getCoupon().getId() : null);
 				order.setPayCoin(0);
 				order.setPayStatus(MemberPayStatusEnums.WAIT.getIndex());
 				memberOrderDao.insert(order);
-				log.info("member order cash create uid={} orderNo={} channel={}",
-						uid, order.getOrderNo(), order.getPayChannel());
+				log.info("member order cash create uid={} orderNo={} channel={} payAmount={} couponId={}",
+						uid, order.getOrderNo(), order.getPayChannel(), order.getPayAmount(), order.getUserCouponId());
 			}
 
 			return setResultSuccess(toCreateResp(order), I18nUtil.getMessage("base_success"));
@@ -207,6 +229,8 @@ public class MemberApiServiceImpl implements MemberApiService {
 			order.setGmtModified(now);
 			memberOrderDao.updateById(order);
 			grantOrRenewMember(order);
+			// 现金支付成功后核销优惠券（幂等）
+			couponRedeemSupport.confirmUsed(order.getUid(), order.getUserCouponId(), null, orderNo);
 			log.info("member pay notify ok uid={} orderNo={} channel={} expireAfter={}",
 					order.getUid(), orderNo, order.getPayChannel(), order.getExpireAfter());
 			return setResultSuccess(paidNotifyData(order), I18nUtil.getMessage("base_success"));
@@ -298,6 +322,8 @@ public class MemberApiServiceImpl implements MemberApiService {
 		resp.setPayChannel(order.getPayChannel());
 		resp.setPayAmount(order.getPayAmount());
 		resp.setPayCoin(order.getPayCoin());
+		resp.setUserCouponId(order.getUserCouponId());
+		resp.setDiscountAmt(order.getDiscountAmt());
 		resp.setPayStatus(order.getPayStatus());
 		resp.setDurationDays(order.getDurationDays());
 		resp.setExpireBefore(order.getExpireBefore());

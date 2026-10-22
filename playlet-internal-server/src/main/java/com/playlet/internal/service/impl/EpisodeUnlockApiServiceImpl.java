@@ -26,6 +26,8 @@ import com.playlet.internal.entity.welfare.UserCoinLedgerEntity;
 import com.playlet.internal.enums.*;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.EpisodeUnlockApiService;
+import com.playlet.internal.service.support.CouponRedeemResult;
+import com.playlet.internal.service.support.CouponRedeemSupport;
 import com.playlet.internal.service.support.EpisodePlayAccessResult;
 import com.playlet.internal.service.support.EpisodePlayAccessSupport;
 import com.playlet.internal.utils.*;
@@ -69,6 +71,8 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 	private AdRewardLogDao adRewardLogDao;
 	@Autowired
 	private AdSlotConfigDao adSlotConfigDao;
+	@Autowired
+	private CouponRedeemSupport couponRedeemSupport;
 
 	@Override
 	public ResponseBase playAccess(@RequestParam("assetId") Integer assetId, HttpServletRequest request) {
@@ -100,13 +104,36 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 			if (priceCoin <= 0) {
 				return setResultError(I18nUtil.getMessage("episode.unlock_coin_unavailable"));
 			}
+			CouponRedeemResult redeem = couponRedeemSupport.resolve(uid, req.getUserCouponId(),
+					CouponScopeEnums.COIN_CONSUME.getCode(), CouponCurrencyEnums.COIN,
+					BigDecimal.valueOf(priceCoin));
+			int payCoin = redeem.getPayCoin() == null ? priceCoin : redeem.getPayCoin();
 			String bizNo = OrderCodeFactory.getOrderCode(uid.longValue());
-			deductUnlockCoin(uid, priceCoin, bizNo);
-			saveUnlock(uid, asset, EpisodeUnlockWayEnums.COIN.getCode(), priceCoin, BigDecimal.ZERO, bizNo);
-			log.info("episode unlock coin ok uid={} assetId={} payCoin={} bizNo={}",
-					uid, asset.getId(), priceCoin, bizNo);
+			if (payCoin > 0) {
+				deductUnlockCoin(uid, payCoin, bizNo);
+			}
+			saveUnlock(uid, asset, EpisodeUnlockWayEnums.COIN.getCode(), payCoin, BigDecimal.ZERO, bizNo);
+			if (redeem.hasCoupon()) {
+				couponRedeemSupport.confirmUsed(uid, redeem.getCoupon().getId(),
+						redeem.getCoupon().getTemplateId(), bizNo);
+			}
+			log.info("episode unlock coin ok uid={} assetId={} payCoin={} bizNo={} couponId={}",
+					uid, asset.getId(), payCoin, bizNo,
+					redeem.hasCoupon() ? redeem.getCoupon().getId() : null);
 
-			return setResultSuccess(I18nUtil.getMessage("base_success"));
+			EpisodeUnlockOrderRespEntity resp = new EpisodeUnlockOrderRespEntity();
+			resp.setAssetId(asset.getId());
+			resp.setDramaId(asset.getDramaId());
+			resp.setUnlockWay(EpisodeUnlockWayEnums.COIN.getCode());
+			resp.setBizNo(bizNo);
+			resp.setPayStatus(MemberPayStatusEnums.PAID.getIndex());
+			resp.setPayCoin(payCoin);
+			resp.setDiscountAmt(redeem.getDiscountAmt());
+			resp.setUserCouponId(redeem.hasCoupon() ? redeem.getCoupon().getId() : null);
+			return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
+		} catch (BaseException e) {
+			log.error("episode unlock coin biz error uid={} assetId={}", uid, req.getAssetId(), e);
+			throw e;
 		} catch (Exception e) {
 			log.error("episode unlock coin failed uid={} assetId={}", uid, req.getAssetId(), e);
 			throw new BaseException(I18nUtil.getMessage("episode.unlock_failed"), e);
@@ -140,18 +167,22 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 			if (!MemberPayChannelEnums.isValid(channel)) {
 				return setResultError(I18nUtil.getMessage("episode.unlock_pay_channel_invalid"));
 			}
+			CouponRedeemResult redeem = couponRedeemSupport.resolve(uid, req.getUserCouponId(),
+					CouponScopeEnums.COIN_CONSUME.getCode(), CouponCurrencyEnums.YUAN, access.getPriceYuan());
 
 			EpisodeUnlockOrderEntity order = new EpisodeUnlockOrderEntity();
 			order.setOrderNo(OrderCodeFactory.getOrderCode(uid.longValue()));
 			order.setUid(uid);
 			order.setDramaId(asset.getDramaId());
 			order.setAssetId(asset.getId());
-			order.setPayAmount(access.getPriceYuan());
+			order.setPayAmount(redeem.getPayAmount());
+			order.setDiscountAmt(redeem.getDiscountAmt());
+			order.setUserCouponId(redeem.hasCoupon() ? redeem.getCoupon().getId() : null);
 			order.setPayStatus(MemberPayStatusEnums.WAIT.getIndex());
 			GenericityUtil.setDate(order);
 			episodeUnlockOrderDao.insert(order);
-			log.info("episode unlock cash create uid={} assetId={} orderNo={} amount={}",
-					uid, asset.getId(), order.getOrderNo(), order.getPayAmount());
+			log.info("episode unlock cash create uid={} assetId={} orderNo={} amount={} couponId={}",
+					uid, asset.getId(), order.getOrderNo(), order.getPayAmount(), order.getUserCouponId());
 
 			EpisodeUnlockOrderRespEntity resp = new EpisodeUnlockOrderRespEntity();
 			resp.setAssetId(asset.getId());
@@ -160,8 +191,13 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 			resp.setBizNo(order.getOrderNo());
 			resp.setPayStatus(order.getPayStatus());
 			resp.setPayAmount(order.getPayAmount());
+			resp.setDiscountAmt(order.getDiscountAmt());
+			resp.setUserCouponId(order.getUserCouponId());
 			resp.setPayChannel(MemberPayChannelEnums.ofCode(channel).getCode());
 			return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
+		} catch (BaseException e) {
+			log.error("episode unlock cash create biz error uid={} assetId={}", uid, req.getAssetId(), e);
+			throw e;
 		} catch (Exception e) {
 			log.error("episode unlock cash create failed uid={} assetId={}", uid, req.getAssetId(), e);
 			throw new BaseException(I18nUtil.getMessage("episode.unlock_failed"), e);
@@ -205,9 +241,13 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 				saveUnlock(order.getUid(), asset, EpisodeUnlockWayEnums.CASH.getCode(),
 						0, order.getPayAmount(), order.getOrderNo());
 			}
+			couponRedeemSupport.confirmUsed(order.getUid(), order.getUserCouponId(), null, orderNo);
 			log.info("episode unlock cash notify ok uid={} assetId={} orderNo={}",
 					order.getUid(), order.getAssetId(), orderNo);
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		} catch (BaseException e) {
+			log.error("episode unlock cash notify biz error orderNo={}", orderNo, e);
+			throw e;
 		} catch (Exception e) {
 			log.error("episode unlock cash notify failed orderNo={}", orderNo, e);
 			throw new BaseException(I18nUtil.getMessage("episode.unlock_failed"), e);

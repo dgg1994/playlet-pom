@@ -29,6 +29,12 @@ public class MemberOrderCreateRespEntity {
 	@ApiModelProperty("金币应付数量")
 	private Integer payCoin;
 
+	@ApiModelProperty("使用的持券ID")
+	private Integer userCouponId;
+
+	@ApiModelProperty("优惠减免")
+	private BigDecimal discountAmt;
+
 	@ApiModelProperty("支付状态：0待支付 1已支付（金币下单成功即为1）")
 	private Integer payStatus;
 

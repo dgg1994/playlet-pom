@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import javax.servlet.http.HttpServletRequest;
+import java.math.BigDecimal;
 
 /**
  * C 端优惠券：网关 /entrance/api/coupon/**
@@ -20,4 +21,12 @@ public interface CouponApiService {
 	@ApiOperation(value = "我的优惠券", notes = "需登录；status 可选 0未用 1已用 2过期 3作废，不传返回全部")
 	ResponseBase myList(HttpServletRequest request,
 			@RequestParam(value = "status", required = false) Integer status);
+
+	@GetMapping("/available")
+	@ApiOperation(value = "下单可用券", notes = "需登录。scope=MEMBER|COIN_CONSUME|RECHARGE；"
+			+ "currency=YUAN|COIN；amount 为原价（元或金币）")
+	ResponseBase available(HttpServletRequest request,
+			@RequestParam("scope") String scope,
+			@RequestParam("currency") String currency,
+			@RequestParam("amount") BigDecimal amount);
 }

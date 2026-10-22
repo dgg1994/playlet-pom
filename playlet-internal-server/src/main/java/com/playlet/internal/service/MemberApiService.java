@@ -28,7 +28,8 @@ public interface MemberApiService {
 
 	@PostMapping("/order/create")
 	@ApiOperation(value = "创建会员订单", notes = "需登录。payType=COIN 扣金币并立即开通；"
-			+ "payType=CASH 需 payChannel=WECHAT|ALIPAY|BANK，生成待支付单，成功后调 pay/notify")
+			+ "payType=CASH 需 payChannel=WECHAT|ALIPAY|BANK，生成待支付单，成功后调 pay/notify。"
+			+ "可选 userCouponId：金币当场核销，现金在 pay/notify 核销")
 	ResponseBase createOrder(HttpServletRequest request, ProductReqEntity productReqEntity);
 
 	@PostMapping("/pay/notify")

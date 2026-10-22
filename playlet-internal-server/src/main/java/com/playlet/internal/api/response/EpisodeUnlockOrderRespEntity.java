@@ -34,6 +34,12 @@ public class EpisodeUnlockOrderRespEntity {
 	@ApiModelProperty("金币实付")
 	private Integer payCoin;
 
+	@ApiModelProperty("使用的持券ID")
+	private Integer userCouponId;
+
+	@ApiModelProperty("优惠减免")
+	private BigDecimal discountAmt;
+
 	@ApiModelProperty("现金渠道")
 	private String payChannel;
 }

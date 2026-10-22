@@ -13,4 +13,7 @@ public class EpisodeUnlockCoinReqEntity {
 
 	@ApiModelProperty(value = "集ID drama_asset.id", required = true)
 	private Integer assetId;
+
+	@ApiModelProperty(value = "用户持券ID；可选，须为 COIN 币种且适用 COIN_CONSUME/ALL")
+	private Integer userCouponId;
 }
