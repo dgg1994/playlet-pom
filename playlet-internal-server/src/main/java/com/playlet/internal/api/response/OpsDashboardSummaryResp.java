@@ -5,53 +5,65 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.Date;
+import java.util.List;
 
 /**
- * 运营看板汇总（对齐数据看板卡片；未实现指标默认 0）。
+ * 运营数据总览汇总（对齐管理端看板原型）。
  */
 @Data
-@ApiModel(value = "运营看板汇总", description = "GMV/eCPM/ARPU/DAU/在线/留存/新增/人均播放")
+@ApiModel(value = "运营数据总览", description = "KPI + 趋势 + 收入构成 + 热播榜 + 待办")
 public class OpsDashboardSummaryResp {
 
 	@ApiModelProperty("区间类型 today|7d|30d|custom")
 	private String rangeType;
 
-	@ApiModelProperty("区间开始日 yyyy-MM-dd")
+	@ApiModelProperty("区间开始日 yyyy-MM-dd（趋势/构成用）")
 	private String startDate;
 
 	@ApiModelProperty("区间结束日 yyyy-MM-dd")
 	private String endDate;
 
-	@ApiModelProperty("实时流水 GMV（万元）；未实现，默认 0")
-	private BigDecimal gmv;
+	@ApiModelProperty("数据更新时间")
+	private Date updateTime;
 
-	@ApiModelProperty("广告 eCPM（元）；未实现，默认 0")
-	private BigDecimal adEcpm;
+	// ---------- KPI（今日口径，较昨日环比） ----------
 
-	@ApiModelProperty("ARPU；未实现，默认 0")
-	private BigDecimal arpu;
+	@ApiModelProperty("今日充值金额(元)")
+	private BigDecimal todayRechargeAmount;
 
-	@ApiModelProperty("DAU：单日=当日活跃；多日=区间平均日活（四舍五入）")
-	private Long dau;
+	@ApiModelProperty("充值较昨日涨跌幅%（无昨日数据为 null）")
+	private BigDecimal todayRechargeMomRate;
 
-	@ApiModelProperty("当前在线设备数（实时，含未登录；与区间无关）")
-	private Long onlineCount;
+	@ApiModelProperty("今日新增用户")
+	private Long todayNewUserCnt;
 
-	@ApiModelProperty("在线判定窗口秒数")
-	private Long onlineWindowSeconds;
+	@ApiModelProperty("新增用户较昨日涨跌幅%")
+	private BigDecimal todayNewUserMomRate;
 
-	@ApiModelProperty("次日留存率 %（一位小数）")
-	private BigDecimal retentionD1Rate;
+	@ApiModelProperty("付费用户数（今日去重）")
+	private Long payingUserCnt;
 
-	@ApiModelProperty("新增用户数")
-	private Long newUserCnt;
+	@ApiModelProperty("付费转化率%：付费用户/今日DAU")
+	private BigDecimal payConversionRate;
 
-	@ApiModelProperty("人均播放时长（分钟，一位小数）")
-	private BigDecimal avgPlayMinutes;
+	@ApiModelProperty("在架短剧数")
+	private Long onShelfDramaCnt;
 
-	@ApiModelProperty("总播放秒（辅助字段；优先用户日播放表）")
-	private Long totalPlaySeconds;
+	@ApiModelProperty("待审核短剧数")
+	private Long pendingAuditDramaCnt;
 
-	@ApiModelProperty("区间 person-day（每日 DAU 之和，辅助字段）")
-	private Long personDays;
+	// ---------- 趋势 / 构成 / 榜 / 待办 ----------
+
+	@ApiModelProperty("充值与播放量趋势")
+	private List<OpsDashboardTrendPoint> trendList;
+
+	@ApiModelProperty("收入构成")
+	private List<OpsDashboardRevenuePart> revenueParts;
+
+	@ApiModelProperty("热播短剧 TOP5")
+	private List<OpsDashboardHotDramaItem> hotDramaTop5;
+
+	@ApiModelProperty("待办事项")
+	private List<OpsDashboardTodoItem> todoList;
 }

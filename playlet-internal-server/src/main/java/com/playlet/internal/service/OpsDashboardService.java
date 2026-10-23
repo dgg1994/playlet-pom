@@ -1,6 +1,7 @@
 package com.playlet.internal.service;
 
 import com.playlet.internal.base.ResponseBase;
+import com.playlet.internal.query.ops.OpsDashboardHotDramaQuery;
 import com.playlet.internal.query.ops.OpsDashboardQuery;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -15,7 +16,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 public interface OpsDashboardService {
 
 	@PostMapping("/summary")
-	@ApiOperation(value = "看板指标汇总", notes = "对齐数据看板：GMV/eCPM/ARPU（暂为0）、DAU、在线、次日留存、新增用户、人均播放；"
-			+ "body.rangeType=today|7d|30d|custom；custom 需 startDate、endDate")
+	@ApiOperation(value = "运营数据总览", notes = "KPI（今日充值/新增/付费转化/在架）+ 充值与播放趋势 + 收入构成 "
+			+ "+ 热播 TOP5 + 待办；body.rangeType=today|7d|30d|custom（默认7d）；custom 需 startDate、endDate")
 	ResponseBase summary(OpsDashboardQuery query);
+
+	@PostMapping("/hotDramaList")
+	@ApiOperation(value = "热播短剧排行（查看全部）", notes = "按区间播放量倒序分页；含分类、播放量、今日充值；"
+			+ "body 同 summary 的 rangeType/startDate/endDate，另加 pageNumber/pageSize")
+	ResponseBase hotDramaList(OpsDashboardHotDramaQuery query);
 }
