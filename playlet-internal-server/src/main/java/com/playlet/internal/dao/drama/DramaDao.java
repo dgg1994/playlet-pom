@@ -1,7 +1,13 @@
 package com.playlet.internal.dao.drama;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.playlet.internal.api.request.DramaPaymentPurchaseQuery;
+import com.playlet.internal.api.request.DramaPaymentQuery;
 import com.playlet.internal.api.response.DramaAnalyticsRespEntity;
+import com.playlet.internal.api.response.DramaEpisodePayItemEntity;
+import com.playlet.internal.api.response.DramaPaymentDetailEntity;
+import com.playlet.internal.api.response.DramaPaymentRespEntity;
+import com.playlet.internal.api.response.DramaPurchaseItemEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.query.creator.CreatorDramaAnalyticsQuery;
 import com.playlet.internal.query.drama.QueryDramaQuery;
@@ -343,4 +349,200 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 			+ "</script>")
 	List<DramaAnalyticsRespEntity> analyticsList(@Param("q") CreatorDramaAnalyticsQuery q,
 			@Param("belongUser") Integer belongUser);
+
+	/**
+	 * 短剧付费汇总：按剧维度统计现金/金币解锁收入与购买人次。
+	 * payType：MEMBER=会员剧 / PAY=含单集付费 / AD=含广告解锁。
+	 */
+	@Select("<script>"
+			+ "SELECT "
+			+ "  CAST(d.id AS CHAR) AS dramaId, "
+			+ "  d.drama_title AS dramaName, "
+			+ "  IFNULL(( "
+			+ "    SELECT GROUP_CONCAT(DISTINCT t.tag_name ORDER BY t.id SEPARATOR '、') "
+			+ "    FROM drama_tag_rel r "
+			+ "    INNER JOIN dic_drama_tag t ON t.group_id = r.tag_group_id "
+			+ "    WHERE r.drama_id = d.id "
+			+ "  ), '') AS dramaTag, "
+			+ "  IFNULL(d.total_episodes, 0) AS dramaSum, "
+			+ "  (SELECT COUNT(1) FROM drama_asset da "
+			+ "    WHERE da.drama_id = d.id AND da.unlock_type = 2 "
+			+ "      AND (da.delete_state = 0 OR da.delete_state IS NULL)"
+			+ "  ) AS dramaPaySum, "
+			+ "  IFNULL(SUM(CASE WHEN ueu.unlock_way IN ('COIN','CASH') "
+			+ "    THEN IFNULL(ueu.cost_yuan, 0) ELSE 0 END), 0) AS dramaTotalRevenue, "
+			+ "  IFNULL(SUM(CASE WHEN ueu.unlock_way IN ('COIN','CASH') THEN 1 ELSE 0 END), 0) AS payPeopleSum, "
+			+ "  MAX(CASE WHEN ueu.unlock_way IN ('COIN','CASH') THEN ueu.setTime ELSE NULL END) AS payTime "
+			+ "FROM drama d "
+			+ "LEFT JOIN user_episode_unlock ueu ON ueu.drama_id = d.id "
+			+ "WHERE (d.delete_state = 0 OR d.delete_state IS NULL) "
+			+ "  AND ( "
+			+ "    d.is_member_drama = 1 "
+			+ "    OR EXISTS (SELECT 1 FROM drama_asset x WHERE x.drama_id = d.id AND x.unlock_type IN (1, 2) "
+			+ "      AND (x.delete_state = 0 OR x.delete_state IS NULL)) "
+			+ "    OR EXISTS (SELECT 1 FROM user_episode_unlock u "
+			+ "      WHERE u.drama_id = d.id AND u.unlock_way IN ('COIN','CASH')) "
+			+ "  ) "
+			+ "<if test='q.dramaName != null and q.dramaName != \"\"'>"
+			+ "  AND (CAST(d.id AS CHAR) = #{q.dramaName} "
+			+ "    OR d.drama_title LIKE CONCAT('%', #{q.dramaName}, '%')) "
+			+ "</if>"
+			+ "<if test='q.dramaTag != null and q.dramaTag != \"\"'>"
+			+ "  AND EXISTS ("
+			+ "    SELECT 1 FROM drama_tag_rel r2 "
+			+ "    INNER JOIN dic_drama_tag t2 ON t2.group_id = r2.tag_group_id "
+			+ "    WHERE r2.drama_id = d.id "
+			+ "      AND (r2.tag_group_id = #{q.dramaTag} OR t2.tag_name LIKE CONCAT('%', #{q.dramaTag}, '%')) "
+			+ "  ) "
+			+ "</if>"
+			+ "<if test='q.payType != null and q.payType == \"MEMBER\"'>"
+			+ "  AND d.is_member_drama = 1 "
+			+ "</if>"
+			+ "<if test='q.payType != null and q.payType == \"PAY\"'>"
+			+ "  AND EXISTS (SELECT 1 FROM drama_asset da2 WHERE da2.drama_id = d.id AND da2.unlock_type = 2 "
+			+ "    AND (da2.delete_state = 0 OR da2.delete_state IS NULL)) "
+			+ "</if>"
+			+ "<if test='q.payType != null and q.payType == \"AD\"'>"
+			+ "  AND EXISTS (SELECT 1 FROM drama_asset da3 WHERE da3.drama_id = d.id AND da3.unlock_type = 1 "
+			+ "    AND (da3.delete_state = 0 OR da3.delete_state IS NULL)) "
+			+ "</if>"
+			+ "GROUP BY d.id, d.drama_title, d.total_episodes "
+			+ "ORDER BY dramaTotalRevenue DESC, d.id DESC "
+			+ "</script>")
+	List<DramaPaymentRespEntity> selectPayDrama(@Param("q") DramaPaymentQuery query);
+
+	/** 短剧付费详情：剧信息 + KPI（不含剧集列表） */
+	@Select("SELECT "
+			+ "  d.id AS dramaId, "
+			+ "  d.drama_title AS dramaName, "
+			+ "  d.cover_url AS coverUrl, "
+			+ "  IFNULL(( "
+			+ "    SELECT GROUP_CONCAT(DISTINCT t.tag_name ORDER BY t.id SEPARATOR '、') "
+			+ "    FROM drama_tag_rel r "
+			+ "    INNER JOIN dic_drama_tag t ON t.group_id = r.tag_group_id "
+			+ "    WHERE r.drama_id = d.id "
+			+ "  ), '') AS dramaTag, "
+			+ "  IFNULL(d.shelf_status, 0) AS shelfStatus, "
+			+ "  IFNULL(d.total_episodes, 0) AS totalEpisodes, "
+			+ "  (SELECT COUNT(1) FROM drama_asset da "
+			+ "    WHERE da.drama_id = d.id AND da.unlock_type = 2 "
+			+ "      AND (da.delete_state = 0 OR da.delete_state IS NULL)) AS paidEpisodes, "
+			+ "  (SELECT COUNT(1) FROM drama_asset da0 "
+			+ "    WHERE da0.drama_id = d.id AND IFNULL(da0.unlock_type, 0) = 0 "
+			+ "      AND (da0.delete_state = 0 OR da0.delete_state IS NULL)) AS freeEpisodes, "
+			+ "  IFNULL(d.shelf_time, d.setTime) AS releaseTime, "
+			+ "  d.producer_firm AS producerFirm, "
+			+ "  IFNULL(d.is_member_drama, 0) AS isMemberDrama, "
+			+ "  EXISTS (SELECT 1 FROM drama_asset da1 WHERE da1.drama_id = d.id AND da1.unlock_type = 1 "
+			+ "    AND (da1.delete_state = 0 OR da1.delete_state IS NULL)) AS adUnlockSupported, "
+			+ "  (SELECT ROUND(AVG(da2.price_yuan), 2) FROM drama_asset da2 "
+			+ "    WHERE da2.drama_id = d.id AND da2.unlock_type = 2 "
+			+ "      AND da2.price_yuan IS NOT NULL "
+			+ "      AND (da2.delete_state = 0 OR da2.delete_state IS NULL)) AS episodePriceAvg, "
+			+ "  (SELECT MAX(da3.price_yuan) FROM drama_asset da3 "
+			+ "    WHERE da3.drama_id = d.id AND da3.unlock_type = 2 "
+			+ "      AND (da3.delete_state = 0 OR da3.delete_state IS NULL)) AS episodePriceOrigin, "
+			+ "  IFNULL((SELECT SUM(IFNULL(ueu.cost_yuan, 0)) FROM user_episode_unlock ueu "
+			+ "    WHERE ueu.drama_id = d.id AND ueu.unlock_way IN ('COIN','CASH')), 0) AS totalRevenue, "
+			+ "  IFNULL((SELECT COUNT(1) FROM user_episode_unlock ueu2 "
+			+ "    WHERE ueu2.drama_id = d.id AND ueu2.unlock_way IN ('COIN','CASH')), 0) AS purchaseCount, "
+			+ "  IFNULL((SELECT "
+			+ "    CASE WHEN (paid_cnt + refund_cnt) = 0 THEN 0 "
+			+ "      ELSE ROUND(refund_cnt * 100.0 / (paid_cnt + refund_cnt), 2) END "
+			+ "    FROM ("
+			+ "      SELECT "
+			+ "        SUM(CASE WHEN eo.pay_status = 1 THEN 1 ELSE 0 END) AS paid_cnt, "
+			+ "        SUM(CASE WHEN eo.pay_status = 3 THEN 1 ELSE 0 END) AS refund_cnt "
+			+ "      FROM episode_unlock_order eo WHERE eo.drama_id = d.id"
+			+ "    ) r"
+			+ "  ), 0) AS refundRate "
+			+ "FROM drama d "
+			+ "WHERE d.id = #{dramaId} AND (d.delete_state = 0 OR d.delete_state IS NULL) "
+			+ "LIMIT 1")
+	DramaPaymentDetailEntity selectPayDramaDetail(@Param("dramaId") Integer dramaId);
+
+	/** 本月 vs 上月现金/金币解锁收入，用于环比 */
+	@Select("SELECT "
+			+ "  IFNULL(SUM(CASE WHEN ueu.setTime >= DATE_FORMAT(CURDATE(), '%Y-%m-01') "
+			+ "    THEN IFNULL(ueu.cost_yuan, 0) ELSE 0 END), 0) AS thisMonth, "
+			+ "  IFNULL(SUM(CASE WHEN ueu.setTime >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01') "
+			+ "      AND ueu.setTime < DATE_FORMAT(CURDATE(), '%Y-%m-01') "
+			+ "    THEN IFNULL(ueu.cost_yuan, 0) ELSE 0 END), 0) AS lastMonth "
+			+ "FROM user_episode_unlock ueu "
+			+ "WHERE ueu.drama_id = #{dramaId} AND ueu.unlock_way IN ('COIN','CASH')")
+	java.util.Map<String, Object> selectPayDramaMom(@Param("dramaId") Integer dramaId);
+
+	/** 付费集统计列表（按收入倒序） */
+	@Select("<script>"
+			+ "SELECT "
+			+ "  da.id AS assetId, "
+			+ "  da.set_num AS setNum, "
+			+ "  IFNULL(da.video_name, CONCAT('第', da.set_num, '集')) AS episodeTitle, "
+			+ "  da.unlock_type AS unlockType, "
+			+ "  IFNULL(da.price_yuan, 0) AS priceYuan, "
+			+ "  IFNULL(agg.purchaseCount, 0) AS purchaseCount, "
+			+ "  IFNULL(agg.revenue, 0) AS revenue, "
+			+ "  da.shelf_time AS shelfTime "
+			+ "FROM drama_asset da "
+			+ "LEFT JOIN ("
+			+ "  SELECT ueu.asset_id AS assetId, "
+			+ "    COUNT(1) AS purchaseCount, "
+			+ "    SUM(IFNULL(ueu.cost_yuan, 0)) AS revenue "
+			+ "  FROM user_episode_unlock ueu "
+			+ "  WHERE ueu.drama_id = #{dramaId} AND ueu.unlock_way IN ('COIN','CASH') "
+			+ "  GROUP BY ueu.asset_id"
+			+ ") agg ON agg.assetId = da.id "
+			+ "WHERE da.drama_id = #{dramaId} "
+			+ "  AND da.unlock_type = 2 "
+			+ "  AND (da.delete_state = 0 OR da.delete_state IS NULL) "
+			+ "ORDER BY IFNULL(agg.revenue, 0) DESC, da.set_num ASC "
+			+ "<if test='limit != null and limit &gt; 0'> LIMIT #{limit} </if>"
+			+ "</script>")
+	List<DramaEpisodePayItemEntity> selectEpisodePayList(@Param("dramaId") Integer dramaId,
+			@Param("limit") Integer limit);
+
+	/** 剧下购买记录：现金单集订单 ∪ 金币解锁 */
+	@Select("<script>"
+			+ "SELECT * FROM ("
+			+ "  SELECT eo.order_no AS orderNo, eo.uid AS uid, a.nickname AS nickname, "
+			+ "    CONCAT('第', IFNULL(da.set_num, '?'), '集单集解锁') AS purchaseContent, "
+			+ "    eo.asset_id AS assetId, da.set_num AS setNum, "
+			+ "    eo.pay_amount AS payAmount, IFNULL(eo.pay_channel, '') AS payChannel, "
+			+ "    IFNULL(eo.pay_time, eo.setTime) AS payTime, eo.pay_status AS payStatus "
+			+ "  FROM episode_unlock_order eo "
+			+ "  LEFT JOIN app_account a ON a.id = eo.uid "
+			+ "  LEFT JOIN drama_asset da ON da.id = eo.asset_id "
+			+ "  WHERE eo.drama_id = #{q.dramaId} "
+			+ "  UNION ALL "
+			+ "  SELECT IFNULL(ueu.biz_no, CONCAT('COIN-', ueu.id)) AS orderNo, "
+			+ "    ueu.uid AS uid, a2.nickname AS nickname, "
+			+ "    CONCAT('第', IFNULL(da2.set_num, '?'), '集金币解锁') AS purchaseContent, "
+			+ "    ueu.asset_id AS assetId, da2.set_num AS setNum, "
+			+ "    IFNULL(ueu.cost_yuan, 0) AS payAmount, 'COIN' AS payChannel, "
+			+ "    ueu.setTime AS payTime, 1 AS payStatus "
+			+ "  FROM user_episode_unlock ueu "
+			+ "  LEFT JOIN app_account a2 ON a2.id = ueu.uid "
+			+ "  LEFT JOIN drama_asset da2 ON da2.id = ueu.asset_id "
+			+ "  WHERE ueu.drama_id = #{q.dramaId} AND ueu.unlock_way = 'COIN' "
+			+ ") u WHERE 1=1 "
+			+ "<if test='q.keyword != null and q.keyword != \"\"'>"
+			+ "  AND (u.orderNo = #{q.keyword}"
+			+ "    OR CAST(u.uid AS CHAR) = #{q.keyword}"
+			+ "    OR u.nickname LIKE CONCAT('%', #{q.keyword}, '%')) "
+			+ "</if>"
+			+ "<if test='q.assetId != null'> AND u.assetId = #{q.assetId} </if>"
+			+ "<if test='q.payChannel != null and q.payChannel != \"\"'> AND u.payChannel = #{q.payChannel} </if>"
+			+ "<if test='q.payStatus != null'> AND u.payStatus = #{q.payStatus} </if>"
+			+ " ORDER BY u.payTime DESC "
+			+ "</script>")
+	List<DramaPurchaseItemEntity> selectDramaPurchaseList(@Param("q") DramaPaymentPurchaseQuery query);
+
+	/** 剧下付费集下拉（筛选用） */
+	@Select("SELECT da.id AS assetId, da.set_num AS setNum, "
+			+ "  IFNULL(da.video_name, CONCAT('第', da.set_num, '集')) AS episodeTitle "
+			+ "FROM drama_asset da "
+			+ "WHERE da.drama_id = #{dramaId} AND da.unlock_type = 2 "
+			+ "  AND (da.delete_state = 0 OR da.delete_state IS NULL) "
+			+ "ORDER BY da.set_num ASC")
+	List<DramaEpisodePayItemEntity> selectPaidEpisodeOptions(@Param("dramaId") Integer dramaId);
 }

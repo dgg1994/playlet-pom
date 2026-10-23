@@ -176,6 +176,7 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 			order.setDramaId(asset.getDramaId());
 			order.setAssetId(asset.getId());
 			order.setPayAmount(redeem.getPayAmount());
+			order.setPayChannel(MemberPayChannelEnums.ofCode(channel).getCode());
 			order.setDiscountAmt(redeem.getDiscountAmt());
 			order.setUserCouponId(redeem.hasCoupon() ? redeem.getCoupon().getId() : null);
 			order.setPayStatus(MemberPayStatusEnums.WAIT.getIndex());

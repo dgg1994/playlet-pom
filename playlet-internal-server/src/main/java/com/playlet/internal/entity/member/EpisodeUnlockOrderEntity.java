@@ -46,6 +46,10 @@ public class EpisodeUnlockOrderEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "payAmount", value = "实付(元)", dataType = "BigDecimal")
 	private BigDecimal payAmount;
 
+	@TableField("pay_channel")
+	@ApiModelProperty(name = "payChannel", value = "现金渠道 WECHAT/ALIPAY/BANK", dataType = "String")
+	private String payChannel;
+
 	@TableField("user_coupon_id")
 	@ApiModelProperty(name = "userCouponId", value = "使用的持券ID", dataType = "Integer")
 	private Integer userCouponId;
