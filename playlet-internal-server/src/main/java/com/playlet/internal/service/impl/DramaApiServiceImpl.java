@@ -1,6 +1,7 @@
 package com.playlet.internal.service.impl;
 
 
+import com.playlet.internal.entity.drama.*;
 import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -30,11 +31,6 @@ import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.constants.EpisodeUnlockConstants;
-import com.playlet.internal.entity.drama.DramaAssetEntity;
-import com.playlet.internal.entity.drama.DramaEntity;
-import com.playlet.internal.entity.drama.TagEntity;
-import com.playlet.internal.entity.drama.UserDramaCollectEntity;
-import com.playlet.internal.entity.drama.UserDramaLikeEntity;
 import com.playlet.internal.enums.DeleteStateEnum;
 import com.playlet.internal.enums.PublicEnums;
 import com.playlet.internal.enums.VerifyStateEnums;
@@ -75,6 +71,9 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
 
     @Autowired
     private UserDramaLikeDao userDramaLikeDao;
+
+    @Autowired
+    private RankListDao rankListDao;
 
     @Autowired
     private UserDramaCollectDao userDramaCollectDao;
@@ -222,10 +221,13 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             if (list == null || list.isEmpty()) {
                 return setResultSuccess(list, I18nUtil.getMessage("base_success"));
             }
+            // 是否是热榜视频
+            RankListEntity rankListEntity = rankListDao.selectOne(new QueryWrapper<RankListEntity>().eq("drama_id", id).eq("board_group_id", "rb_hot_play"));
             if (uid == null) {
                 for (DramaAssetRespEntity item : list) {
                     item.setIsLike(PublicEnums.ZERO.getIndex());
                     item.setIsCollect(PublicEnums.ZERO.getIndex());
+                    item.setIsHot(rankListEntity != null ? PublicEnums.ONE.getIndex() : PublicEnums.ZERO.getIndex());
                     // 未登录也回填播放策略（免费可播，其余标 NEED_LOGIN）
                     fillPlayAccessOnSelection(item, null);
                 }
@@ -234,6 +236,7 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             // 收藏是整剧维度，只查一次
             Integer isCollect = userDramaCollectDao.findByUidAndDrama(uid, id) != null
                     ? PublicEnums.ONE.getIndex() : PublicEnums.ZERO.getIndex();
+
             // 点赞按集批量查，避免 N+1
             List<String> episodeIds = list.stream()
                     .map(item -> String.valueOf(item.getId()))
@@ -247,6 +250,7 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
                 item.setIsLike(likedEpisodeIds.contains(String.valueOf(item.getId()))
                         ? PublicEnums.ONE.getIndex() : PublicEnums.ZERO.getIndex());
                 item.setIsCollect(isCollect);
+                item.setIsHot(rankListEntity != null ? PublicEnums.ONE.getIndex() : PublicEnums.ZERO.getIndex());
                 fillPlayAccessOnSelection(item, uid);
             }
             return setResultSuccess(list, I18nUtil.getMessage("base_success"));
