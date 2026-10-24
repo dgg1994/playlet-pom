@@ -30,7 +30,8 @@ public interface TheaterApiService {
 			@ApiImplicitParam(name = "pageSize", value = "推荐分页大小", dataType = "int", paramType = "query"),
 			@ApiImplicitParam(name = "seed", value = "推荐会话种子；首页可空，翻页原样回传", dataType = "string", paramType = "query")
 	})
-	@ApiOperation(value = "剧场首页", notes = "同一接口按 tab 返回热榜/剧单/推荐；推荐登录且有偏好映射时加权，否则保持 seed 打散")
+	@ApiOperation(value = "剧场首页", notes = "同一接口按 tab 返回热榜/剧单/推荐；推荐登录且有偏好映射时加权，否则保持 seed 打散；"
+			+ "各剧条目含 recentWatched（1最近看过/0未看，未登录为0）")
 	ResponseBase home(String tab, Integer pageNumber, Integer pageSize, String seed, HttpServletRequest request);
 
 	@PostMapping("/findList")

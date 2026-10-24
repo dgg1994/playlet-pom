@@ -49,4 +49,8 @@ public class RecommendDramaRespEntity {
 	@ApiModelProperty(name = "vidoeRes",value = "视频内容",required = false,dataType = "RecommendVidoeRespEntity")
 	private RecommendVidoeRespEntity vidoeRes;
 
+	/** 当前用户是否最近观看过该剧：1是0否（未登录恒为0） */
+	@ApiModelProperty(name = "recentWatched", value = "是否最近观看 1是0否", required = false, dataType = "Integer")
+	private Integer recentWatched;
+
 }

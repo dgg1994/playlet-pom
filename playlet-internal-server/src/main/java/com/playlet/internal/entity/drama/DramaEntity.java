@@ -186,4 +186,9 @@ public class DramaEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "dramaSteps", value = "剧评审步骤：AI / A组 / B组", required = false)
 	private List<DramaAuditStepEntity> dramaSteps;
 
+	/** 当前用户是否最近观看过该剧：1是0否（剧场首页轮播等展示用，非表字段） */
+	@TableField(exist = false)
+	@ApiModelProperty(name = "recentWatched", value = "是否最近观看 1是0否", required = false, dataType = "Integer")
+	private Integer recentWatched;
+
 }

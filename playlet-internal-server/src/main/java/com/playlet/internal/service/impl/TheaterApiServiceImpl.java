@@ -15,6 +15,7 @@ import com.playlet.internal.dao.drama.*;
 import com.playlet.internal.entity.drama.*;
 import com.playlet.internal.enums.DeleteStateEnum;
 import com.playlet.internal.enums.PlaylistMatchModeEnums;
+import com.playlet.internal.enums.PublicEnums;
 import com.playlet.internal.enums.RankBoardTypeEnums;
 import com.playlet.internal.enums.RecommendedCarouselEnums;
 import com.playlet.internal.enums.TheaterHomeTabEnums;
@@ -26,6 +27,7 @@ import com.playlet.internal.service.support.UserActiveStatService;
 import com.playlet.internal.service.support.WatchPreferMatchSupport;
 import com.playlet.internal.utils.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -35,7 +37,9 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static com.playlet.internal.constants.RedisKeyConstants.*;
@@ -101,6 +105,8 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 		if (resp.getPreferApplied() == null) {
 			resp.setPreferApplied(Boolean.FALSE);
 		}
+		// 按当前用户浏览历史标记 recentWatched（热榜缓存已 copy，不会污染公共缓存）
+		fillRecentWatched(resp, request);
 		log.info("theater home tab={} preferApplied={}", tabEnum.getCode(), resp.getPreferApplied());
 		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
 	}
@@ -266,16 +272,163 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 		return items;
 	}
 
-	/** 热榜缓存对象不可被调用方改 tab 字段污染。 */
+	/**
+	 * 热榜缓存浅拷贝列表不够：条目需拷贝，避免按用户填 recentWatched 污染公共缓存。
+	 */
 	private static TheaterHomeRespEntity copyHome(TheaterHomeRespEntity src) {
 		TheaterHomeRespEntity resp = new TheaterHomeRespEntity();
-		resp.setCarousels(src.getCarousels());
+		List<DramaEntity> carousels = new ArrayList<>();
+		if (src.getCarousels() != null) {
+			for (DramaEntity drama : src.getCarousels()) {
+				if (drama == null) {
+					continue;
+				}
+				DramaEntity copy = new DramaEntity();
+				BeanUtils.copyProperties(drama, copy);
+				carousels.add(copy);
+			}
+		}
+		resp.setCarousels(carousels);
 		List<TheaterRankBlockEntity> blocks = new ArrayList<>();
 		if (src.getBlocks() != null) {
-			blocks.addAll(src.getBlocks());
+			for (TheaterRankBlockEntity block : src.getBlocks()) {
+				if (block == null) {
+					continue;
+				}
+				TheaterRankBlockEntity blockCopy = new TheaterRankBlockEntity();
+				blockCopy.setGroupId(block.getGroupId());
+				blockCopy.setBoardName(block.getBoardName());
+				blockCopy.setBoardType(block.getBoardType());
+				List<RankListItemEntity> items = new ArrayList<>();
+				if (block.getItems() != null) {
+					for (RankListItemEntity item : block.getItems()) {
+						if (item == null) {
+							continue;
+						}
+						RankListItemEntity itemCopy = new RankListItemEntity();
+						BeanUtils.copyProperties(item, itemCopy);
+						items.add(itemCopy);
+					}
+				}
+				blockCopy.setItems(items);
+				blocks.add(blockCopy);
+			}
 		}
 		resp.setBlocks(blocks);
 		return resp;
+	}
+
+	/** 首页各剧条目打上 recentWatched：命中用户浏览历史为 1，否则 0。 */
+	private void fillRecentWatched(TheaterHomeRespEntity resp, HttpServletRequest request) {
+		if (resp == null) {
+			return;
+		}
+		Integer uid = AppTokenUtil.resolveUid(request);
+		Set<Integer> watchedDramaIds = loadRecentWatchedDramaIds(uid);
+		int yes = PublicEnums.ONE.getIndex();
+		int no = PublicEnums.ZERO.getIndex();
+		if (resp.getCarousels() != null) {
+			for (DramaEntity drama : resp.getCarousels()) {
+				if (drama == null) {
+					continue;
+				}
+				boolean hit = drama.getId() != null && watchedDramaIds.contains(drama.getId());
+				drama.setRecentWatched(hit ? yes : no);
+			}
+		}
+		if (resp.getBlocks() != null) {
+			for (TheaterRankBlockEntity block : resp.getBlocks()) {
+				if (block == null || block.getItems() == null) {
+					continue;
+				}
+				for (RankListItemEntity item : block.getItems()) {
+					if (item == null) {
+						continue;
+					}
+					Integer dramaId = parseDramaId(item.getDramaId());
+					boolean hit = dramaId != null && watchedDramaIds.contains(dramaId);
+					item.setRecentWatched(hit ? yes : no);
+				}
+			}
+		}
+		RecommendPageRespEntity feed = resp.getFeed();
+		if (feed != null && feed.getPage() != null && feed.getPage().getList() != null) {
+			for (RecommendDramaRespEntity item : feed.getPage().getList()) {
+				if (item == null) {
+					continue;
+				}
+				boolean hit = item.getId() != null && watchedDramaIds.contains(item.getId());
+				item.setRecentWatched(hit ? yes : no);
+			}
+		}
+	}
+
+	/** 读 Redis 浏览列表；未登录/空标记/异常返回空集；miss 时回源 MySQL 并重建缓存。 */
+	private Set<Integer> loadRecentWatchedDramaIds(Integer uid) {
+		Set<Integer> ids = new HashSet<>();
+		if (uid == null || uid <= 0) {
+			return ids;
+		}
+		try {
+			if (Boolean.TRUE.equals(redisUtil.hasKey(VIEW_EMPTY_KEY + uid))) {
+				return ids;
+			}
+			String listKey = VIEW_LIST_KEY + uid;
+			if (Boolean.TRUE.equals(redisUtil.hasKey(listKey))) {
+				List<Object> cached = redisUtil.lGet(listKey, 0, -1);
+				if (cached != null) {
+					for (Object raw : cached) {
+						Integer dramaId = toIntegerId(raw);
+						if (dramaId != null) {
+							ids.add(dramaId);
+						}
+					}
+				}
+				return ids;
+			}
+			List<UserWatchHistoryEntity> rows = userWatchHistoryDao.findByUidLimit(uid, VIEW_HISTORY_MAX);
+			if (rows == null || rows.isEmpty()) {
+				redisUtil.set(VIEW_EMPTY_KEY + uid, "1", 60);
+				return ids;
+			}
+			for (UserWatchHistoryEntity row : rows) {
+				if (row != null && row.getDramaId() != null) {
+					ids.add(row.getDramaId());
+				}
+			}
+			rebuildViewCache(uid);
+		} catch (Exception e) {
+			log.warn("loadRecentWatchedDramaIds failed uid={}: {}", uid, e.getMessage());
+		}
+		return ids;
+	}
+
+	private static Integer parseDramaId(String dramaId) {
+		if (StringUtils.isEmpty(dramaId)) {
+			return null;
+		}
+		try {
+			return Integer.valueOf(dramaId.trim());
+		} catch (NumberFormatException e) {
+			return null;
+		}
+	}
+
+	private static Integer toIntegerId(Object raw) {
+		if (raw == null) {
+			return null;
+		}
+		if (raw instanceof Integer) {
+			return (Integer) raw;
+		}
+		if (raw instanceof Number) {
+			return ((Number) raw).intValue();
+		}
+		try {
+			return Integer.valueOf(String.valueOf(raw).trim());
+		} catch (NumberFormatException e) {
+			return null;
+		}
 	}
 
 	@Override
@@ -408,7 +561,7 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 		PageInfo<DramaEntity> basePage = new PageInfo<>(dramaEntities);
 		log.info("theater search title={}, tagId={}, tagGroupId={}, preferTags={}, hit={}",
 				entity.getDramaTitle(), entity.getTagId(), entity.getTagGroupId(),
-				preferTagGroupIds.size(), dramaEntities.size());
+				preferTagGroupIds == null ? 0 : preferTagGroupIds.size(), dramaEntities.size());
 		// 仅标题搜索首页计入热搜；标签筛选/翻页不记，避免刷榜
 		if (StringUtils.isNotEmpty(entity.getDramaTitle()) && !dramaEntities.isEmpty()
 				&& (entity.getPageNumber() == null || entity.getPageNumber() <= 1)) {

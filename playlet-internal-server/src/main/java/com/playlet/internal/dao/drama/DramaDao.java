@@ -73,7 +73,8 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 			+ "  ) "
 			+ "</if>"
 			+ "<choose>"
-			+ "  <when test='preferTagGroupIds != null and preferTagGroupIds.size() &gt; 0'>"
+			// 仅判 null：空偏好须传 null，勿传 Collections.emptyList（JDK16+ OGNL size 反射失败）
+			+ "  <when test='preferTagGroupIds != null'>"
 			+ "    order by ("
 			+ "      case when exists ("
 			+ "        select 1 from drama_tag_rel pr "
@@ -229,7 +230,8 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 			+ "SELECT d.* FROM drama d "
 			+ "WHERE d.delete_state = #{entity.deleteState} AND d.verify_status = #{entity.verifyStatus} "
 			+ "<choose>"
-			+ "  <when test='preferTagGroupIds != null and preferTagGroupIds.size() &gt; 0'>"
+			// 仅判 null：空偏好须传 null，勿传 Collections.emptyList（JDK16+ OGNL size 反射失败）
+			+ "  <when test='preferTagGroupIds != null'>"
 			+ "    ORDER BY ("
 			+ "      case when exists ("
 			+ "        select 1 from drama_tag_rel pr "
@@ -275,7 +277,8 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 			+ "        )"
 			+ "  ) "
 			+ "<choose>"
-			+ "  <when test='preferTagGroupIds != null and preferTagGroupIds.size() &gt; 0'>"
+			// 仅判 null：空偏好须传 null，勿传 Collections.emptyList（JDK16+ OGNL size 反射失败）
+			+ "  <when test='preferTagGroupIds != null'>"
 			+ "    ORDER BY ("
 			+ "      case when exists ("
 			+ "        select 1 from drama_tag_rel pr "

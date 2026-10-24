@@ -7,7 +7,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -22,26 +21,28 @@ public class WatchPreferMatchSupport {
 	private UserWatchPreferenceDao userWatchPreferenceDao;
 
 	/**
-	 * 解析用户偏好对应的剧标签 groupId；无登录/无偏好/无映射返回空列表。
+	 * 解析用户偏好对应的剧标签 groupId；无登录/无偏好/无映射返回 null。
+	 * 注意：勿返回 Collections.emptyList()——MyBatis OGNL 在 JDK16+ 反射调 size() 会 InaccessibleObjectException。
 	 */
 	public List<String> resolveDramaTagGroupIds(Integer uid) {
 		if (uid == null || uid <= 0) {
-			return Collections.emptyList();
+			return null;
 		}
 		try {
 			List<String> ids = userWatchPreferenceDao.findDramaTagGroupIdsByUid(uid,
 					WatchPreferConstants.STATUS_ENABLED);
 			if (CollectionUtils.isEmpty(ids)) {
-				return Collections.emptyList();
+				return null;
 			}
-			return ids.stream()
+			List<String> result = ids.stream()
 					.filter(id -> id != null && !id.trim().isEmpty())
 					.map(String::trim)
 					.distinct()
 					.collect(Collectors.toList());
+			return result.isEmpty() ? null : result;
 		} catch (Exception e) {
 			log.warn("resolveDramaTagGroupIds failed uid={}: {}", uid, e.getMessage());
-			return Collections.emptyList();
+			return null;
 		}
 	}
 
@@ -49,6 +50,6 @@ public class WatchPreferMatchSupport {
 	 * 是否有可用于加权的偏好标签。
 	 */
 	public boolean hasPreferTags(Integer uid) {
-		return !resolveDramaTagGroupIds(uid).isEmpty();
+		return CollectionUtils.isNotEmpty(resolveDramaTagGroupIds(uid));
 	}
 }

@@ -51,4 +51,8 @@ public class RankListItemEntity {
 
 	@ApiModelProperty("更新时间")
 	private Date gmtModified;
+
+	/** 当前用户是否最近观看过该剧：1是0否（未登录恒为0） */
+	@ApiModelProperty("是否最近观看 1是0否")
+	private Integer recentWatched;
 }
