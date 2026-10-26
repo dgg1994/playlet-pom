@@ -166,4 +166,12 @@ public class AppAccountEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "likeCount",value = "获赞数",required = false,dataType = "Long")
 	private Long likeCount;
 
+	@TableField(exist = false)
+	@ApiModelProperty(name = "isVip",value = "是否是vip",required = false,dataType = "Integer")
+	private Integer isVip;
+
+	@TableField(exist = false)
+	@ApiModelProperty(name = "couponCount",value = "优惠卷数量",required = false,dataType = "Integer")
+	private Integer couponCount;
+
 }

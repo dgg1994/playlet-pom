@@ -1,4 +1,5 @@
 package com.playlet.internal.service.impl;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.api.request.UserRegisterEntity;
 import com.playlet.internal.base.BaseApiService;
@@ -11,11 +12,15 @@ import com.playlet.internal.dao.account.AppAccountDao;
 import com.playlet.internal.dao.account.AppOauthAccountDao;
 import com.playlet.internal.dao.account.AppPushDeviceDao;
 import com.playlet.internal.dao.account.UserFollowDao;
+import com.playlet.internal.dao.coupon.UserCouponDao;
 import com.playlet.internal.dao.drama.UserDramaLikeDao;
+import com.playlet.internal.dao.member.UserMemberDao;
 import com.playlet.internal.dao.template.EmailTemplateDao;
 import com.playlet.internal.entity.account.AppAccountEntity;
 import com.playlet.internal.entity.account.AppOauthAccountEntity;
 import com.playlet.internal.entity.account.AppPushDeviceEntity;
+import com.playlet.internal.entity.coupon.UserCouponEntity;
+import com.playlet.internal.entity.member.UserMemberEntity;
 import com.playlet.internal.entity.template.EmailTemplateEntity;
 import com.playlet.internal.enums.*;
 import com.playlet.internal.exception.BaseException;
@@ -89,6 +94,13 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 
 	@Autowired
 	private UserActiveStatService userActiveStatService;
+
+	@Autowired
+	private UserMemberDao userMemberDao;
+
+	@Autowired
+	private UserCouponDao userCouponDao;
+
 
 	@SuppressWarnings("deprecation")
 	@Override
@@ -396,6 +408,12 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			}
 			String avatar = entity.getAvatar();
 			entity.setAvatar(mediaUrlService.sign(avatar));
+			// vip相关
+			UserMemberEntity userMember = userMemberDao.selectOne(new QueryWrapper<UserMemberEntity>().eq("uid", entity.getId()));
+			entity.setIsVip(userMember != null ? userMember.getStatus() : 0);
+			// 优惠卷数量
+			Integer count = userCouponDao.selectCount(new QueryWrapper<UserCouponEntity>().eq("uid", entity.getId()).eq("status",0));
+			entity.setCouponCount(count);
 			return setResultSuccess(entity);
 		} catch (Exception e) {
 			log.error("service error", e);
