@@ -162,20 +162,14 @@ public class DramaDanmuApiServiceImpl implements DramaDanmuApiService {
 
 	@Override
 	public ResponseBase list(@RequestBody DanmuListRequest request) {
-		if (request == null || request.getVideoId() == null
-				|| request.getFromTime() == null || request.getToTime() == null) {
+		if (request == null || request.getVideoId() == null) {
 			return setResultError(I18nUtil.getMessage("param_not_null"));
 		}
-		int from = request.getFromTime();
-		int to = request.getToTime();
+		int from = request.getFromTime() !=  null ? request.getFromTime() : 0;
+		int to = request.getToTime() !=  null ? request.getToTime() : DanmuConstants.LIST_MAX_WINDOW_SEC;
 		if (from < 0 || to < 0 || from > to) {
 			return setResultError(I18nUtil.getMessage("danmu_play_time_invalid"));
 		}
-		// 限制单次时间窗，避免全片一次拉光
-		if (to - from > DanmuConstants.LIST_MAX_WINDOW_SEC) {
-			return setResultError(I18nUtil.getMessage("danmu_play_time_invalid"));
-		}
-
 		List<DramaDanmuEntity> rows = dramaDanmuDao.findByVideoAndPlayTimeRange(
 				request.getVideoId(), from, to,
 				DanmuStatusEnums.NORMAL.getIndex(),

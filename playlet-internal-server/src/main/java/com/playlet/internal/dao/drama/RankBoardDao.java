@@ -44,4 +44,13 @@ public interface RankBoardDao extends BaseMapper<RankBoardEntity> {
 
 	@Update("update rank_board set status = #{status},gmtModified = NOW() where group_id = #{groupId}")
 	void updateByGroupId(@Param("groupId") String groupId, @Param("status") Integer status);
+
+	@Select("select " +
+			"rb.* " +
+			"from rank_board rb " +
+			"left join rank_list rl on rl.board_group_id = rb.group_id " +
+			"where rl.drama_id = #{id} and rb.langue = 'zh-cn' " +
+			"order by rb.sort_weight desc " +
+			"limit 1;")
+    RankBoardEntity selectBoardName(@Param("id") Integer id);
 }

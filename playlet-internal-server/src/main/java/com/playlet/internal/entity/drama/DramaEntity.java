@@ -191,4 +191,8 @@ public class DramaEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "recentWatched", value = "是否最近观看 1是0否", required = false, dataType = "Integer")
 	private Integer recentWatched;
 
+	@TableField(exist = false)
+	@ApiModelProperty(name = "isHot", value = "隶属哪个榜单", required = false, dataType = "Integer")
+	private String isHot;
+
 }

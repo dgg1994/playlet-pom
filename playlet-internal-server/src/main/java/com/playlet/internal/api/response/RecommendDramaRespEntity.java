@@ -53,4 +53,7 @@ public class RecommendDramaRespEntity {
 	@ApiModelProperty(name = "recentWatched", value = "是否最近观看 1是0否", required = false, dataType = "Integer")
 	private Integer recentWatched;
 
+	@ApiModelProperty(name = "isHot",value = "榜单名称",required = true,dataType = "String")
+	private String isHot;
+
 }

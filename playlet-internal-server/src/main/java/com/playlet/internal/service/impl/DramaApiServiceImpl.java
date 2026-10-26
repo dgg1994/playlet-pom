@@ -76,6 +76,9 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
     private RankListDao rankListDao;
 
     @Autowired
+    private RankBoardDao rankBoardDao;
+
+    @Autowired
     private UserDramaCollectDao userDramaCollectDao;
 
     @Autowired
@@ -216,18 +219,18 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
     public ResponseBase selections(Integer id, HttpServletRequest request) {
         try {
             Integer uid = AppTokenUtil.resolveUid(request);
+            // 是否是热榜视频
+            RankBoardEntity rankBoardEntity = rankBoardDao.selectBoardName(id);
             // C 端只返回已上架集
             List<DramaAssetRespEntity> list = dramaAssetDao.findOnShelfByDramaId(id);
             if (list == null || list.isEmpty()) {
                 return setResultSuccess(list, I18nUtil.getMessage("base_success"));
             }
-            // 是否是热榜视频
-            RankListEntity rankListEntity = rankListDao.selectOne(new QueryWrapper<RankListEntity>().eq("drama_id", id).eq("board_group_id", "rb_hot_play"));
             if (uid == null) {
                 for (DramaAssetRespEntity item : list) {
                     item.setIsLike(PublicEnums.ZERO.getIndex());
                     item.setIsCollect(PublicEnums.ZERO.getIndex());
-                    item.setIsHot(rankListEntity != null ? PublicEnums.ONE.getIndex() : PublicEnums.ZERO.getIndex());
+                    item.setIsHot(rankBoardEntity != null ? rankBoardEntity.getBoardName() : null);
                     // 未登录也回填播放策略（免费可播，其余标 NEED_LOGIN）
                     fillPlayAccessOnSelection(item, null);
                 }
@@ -250,7 +253,7 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
                 item.setIsLike(likedEpisodeIds.contains(String.valueOf(item.getId()))
                         ? PublicEnums.ONE.getIndex() : PublicEnums.ZERO.getIndex());
                 item.setIsCollect(isCollect);
-                item.setIsHot(rankListEntity != null ? PublicEnums.ONE.getIndex() : PublicEnums.ZERO.getIndex());
+                item.setIsHot(rankBoardEntity != null ? rankBoardEntity.getBoardName() : null);
                 fillPlayAccessOnSelection(item, uid);
             }
             return setResultSuccess(list, I18nUtil.getMessage("base_success"));
@@ -487,6 +490,9 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             entity.setScoreNum(scoreNum == null ? 0 : scoreNum);
             entity.setTagList(tagList);
             entity.setCoverUrl(mediaUrlService.sign(entity.getCoverUrl()));
+            // 是否是热榜视频
+            RankBoardEntity rankBoardEntity = rankBoardDao.selectBoardName(id);
+            entity.setIsHot(rankBoardEntity != null ? rankBoardEntity.getBoardName() : null);
             return setResultSuccess(entity, I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
             log.error("service error", e);
@@ -499,6 +505,8 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
         try {
             Integer uid = AppTokenUtil.resolveUid(request);
             List<String> preferTagGroupIds = watchPreferMatchSupport.resolveDramaTagGroupIds(uid);
+            // 是否是热榜视频
+            RankBoardEntity rankBoardEntity = rankBoardDao.selectBoardName(id);
             List<RecommendDramaRespEntity> list = dramaDao.relatedWork(id,
                     DeleteStateEnum.NORMAL.getIndex(),
                     VerifyStateEnums.AVAILABLE_NOW.getIndex(),
@@ -506,6 +514,7 @@ public class DramaApiServiceImpl extends BaseApiService implements DramaApiServi
             if (list != null) {
                 for (RecommendDramaRespEntity item : list) {
                     item.setCoverUrl(mediaUrlService.sign(item.getCoverUrl()));
+                    item.setIsHot(rankBoardEntity != null ? rankBoardEntity.getBoardName() : null);
                 }
             }
             return setResultSuccess(list, I18nUtil.getMessage("base_success"));

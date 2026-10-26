@@ -78,8 +78,8 @@ public class DramaAssetRespEntity {
 	@ApiModelProperty(name = "isLike",value = "是否点赞 1是0否",required = true,dataType = "String")
 	private Integer isLike;
 
-	@ApiModelProperty(name = "isHot",value = "是否热榜 1是0否",required = true,dataType = "String")
-	private Integer isHot;
+	@ApiModelProperty(name = "isHot",value = "榜单名称",required = true,dataType = "String")
+	private String isHot;
 	
 	@ApiModelProperty(name = "isCollect",value = "是否收藏 1是0否",required = true,dataType = "String")
 	private Integer isCollect;
