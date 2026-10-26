@@ -16,7 +16,7 @@ public class CouponIssueQuery {
 	@ApiModelProperty(value = "券模板ID", required = true)
 	private Integer templateId;
 
-	@ApiModelProperty(value = "目标用户 uid 列表", required = true)
+	@ApiModelProperty(value = "目标用户 uid 列表；包含 0 表示发放给全部用户", required = true)
 	private List<Integer> uidList;
 
 	@ApiModelProperty(value = "备注")

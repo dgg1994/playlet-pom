@@ -211,15 +211,25 @@ public class CouponManageServiceImpl implements CouponManageService {
 				return setResultError("券模板未启用");
 			}
 
-			// 去重 uid
+			// uid 为 0 表示发放给全部用户
+			boolean issueAll = query.getUidList().contains(0);
 			Set<Integer> uidSet = new HashSet<>();
-			for (Integer uid : query.getUidList()) {
-				if (uid != null && uid > 0) {
-					uidSet.add(uid);
+			if (issueAll) {
+				List<Integer> allUids = appAccountDao.findAllUids();
+				if (allUids == null || allUids.isEmpty()) {
+					return setResultError("暂无可发放用户");
 				}
-			}
-			if (uidSet.isEmpty()) {
-				return setResultError("请选择有效用户");
+				uidSet.addAll(allUids);
+			} else {
+				// 去重 uid
+				for (Integer uid : query.getUidList()) {
+					if (uid != null && uid > 0) {
+						uidSet.add(uid);
+					}
+				}
+				if (uidSet.isEmpty()) {
+					return setResultError("请选择有效用户");
+				}
 			}
 
 			int perUserLimit = template.getPerUserLimit() == null
@@ -231,6 +241,7 @@ public class CouponManageServiceImpl implements CouponManageService {
 					+ System.currentTimeMillis()
 					+ UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
 
+			int limitSkipCount = 0;
 			for (Integer uid : uidSet) {
 				AppAccountEntity account = appAccountDao.findByUid(uid);
 				if (account == null) {
@@ -239,7 +250,12 @@ public class CouponManageServiceImpl implements CouponManageService {
 				}
 				int owned = userCouponDao.countByUidAndTemplate(uid, template.getId());
 				if (owned >= perUserLimit) {
-					skipReasons.add("uid=" + uid + " 已达限领");
+					// 全员发放时逐条记录会导致原因列表过大，改为汇总
+					if (issueAll) {
+						limitSkipCount++;
+					} else {
+						skipReasons.add("uid=" + uid + " 已达限领");
+					}
 					continue;
 				}
 				// 总上限：每发一张前乐观加 1
@@ -253,6 +269,9 @@ public class CouponManageServiceImpl implements CouponManageService {
 				GenericityUtil.setDate(userCoupon);
 				userCouponDao.insert(userCoupon);
 				issuedUids.add(uid);
+			}
+			if (issueAll && limitSkipCount > 0) {
+				skipReasons.add(limitSkipCount + " 人已达限领");
 			}
 
 			Integer adminId = SysUserTokenUtil.resolveAdminId(request);
@@ -270,10 +289,11 @@ public class CouponManageServiceImpl implements CouponManageService {
 			GenericityUtil.setDate(logEntity);
 			couponIssueLogDao.insert(logEntity);
 
-			Map<String, Object> data = new HashMap<>(6);
+			Map<String, Object> data = new HashMap<>(8);
 			data.put("batchNo", batchNo);
 			data.put("issueCount", issuedUids.size());
 			data.put("requestCount", uidSet.size());
+			data.put("issueAll", issueAll);
 			data.put("skipReasons", skipReasons);
 			log.info("coupon issue batchNo={} templateId={} issued={}",
 					batchNo, template.getId(), issuedUids.size());

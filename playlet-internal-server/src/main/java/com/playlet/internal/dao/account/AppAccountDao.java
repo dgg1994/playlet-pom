@@ -103,6 +103,10 @@ public interface AppAccountDao extends BaseMapper<AppAccountEntity> {
 	@Select("select ifnull(count(1), 0) from app_account")
 	long countAllUsers();
 
+	/** 全量用户 uid（发放优惠券全员发放用） */
+	@Select("select id from app_account order by id asc")
+	List<Integer> findAllUids();
+
 	@Select("select ifnull(count(1), 0) from app_account "
 			+ "where setTime >= #{startTime} and setTime < #{endTimeExclusive}")
 	long countNewUsers(@Param("startTime") String startTime, @Param("endTimeExclusive") String endTimeExclusive);
