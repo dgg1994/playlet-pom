@@ -25,14 +25,14 @@ public class CoinRateSupport {
 	/**
 	 * 返回当前生效的 coinPerYuan；无配置时返回 null。
 	 */
-	public Integer resolveCoinPerYuan() {
+	public BigDecimal resolveCoinPerYuan() {
 		CoinGlobalConfigEntity cfg = coinGlobalConfigDao.findOne();
 		if (cfg == null) {
 			return null;
 		}
 		if (Integer.valueOf(CoinConstants.RATE_MODE_DAILY).equals(cfg.getRateMode())) {
 			CoinRateDailyEntity daily = coinRateDailyDao.findLatest();
-			if (daily != null && daily.getCoinPerYuan() != null && daily.getCoinPerYuan() > 0) {
+			if (daily != null && daily.getCoinPerYuan() != null && daily.getCoinPerYuan().compareTo(BigDecimal.ZERO) > 0) {
 				return daily.getCoinPerYuan();
 			}
 		}
@@ -56,7 +56,7 @@ public class CoinRateSupport {
 		if (coinTotal <= 0 || row.getEcpm().compareTo(BigDecimal.ZERO) <= 0
 				|| row.getRRate().compareTo(BigDecimal.ZERO) <= 0 || adTotal <= 0) {
 			row.setPCoin(BigDecimal.ZERO);
-			row.setCoinPerYuan(0);
+			row.setCoinPerYuan(BigDecimal.ZERO);
 			return row;
 		}
 		// 广告收入(元) = 次数 * eCPM / 1000
@@ -67,9 +67,10 @@ public class CoinRateSupport {
 		BigDecimal pCoin = adIncome.divide(BigDecimal.valueOf(coinTotal), 10, RoundingMode.HALF_UP);
 		row.setPCoin(pCoin);
 		if (pCoin.compareTo(BigDecimal.ZERO) <= 0) {
-			row.setCoinPerYuan(0);
+			row.setCoinPerYuan(BigDecimal.ZERO);
 		} else {
-			row.setCoinPerYuan(BigDecimal.ONE.divide(pCoin, 0, RoundingMode.HALF_UP).intValue());
+			BigDecimal coinPerYuan = BigDecimal.ONE.divide(pCoin, 0, RoundingMode.HALF_UP);
+			row.setCoinPerYuan(coinPerYuan);
 		}
 		return row;
 	}

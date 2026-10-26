@@ -2,6 +2,7 @@ package com.playlet.internal.service.impl;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.playlet.internal.api.response.WelfareHomeRespEntity;
 import com.playlet.internal.api.response.WelfareTaskItemEntity;
 import com.playlet.internal.base.BaseApiService;
@@ -9,10 +10,13 @@ import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.account.AppAccountDao;
+import com.playlet.internal.dao.coin.CoinGlobalConfigDao;
+import com.playlet.internal.dao.welfare.UserCoinLedgerDao;
 import com.playlet.internal.dao.welfare.UserWelfareProgressDao;
 import com.playlet.internal.dao.welfare.WelfareTaskDao;
 import com.playlet.internal.dao.welfare.WelfareTaskI18nDao;
 import com.playlet.internal.entity.account.AppAccountEntity;
+import com.playlet.internal.entity.coin.CoinGlobalConfigEntity;
 import com.playlet.internal.entity.welfare.UserWelfareProgressEntity;
 import com.playlet.internal.entity.welfare.WelfareTaskEntity;
 import com.playlet.internal.entity.welfare.WelfareTaskI18nEntity;
@@ -32,6 +36,7 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.WeekFields;
 import java.util.ArrayList;
@@ -63,6 +68,10 @@ public class WelfareTaskApiServiceImpl extends BaseApiService implements Welfare
 	private WatchGiftService watchGiftService;
 	@Autowired
 	private MediaUrlService mediaUrlService;
+	@Autowired
+	private CoinGlobalConfigDao coinGlobalConfigDao;
+	@Autowired
+	private UserCoinLedgerDao userCoinLedgerDao;
 
 	@Override
 	public ResponseBase home(HttpServletRequest request) {
@@ -71,12 +80,26 @@ public class WelfareTaskApiServiceImpl extends BaseApiService implements Welfare
 		if (uid != null) {
 			AppAccountEntity account = appAccountDao.findByUid(uid);
 			resp.setCoinBalance(account == null || account.getCoinBalance() == null ? 0L : account.getCoinBalance());
+			// 今日收益
+			BigDecimal todayEarnings = userCoinLedgerDao.selectTodayEarningsByUid(uid);
+			resp.setTodayEarnings(todayEarnings == null ? BigDecimal.ZERO : todayEarnings);
 		}else {
 			resp.setCoinBalance(0L);
+			resp.setTodayEarnings(BigDecimal.ZERO);
 		}
+		// 金币比例
+		CoinGlobalConfigEntity coinGlobalConfigEntity = coinGlobalConfigDao.selectOne(new QueryWrapper<>());
+		BigDecimal manualCoinPerYuan = BigDecimal.ZERO;
+		if (coinGlobalConfigEntity != null) {
+			manualCoinPerYuan = coinGlobalConfigEntity.getManualCoinPerYuan();
+		}
+		String coinRateStr = String.format("1 : %s", manualCoinPerYuan);
+		resp.setCoinRate(coinRateStr);
+		List<String> ads = new ArrayList<>();
 		resp.setSignIn(signInService.buildHomeSummary(uid));
 		resp.setWatchGift(watchGiftService.buildHomeSummary(uid));
-		resp.setTasks(buildTaskItems(uid));
+		resp.setTasks(buildTaskItems(ads,uid));
+		resp.setAd(ads);
 		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
 	}
 
@@ -86,7 +109,8 @@ public class WelfareTaskApiServiceImpl extends BaseApiService implements Welfare
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403,I18nUtil.getMessage("login_required"));
 		}
-		return setResultSuccess(buildTaskItems(uid), I18nUtil.getMessage("base_success"));
+		List<String> ads = new  ArrayList<>();
+		return setResultSuccess(buildTaskItems(ads,uid), I18nUtil.getMessage("base_success"));
 	}
 
 	/**
@@ -94,7 +118,7 @@ public class WelfareTaskApiServiceImpl extends BaseApiService implements Welfare
 	 * @param uid 用户ID
 	 * @return 任务项
 	 */
-	private List<WelfareTaskItemEntity> buildTaskItems(Integer uid) {
+	private List<WelfareTaskItemEntity> buildTaskItems(List<String> ads,Integer uid) {
 		List<WelfareTaskEntity> tasks = welfareTaskDao.findEnabledList();
 		if (tasks == null) {
 			tasks = new ArrayList<>();
@@ -141,6 +165,7 @@ public class WelfareTaskApiServiceImpl extends BaseApiService implements Welfare
 			if (byTaskIdAndLangue != null) {
 				item.setTaskName(byTaskIdAndLangue.getTaskName());
 				item.setTaskDesc(byTaskIdAndLangue.getTaskDesc());
+				ads.add(byTaskIdAndLangue.getTaskDesc());
 			}
 			if (progress == null) {
 				item.setProgress(0);

@@ -29,7 +29,7 @@ public class CoinGlobalConfigEntity {
 
 	@TableField("manual_coin_per_yuan")
 	@ApiModelProperty(name = "manualCoinPerYuan", value = "手动汇率：多少币≈1元", dataType = "Integer")
-	private Integer manualCoinPerYuan;
+	private BigDecimal manualCoinPerYuan;
 
 	@TableField("rate_mode")
 	@ApiModelProperty(name = "rateMode", value = "1手动 2按日广告公式", dataType = "Integer")

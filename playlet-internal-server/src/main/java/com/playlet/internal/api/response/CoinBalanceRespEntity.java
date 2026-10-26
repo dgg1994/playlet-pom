@@ -4,6 +4,8 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
+import java.math.BigDecimal;
+
 /**
  * C 端金币余额与汇率。
  */
@@ -21,7 +23,7 @@ public class CoinBalanceRespEntity {
 	private Long availableCoin;
 
 	@ApiModelProperty("当前多少币≈1元；无配置为 null")
-	private Integer coinPerYuan;
+	private BigDecimal coinPerYuan;
 
 	@ApiModelProperty("汇率模式 1手动 2按日")
 	private Integer rateMode;

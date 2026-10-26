@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Repository
@@ -25,4 +26,10 @@ public interface UserCoinLedgerDao extends BaseMapper<UserCoinLedgerEntity> {
 			+ "order by setTime desc, id desc"
 			+ "</script>")
 	List<UserCoinLedgerEntity> findByUidAndBizType(@Param("uid") Integer uid, @Param("bizType") String bizType);
+
+	@Select("SELECT SUM(ucl.change_amt) " +
+			"FROM user_coin_ledger ucl " +
+			"WHERE ucl.uid = #{uid} " +
+			"  AND DATE(ucl.setTime) = CURDATE();")
+    BigDecimal selectTodayEarningsByUid(@Param("uid") Integer uid);
 }

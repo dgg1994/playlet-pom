@@ -49,7 +49,7 @@ public class CoinRateDailyEntity {
 
 	@TableField("coin_per_yuan")
 	@ApiModelProperty(name = "coinPerYuan", value = "多少币≈1元", dataType = "Integer")
-	private Integer coinPerYuan;
+	private BigDecimal coinPerYuan;
 
 	@TableField("setTime")
 	@ApiModelProperty(name = "setTime", value = "创建时间", dataType = "Date")

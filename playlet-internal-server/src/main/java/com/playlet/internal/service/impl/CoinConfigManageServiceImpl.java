@@ -114,7 +114,7 @@ public class CoinConfigManageServiceImpl implements CoinConfigManageService {
 				toSave = coinRateSupport.computeDailyRate(adTotal, ecpm, rRate, coinTotal);
 				toSave.setBizDate(entity.getBizDate());
 			} else {
-				if (entity.getCoinPerYuan() == null || entity.getCoinPerYuan() < 0) {
+				if (entity.getCoinPerYuan() == null || BigDecimal.ZERO.compareTo(entity.getCoinPerYuan()) > 0) {
 					return setResultError("coinPerYuan 须 >= 0，或传广告公式字段由服务端计算");
 				}
 				toSave = new CoinRateDailyEntity();
@@ -172,7 +172,7 @@ public class CoinConfigManageServiceImpl implements CoinConfigManageService {
 				&& entity.getRateMode() != CoinConstants.RATE_MODE_DAILY) {
 			return "rateMode 仅支持 1手动/2按日";
 		}
-		if (entity.getManualCoinPerYuan() != null && entity.getManualCoinPerYuan() < 0) {
+		if (entity.getManualCoinPerYuan() != null && BigDecimal.ZERO.compareTo(entity.getManualCoinPerYuan()) > 0) {
 			return "manualCoinPerYuan 不能为负";
 		}
 		if (entity.getIdleClearDays() != null && entity.getIdleClearDays() < 1) {
