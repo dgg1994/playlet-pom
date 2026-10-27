@@ -51,6 +51,12 @@ public class RedisKeyConstants {
 
     /** 邮箱验证码：后缀为 email */
     public static final String EMAIL_CODE_KEY = PROJECT_PREFIX + "email:code:";
+    /** 短信验证码：后缀为 区号+手机号 */
+    public static final String SMS_CODE_KEY = PROJECT_PREFIX + "sms:code:";
+    /** 短信发送冷却：后缀为 区号+手机号（纯数字，去掉 +） */
+    public static final String SMS_COOLDOWN_KEY = PROJECT_PREFIX + "sms:cd:";
+    /** 短信发送冷却秒数：同一号码 60 秒内只能发一次 */
+    public static final long SMS_COOLDOWN_SEC = 60L;
     /** 作家端邮箱验证码：后缀为登录邮箱 */
     public static final String CREATOR_EMAIL_CODE_KEY = PROJECT_PREFIX + "creator:email:code:";
     /** 接口幂等：后缀为 requestId */

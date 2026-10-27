@@ -19,6 +19,8 @@ import javax.annotation.PostConstruct;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.URLDecoder;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 短信发送工具类
@@ -29,6 +31,9 @@ public class SmsUtil extends BaseApiService {
     
     private static final Logger LOG = LoggerFactory.getLogger(SmsUtil.class);
     
+    /** 网关错误码：mterrcode=0112 */
+    private static final Pattern ERR_CODE_PATTERN = Pattern.compile("mterrcode=([^&\\s]+)");
+
     private static String URL;       // 接口地址
     private static String ACCOUNT;   // 账号
     private static String PASSWORD;  // 密码
@@ -71,8 +76,9 @@ public class SmsUtil extends BaseApiService {
             if (result != null && result.contains("mterrcode=000")) {
                 return setResultSuccess("验证码发送成功");
             } else {
-                LOG.error("短信发送失败: mobile={}, result={}", mobile, result);
-                return setResultError("验证码发送失败，请稍后重试");
+                String errCode = extractErrCode(result);
+                LOG.error("短信发送失败: mobile={}, mterrcode={}, result={}", mobile, errCode, result);
+                return setResultError("验证码发送失败" + (errCode == null ? "" : "(" + errCode + ")") + "，请稍后重试");
             }
         } catch (Exception e) {
             LOG.error("短信发送异常: mobile={}", mobile, e);
@@ -92,7 +98,9 @@ public class SmsUtil extends BaseApiService {
             if (result != null && result.contains("mterrcode=000")) {
                 return setResultSuccess("短信发送成功");
             } else {
-                return setResultError("短信发送失败");
+                String errCode = extractErrCode(result);
+                LOG.error("短信发送失败: mobile={}, mterrcode={}, result={}", mobile, errCode, result);
+                return setResultError("短信发送失败" + (errCode == null ? "" : "(" + errCode + ")"));
             }
         } catch (Exception e) {
             LOG.error("短信发送异常", e);
@@ -231,6 +239,17 @@ public class SmsUtil extends BaseApiService {
         }
     }
     
+    /**
+     * 从网关响应中提取错误码，便于定位问题（如 mterrcode=0112 → 0112）
+     */
+    private static String extractErrCode(String response) {
+        if (response == null) {
+            return null;
+        }
+        Matcher matcher = ERR_CODE_PATTERN.matcher(response);
+        return matcher.find() ? matcher.group(1) : null;
+    }
+
     /**
      * 查询余额
      * @return 余额信息

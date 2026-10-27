@@ -24,11 +24,16 @@ import java.lang.reflect.InvocationTargetException;
 public interface AppUserService {
 
     @PostMapping("/signUp")
-    @ApiOperation(value = "注册", notes = "注册", response = ResponseBase.class)
+    @ApiOperation(value = "注册", notes = "手机号+密码注册。body：mobilePrefix（区号，如 86）、mobileNumber（手机号）、userPassword（6~20 位）、"
+            + "telCode（短信验证码，先调 /sendSmsCode 获取）、可选 registrationId/cid、deviceName、enterInvitationCode。"
+            + "注册成功直接返回 token（注册即登录）。仍兼容旧邮箱注册：传 userEmail + emailCode。",
+            response = ResponseBase.class)
     ResponseBase signUp(AppAccountEntity entity);
 
     @PostMapping("/login")
-    @ApiOperation(value = "登录", notes = "登录", response = ResponseBase.class)
+    @ApiOperation(value = "登录", notes = "手机号+密码登录（默认）。body：loginType=2、userAccount（手机号，不含区号）、mobilePrefix（区号）、"
+            + "userPassword；loginType=1 为邮箱登录（userAccount 传邮箱）。不传 loginType 时按手机号处理。",
+            response = ResponseBase.class)
     ResponseBase login(AppAccountEntity entity, HttpServletRequest req);
 
     @PostMapping("/oneClickLogin")
@@ -53,6 +58,27 @@ public interface AppUserService {
     })
     @ApiOperation(value = "校验邮件验证码", notes = "校验邮件验证码", response = ResponseBase.class)
     ResponseBase checkEmailCode(@RequestParam("userEmail") String userEmail, @RequestParam("emailCode") String emailCode);
+
+    @GetMapping("/sendSmsCode")
+    @ApiImplicitParams({
+            @ApiImplicitParam(name = "mobilePrefix", value = "国家区号，如 86 或 +86", required = true, dataType = "String", paramType = "query"),
+            @ApiImplicitParam(name = "mobileNumber", value = "手机号码（不含区号）", required = true, dataType = "String", paramType = "query"),
+    })
+    @ApiOperation(value = "发送短信验证码", notes = "注册/忘记密码共用。同一号码 60 秒内只能发一次，验证码 5 分钟有效。",
+            response = ResponseBase.class)
+    ResponseBase sendSmsCode(@RequestParam("mobilePrefix") String mobilePrefix,
+                             @RequestParam("mobileNumber") String mobileNumber);
+
+    @GetMapping("/checkSmsCode")
+    @ApiImplicitParams({
+            @ApiImplicitParam(name = "mobilePrefix", value = "国家区号，如 86 或 +86", required = true, dataType = "String", paramType = "query"),
+            @ApiImplicitParam(name = "mobileNumber", value = "手机号码（不含区号）", required = true, dataType = "String", paramType = "query"),
+            @ApiImplicitParam(name = "smsCode", value = "短信验证码", required = true, dataType = "String", paramType = "query"),
+    })
+    @ApiOperation(value = "校验短信验证码", notes = "仅校验不删除，注册/忘记密码时会再次校验并失效。", response = ResponseBase.class)
+    ResponseBase checkSmsCode(@RequestParam("mobilePrefix") String mobilePrefix,
+                              @RequestParam("mobileNumber") String mobileNumber,
+                              @RequestParam("smsCode") String smsCode);
     
     @PostMapping("/updatePwd")
 	@ApiOperation(value = "修改密码",notes="修改密码",response=ResponseBase.class)
@@ -92,7 +118,9 @@ public interface AppUserService {
 	ResponseBase heartbeat(HttpServletRequest request);
 	
 	@PostMapping("/forgetPassword")
-	@ApiOperation(value = "忘记密码",notes="忘记密码",response=ResponseBase.class)
+	@ApiOperation(value = "忘记密码（短信验证码重置）", notes = "手机号找回：body 传 mobilePrefix、mobileNumber、telCode（短信验证码）、newPassword（6~20 位）；"
+			+ "仍兼容邮箱找回：传 email + emailCode + newPassword。重置成功后踢全端，需重新登录。",
+			response=ResponseBase.class)
     ResponseBase forgetPasswrod(UpdatePwdEntity entity);
 
 

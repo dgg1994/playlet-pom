@@ -76,7 +76,18 @@ telegram:
   notice_group_id: '-1003786742166'
 #短信发送
 sms:
+  # 通道：auto=区号86走阿里云、其他走国际通道；aliyun=全走阿里云；santo=全走国际通道
+  provider: auto
   url: http://api2.santo.cc/submit
   account: D4fHZloE
   password: LpQaKN8a
+  #阿里云短信（国内通道）：需先报备签名与验证码模板
+  aliyun:
+    access-key-id:            # RAM 子账号 AccessKeyId（建议用环境变量 SMS_ALIYUN_AK）
+    access-key-secret:        # RAM 子账号 AccessKeySecret
+    region-id: cn-hangzhou
+    endpoint: dysmsapi.aliyuncs.com
+    sign-name:                # 已报备签名，如 剧好看
+    template-code:            # 已报备验证码模板 CODE，如 SMS_123456789
+    template-param: code
 

@@ -23,7 +23,16 @@ public class UpdatePwdEntity {
 	@ApiModelProperty(name = "emailCode",value = "邮箱验证码",required = true,dataType = "String")
 	private String emailCode;
 	
-	@ApiModelProperty(name = "email",value = "邮箱",required = true,dataType = "String")
+	@ApiModelProperty(name = "email",value = "邮箱（邮箱找回时必填）",required = false,dataType = "String")
 	private String email;
+
+	@ApiModelProperty(name = "mobileNumber",value = "手机号（不含区号；手机号找回时必填）",required = false,dataType = "String")
+	private String mobileNumber;
+
+	@ApiModelProperty(name = "mobilePrefix",value = "国家区号，如 86 / +86（手机号找回时必填）",required = false,dataType = "String")
+	private String mobilePrefix;
+
+	@ApiModelProperty(name = "telCode",value = "短信验证码（手机号找回时必填）",required = false,dataType = "String")
+	private String telCode;
 
 }

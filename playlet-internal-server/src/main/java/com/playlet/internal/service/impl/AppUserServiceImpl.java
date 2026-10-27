@@ -1,4 +1,5 @@
 package com.playlet.internal.service.impl;
+
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.api.request.UserRegisterEntity;
@@ -23,13 +24,13 @@ import com.playlet.internal.entity.coupon.UserCouponEntity;
 import com.playlet.internal.entity.member.UserMemberEntity;
 import com.playlet.internal.entity.template.EmailTemplateEntity;
 import com.playlet.internal.enums.*;
-import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.filter.JWTAuthenticationFilter;
 import com.playlet.internal.query.account.BindPushQuery;
 import com.playlet.internal.query.account.PushSwitchQuery;
 import com.playlet.internal.query.account.UpdatePwdEntity;
 import com.playlet.internal.service.AppUserService;
 import com.playlet.internal.service.MediaUrlService;
+import com.playlet.internal.service.support.SmsSendSupport;
 import com.playlet.internal.service.support.UserActiveStatService;
 import com.playlet.internal.service.support.UserOnlineHeartbeatService;
 import com.playlet.internal.utils.*;
@@ -37,7 +38,6 @@ import com.playlet.internal.utils.oidc.OidcIdTokenPayload;
 import com.playlet.internal.utils.oidc.OidcTokenVerifier;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.InvalidKeyException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -45,6 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+
 import javax.servlet.http.HttpServletRequest;
 import java.lang.reflect.InvocationTargetException;
 import java.time.LocalDateTime;
@@ -61,6 +62,13 @@ import java.util.regex.Pattern;
 public class AppUserServiceImpl extends BaseApiService implements AppUserService {
 
 	private static final Pattern BIRTH_MONTH_PATTERN = Pattern.compile("^\\d{4}-(0[1-9]|1[0-2])$");
+
+	/** 手机号（不含区号） */
+	private static final Pattern MOBILE_PATTERN = Pattern.compile("^\\d{5,20}$");
+	/** 国家区号，允许 86 或 +86 */
+	private static final Pattern MOBILE_PREFIX_PATTERN = Pattern.compile("^\\+?\\d{1,5}$");
+	/** 登录密码：6~20 位字母、数字及常用符号 */
+	private static final Pattern PASSWORD_PATTERN = Pattern.compile("^[A-Za-z0-9@#!$%^&*()_+\\-=.]{6,20}$");
 
 	@Autowired
 	private RedisUtil redisUtil;
@@ -101,29 +109,59 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	@Autowired
 	private UserCouponDao userCouponDao;
 
+	@Autowired
+	private SmsSendSupport smsSendSupport;
+
 
 	@SuppressWarnings("deprecation")
 	@Override
 	public ResponseBase signUp(@RequestBody AppAccountEntity entity) {
         try {
-            if (entity == null || StringUtils.isEmpty(entity.getUserEmail())
-                    || StringUtils.isEmpty(entity.getUserPassword())) {
+            if (entity == null) {
                 return setResultError(I18nUtil.getMessage("base_error"));
             }
-            // 校验邮箱验证码
-            if (!verifyCode(entity.getUserEmail(), entity.getEmailCode())) {
-                return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
+            String mobilePrefix = normalizeMobilePrefix(entity.getMobilePrefix());
+            String mobileNumber = trimToNull(entity.getMobileNumber());
+            // 优先手机号注册；未传手机号时兼容旧的邮箱注册
+            boolean byPhone = isValidMobile(mobilePrefix, mobileNumber);
+            if (!byPhone && StringUtils.isEmpty(entity.getUserEmail())) {
+                return setResultError(I18nUtil.getMessage("phone_format_error"));
             }
-            // 邮箱唯一性校验
-            if (appAccountDao.findByEmail(entity.getUserEmail()) != null) {
-                return setResultError(I18nUtil.getMessage("user.account_exist"));
+            if (!isValidPassword(entity.getUserPassword())) {
+                return setResultError(I18nUtil.getMessage("password_format_error"));
+            }
+            if (byPhone) {
+                // 校验短信验证码
+                if (!verifySmsCode(mobilePrefix, mobileNumber, entity.getTelCode())) {
+                    return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
+                }
+                // 手机号唯一性校验
+                if (appAccountDao.findByTel(mobileNumber, mobilePrefix) != null
+                        || appAccountDao.findByAccount(mobileNumber) != null) {
+                    return setResultError(I18nUtil.getMessage("user.account_exist"));
+                }
+            } else {
+                // 校验邮箱验证码
+                if (!verifyCode(entity.getUserEmail(), entity.getEmailCode())) {
+                    return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
+                }
+                // 邮箱唯一性校验
+                if (appAccountDao.findByEmail(entity.getUserEmail()) != null) {
+                    return setResultError(I18nUtil.getMessage("user.account_exist"));
+                }
             }
             AppAccountEntity account = new AppAccountEntity();
-            account.setUserAccount(entity.getUserEmail());
-            account.setUserEmail(entity.getUserEmail());
+            if (byPhone) {
+                account.setUserAccount(mobileNumber);
+                account.setMobileNumber(mobileNumber);
+                account.setMobilePrefix(mobilePrefix);
+            } else {
+                account.setUserAccount(entity.getUserEmail());
+                account.setUserEmail(entity.getUserEmail());
+                account.setMobileNumber(entity.getMobileNumber());
+                account.setMobilePrefix(mobilePrefix);
+            }
             account.setUserPassword(PasswordHashUtils.encode(entity.getUserPassword()));
-            account.setMobileNumber(entity.getMobileNumber());
-            account.setMobilePrefix(entity.getMobilePrefix());
             Long seed = Long.parseLong(
                     System.currentTimeMillis() +
                             String.format("%04d", ThreadLocalRandom.current().nextInt(1000, 9999))
@@ -142,14 +180,20 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
             account.setGmtModified(new Date());
             appAccountDao.insert(account);
             upsertPushBind(account.getId(), account.getRegistrationId(), account.getDeviceName());
+            // 验证码一次性：注册成功后立即失效
+            if (byPhone) {
+                redisUtil.del(smsCodeKey(mobilePrefix, mobileNumber));
+            } else {
+                redisUtil.del(RedisKeyConstants.EMAIL_CODE_KEY + entity.getUserEmail());
+            }
             String token = Jwts.builder()
                     // 设置主题
-                    .setSubject(entity.getUserAccount())
+                    .setSubject(account.getUserAccount())
                     // 设置到期时间
                     .setExpiration(new Date(System.currentTimeMillis() + Constants.USER_JWT_EXPIRE_TIME))
                     // 选择 加密算法和私钥
                     .signWith(SignatureAlgorithm.HS512, Constants.SIGNING_KEY).compact();
-            redisUtil.set(Constants.APP_PACKAGE_NAME + entity.getUserAccount(),
+            redisUtil.set(Constants.APP_PACKAGE_NAME + account.getUserAccount(),
                     Constants.AUTH_HEADER_START_WITH + token, Constants.USER_REDIS_EXPIRE_TIME / 1000);
 			// 注册即登录：写入 last_login_time，避免久未登录清币误伤
 			appAccountDao.touchLastLoginTime(account.getId());
@@ -164,13 +208,13 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	@Override
 	public ResponseBase login(@RequestBody AppAccountEntity entity, HttpServletRequest req) {
 		try {
-			if(entity.getLoginType() == null) {
-				return setResultError(I18nUtil.getMessage("user.account_error"));
-			}
+			// 不传 loginType 时默认手机号+密码登录
+			Integer loginType = entity.getLoginType() == null
+					? PublicEnums.TOW.getIndex() : entity.getLoginType();
 			AppAccountEntity appUserEntity = null;
-			if(PublicEnums.ONE.getIndex().equals(entity.getLoginType())) {//邮箱登录
+			if(PublicEnums.ONE.getIndex().equals(loginType)) {//邮箱登录
 				appUserEntity = appAccountDao.findByEmail(entity.getUserAccount());
-			}else if(PublicEnums.TOW.getIndex().equals(entity.getLoginType())) {//手机号登录
+			}else if(PublicEnums.TOW.getIndex().equals(loginType)) {//手机号登录
 				appUserEntity = appAccountDao.findByTel(entity.getUserAccount(),entity.getMobilePrefix());
 			}
 			if (appUserEntity == null) {
@@ -457,13 +501,55 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	}
 
 	@Override
+	public ResponseBase sendSmsCode(String mobilePrefix, String mobileNumber) {
+		try {
+			String prefix = normalizeMobilePrefix(mobilePrefix);
+			String mobile = trimToNull(mobileNumber);
+			if (!isValidMobile(prefix, mobile)) {
+				return setResultError(I18nUtil.getMessage("phone_format_error"));
+			}
+			String fullMobile = toE164(prefix, mobile);
+			// 60 秒冷却，防止刷短信
+			if (redisUtil.hasKey(RedisKeyConstants.SMS_COOLDOWN_KEY + fullMobile)) {
+				return setResultError(I18nUtil.getMessage("sms_send_too_frequent"));
+			}
+			String code = OrderCodeFactory.getRandomStr(6);
+			String provider = smsSendSupport.resolveProvider(prefix);
+			if (!smsSendSupport.sendVerificationCode(prefix, mobile, code)) {
+				log.warn("短信验证码发送失败 provider={} mobile={}", provider, fullMobile);
+				return setResultError(I18nUtil.getMessage("sms_send_failed"));
+			}
+			redisUtil.set(smsCodeKey(prefix, mobile), code, Constants.CODE_EXPIRE_TIME);
+			redisUtil.set(RedisKeyConstants.SMS_COOLDOWN_KEY + fullMobile, "1",
+					RedisKeyConstants.SMS_COOLDOWN_SEC);
+			return setResultSuccess(I18nUtil.getMessage("send_success"));
+		} catch (Exception e) {
+			log.error("sendSmsCode error mobile={}", mobileNumber, e);
+			throw new RuntimeException(e);
+		}
+	}
+
+	@Override
+	public ResponseBase checkSmsCode(String mobilePrefix, String mobileNumber, String smsCode) {
+		String prefix = normalizeMobilePrefix(mobilePrefix);
+		String mobile = trimToNull(mobileNumber);
+		if (!isValidMobile(prefix, mobile)) {
+			return setResultError(I18nUtil.getMessage("phone_format_error"));
+		}
+		if (verifySmsCode(prefix, mobile, smsCode)) {
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		}
+		return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
+	}
+
+	@Override
 	public ResponseBase updatePwd(@RequestBody UpdatePwdEntity entity, HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
 		}
-		if (entity == null || StringUtils.isEmpty(entity.getNewPassword())) {
-			return setResultError(I18nUtil.getMessage("base_error"));
+		if (entity == null || !isValidPassword(entity.getNewPassword())) {
+			return setResultError(I18nUtil.getMessage("password_format_error"));
 		}
 		AppAccountEntity account = appAccountDao.selectById(uid);
 		if (account == null) {
@@ -683,22 +769,43 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 
 	@Override
 	public ResponseBase forgetPasswrod(@RequestBody UpdatePwdEntity entity) {
-		if (entity == null || StringUtils.isEmpty(entity.getEmail())
-				|| StringUtils.isEmpty(entity.getNewPassword())) {
+		if (entity == null || StringUtils.isEmpty(entity.getNewPassword())) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
-		if (!verifyCode(entity.getEmail(), entity.getEmailCode())) {
-			return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
+		if (!isValidPassword(entity.getNewPassword())) {
+			return setResultError(I18nUtil.getMessage("password_format_error"));
 		}
-		AppAccountEntity account = appAccountDao.findByEmail(entity.getEmail());
+		String mobilePrefix = normalizeMobilePrefix(entity.getMobilePrefix());
+		String mobileNumber = trimToNull(entity.getMobileNumber());
+		// 优先手机号+短信验证码；未传手机号时兼容邮箱验证码找回
+		boolean byPhone = isValidMobile(mobilePrefix, mobileNumber);
+		if (!byPhone && StringUtils.isEmpty(entity.getEmail())) {
+			return setResultError(I18nUtil.getMessage("phone_format_error"));
+		}
+		AppAccountEntity account;
+		if (byPhone) {
+			if (!verifySmsCode(mobilePrefix, mobileNumber, entity.getTelCode())) {
+				return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
+			}
+			account = appAccountDao.findByTel(mobileNumber, mobilePrefix);
+		} else {
+			if (!verifyCode(entity.getEmail(), entity.getEmailCode())) {
+				return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
+			}
+			account = appAccountDao.findByEmail(entity.getEmail());
+		}
 		if (account == null) {
 			return setResultError(I18nUtil.getMessage("user.account_error"));
 		}
 		account.setUserPassword(PasswordHashUtils.encode(entity.getNewPassword()));
 		account.setGmtModified(new Date());
 		appAccountDao.updateById(account);
-		// 清理邮箱验证码
-		redisUtil.del(RedisKeyConstants.EMAIL_CODE_KEY + entity.getEmail());
+		// 清理验证码，保证一次性
+		if (byPhone) {
+			redisUtil.del(smsCodeKey(mobilePrefix, mobileNumber));
+		} else {
+			redisUtil.del(RedisKeyConstants.EMAIL_CODE_KEY + entity.getEmail());
+		}
 		// 忘记密码后踢全端
 		AppTokenUtil.invalidateAccountSessions(account);
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
@@ -732,7 +839,7 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 	// ==================== 私有工具方法 ====================
 
 	/**
-	 * 校验验证码
+	 * 校验邮箱验证码
 	 */
 	private boolean verifyCode(String email, String code) {
 		if (StringUtils.isEmpty(code)) {
@@ -740,6 +847,50 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 		}
 		Object cache = redisUtil.get(RedisKeyConstants.EMAIL_CODE_KEY + email);
 		return cache != null && cache.toString().equals(code);
+	}
+
+	/**
+	 * 校验短信验证码
+	 */
+	private boolean verifySmsCode(String mobilePrefix, String mobileNumber, String code) {
+		if (StringUtils.isEmpty(code)) {
+			return false;
+		}
+		Object cache = redisUtil.get(smsCodeKey(mobilePrefix, mobileNumber));
+		return cache != null && cache.toString().equals(code.trim());
+	}
+
+	/** 短信验证码 Redis key：区号+手机号，保证跨国同号不串 */
+	private String smsCodeKey(String mobilePrefix, String mobileNumber) {
+		return RedisKeyConstants.SMS_CODE_KEY + mobilePrefix + mobileNumber;
+	}
+
+	/** 区号：仅去空格，保持与库里 mobile_prefix 一致的写法 */
+	private String normalizeMobilePrefix(String mobilePrefix) {
+		return mobilePrefix == null ? "" : mobilePrefix.trim();
+	}
+
+	private String trimToNull(String value) {
+		if (value == null) {
+			return null;
+		}
+		String v = value.trim();
+		return v.isEmpty() ? null : v;
+	}
+
+	private boolean isValidMobile(String mobilePrefix, String mobileNumber) {
+		return MOBILE_PREFIX_PATTERN.matcher(mobilePrefix).matches()
+				&& mobileNumber != null && MOBILE_PATTERN.matcher(mobileNumber).matches();
+	}
+
+	/** 短信通道要求：区号+号码，不带 + */
+	private String toE164(String mobilePrefix, String mobileNumber) {
+		String prefix = mobilePrefix.startsWith("+") ? mobilePrefix.substring(1) : mobilePrefix;
+		return prefix + mobileNumber;
+	}
+
+	private boolean isValidPassword(String password) {
+		return password != null && PASSWORD_PATTERN.matcher(password).matches();
 	}
 
 	/** 登录邮箱：优先 user_email */
