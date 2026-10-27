@@ -32,6 +32,18 @@ public final class EpisodeUnlockConstants {
 	/** 播放拦截：未上架 */
 	public static final String BLOCK_NOT_ON_SHELF = "NOT_ON_SHELF";
 
+	/** 解锁结果：已解锁（金币/广告/会员直通） */
+	public static final String UNLOCK_STATUS_UNLOCKED = "UNLOCKED";
+
+	/** 解锁结果：待支付（现金下单成功，等待回调） */
+	public static final String UNLOCK_STATUS_WAIT_PAY = "WAIT_PAY";
+
+	/** 解锁范围：只解锁当前集 */
+	public static final String UNLOCK_SCOPE_SINGLE = "SINGLE";
+
+	/** 解锁范围：当前集及之后所有付费集（后续剧集全部解锁） */
+	public static final String UNLOCK_SCOPE_REMAINING = "REMAINING";
+
 	private EpisodeUnlockConstants() {
 	}
 }

@@ -152,6 +152,12 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 	@Select("select set_num from drama_asset where id = #{episodeId}")
 	String selectSetNum(@Param("episodeId") String episodeId);
 
+	/** 批量解锁：取该剧从起始集号起、已上架未删除的集（含起始集），按集号升序 */
+	@Select("select * from drama_asset where drama_id = #{dramaId} and ifnull(delete_state, 0) = 0 "
+			+ "and shelf_status = 1 and video_status = 1 and set_num >= #{fromSetNum} order by set_num, id")
+	List<DramaAssetEntity> findOnShelfFromSetNum(@Param("dramaId") Integer dramaId,
+			@Param("fromSetNum") Integer fromSetNum);
+
 	@Select("<script>"
 			+ "select id, set_num as setNum from drama_asset where id in "
 			+ "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>"

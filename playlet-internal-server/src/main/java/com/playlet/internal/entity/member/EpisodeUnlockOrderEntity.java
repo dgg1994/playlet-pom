@@ -42,6 +42,18 @@ public class EpisodeUnlockOrderEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "assetId", value = "集ID", dataType = "Integer")
 	private Integer assetId;
 
+	@TableField("unlock_scope")
+	@ApiModelProperty(name = "unlockScope", value = "解锁范围 SINGLE=单集 / REMAINING=当前集及之后全部付费集", dataType = "String")
+	private String unlockScope;
+
+	@TableField("from_set_num")
+	@ApiModelProperty(name = "fromSetNum", value = "REMAINING 时的起始集号", dataType = "Integer")
+	private Integer fromSetNum;
+
+	@TableField("unlock_count")
+	@ApiModelProperty(name = "unlockCount", value = "本次解锁集数", dataType = "Integer")
+	private Integer unlockCount;
+
 	@TableField("pay_amount")
 	@ApiModelProperty(name = "payAmount", value = "实付(元)", dataType = "BigDecimal")
 	private BigDecimal payAmount;

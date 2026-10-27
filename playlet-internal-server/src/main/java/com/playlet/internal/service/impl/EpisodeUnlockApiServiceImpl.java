@@ -1,9 +1,8 @@
 package com.playlet.internal.service.impl;
 
 import com.playlet.internal.api.request.EpisodeUnlockAdReqEntity;
-import com.playlet.internal.api.request.EpisodeUnlockCashCreateReqEntity;
 import com.playlet.internal.api.request.EpisodeUnlockCashNotifyReqEntity;
-import com.playlet.internal.api.request.EpisodeUnlockCoinReqEntity;
+import com.playlet.internal.api.request.EpisodeUnlockReqEntity;
 import com.playlet.internal.api.response.EpisodePlayAccessRespEntity;
 import com.playlet.internal.api.response.EpisodeUnlockOrderRespEntity;
 import com.playlet.internal.api.response.PayPrepayResult;
@@ -44,7 +43,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 import static com.playlet.internal.base.BaseApiService.setResultError;
 import static com.playlet.internal.base.BaseApiService.setResultSuccess;
@@ -87,7 +88,7 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 
 	@Override
 	@Transactional(rollbackFor = Exception.class)
-	public ResponseBase unlockByCoin(HttpServletRequest request, @RequestBody EpisodeUnlockCoinReqEntity req) {
+	public ResponseBase unlock(HttpServletRequest request, @RequestBody EpisodeUnlockReqEntity req) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
@@ -95,16 +96,42 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 		if (req == null || req.getAssetId() == null) {
 			return setResultError(I18nUtil.getMessage("param_not_null"));
 		}
+		String payType = req.getPayType() == null ? null : req.getPayType().trim();
+		if (MemberPayTypeEnums.ofCode(payType) == null) {
+			return setResultError(I18nUtil.getMessage("episode.unlock_pay_type_invalid"));
+		}
+		String scope = resolveScope(req.getUnlockScope());
+		if (scope == null) {
+			return setResultError(I18nUtil.getMessage("episode.unlock_scope_invalid"));
+		}
 		try {
 			DramaAssetEntity asset = requirePayAsset(req.getAssetId());
 			EpisodePlayAccessResult access = episodePlayAccessSupport.resolve(uid, asset);
 			if (access.isCanPlay()) {
-				return setResultSuccess(I18nUtil.getMessage("base_success"));
+				return setResultSuccess(alreadyUnlockedResp(asset, access), I18nUtil.getMessage("base_success"));
 			}
 			if (!EpisodeUnlockConstants.BLOCK_NEED_PAY.equals(access.getBlockReason())) {
 				return setResultError(I18nUtil.getMessage("episode.unlock_not_allowed"));
 			}
-			int priceCoin = access.getPriceCoin() == null ? 0 : access.getPriceCoin();
+			if (MemberPayTypeEnums.isCoin(payType)) {
+				return unlockByCoin(uid, asset, access, req, scope);
+			}
+			return createCashOrder(uid, asset, access, req, scope);
+		} catch (Exception e) {
+			log.error("episode unlock failed uid={} assetId={} payType={}", uid, req.getAssetId(), payType, e);
+			throw new BaseException(I18nUtil.getMessage("episode.unlock_failed"), e);
+		}
+	}
+
+	/** 金币解锁：按范围合并计价，扣金币并逐集写入解锁记录 */
+	private ResponseBase unlockByCoin(Integer uid, DramaAssetEntity asset,
+			EpisodePlayAccessResult access, EpisodeUnlockReqEntity req, String scope) throws Exception {
+		try {
+			List<DramaAssetEntity> targets = resolveUnlockTargets(uid, asset, scope);
+			if (targets.isEmpty()) {
+				return setResultSuccess(alreadyUnlockedResp(asset, access), I18nUtil.getMessage("base_success"));
+			}
+			int priceCoin = sumPriceCoin(targets);
 			if (priceCoin <= 0) {
 				return setResultError(I18nUtil.getMessage("episode.unlock_coin_unavailable"));
 			}
@@ -116,13 +143,17 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 			if (payCoin > 0) {
 				deductUnlockCoin(uid, payCoin, bizNo);
 			}
-			saveUnlock(uid, asset, EpisodeUnlockWayEnums.COIN.getCode(), payCoin, BigDecimal.ZERO, bizNo);
+			// 各集按原价记账；优惠券减免体现在券核销与 discountAmt
+			for (DramaAssetEntity item : targets) {
+				saveUnlock(uid, item, EpisodeUnlockWayEnums.COIN.getCode(),
+						item.getPriceCoin() == null ? 0 : item.getPriceCoin(), BigDecimal.ZERO, bizNo);
+			}
 			if (redeem.hasCoupon()) {
 				couponRedeemSupport.confirmUsed(uid, redeem.getCoupon().getId(),
 						redeem.getCoupon().getTemplateId(), bizNo);
 			}
-			log.info("episode unlock coin ok uid={} assetId={} payCoin={} bizNo={} couponId={}",
-					uid, asset.getId(), payCoin, bizNo,
+			log.info("episode unlock coin ok uid={} assetId={} scope={} count={} payCoin={} bizNo={} couponId={}",
+					uid, asset.getId(), scope, targets.size(), payCoin, bizNo,
 					redeem.hasCoupon() ? redeem.getCoupon().getId() : null);
 
 			EpisodeUnlockOrderRespEntity resp = new EpisodeUnlockOrderRespEntity();
@@ -131,6 +162,9 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 			resp.setUnlockWay(EpisodeUnlockWayEnums.COIN.getCode());
 			resp.setBizNo(bizNo);
 			resp.setPayStatus(MemberPayStatusEnums.PAID.getIndex());
+			resp.setUnlockStatus(EpisodeUnlockConstants.UNLOCK_STATUS_UNLOCKED);
+			resp.setUnlockScope(scope);
+			resp.setUnlockCount(targets.size());
 			resp.setPayCoin(payCoin);
 			resp.setDiscountAmt(redeem.getDiscountAmt());
 			resp.setUserCouponId(redeem.hasCoupon() ? redeem.getCoupon().getId() : null);
@@ -144,27 +178,16 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 		}
 	}
 
-	@Override
-	@Transactional(rollbackFor = Exception.class)
-	public ResponseBase createCashOrder(HttpServletRequest request,
-			@RequestBody EpisodeUnlockCashCreateReqEntity req) {
-		Integer uid = AppTokenUtil.resolveUid(request);
-		if (uid == null) {
-			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
-		}
-		if (req == null || req.getAssetId() == null) {
-			return setResultError(I18nUtil.getMessage("param_not_null"));
-		}
+	/** 现金解锁：按范围合并计价，生成待支付单并调三方下单，支付成功后由回调解锁 */
+	private ResponseBase createCashOrder(Integer uid, DramaAssetEntity asset,
+			EpisodePlayAccessResult access, EpisodeUnlockReqEntity req, String scope) {
 		try {
-			DramaAssetEntity asset = requirePayAsset(req.getAssetId());
-			EpisodePlayAccessResult access = episodePlayAccessSupport.resolve(uid, asset);
-			if (access.isCanPlay()) {
+			List<DramaAssetEntity> targets = resolveUnlockTargets(uid, asset, scope);
+			if (targets.isEmpty()) {
 				return setResultSuccess(alreadyUnlockedResp(asset, access), I18nUtil.getMessage("base_success"));
 			}
-			if (!EpisodeUnlockConstants.BLOCK_NEED_PAY.equals(access.getBlockReason())) {
-				return setResultError(I18nUtil.getMessage("episode.unlock_not_allowed"));
-			}
-			if (access.getPriceYuan() == null || access.getPriceYuan().compareTo(BigDecimal.ZERO) <= 0) {
+			BigDecimal priceYuan = sumPriceYuan(targets);
+			if (priceYuan.compareTo(BigDecimal.ZERO) <= 0) {
 				return setResultError(I18nUtil.getMessage("episode.unlock_cash_unavailable"));
 			}
 			String channel = req.getPayChannel() == null ? null : req.getPayChannel().trim();
@@ -172,7 +195,7 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 				return setResultError(I18nUtil.getMessage("episode.unlock_pay_channel_invalid"));
 			}
 			CouponRedeemResult redeem = couponRedeemSupport.resolve(uid, req.getUserCouponId(),
-					CouponScopeEnums.COIN_CONSUME.getCode(), CouponCurrencyEnums.YUAN, access.getPriceYuan());
+					CouponScopeEnums.COIN_CONSUME.getCode(), CouponCurrencyEnums.YUAN, priceYuan);
 
 			EpisodeUnlockOrderEntity order = new EpisodeUnlockOrderEntity();
 			order.setOrderNo(OrderCodeFactory.getOrderCode(uid.longValue()));
@@ -184,10 +207,14 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 			order.setDiscountAmt(redeem.getDiscountAmt());
 			order.setUserCouponId(redeem.hasCoupon() ? redeem.getCoupon().getId() : null);
 			order.setPayStatus(MemberPayStatusEnums.WAIT.getIndex());
+			order.setUnlockScope(scope);
+			order.setFromSetNum(asset.getSetNum());
+			order.setUnlockCount(targets.size());
 			GenericityUtil.setDate(order);
 			episodeUnlockOrderDao.insert(order);
-			log.info("episode unlock cash create uid={} assetId={} orderNo={} amount={} couponId={}",
-					uid, asset.getId(), order.getOrderNo(), order.getPayAmount(), order.getUserCouponId());
+			log.info("episode unlock cash create uid={} assetId={} scope={} count={} orderNo={} amount={} couponId={}",
+					uid, asset.getId(), scope, targets.size(), order.getOrderNo(),
+					order.getPayAmount(), order.getUserCouponId());
 
 			EpisodeUnlockOrderRespEntity resp = new EpisodeUnlockOrderRespEntity();
 			resp.setAssetId(asset.getId());
@@ -195,6 +222,9 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 			resp.setUnlockWay(EpisodeUnlockWayEnums.CASH.getCode());
 			resp.setBizNo(order.getOrderNo());
 			resp.setPayStatus(order.getPayStatus());
+			resp.setUnlockStatus(EpisodeUnlockConstants.UNLOCK_STATUS_WAIT_PAY);
+			resp.setUnlockScope(scope);
+			resp.setUnlockCount(targets.size());
 			resp.setPayAmount(order.getPayAmount());
 			resp.setDiscountAmt(order.getDiscountAmt());
 			resp.setUserCouponId(order.getUserCouponId());
@@ -239,15 +269,37 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 			order.setGmtModified(now);
 			episodeUnlockOrderDao.updateById(order);
 
-			UserEpisodeUnlockEntity exist = userEpisodeUnlockDao.findByUidAndAssetId(
-					order.getUid(), order.getAssetId());
-			if (exist == null) {
-				saveUnlock(order.getUid(), asset, EpisodeUnlockWayEnums.CASH.getCode(),
-						0, order.getPayAmount(), order.getOrderNo());
+			// REMAINING：起始集及之后全部未解锁付费集一次性解锁；SINGLE：仅订单那一集
+			int unlockedCount;
+			if (EpisodeUnlockConstants.UNLOCK_SCOPE_REMAINING.equals(order.getUnlockScope())) {
+				List<DramaAssetEntity> targets = dramaAssetDao.findOnShelfFromSetNum(order.getDramaId(),
+						order.getFromSetNum() == null ? asset.getSetNum() : order.getFromSetNum());
+				unlockedCount = 0;
+				if (targets != null) {
+					for (DramaAssetEntity item : targets) {
+						if (!EpisodeUnlockTypeEnums.isPay(item.getUnlockType())) {
+							continue;
+						}
+						if (userEpisodeUnlockDao.findByUidAndAssetId(order.getUid(), item.getId()) != null) {
+							continue;
+						}
+						saveUnlock(order.getUid(), item, EpisodeUnlockWayEnums.CASH.getCode(),
+								0, item.getPriceYuan(), orderNo);
+						unlockedCount++;
+					}
+				}
+			} else {
+				UserEpisodeUnlockEntity exist = userEpisodeUnlockDao.findByUidAndAssetId(
+						order.getUid(), order.getAssetId());
+				if (exist == null) {
+					saveUnlock(order.getUid(), asset, EpisodeUnlockWayEnums.CASH.getCode(),
+							0, order.getPayAmount(), order.getOrderNo());
+				}
+				unlockedCount = 1;
 			}
 			couponRedeemSupport.confirmUsed(order.getUid(), order.getUserCouponId(), null, orderNo);
-			log.info("episode unlock cash notify ok uid={} assetId={} orderNo={}",
-					order.getUid(), order.getAssetId(), orderNo);
+			log.info("episode unlock cash notify ok uid={} assetId={} scope={} count={} orderNo={}",
+					order.getUid(), order.getAssetId(), order.getUnlockScope(), unlockedCount, orderNo);
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (BaseException e) {
 			log.error("episode unlock cash notify biz error orderNo={}", orderNo, e);
@@ -344,6 +396,65 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 			log.error("episode prepay failed orderNo={} channel={}", orderNo, channel, e);
 			return PayPrepayResult.fail(channel, "获取支付参数失败：" + e.getMessage());
 		}
+	}
+
+	/** 解析解锁范围；空值按 SINGLE，非法值返回 null */
+	private String resolveScope(String unlockScope) {
+		if (StringUtils.isEmpty(unlockScope)) {
+			return EpisodeUnlockConstants.UNLOCK_SCOPE_SINGLE;
+		}
+		String scope = unlockScope.trim();
+		if (EpisodeUnlockConstants.UNLOCK_SCOPE_SINGLE.equalsIgnoreCase(scope)) {
+			return EpisodeUnlockConstants.UNLOCK_SCOPE_SINGLE;
+		}
+		if (EpisodeUnlockConstants.UNLOCK_SCOPE_REMAINING.equalsIgnoreCase(scope)) {
+			return EpisodeUnlockConstants.UNLOCK_SCOPE_REMAINING;
+		}
+		return null;
+	}
+
+	/**
+	 * 本次要解锁的付费集：SINGLE 仅当前集；REMAINING 为当前集及之后所有未解锁付费集（跳过免费/广告集与已解锁集）。
+	 */
+	private List<DramaAssetEntity> resolveUnlockTargets(Integer uid, DramaAssetEntity asset, String scope) {
+		List<DramaAssetEntity> targets = new ArrayList<>();
+		if (!EpisodeUnlockConstants.UNLOCK_SCOPE_REMAINING.equals(scope)
+				|| asset.getDramaId() == null || asset.getSetNum() == null) {
+			targets.add(asset);
+			return targets;
+		}
+		List<DramaAssetEntity> list = dramaAssetDao.findOnShelfFromSetNum(asset.getDramaId(), asset.getSetNum());
+		if (list == null) {
+			return targets;
+		}
+		for (DramaAssetEntity item : list) {
+			if (!EpisodeUnlockTypeEnums.isPay(item.getUnlockType())) {
+				continue;
+			}
+			if (userEpisodeUnlockDao.findByUidAndAssetId(uid, item.getId()) != null) {
+				continue;
+			}
+			targets.add(item);
+		}
+		return targets;
+	}
+
+	private int sumPriceCoin(List<DramaAssetEntity> list) {
+		int total = 0;
+		for (DramaAssetEntity item : list) {
+			total += item.getPriceCoin() == null ? 0 : item.getPriceCoin();
+		}
+		return total;
+	}
+
+	private BigDecimal sumPriceYuan(List<DramaAssetEntity> list) {
+		BigDecimal total = BigDecimal.ZERO;
+		for (DramaAssetEntity item : list) {
+			if (item.getPriceYuan() != null) {
+				total = total.add(item.getPriceYuan());
+			}
+		}
+		return total;
 	}
 
 	/** 付费解锁前置：已上架且 unlock_type=付费、非会员短剧由 access 再拦 */
@@ -443,6 +554,7 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 		resp.setDramaId(asset.getDramaId());
 		resp.setUnlockWay(access.getUnlockWay());
 		resp.setPayStatus(MemberPayStatusEnums.PAID.getIndex());
+		resp.setUnlockStatus(EpisodeUnlockConstants.UNLOCK_STATUS_UNLOCKED);
 		return resp;
 	}
 
