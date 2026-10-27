@@ -19,4 +19,10 @@ public class EpisodeUnlockCashCreateReqEntity {
 
 	@ApiModelProperty(value = "用户持券ID；可选，须为 YUAN 币种且适用 COIN_CONSUME/ALL")
 	private Integer userCouponId;
+
+	@ApiModelProperty(value = "支付场景：PC/H5/APP/MINI；默认 PC")
+	private String payScene;
+
+	@ApiModelProperty(value = "微信 JSAPI/小程序场景的用户 openid；payChannel=WECHAT 且 payScene=MINI 时必填")
+	private String openId;
 }

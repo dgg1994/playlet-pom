@@ -4,6 +4,7 @@ import com.playlet.internal.api.request.MemberPayNotifyReqEntity;
 import com.playlet.internal.api.request.ProductReqEntity;
 import com.playlet.internal.api.response.MemberOrderCreateRespEntity;
 import com.playlet.internal.api.response.MemberStatusRespEntity;
+import com.playlet.internal.api.response.PayPrepayResult;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.MemberConstants;
@@ -23,10 +24,12 @@ import com.playlet.internal.enums.CouponScopeEnums;
 import com.playlet.internal.enums.MemberPayChannelEnums;
 import com.playlet.internal.enums.MemberPayStatusEnums;
 import com.playlet.internal.enums.MemberPayTypeEnums;
+import com.playlet.internal.enums.PaySceneEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.MemberApiService;
 import com.playlet.internal.service.support.CouponRedeemResult;
 import com.playlet.internal.service.support.CouponRedeemSupport;
+import com.playlet.internal.service.support.pay.PaySupport;
 import com.playlet.internal.utils.AppTokenUtil;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
@@ -72,6 +75,8 @@ public class MemberApiServiceImpl implements MemberApiService {
 	private UserCoinLedgerDao userCoinLedgerDao;
 	@Autowired
 	private CouponRedeemSupport couponRedeemSupport;
+	@Autowired
+	private PaySupport paySupport;
 
 	@Override
 	public ResponseBase status(HttpServletRequest request) {
@@ -185,7 +190,12 @@ public class MemberApiServiceImpl implements MemberApiService {
 						uid, order.getOrderNo(), order.getPayChannel(), order.getPayAmount(), order.getUserCouponId());
 			}
 
-			return setResultSuccess(toCreateResp(order), I18nUtil.getMessage("base_success"));
+			MemberOrderCreateRespEntity resp = toCreateResp(order);
+			if (MemberPayTypeEnums.CASH == payType) {
+				resp.setPayInfo(tryPrepay(order.getPayChannel(), productReqEntity.getPayScene(),
+						productReqEntity.getOpenId(), order.getOrderNo(), order.getPayAmount(), "会员套餐购买"));
+			}
+			return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
 		} catch (BaseException e) {
 			log.error("member order create biz error uid={}", uid, e);
 			throw e;
@@ -240,6 +250,24 @@ public class MemberApiServiceImpl implements MemberApiService {
 		} catch (Exception e) {
 			log.error("member pay notify failed orderNo={}", orderNo, e);
 			throw new BaseException("会员支付确认失败", e);
+		}
+	}
+
+	/**
+	 * 现金下单后拉三方预支付；失败不影响订单本身，返回失败原因由前端再调 /api/pay/prepay 重试。
+	 */
+	private PayPrepayResult tryPrepay(String channel, String payScene, String openId,
+			String orderNo, BigDecimal amountYuan, String subject) {
+		if (!paySupport.available(channel)) {
+			return null;
+		}
+		try {
+			PaySceneEnums scene = PaySceneEnums.ofCode(payScene) == null
+					? PaySceneEnums.PC : PaySceneEnums.ofCode(payScene);
+			return paySupport.prepay(channel, scene, orderNo, amountYuan, subject, openId);
+		} catch (Exception e) {
+			log.error("member prepay failed orderNo={} channel={}", orderNo, channel, e);
+			return PayPrepayResult.fail(channel, "获取支付参数失败：" + e.getMessage());
 		}
 	}
 

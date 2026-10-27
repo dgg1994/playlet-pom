@@ -42,4 +42,7 @@ public class EpisodeUnlockOrderRespEntity {
 
 	@ApiModelProperty("现金渠道")
 	private String payChannel;
+
+	@ApiModelProperty("三方下单结果（现金下单时返回，失败时 success=false 可用 /api/pay/prepay 重试）")
+	private PayPrepayResult payInfo;
 }

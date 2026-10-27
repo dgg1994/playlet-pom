@@ -6,6 +6,7 @@ import com.playlet.internal.api.request.EpisodeUnlockCashNotifyReqEntity;
 import com.playlet.internal.api.request.EpisodeUnlockCoinReqEntity;
 import com.playlet.internal.api.response.EpisodePlayAccessRespEntity;
 import com.playlet.internal.api.response.EpisodeUnlockOrderRespEntity;
+import com.playlet.internal.api.response.PayPrepayResult;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.EpisodeUnlockConstants;
@@ -30,6 +31,7 @@ import com.playlet.internal.service.support.CouponRedeemResult;
 import com.playlet.internal.service.support.CouponRedeemSupport;
 import com.playlet.internal.service.support.EpisodePlayAccessResult;
 import com.playlet.internal.service.support.EpisodePlayAccessSupport;
+import com.playlet.internal.service.support.pay.PaySupport;
 import com.playlet.internal.utils.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -73,6 +75,8 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 	private AdSlotConfigDao adSlotConfigDao;
 	@Autowired
 	private CouponRedeemSupport couponRedeemSupport;
+	@Autowired
+	private PaySupport paySupport;
 
 	@Override
 	public ResponseBase playAccess(@RequestParam("assetId") Integer assetId, HttpServletRequest request) {
@@ -195,10 +199,9 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 			resp.setDiscountAmt(order.getDiscountAmt());
 			resp.setUserCouponId(order.getUserCouponId());
 			resp.setPayChannel(MemberPayChannelEnums.ofCode(channel).getCode());
+			resp.setPayInfo(tryPrepay(order.getPayChannel(), req.getPayScene(), req.getOpenId(),
+					order.getOrderNo(), order.getPayAmount(), "剧集解锁"));
 			return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
-		} catch (BaseException e) {
-			log.error("episode unlock cash create biz error uid={} assetId={}", uid, req.getAssetId(), e);
-			throw e;
 		} catch (Exception e) {
 			log.error("episode unlock cash create failed uid={} assetId={}", uid, req.getAssetId(), e);
 			throw new BaseException(I18nUtil.getMessage("episode.unlock_failed"), e);
@@ -322,6 +325,24 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 		} catch (Exception e) {
 			log.error("episode unlock ad failed uid={} assetId={}", uid, req.getAssetId(), e);
 			throw new BaseException(I18nUtil.getMessage("episode.unlock_failed"), e);
+		}
+	}
+
+	/**
+	 * 现金下单后拉三方预支付；失败不影响订单本身，前端可再调 /api/pay/prepay 重试。
+	 */
+	private PayPrepayResult tryPrepay(String channel, String payScene, String openId,
+			String orderNo, BigDecimal amountYuan, String subject) {
+		if (!paySupport.available(channel)) {
+			return null;
+		}
+		try {
+			PaySceneEnums scene = PaySceneEnums.ofCode(payScene) == null
+					? PaySceneEnums.PC : PaySceneEnums.ofCode(payScene);
+			return paySupport.prepay(channel, scene, orderNo, amountYuan, subject, openId);
+		} catch (Exception e) {
+			log.error("episode prepay failed orderNo={} channel={}", orderNo, channel, e);
+			return PayPrepayResult.fail(channel, "获取支付参数失败：" + e.getMessage());
 		}
 	}
 

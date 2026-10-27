@@ -22,4 +22,10 @@ public class ProductReqEntity {
 
 	@ApiModelProperty(value = "用户持券ID（user_coupon.id）；可选，不传则原价")
 	private Integer userCouponId;
+
+	@ApiModelProperty(value = "支付场景：PC/H5/APP/MINI；默认 PC。APP/MINI 时返回拉起支付参数")
+	private String payScene;
+
+	@ApiModelProperty(value = "微信 JSAPI/小程序场景的用户 openid；payChannel=WECHAT 且 payScene=MINI 时必填")
+	private String openId;
 }

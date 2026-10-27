@@ -7,6 +7,8 @@ import com.playlet.internal.entity.member.MemberOrderEntity;
 import com.playlet.internal.enums.MemberPayStatusEnums;
 import com.playlet.internal.enums.RechargeProductTypeEnums;
 import com.playlet.internal.exception.BaseException;
+import com.playlet.internal.service.support.pay.PayRefundResult;
+import com.playlet.internal.service.support.pay.PaySupport;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.StringUtils;
@@ -18,7 +20,7 @@ import java.math.BigDecimal;
 import java.util.Date;
 
 /**
- * 订单退款标记（暂不对接渠道原路退回；会员/单集解锁共用）。
+ * 订单退款：先调三方原路退回，再标记本地已退款（会员/单集解锁共用）。
  */
 @Slf4j
 @Component
@@ -28,14 +30,79 @@ public class OrderRefundSupport {
 	private MemberOrderDao memberOrderDao;
 	@Autowired
 	private EpisodeUnlockOrderDao episodeUnlockOrderDao;
+	@Autowired
+	private PaySupport paySupport;
 
-	/** 按商品类型标记已退款；幂等（已退款直接返回）。 */
+	/** 按商品类型退款；渠道已配置时先走渠道退款，失败直接抛出（不打退款标记） */
 	public void markRefunded(String orderNo, RechargeProductTypeEnums type, String remark) {
+		refundByChannel(orderNo, type);
+		markRefundedLocal(orderNo, type, remark);
+	}
+
+	/** 仅改本地状态，不再调用渠道（供退款回调补单使用，避免重复调渠道退款） */
+	public void markRefundedLocal(String orderNo, RechargeProductTypeEnums type, String remark) {
 		if (type == RechargeProductTypeEnums.MEMBER) {
 			refundMember(orderNo, remark);
 		} else {
 			refundEpisode(orderNo, remark);
 		}
+	}
+
+	/** 判断订单归属的商品类型；两表都没有返回 null */
+	public RechargeProductTypeEnums resolveType(String orderNo) {
+		if (StringUtils.isEmpty(orderNo)) {
+			return null;
+		}
+		if (memberOrderDao.findByOrderNo(orderNo) != null) {
+			return RechargeProductTypeEnums.MEMBER;
+		}
+		if (episodeUnlockOrderDao.findByOrderNo(orderNo) != null) {
+			return RechargeProductTypeEnums.EPISODE;
+		}
+		return null;
+	}
+
+	/**
+	 * 调用渠道原路退回。渠道未配置（如 BANK、或 pay 开关关闭）时直接跳过保持原有本地行为；
+	 * 渠道返回明确失败时抛业务异常，上层据此不打退款标记。
+	 */
+	private void refundByChannel(String orderNo, RechargeProductTypeEnums type) {
+		String channel;
+		String thirdTradeNo;
+		BigDecimal payAmount;
+		if (type == RechargeProductTypeEnums.MEMBER) {
+			MemberOrderEntity order = memberOrderDao.findByOrderNo(orderNo);
+			if (order == null) {
+				throw new BaseException(I18nUtil.getMessage("base_data_null"));
+			}
+			channel = order.getPayChannel();
+			thirdTradeNo = order.getThirdTradeNo();
+			payAmount = order.getPayAmount();
+		} else {
+			EpisodeUnlockOrderEntity order = episodeUnlockOrderDao.findByOrderNo(orderNo);
+			if (order == null) {
+				throw new BaseException(I18nUtil.getMessage("base_data_null"));
+			}
+			channel = order.getPayChannel();
+			thirdTradeNo = order.getThirdTradeNo();
+			payAmount = order.getPayAmount();
+		}
+		if (StringUtils.isEmpty(channel) || !paySupport.available(channel)) {
+			log.warn("refund skip channel orderNo={} channel={} (渠道未配置或不支持在线退款)", orderNo, channel);
+			return;
+		}
+		if (payAmount == null || payAmount.compareTo(BigDecimal.ZERO) <= 0) {
+			log.warn("refund skip channel orderNo={} amount={}", orderNo, payAmount);
+			return;
+		}
+		// 退款单号固定由订单号派生，保证重试幂等
+		String refundNo = "R" + orderNo;
+		PayRefundResult result = paySupport.refund(channel, orderNo, thirdTradeNo, refundNo,
+				payAmount, payAmount, "用户退款");
+		if (result == null || !result.isSuccess()) {
+			throw new BaseException("渠道退款失败：" + (result == null ? "无响应" : result.getErrMsg()));
+		}
+		log.info("refund by channel ok orderNo={} refundNo={} status={}", orderNo, refundNo, result.getStatus());
 	}
 
 	/** 查已支付现金订单金额；非已支付抛业务异常。 */

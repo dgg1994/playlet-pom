@@ -46,4 +46,7 @@ public class MemberOrderCreateRespEntity {
 
 	@ApiModelProperty("预计/实际开通后到期时间")
 	private Date expireAfter;
+
+	@ApiModelProperty("三方下单结果（payType=CASH 时返回，失败时 success=false 可用 /api/pay/prepay 重试）")
+	private PayPrepayResult payInfo;
 }

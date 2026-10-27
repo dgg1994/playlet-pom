@@ -45,6 +45,22 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+
+      <!-- 微信支付配置-->
+      <dependency>
+        <groupId>com.github.wechatpay-apiv3</groupId>
+        <artifactId>wechatpay-java</artifactId>
+        <version>0.2.12</version>
+      </dependency>
+
+
+      <!-- 支付宝支付配置-->
+      <dependency>
+        <groupId>com.alipay.sdk</groupId>
+        <artifactId>alipay-sdk-java</artifactId>
+        <version>4.34.0.ALL</version>
+      </dependency>
+
     </dependencies>
   </dependencyManagement>
 

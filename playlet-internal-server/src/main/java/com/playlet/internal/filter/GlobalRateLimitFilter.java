@@ -28,6 +28,9 @@ public class GlobalRateLimitFilter extends OncePerRequestFilter {
     // 每秒最大请求次数
     private static final int MAX_REQUESTS_PER_SECOND = 3;
 
+    /** 三方异步回调（微信/支付宝）：来源 IP 集中，按秒限流会误杀，直接放行 */
+    private static final String PAY_NOTIFY_URI_PREFIX = "/api/pay/";
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
@@ -37,6 +40,11 @@ public class GlobalRateLimitFilter extends OncePerRequestFilter {
         // 获取客户端IP和请求URI
         String ip = getClientIp(request);
         String uri = request.getRequestURI();
+
+        if (uri != null && uri.startsWith(PAY_NOTIFY_URI_PREFIX)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
 //        logger.info("请求IP：{}，请求URI：{}", ip, uri);
 
