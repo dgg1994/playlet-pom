@@ -49,6 +49,15 @@ public class PayProperties {
 
 		/** 退款结果通知地址（须外网可达） */
 		private String refundNotifyUrl;
+
+		/** 签约计划号（商户平台「签约中心」创建，连续包月必填） */
+		private String papayPlanId;
+
+		/** 签约/解约结果通知地址（须外网可达） */
+		private String contractNotifyUrl;
+
+		/** 代扣结果通知地址（须外网可达，未配置时复用 notifyUrl） */
+		private String deductNotifyUrl;
 	}
 
 	@Data
@@ -82,5 +91,25 @@ public class PayProperties {
 
 		/** 订单相对超时时间，默认 30m */
 		private String timeoutExpress = "30m";
+
+		/** 签约异步通知地址（alipay.user.agreement.sign 回调） */
+		private String signNotifyUrl;
+
+		/** 签约场景码，默认 INDUSTRY|DEFAULT_SCENE */
+		private String signScene = "INDUSTRY|DEFAULT_SCENE";
+
+		/**
+		 * 签约产品码：通用代扣。
+		 * <p>
+		 * 用 GENERAL_WITHHOLDING_P 而非 CYCLE_PAY_AUTH：后者由支付宝按周期规则自动扣款，
+		 * 会与服务端主动代扣重复。通用代扣只签约，每期由 alipay.trade.create 主动发起。
+		 */
+		private String signProductCode = "GENERAL_WITHHOLDING_P";
+
+		/** 协议产品码（与签约产品码一致） */
+		private String personalProductCode = "GENERAL_WITHHOLDING_P";
+
+		/** 代扣交易中的产品码：商户/通用代扣 */
+		private String withholdProductCode = "GENERAL_WITHHOLDING";
 	}
 }

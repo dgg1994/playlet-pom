@@ -40,4 +40,14 @@ public interface PayApiService {
 	@PostMapping("/alipay/pay/notify")
 	@ApiOperation(value = "支付宝支付结果回调", notes = "无需登录；验签通过后落账，返回 success/failure")
 	void alipayPayNotify(HttpServletRequest request, HttpServletResponse response);
+
+	@PostMapping("/alipay/contract/notify")
+	@ApiOperation(value = "支付宝签约/解约回调", notes = "无需登录；alipay.user.agreement 相关通知，"
+			+ "status=NORMAL 置已签约并开启自动续费，UNSIGN 关闭自动续费。返回 success/failure")
+	void alipayContractNotify(HttpServletRequest request, HttpServletResponse response);
+
+	@PostMapping("/wechat/contract/notify")
+	@ApiOperation(value = "微信签约/解约回调", notes = "无需登录；V3 通知验签解密后，"
+			+ "contract_status=SIGNED 置已签约，TERMINATED 解约。返回微信标准应答")
+	void wechatContractNotify(HttpServletRequest request, HttpServletResponse response);
 }

@@ -81,4 +81,7 @@ public class RedisKeyConstants {
     public static final String ONLINE_ZSET = ONLINE_DEVICE_ZSET;
     /** 在线判定窗口（秒）：窗口内有心跳视为在线 */
     public static final long ONLINE_WINDOW_SEC = 300L;
+
+    /** 连续包月自动续费任务锁（多实例互斥） */
+    public static final String AUTO_RENEW_LOCK = PROJECT_PREFIX + "member:autoRenew:lock";
 }

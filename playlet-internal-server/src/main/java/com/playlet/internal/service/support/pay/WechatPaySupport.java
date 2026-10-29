@@ -59,6 +59,23 @@ public class WechatPaySupport {
 	}
 
 	/**
+	 * 配置变更后失效全部缓存的 SDK 客户端，下次调用按新配置重建。
+	 * <p>wechatpay-java 0.2.12 的 RSAAutoCertificateConfig 无 close()，
+	 * 旧实例的证书监控线程无法主动停止；配置变更为低频操作，可接受。
+	 */
+	public void invalidate() {
+		synchronized (this) {
+			config = null;
+			nativePayService = null;
+			jsapiServiceExtension = null;
+			appServiceExtension = null;
+			h5Service = null;
+			refundService = null;
+			notificationParser = null;
+		}
+	}
+
+	/**
 	 * 下单。
 	 *
 	 * @param scene       支付场景
@@ -229,6 +246,23 @@ public class WechatPaySupport {
 				.body(body)
 				.build();
 		return notificationParser().parse(param, RefundNotification.class);
+	}
+
+	/**
+	 * 解析任意 V3 通知为 Map（papay 签约/解约等非支付类通知没有专用模型，统一按 JSON 处理）。
+	 * 验签/解密失败会抛异常。
+	 */
+	@SuppressWarnings("unchecked")
+	public Map<String, Object> parseNotifyMap(String serial, String timestamp, String nonce,
+			String signature, String body) {
+		RequestParam param = new RequestParam.Builder()
+				.serialNumber(serial)
+				.timestamp(timestamp)
+				.nonce(nonce)
+				.signature(signature)
+				.body(body)
+				.build();
+		return notificationParser().parse(param, Map.class);
 	}
 
 	private PayOrderResult toOrderResult(Transaction tx) {

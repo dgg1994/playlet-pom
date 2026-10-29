@@ -42,6 +42,22 @@ public class MemberOrderEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "productCode", value = "套餐编码快照", dataType = "String")
 	private String productCode;
 
+	@TableField("order_type")
+	@ApiModelProperty(name = "orderType", value = "1首购 2自动续费代扣", dataType = "Integer")
+	private Integer orderType;
+
+	@TableField("agreement_id")
+	@ApiModelProperty(name = "agreementId", value = "签约协议ID user_pay_agreement.id", dataType = "Integer")
+	private Integer agreementId;
+
+	@TableField("period_index")
+	@ApiModelProperty(name = "periodIndex", value = "第几期；首购为1，自动续费递增", dataType = "Integer")
+	private Integer periodIndex;
+
+	@TableField("deduct_status")
+	@ApiModelProperty(name = "deductStatus", value = "代扣状态 0未扣款 1成功 2失败", dataType = "Integer")
+	private Integer deductStatus;
+
 	@TableField("duration_days")
 	@ApiModelProperty(name = "durationDays", value = "开通天数快照", dataType = "Integer")
 	private Integer durationDays;

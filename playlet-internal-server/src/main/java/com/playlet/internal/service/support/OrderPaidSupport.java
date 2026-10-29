@@ -1,7 +1,6 @@
 package com.playlet.internal.service.support;
 
 import com.playlet.internal.api.request.EpisodeUnlockCashNotifyReqEntity;
-import com.playlet.internal.api.request.MemberPayNotifyReqEntity;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.member.EpisodeUnlockOrderDao;
@@ -9,7 +8,7 @@ import com.playlet.internal.dao.member.MemberOrderDao;
 import com.playlet.internal.enums.RechargeProductTypeEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.EpisodeUnlockApiService;
-import com.playlet.internal.service.MemberApiService;
+import com.playlet.internal.service.support.member.MemberPaidSupport;
 import com.playlet.internal.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +26,7 @@ public class OrderPaidSupport {
 	@Autowired
 	private EpisodeUnlockOrderDao episodeUnlockOrderDao;
 	@Autowired
-	private MemberApiService memberApiService;
+	private MemberPaidSupport memberPaidSupport;
 	@Autowired
 	private EpisodeUnlockApiService episodeUnlockApiService;
 
@@ -51,18 +50,20 @@ public class OrderPaidSupport {
 		if (type == null) {
 			throw new BaseException("订单不存在");
 		}
-		ResponseBase resp;
 		if (type == RechargeProductTypeEnums.MEMBER) {
-			MemberPayNotifyReqEntity req = new MemberPayNotifyReqEntity();
-			req.setOrderNo(orderNo);
-			req.setThirdTradeNo(thirdTradeNo);
-			resp = memberApiService.payNotify(req);
-		} else {
-			EpisodeUnlockCashNotifyReqEntity req = new EpisodeUnlockCashNotifyReqEntity();
-			req.setOrderNo(orderNo);
-			req.setThirdTradeNo(thirdTradeNo);
-			resp = episodeUnlockApiService.cashNotify(req);
+			// 会员入账走 MemberPaidSupport（不再回调 MemberApiService，避免形成 Bean 循环依赖）
+			try {
+				memberPaidSupport.markPaid(orderNo, thirdTradeNo);
+			} catch (Exception e) {
+				throw new BaseException("会员支付确认失败", e);
+			}
+			log.info("order mark paid ok orderNo={} thirdTradeNo={} type={}", orderNo, thirdTradeNo, type.getCode());
+			return;
 		}
+		EpisodeUnlockCashNotifyReqEntity req = new EpisodeUnlockCashNotifyReqEntity();
+		req.setOrderNo(orderNo);
+		req.setThirdTradeNo(thirdTradeNo);
+		ResponseBase resp = episodeUnlockApiService.cashNotify(req);
 		if (resp == null || !Integer.valueOf(Constants.HTTP_RES_CODE_200).equals(resp.getCode())) {
 			throw new BaseException(resp == null || StringUtils.isEmpty(resp.getMsg())
 					? "支付确认失败" : resp.getMsg());

@@ -2,10 +2,11 @@ package com.playlet.internal.service.impl;
 
 import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.base.ResponseBase;
-import com.playlet.internal.dao.pay.PayChannelConfigDao;
+import com.playlet.internal.config.PayConfigLoader;
 import com.playlet.internal.dao.pay.PayGlobalConfigDao;
-import com.playlet.internal.entity.pay.PayChannelConfigEntity;
+import com.playlet.internal.dao.pay.PaySdkConfigDao;
 import com.playlet.internal.entity.pay.PayGlobalConfigEntity;
+import com.playlet.internal.entity.pay.PaySdkConfigEntity;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.PayConfigManageService;
 import com.playlet.internal.utils.GenericityUtil;
@@ -19,7 +20,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -38,61 +41,24 @@ import static com.playlet.internal.base.BaseApiService.setResultSuccess;
 @Transactional(rollbackFor = Exception.class)
 public class PayConfigManageServiceImpl implements PayConfigManageService {
 
-	/** 支持的支付渠道 */
-	private static final Set<String> SUPPORT_CHANNELS = new HashSet<>(
-			Arrays.asList("WECHAT", "ALIPAY", "DOUYIN"));
-
 	/** 支持的结算周期 */
 	private static final Set<String> SUPPORT_SETTLE_CYCLES = new HashSet<>(
 			Arrays.asList("T+0", "T+1", "T+3", "T+7", "MONTH"));
 
 	@Autowired
-	private PayChannelConfigDao payChannelConfigDao;
-	@Autowired
 	private PayGlobalConfigDao payGlobalConfigDao;
+	@Autowired
+	private PaySdkConfigDao paySdkConfigDao;
+	@Autowired
+	private PayConfigLoader payConfigLoader;
 
 	@Override
 	@SysLogAnnotation(module = "支付配置", type = "GET", remark = "查询支付配置")
 	public ResponseBase get() {
-		List<PayChannelConfigEntity> channels = payChannelConfigDao.findList();
 		PayGlobalConfigEntity global = payGlobalConfigDao.findOne();
 		Map<String, Object> data = new HashMap<>(4);
-		data.put("channels", channels);
 		data.put("global", global);
 		return setResultSuccess(data, I18nUtil.getMessage("base_success"));
-	}
-
-	@Override
-	@SysLogAnnotation(module = "支付配置", type = "POST", remark = "更新支付渠道配置")
-	public ResponseBase updateChannel(@RequestBody PayChannelConfigEntity entity) {
-		try {
-			if (entity == null || entity.getId() == null) {
-				return setResultError(I18nUtil.getMessage("base_error"));
-			}
-			PayChannelConfigEntity old = payChannelConfigDao.selectById(entity.getId());
-			if (old == null) {
-				return setResultError(I18nUtil.getMessage("base_data_null"));
-			}
-			String err = validateChannel(entity);
-			if (err != null) {
-				return setResultError(err);
-			}
-			old.setMerchantNo(entity.getMerchantNo());
-			old.setAppId(entity.getAppId());
-			old.setEnabled(entity.getEnabled() == null ? old.getEnabled() : entity.getEnabled());
-			old.setRemark(entity.getRemark());
-			GenericityUtil.updateDate(old);
-			payChannelConfigDao.updateById(old);
-			log.info("pay channel config update id={} channel={} enabled={}",
-					old.getId(), old.getChannel(), old.getEnabled());
-			return setResultSuccess(old, I18nUtil.getMessage("base_success"));
-		} catch (BaseException e) {
-			log.error("pay channel config update biz error", e);
-			throw e;
-		} catch (Exception e) {
-			log.error("pay channel config update failed", e);
-			throw new BaseException("操作失败", e);
-		}
 	}
 
 	@Override
@@ -138,23 +104,114 @@ public class PayConfigManageServiceImpl implements PayConfigManageService {
 		}
 	}
 
-	private String validateChannel(PayChannelConfigEntity entity) {
-		if (entity.getEnabled() != null
-				&& entity.getEnabled() != 0 && entity.getEnabled() != 1) {
-			return "enabled 仅支持 0/1";
+	@Override
+	@SysLogAnnotation(module = "支付配置", type = "GET", remark = "查询支付SDK商户参数")
+	public ResponseBase sdkList() {
+		Map<String, PaySdkConfigEntity> byKey = new HashMap<>(16);
+		for (PaySdkConfigEntity row : paySdkConfigDao.findList()) {
+			byKey.put(row.getConfigKey(), row);
 		}
-		if (entity.getChannel() != null && !SUPPORT_CHANNELS.contains(entity.getChannel())) {
-			return "不支持的支付渠道：" + entity.getChannel();
+		List<Map<String, Object>> items = new ArrayList<>();
+		for (Map.Entry<String, String> entry : PayConfigLoader.KNOWN_KEYS.entrySet()) {
+			String key = entry.getKey();
+			boolean secret = payConfigLoader.isSecretKey(key);
+			PaySdkConfigEntity row = byKey.get(key);
+			boolean configured = row != null && StringUtils.isNotBlank(row.getConfigValue());
+			Map<String, Object> item = new HashMap<>(8);
+			item.put("configKey", key);
+			item.put("remark", entry.getValue());
+			item.put("secret", secret);
+			item.put("configured", configured);
+			// 敏感项永不回显明文/密文，前端据 configured 展示占位
+			item.put("value", !secret && configured ? row.getConfigValue() : null);
+			item.put("encrypted", row != null && Integer.valueOf(1).equals(row.getEncrypted()));
+			item.put("gmtModified", row == null ? null : row.getGmtModified());
+			items.add(item);
 		}
-		// 启用前须至少配置商户号或 APPID
-		if (entity.getEnabled() != null && entity.getEnabled() == 1) {
-			String merchantNo = entity.getMerchantNo() != null ? entity.getMerchantNo() : oldOrNull(entity, "merchantNo");
-			String appId = entity.getAppId() != null ? entity.getAppId() : oldOrNull(entity, "appId");
-			if (StringUtils.isBlank(merchantNo) && StringUtils.isBlank(appId)) {
-				return "启用前请先配置商户号或 APPID";
+		Map<String, Object> data = new HashMap<>(4);
+		data.put("items", items);
+		data.put("encryptEnabled", payConfigLoader.encryptEnabled());
+		return setResultSuccess(data, I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	@SysLogAnnotation(module = "支付配置", type = "POST", remark = "更新支付SDK商户参数")
+	public ResponseBase sdkUpdate(@RequestBody List<PaySdkConfigEntity> items) {
+		try {
+			if (items == null || items.isEmpty()) {
+				return setResultError(I18nUtil.getMessage("param_not_null"));
 			}
+			Date now = new Date();
+			int updated = 0;
+			for (PaySdkConfigEntity item : items) {
+				String key = item == null ? null : item.getConfigKey();
+				if (StringUtils.isEmpty(key) || !PayConfigLoader.KNOWN_KEYS.containsKey(key)) {
+					return setResultError("不支持的支付配置键：" + key);
+				}
+				// null 表示未修改跳过；空串表示清空该键（DB 不再生效，回落 yml 默认）
+				String value = item.getConfigValue() == null ? null : item.getConfigValue().trim();
+				if (value == null) {
+					continue;
+				}
+				boolean secret = payConfigLoader.isSecretKey(key);
+				boolean clear = value.isEmpty();
+				if (secret && !clear) {
+					if (!payConfigLoader.encryptEnabled()) {
+						return setResultError("未配置 pay.config.encrypt-key，无法加密存储敏感项：" + key);
+					}
+					value = payConfigLoader.encrypt(value);
+				}
+				PaySdkConfigEntity row = paySdkConfigDao.findByKey(key);
+				if (row == null) {
+					row = new PaySdkConfigEntity();
+					row.setConfigKey(key);
+					row.setSetTime(now);
+				}
+				row.setConfigValue(clear ? null : value);
+				row.setEncrypted(secret && !clear ? 1 : 0);
+				row.setGmtModified(now);
+				if (row.getId() == null) {
+					paySdkConfigDao.insert(row);
+				} else {
+					paySdkConfigDao.updateById(row);
+				}
+				updated++;
+			}
+			int applied = payConfigLoader.applyFromDb();
+			payConfigLoader.invalidateClients();
+			log.info("pay sdk config updated keys={} applied={}", updated, applied);
+			Map<String, Object> data = new HashMap<>(4);
+			data.put("updated", updated);
+			data.put("applied", applied);
+			return setResultSuccess(data, I18nUtil.getMessage("base_success"));
+		} catch (IllegalStateException e) {
+			log.error("pay sdk config update encrypt error", e);
+			return setResultError(e.getMessage());
+		} catch (BaseException e) {
+			log.error("pay sdk config update biz error", e);
+			throw e;
+		} catch (Exception e) {
+			log.error("pay sdk config update failed", e);
+			throw new BaseException("操作失败", e);
 		}
-		return null;
+	}
+
+	@Override
+	@SysLogAnnotation(module = "支付配置", type = "POST", remark = "刷新支付配置并重建支付客户端")
+	public ResponseBase sdkRefresh() {
+		try {
+			int applied = payConfigLoader.applyFromDb();
+			payConfigLoader.invalidateClients();
+			Map<String, Object> data = new HashMap<>(4);
+			data.put("applied", applied);
+			return setResultSuccess(data, I18nUtil.getMessage("base_success"));
+		} catch (IllegalStateException e) {
+			log.error("pay sdk config refresh decrypt error", e);
+			return setResultError(e.getMessage());
+		} catch (Exception e) {
+			log.error("pay sdk config refresh failed", e);
+			throw new BaseException("操作失败", e);
+		}
 	}
 
 	private String validateGlobal(PayGlobalConfigEntity entity) {
@@ -167,14 +224,5 @@ public class PayConfigManageServiceImpl implements PayConfigManageService {
 			return "minWithdrawAmount 不能为空且须 >= 0";
 		}
 		return null;
-	}
-
-	/** 渠道启用校验时读取库中旧值（避免前端只传部分字段导致误判） */
-	private String oldOrNull(PayChannelConfigEntity entity, String field) {
-		PayChannelConfigEntity old = payChannelConfigDao.selectById(entity.getId());
-		if (old == null) {
-			return null;
-		}
-		return "merchantNo".equals(field) ? old.getMerchantNo() : old.getAppId();
 	}
 }

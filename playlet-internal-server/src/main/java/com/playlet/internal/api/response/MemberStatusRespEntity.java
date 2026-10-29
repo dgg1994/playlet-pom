@@ -24,4 +24,10 @@ public class MemberStatusRespEntity {
 
 	@ApiModelProperty("是否可免费看会员短剧")
 	private Boolean vipDramaFree;
+
+	@ApiModelProperty("是否开启连续包月自动续费")
+	private Boolean autoRenew;
+
+	@ApiModelProperty("下次自动扣款时间")
+	private Date nextDeductTime;
 }

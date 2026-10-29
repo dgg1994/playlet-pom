@@ -6,6 +6,7 @@ import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.dao.member.MemberProductDao;
 import com.playlet.internal.entity.member.MemberProductEntity;
+import com.playlet.internal.enums.MemberProductTypeEnums;
 import com.playlet.internal.enums.PublicEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.MemberProductManageService;
@@ -62,6 +63,7 @@ public class MemberProductManageServiceImpl implements MemberProductManageServic
 				return setResultError(err);
 			}
 			normalize(entity);
+			normalizeRenew(entity);
 			if (entity.getStatus() == null) {
 				entity.setStatus(PublicEnums.ONE.getIndex());
 			}
@@ -83,9 +85,6 @@ public class MemberProductManageServiceImpl implements MemberProductManageServic
 			}
 			log.info("member product save id={} code={}", entity.getId(), entity.getProductCode());
 			return setResultSuccess(entity.getId(), I18nUtil.getMessage("base_success"));
-		} catch (BaseException e) {
-			log.error("member product save biz error", e);
-			throw e;
 		} catch (Exception e) {
 			log.error("member product save failed", e);
 			throw new BaseException("操作失败", e);
@@ -108,13 +107,11 @@ public class MemberProductManageServiceImpl implements MemberProductManageServic
 				return setResultError(err);
 			}
 			normalize(entity);
+			normalizeRenew(entity);
 			GenericityUtil.updateDate(entity);
 			memberProductDao.updateById(entity);
 			log.info("member product update id={}", entity.getId());
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
-		} catch (BaseException e) {
-			log.error("member product update biz error id={}", entity == null ? null : entity.getId(), e);
-			throw e;
 		} catch (Exception e) {
 			log.error("member product update failed id={}", entity == null ? null : entity.getId(), e);
 			throw new BaseException("操作失败", e);
@@ -144,9 +141,6 @@ public class MemberProductManageServiceImpl implements MemberProductManageServic
 			memberProductDao.updateById(upd);
 			log.info("member product changeStatus id={} status={}", old.getId(), entity.getStatus());
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
-		} catch (BaseException e) {
-			log.error("member product changeStatus biz error", e);
-			throw e;
 		} catch (Exception e) {
 			log.error("member product changeStatus failed", e);
 			throw new BaseException("操作失败", e);
@@ -159,6 +153,22 @@ public class MemberProductManageServiceImpl implements MemberProductManageServic
 		}
 		if (entity.getProductName() != null) {
 			entity.setProductName(entity.getProductName().trim());
+		}
+	}
+
+	/** 连续包月字段兜底：一次性套餐清掉续费价与周期 */
+	private void normalizeRenew(MemberProductEntity entity) {
+		if (entity.getProductType() != null
+				&& Integer.valueOf(MemberProductTypeEnums.AUTO_RENEW.getIndex()).equals(entity.getProductType())) {
+			if (entity.getRenewPeriodDays() == null || entity.getRenewPeriodDays() <= 0) {
+				entity.setRenewPeriodDays(entity.getDurationDays() == null || entity.getDurationDays() <= 0
+						? 30 : entity.getDurationDays());
+			}
+		} else {
+			entity.setProductType(entity.getProductType() == null
+					? MemberProductTypeEnums.ONCE.getIndex() : entity.getProductType());
+			entity.setRenewPriceYuan(null);
+			entity.setRenewPeriodDays(null);
 		}
 	}
 

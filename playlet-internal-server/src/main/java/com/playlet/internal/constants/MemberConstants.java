@@ -17,6 +17,12 @@ public final class MemberConstants {
 	/** 金币买会员流水 task_code */
 	public static final String COIN_TASK_MEMBER_BUY = "MEMBER_BUY";
 
+	/** 自动续费开关：开启 */
+	public static final int AUTO_RENEW_ON = 1;
+
+	/** 自动续费开关：关闭 */
+	public static final int AUTO_RENEW_OFF = 0;
+
 	private MemberConstants() {
 	}
 }

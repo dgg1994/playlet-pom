@@ -1,8 +1,10 @@
 package com.playlet.internal.service.impl;
 
+import com.playlet.internal.api.request.MemberContractReqEntity;
 import com.playlet.internal.api.request.MemberPayNotifyReqEntity;
 import com.playlet.internal.api.request.ProductReqEntity;
 import com.playlet.internal.api.response.MemberOrderCreateRespEntity;
+import com.playlet.internal.api.response.PayContractResult;
 import com.playlet.internal.api.response.MemberStatusRespEntity;
 import com.playlet.internal.api.response.PayPrepayResult;
 import com.playlet.internal.base.ResponseBase;
@@ -21,6 +23,8 @@ import com.playlet.internal.entity.welfare.UserCoinLedgerEntity;
 import com.playlet.internal.enums.CoinBizTypeEnums;
 import com.playlet.internal.enums.CouponCurrencyEnums;
 import com.playlet.internal.enums.CouponScopeEnums;
+import com.playlet.internal.enums.MemberDeductStatusEnums;
+import com.playlet.internal.enums.MemberOrderTypeEnums;
 import com.playlet.internal.enums.MemberPayChannelEnums;
 import com.playlet.internal.enums.MemberPayStatusEnums;
 import com.playlet.internal.enums.MemberPayTypeEnums;
@@ -28,6 +32,8 @@ import com.playlet.internal.enums.PaySceneEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.service.MemberApiService;
 import com.playlet.internal.service.support.CouponRedeemResult;
+import com.playlet.internal.service.support.member.MemberAutoRenewSupport;
+import com.playlet.internal.service.support.member.MemberPaidSupport;
 import com.playlet.internal.service.support.CouponRedeemSupport;
 import com.playlet.internal.service.support.pay.PaySupport;
 import com.playlet.internal.utils.AppTokenUtil;
@@ -45,7 +51,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
 import java.math.BigDecimal;
-import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -77,6 +82,10 @@ public class MemberApiServiceImpl implements MemberApiService {
 	private CouponRedeemSupport couponRedeemSupport;
 	@Autowired
 	private PaySupport paySupport;
+	@Autowired
+	private MemberAutoRenewSupport memberAutoRenewSupport;
+	@Autowired
+	private MemberPaidSupport memberPaidSupport;
 
 	@Override
 	public ResponseBase status(HttpServletRequest request) {
@@ -86,11 +95,15 @@ public class MemberApiServiceImpl implements MemberApiService {
 		}
 		UserMemberEntity member = userMemberDao.findActiveByUid(uid);
 		boolean active = member != null;
+		UserMemberEntity row = userMemberDao.findByUid(uid);
 		MemberStatusRespEntity resp = new MemberStatusRespEntity();
 		resp.setIsMember(active);
 		resp.setExpireTime(active ? member.getExpireTime() : null);
 		resp.setAdFree(active);
 		resp.setVipDramaFree(active);
+		resp.setAutoRenew(row != null
+				&& Integer.valueOf(MemberConstants.AUTO_RENEW_ON).equals(row.getAutoRenew()));
+		resp.setNextDeductTime(row == null ? null : row.getNextDeductTime());
 		return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
 	}
 
@@ -114,6 +127,7 @@ public class MemberApiServiceImpl implements MemberApiService {
 			return setResultError(I18nUtil.getMessage("param_not_null"));
 		}
 		try {
+			// 查询会员套餐
 			MemberProductEntity product = memberProductDao.selectById(productReqEntity.getProductId());
 			if (product == null || !Integer.valueOf(MemberConstants.PRODUCT_STATUS_ON).equals(product.getStatus())) {
 				return setResultError(I18nUtil.getMessage("base_data_null"));
@@ -126,8 +140,15 @@ public class MemberApiServiceImpl implements MemberApiService {
 			if (payType == null) {
 				payType = MemberPayTypeEnums.CASH;
 			}
+			// 套餐是否为连续包月
+			boolean autoRenew = MemberAutoRenewSupport.isAutoRenewProduct(product);
+			if (autoRenew && MemberPayTypeEnums.COIN == payType) {
+				return setResultError("连续包月套餐不支持金币购买，请选择现金支付");
+			}
 
-			Date[] expireRange = calcExpireRange(uid, product.getDurationDays());
+			// 计算本次开通前后的到期时间
+			Date[] expireRange = memberPaidSupport.calcExpireRange(uid, product.getDurationDays());
+			// 创建会员订单
 			MemberOrderEntity order = new MemberOrderEntity();
 			order.setOrderNo(OrderCodeFactory.getOrderCode(uid.longValue()));
 			order.setUid(uid);
@@ -135,6 +156,9 @@ public class MemberApiServiceImpl implements MemberApiService {
 			order.setProductCode(product.getProductCode());
 			order.setDurationDays(product.getDurationDays());
 			order.setPayType(payType.getCode());
+			order.setOrderType(MemberOrderTypeEnums.NEW.getIndex());
+			order.setPeriodIndex(1);
+			order.setDeductStatus(MemberDeductStatusEnums.INIT.getIndex());
 			order.setExpireBefore(expireRange[0]);
 			order.setExpireAfter(expireRange[1]);
 			GenericityUtil.setDate(order);
@@ -145,6 +169,7 @@ public class MemberApiServiceImpl implements MemberApiService {
 				if (priceCoin <= 0) {
 					return setResultError("该套餐不支持金币购买");
 				}
+				// 优惠券试算/校验结果 结果集
 				CouponRedeemResult redeem = couponRedeemSupport.resolve(uid, productReqEntity.getUserCouponId(),
 						CouponScopeEnums.MEMBER.getCode(), CouponCurrencyEnums.COIN, BigDecimal.valueOf(priceCoin));
 				int payCoin = redeem.getPayCoin() == null ? priceCoin : redeem.getPayCoin();
@@ -160,8 +185,10 @@ public class MemberApiServiceImpl implements MemberApiService {
 				if (payCoin > 0) {
 					deductMemberCoin(uid, payCoin, order.getOrderNo());
 				}
-				grantOrRenewMember(order);
+				// 开通或续期会员
+				memberPaidSupport.grantOrRenewMember(order);
 				if (redeem.hasCoupon()) {
+					// 支付成功后核销
 					couponRedeemSupport.confirmUsed(uid, redeem.getCoupon().getId(),
 							redeem.getCoupon().getTemplateId(), order.getOrderNo());
 				}
@@ -177,6 +204,7 @@ public class MemberApiServiceImpl implements MemberApiService {
 				if (product.getPriceYuan() == null || product.getPriceYuan().compareTo(BigDecimal.ZERO) <= 0) {
 					return setResultError(I18nUtil.getMessage("base_error"));
 				}
+				// userCouponId 为空则无优惠；否则校验归属/状态/范围/币种并算应付
 				CouponRedeemResult redeem = couponRedeemSupport.resolve(uid, productReqEntity.getUserCouponId(),
 						CouponScopeEnums.MEMBER.getCode(), CouponCurrencyEnums.YUAN, product.getPriceYuan());
 				order.setPayChannel(MemberPayChannelEnums.ofCode(channel).getCode());
@@ -190,18 +218,90 @@ public class MemberApiServiceImpl implements MemberApiService {
 						uid, order.getOrderNo(), order.getPayChannel(), order.getPayAmount(), order.getUserCouponId());
 			}
 
+			// 构建返回值
 			MemberOrderCreateRespEntity resp = toCreateResp(order);
-			if (MemberPayTypeEnums.CASH == payType) {
+			if (MemberPayTypeEnums.CASH == payType && autoRenew) {
+				// 连续包月：首期同步拉起三方签约（支付宝返回 form / 微信返回签约参数）
+				PaySceneEnums scene = PaySceneEnums.ofCode(productReqEntity.getPayScene()) == null
+						? PaySceneEnums.PC : PaySceneEnums.ofCode(productReqEntity.getPayScene());
+				PayContractResult contract = memberAutoRenewSupport.createAgreementAndSign(uid, product,
+						order, order.getPayChannel(), scene, productReqEntity.getOpenId());
+				resp.setContract(contract);
+			} else if (MemberPayTypeEnums.CASH == payType) {
 				resp.setPayInfo(tryPrepay(order.getPayChannel(), productReqEntity.getPayScene(),
 						productReqEntity.getOpenId(), order.getOrderNo(), order.getPayAmount(), "会员套餐购买"));
 			}
 			return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
-		} catch (BaseException e) {
-			log.error("member order create biz error uid={}", uid, e);
-			throw e;
 		} catch (Exception e) {
 			log.error("member order create failed uid={}", uid, e);
 			throw new BaseException("会员下单失败", e);
+		}
+	}
+
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public ResponseBase signAutoRenew(HttpServletRequest request, @RequestBody MemberContractReqEntity req) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		if (req == null || req.getProductId() == null) {
+			return setResultError(I18nUtil.getMessage("param_not_null"));
+		}
+		String channel = req.getPayChannel() == null ? null : req.getPayChannel().trim();
+		if (!MemberPayChannelEnums.isValid(channel) || MemberPayChannelEnums.BANK.getCode().equals(channel)) {
+			return setResultError("连续包月仅支持 WECHAT / ALIPAY");
+		}
+		try {
+			// 查询会员套餐
+			MemberProductEntity product = memberProductDao.selectById(req.getProductId());
+			if (product == null || !Integer.valueOf(MemberConstants.PRODUCT_STATUS_ON).equals(product.getStatus())) {
+				return setResultError(I18nUtil.getMessage("base_data_null"));
+			}
+			if (!MemberAutoRenewSupport.isAutoRenewProduct(product)) {
+				return setResultError("该套餐不是连续包月套餐");
+			}
+			if (product.getPriceYuan() == null || product.getPriceYuan().compareTo(BigDecimal.ZERO) <= 0) {
+				return setResultError(I18nUtil.getMessage("base_error"));
+			}
+			// 复用下单逻辑生成首期订单，再拉起签约
+			ProductReqEntity orderReq = new ProductReqEntity();
+			orderReq.setProductId(req.getProductId());
+			orderReq.setPayType(MemberPayTypeEnums.CASH.getCode());
+			orderReq.setPayChannel(channel);
+			orderReq.setPayScene(req.getPayScene());
+			orderReq.setOpenId(req.getOpenId());
+			orderReq.setUserCouponId(req.getUserCouponId());
+			return createOrder(request, orderReq);
+		} catch (Exception e) {
+			log.error("member auto renew sign failed uid={}", uid, e);
+			throw new BaseException("连续包月开通失败", e);
+		}
+	}
+
+	@Override
+	public ResponseBase autoRenewStatus(HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		return setResultSuccess(memberAutoRenewSupport.status(uid), I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	@Transactional(rollbackFor = Exception.class)
+	public ResponseBase unsignAutoRenew(HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		try {
+			// 用户主动解约：先调三方，再落本地状态
+			memberAutoRenewSupport.unsign(uid);
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		} catch (Exception e) {
+			log.error("member auto renew unsign failed uid={}", uid, e);
+			throw new BaseException("关闭连续包月失败", e);
 		}
 	}
 
@@ -213,40 +313,9 @@ public class MemberApiServiceImpl implements MemberApiService {
 		}
 		String orderNo = req.getOrderNo().trim();
 		try {
-			MemberOrderEntity order = memberOrderDao.findByOrderNo(orderNo);
-			if (order == null) {
-				return setResultError(I18nUtil.getMessage("base_data_null"));
-			}
-			// 金币单创建时已支付；现金单走本回调
-			if (MemberPayStatusEnums.isPaid(order.getPayStatus())) {
-				return setResultSuccess(paidNotifyData(order), I18nUtil.getMessage("base_success"));
-			}
-			if (!MemberPayTypeEnums.isCash(order.getPayType())) {
-				return setResultError(I18nUtil.getMessage("base_error"));
-			}
-			if (!MemberPayStatusEnums.WAIT.getIndex().equals(order.getPayStatus())) {
-				return setResultError(I18nUtil.getMessage("base_error"));
-			}
-
-			Date[] expireRange = calcExpireRange(order.getUid(), order.getDurationDays());
-			Date now = new Date();
-			order.setPayStatus(MemberPayStatusEnums.PAID.getIndex());
-			order.setPayTime(now);
-			order.setThirdTradeNo(StringUtils.isEmpty(req.getThirdTradeNo())
-					? order.getOrderNo() : req.getThirdTradeNo().trim());
-			order.setExpireBefore(expireRange[0]);
-			order.setExpireAfter(expireRange[1]);
-			order.setGmtModified(now);
-			memberOrderDao.updateById(order);
-			grantOrRenewMember(order);
-			// 现金支付成功后核销优惠券（幂等）
-			couponRedeemSupport.confirmUsed(order.getUid(), order.getUserCouponId(), null, orderNo);
-			log.info("member pay notify ok uid={} orderNo={} channel={} expireAfter={}",
-					order.getUid(), orderNo, order.getPayChannel(), order.getExpireAfter());
-			return setResultSuccess(paidNotifyData(order), I18nUtil.getMessage("base_success"));
-		} catch (BaseException e) {
-			log.error("member pay notify biz error orderNo={}", orderNo, e);
-			throw e;
+			// 入账逻辑下沉到 MemberPaidSupport；开启自动续费由 MemberPaidEvent 监听处理
+			MemberOrderEntity paid = memberPaidSupport.markPaid(orderNo, req.getThirdTradeNo());
+			return setResultSuccess(paidNotifyData(paid), I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			log.error("member pay notify failed orderNo={}", orderNo, e);
 			throw new BaseException("会员支付确认失败", e);
@@ -307,42 +376,11 @@ public class MemberApiServiceImpl implements MemberApiService {
 		}
 	}
 
-	private void grantOrRenewMember(MemberOrderEntity order) throws Exception {
-		UserMemberEntity exist = userMemberDao.findByUid(order.getUid());
-		Date now = new Date();
-		if (exist == null) {
-			UserMemberEntity insert = new UserMemberEntity();
-			insert.setUid(order.getUid());
-			insert.setStatus(MemberConstants.MEMBER_STATUS_ON);
-			insert.setExpireTime(order.getExpireAfter());
-			insert.setLastOrderNo(order.getOrderNo());
-			GenericityUtil.setDate(insert);
-			userMemberDao.insert(insert);
-			return;
-		}
-		exist.setStatus(MemberConstants.MEMBER_STATUS_ON);
-		exist.setExpireTime(order.getExpireAfter());
-		exist.setLastOrderNo(order.getOrderNo());
-		exist.setGmtModified(now);
-		userMemberDao.updateById(exist);
-	}
-
-	private Date[] calcExpireRange(Integer uid, int durationDays) {
-		Date now = new Date();
-		UserMemberEntity active = userMemberDao.findActiveByUid(uid);
-		Date expireBefore;
-		Date base;
-		if (active != null && active.getExpireTime() != null && active.getExpireTime().after(now)) {
-			expireBefore = active.getExpireTime();
-			base = active.getExpireTime();
-		} else {
-			expireBefore = now;
-			base = now;
-		}
-		Date expireAfter = Date.from(base.toInstant().plus(durationDays, ChronoUnit.DAYS));
-		return new Date[] { expireBefore, expireAfter };
-	}
-
+	/**
+	 * 会员下单出参
+	 * @param order
+	 * @return
+	 */
 	private static MemberOrderCreateRespEntity toCreateResp(MemberOrderEntity order) {
 		MemberOrderCreateRespEntity resp = new MemberOrderCreateRespEntity();
 		resp.setOrderNo(order.getOrderNo());

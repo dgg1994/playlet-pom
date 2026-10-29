@@ -1,5 +1,7 @@
 package com.playlet.internal.service.support.pay;
 
+import com.playlet.internal.api.response.PayContractResult;
+import com.playlet.internal.api.response.PayDeductResult;
 import com.playlet.internal.api.response.PayPrepayResult;
 import com.playlet.internal.enums.MemberPayChannelEnums;
 import com.playlet.internal.enums.PaySceneEnums;
@@ -21,6 +23,8 @@ public class PaySupport {
 	private WechatPaySupport wechatPaySupport;
 	@Autowired
 	private AlipaySupport alipaySupport;
+	@Autowired
+	private WechatPapaySupport wechatPapaySupport;
 
 	/** 该渠道是否已配置且启用（未配置时调用方应走本地兜底逻辑） */
 	public boolean available(String channel) {
@@ -53,8 +57,10 @@ public class PaySupport {
 		try {
 			PaySceneEnums target = scene == null ? PaySceneEnums.PC : scene;
 			if (ch == MemberPayChannelEnums.ALIPAY) {
+				// 支付宝下单
 				return alipaySupport.prepay(target, orderNo, amountYuan, subject, buildAttach(orderNo));
 			}
+			// 微信下单
 			return wechatPaySupport.prepay(target, orderNo, amountYuan, subject, openId);
 		} catch (BaseException e) {
 			throw e;
@@ -122,6 +128,97 @@ public class PaySupport {
 		}
 	}
 
+	// ------------------------------------------------------------ 连续包月（代扣）
+
+	/** 渠道是否支持签约代扣（微信需额外配置 plan_id） */
+	public boolean contractAvailable(String channel) {
+		MemberPayChannelEnums ch = MemberPayChannelEnums.ofCode(channel);
+		if (ch == null) {
+			return false;
+		}
+		if (ch == MemberPayChannelEnums.ALIPAY) {
+			return alipaySupport.enabled();
+		}
+		if (ch == MemberPayChannelEnums.WECHAT) {
+			return wechatPapaySupport.enabled();
+		}
+		return false;
+	}
+
+	/**
+	 * 发起签约（连续包月）。
+	 *
+	 * @param scene      签约场景 PC/H5/APP/MINI
+	 * @param externalNo 商户侧签约号（幂等键）
+	 * @param openId     微信 MINI/JSAPI 场景必填
+	 */
+	public PayContractResult contractSign(String channel, PaySceneEnums scene, String externalNo,
+			String productName, BigDecimal amountYuan, String openId) {
+		MemberPayChannelEnums ch = requireChannel(channel);
+		try {
+			if (ch == MemberPayChannelEnums.ALIPAY) {
+				return alipaySupport.agreementSign(scene, externalNo, productName, amountYuan);
+			}
+			return wechatPapaySupport.contractSign(scene, externalNo, productName, openId);
+		} catch (BaseException e) {
+			throw e;
+		} catch (Exception e) {
+			log.error("pay contract sign failed channel={} externalNo={}", channel, externalNo, e);
+			throw new BaseException("签约失败", e);
+		}
+	}
+
+	/** 查询签约状态；未查到返回 null */
+	public String contractQuery(String channel, String externalNo, String agreementNo) {
+		MemberPayChannelEnums ch = requireChannel(channel);
+		try {
+			if (ch == MemberPayChannelEnums.ALIPAY) {
+				com.alibaba.fastjson.JSONObject json =
+						alipaySupport.agreementQuery(externalNo, agreementNo);
+				return json == null ? null : json.getString("status");
+			}
+			return wechatPapaySupport.contractQuery(null, externalNo, agreementNo);
+		} catch (Exception e) {
+			log.error("pay contract query failed channel={} externalNo={}", channel, externalNo, e);
+			return null;
+		}
+	}
+
+	/** 解约；失败返回 false */
+	public boolean contractUnsign(String channel, String externalNo, String agreementNo) {
+		MemberPayChannelEnums ch = MemberPayChannelEnums.ofCode(channel);
+		if (ch == null) {
+			return false;
+		}
+		try {
+			if (ch == MemberPayChannelEnums.ALIPAY) {
+				return alipaySupport.agreementUnsign(externalNo, agreementNo);
+			}
+			return wechatPapaySupport.contractUnsign(null, externalNo, agreementNo, "用户主动解约");
+		} catch (Exception e) {
+			log.error("pay contract unsign failed channel={} externalNo={}", channel, externalNo, e);
+			return false;
+		}
+	}
+
+	/** 按协议扣款（每期自动续费） */
+	public PayDeductResult contractPay(String channel, String agreementNo, String orderNo,
+			BigDecimal amountYuan, String subject) {
+		MemberPayChannelEnums ch = requireChannel(channel);
+		try {
+			if (ch == MemberPayChannelEnums.ALIPAY) {
+				return alipaySupport.agreementPay(agreementNo, null, orderNo, amountYuan, subject);
+			}
+			return wechatPapaySupport.contractPay(orderNo, agreementNo, amountYuan, subject);
+		} catch (BaseException e) {
+			throw e;
+		} catch (Exception e) {
+			log.error("pay contract deduct failed channel={} orderNo={}", channel, orderNo, e);
+			throw new BaseException("代扣失败", e);
+		}
+	}
+
+	// 选择支付渠道
 	private MemberPayChannelEnums requireChannel(String channel) {
 		MemberPayChannelEnums ch = MemberPayChannelEnums.ofCode(channel);
 		if (ch == null) {

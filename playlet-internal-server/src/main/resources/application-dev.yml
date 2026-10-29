@@ -84,11 +84,11 @@ sms:
   password: LpQaKN8a
   #阿里云短信（国内通道）：需先报备签名与验证码模板
   aliyun:
-    access-key-id:            # RAM 子账号 AccessKeyId（建议用环境变量 SMS_ALIYUN_AK）
-    access-key-secret:        # RAM 子账号 AccessKeySecret
+    access-key-id: ${SMS_ALIYUN_AK:}           # RAM 子账号 AccessKeyId，通过环境变量 SMS_ALIYUN_AK 注入
+    access-key-secret: ${SMS_ALIYUN_AK_SECRET:}      # RAM 子账号 AccessKeySecret，通过环境变量 SMS_ALIYUN_AK_SECRET 注入
     region-id: cn-hangzhou
     endpoint: dysmsapi.aliyuncs.com
-    sign-name:                # 已报备签名，如 剧好看
-    template-code:            # 已报备验证码模板 CODE，如 SMS_123456789
+    sign-name: 山东映川文化传媒                # 已报备签名，如 剧好看
+    template-code: SMS_338927523            # 已报备验证码模板 CODE，如 SMS_123456789
     template-param: code
 

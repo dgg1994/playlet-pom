@@ -38,4 +38,8 @@ public interface MemberOrderDao extends BaseMapper<MemberOrderEntity> {
 	@Select("select * from member_order where uid = #{uid} and pay_status = 1 "
 			+ "order by id desc")
 	List<MemberOrderEntity> findPaidByUid(@Param("uid") Integer uid);
+
+	/** 按协议取历次续费订单（含失败单），用于推算下一期期数 */
+	@Select("select * from member_order where agreement_id = #{agreementId} order by period_index desc")
+	List<MemberOrderEntity> findByAgreementId(@Param("agreementId") Integer agreementId);
 }

@@ -49,4 +49,7 @@ public class MemberOrderCreateRespEntity {
 
 	@ApiModelProperty("三方下单结果（payType=CASH 时返回，失败时 success=false 可用 /api/pay/prepay 重试）")
 	private PayPrepayResult payInfo;
+
+	@ApiModelProperty("连续包月签约结果（连续包月套餐返回，客户端据此拉起签约）")
+	private PayContractResult contract;
 }

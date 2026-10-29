@@ -34,9 +34,21 @@ public class MemberProductEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "productName", value = "展示名", dataType = "String")
 	private String productName;
 
+	@TableField("product_type")
+	@ApiModelProperty(name = "productType", value = "1一次性 2连续包月", dataType = "Integer")
+	private Integer productType;
+
 	@TableField("duration_days")
 	@ApiModelProperty(name = "durationDays", value = "有效天数", dataType = "Integer")
 	private Integer durationDays;
+
+	@TableField("renew_price_yuan")
+	@ApiModelProperty(name = "renewPriceYuan", value = "连续包月每期续费价(元)；为空取 priceYuan", dataType = "BigDecimal")
+	private BigDecimal renewPriceYuan;
+
+	@TableField("renew_period_days")
+	@ApiModelProperty(name = "renewPeriodDays", value = "连续包月每期天数；连续包月时为周期长度", dataType = "Integer")
+	private Integer renewPeriodDays;
 
 	@TableField("original_price")
 	@ApiModelProperty(name = "originalPrice", value = "划线原价(元)", dataType = "BigDecimal")
