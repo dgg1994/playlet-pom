@@ -169,9 +169,6 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 			resp.setDiscountAmt(redeem.getDiscountAmt());
 			resp.setUserCouponId(redeem.hasCoupon() ? redeem.getCoupon().getId() : null);
 			return setResultSuccess(resp, I18nUtil.getMessage("base_success"));
-		} catch (BaseException e) {
-			log.error("episode unlock coin biz error uid={} assetId={}", uid, req.getAssetId(), e);
-			throw e;
 		} catch (Exception e) {
 			log.error("episode unlock coin failed uid={} assetId={}", uid, req.getAssetId(), e);
 			throw new BaseException(I18nUtil.getMessage("episode.unlock_failed"), e);
@@ -414,29 +411,19 @@ public class EpisodeUnlockApiServiceImpl implements EpisodeUnlockApiService {
 	}
 
 	/**
-	 * 本次要解锁的付费集：SINGLE 仅当前集；REMAINING 为当前集及之后所有未解锁付费集（跳过免费/广告集与已解锁集）。
+	 * 本次要解锁的付费集：
+	 *   SINGLE    → 仅当前集
+	 *   REMAINING → 当前用户所有剧下未解锁的付费集一次性解锁（全局）
 	 */
 	private List<DramaAssetEntity> resolveUnlockTargets(Integer uid, DramaAssetEntity asset, String scope) {
-		List<DramaAssetEntity> targets = new ArrayList<>();
-		if (!EpisodeUnlockConstants.UNLOCK_SCOPE_REMAINING.equals(scope)
-				|| asset.getDramaId() == null || asset.getSetNum() == null) {
-			targets.add(asset);
-			return targets;
+		if (!EpisodeUnlockConstants.UNLOCK_SCOPE_REMAINING.equals(scope)) {
+			List<DramaAssetEntity> single = new ArrayList<>();
+			single.add(asset);
+			return single;
 		}
-		List<DramaAssetEntity> list = dramaAssetDao.findOnShelfFromSetNum(asset.getDramaId(), asset.getSetNum());
-		if (list == null) {
-			return targets;
-		}
-		for (DramaAssetEntity item : list) {
-			if (!EpisodeUnlockTypeEnums.isPay(item.getUnlockType())) {
-				continue;
-			}
-			if (userEpisodeUnlockDao.findByUidAndAssetId(uid, item.getId()) != null) {
-				continue;
-			}
-			targets.add(item);
-		}
-		return targets;
+		// REMAINING 直接查全局未解锁付费集
+		List<DramaAssetEntity> all = dramaAssetDao.findUnlockedPayAssets(uid, EpisodeUnlockTypeEnums.PAY.getIndex());
+		return all == null ? new ArrayList<>() : all;
 	}
 
 	private int sumPriceCoin(List<DramaAssetEntity> list) {

@@ -164,4 +164,19 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 			+ "</script>")
 	List<DramaAssetEntity> findIdAndSetNumByIds(@Param("ids") List<String> ids);
 
+	/**
+	 * REMAINING 全局解锁：当前用户所有剧下未解锁的付费集。
+	 * 条件：已上架未删除、unlock_type=2、不存在解锁记录。
+	 * 按 drama_id + set_num 升序，确保同剧连续便于对账。
+	 */
+	@Select("SELECT da.* FROM drama_asset da "
+			+ "WHERE IFNULL(da.delete_state, 0) = 0 "
+			+ "AND da.shelf_status = 1 AND da.video_status = 1 "
+			+ "AND da.unlock_type = #{unlockType} "
+			+ "AND da.id NOT IN ("
+			+ "  SELECT ueu.asset_id FROM user_episode_unlock ueu WHERE ueu.uid = #{uid}"
+			+ ") ORDER BY da.drama_id, da.set_num, da.id")
+	List<DramaAssetEntity> findUnlockedPayAssets(@Param("uid") Integer uid,
+			@Param("unlockType") Integer unlockType);
+
 }

@@ -153,7 +153,31 @@ public class DramaEntity extends PageQueryHelperEntity {
 	@TableField("is_member_drama")
 	@ApiModelProperty(name = "isMemberDrama", value = "是否会员短剧 0否 1是", required = false, dataType = "Integer")
 	private Integer isMemberDrama;
-	
+
+	@TableField("record_status")
+	@ApiModelProperty(name = "recordStatus", value = "备案状态 0待初审 1初审通过待复审 2备案通过 3初审驳回 4复审驳回 5已上架", required = false, dataType = "Integer")
+	private Integer recordStatus;
+
+	@TableField("record_no")
+	@ApiModelProperty(name = "recordNo", value = "备案号（通过后自动生成）", required = false, dataType = "String")
+	private String recordNo;
+
+	@TableField("filing_category")
+	@ApiModelProperty(name = "filingCategory", value = "备案分类 1一类 2二类 3三类", required = false, dataType = "Integer")
+	private Integer filingCategory;
+
+	@TableField("record_type")
+	@ApiModelProperty(name = "recordType", value = "备案类型 官方备案/平台备案", required = false, dataType = "String")
+	private String recordType;
+
+	@TableField("investment_amount")
+	@ApiModelProperty(name = "investmentAmount", value = "投资额（元）", required = false, dataType = "Long")
+	private Long investmentAmount;
+
+	@TableField("theme_partition")
+	@ApiModelProperty(name = "themePartition", value = "题材分区：女频/男频", required = false, dataType = "String")
+	private String themePartition;
+
 	@TableField("setTime")
 	@ApiModelProperty(name = "setTime",value = "创建时间",required = false,dataType = "Date")
     private Date setTime;

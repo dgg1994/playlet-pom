@@ -74,6 +74,10 @@ public class MemberProductEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "remark", value = "备注", dataType = "String")
 	private String remark;
 
+	@TableField("badge_text")
+	@ApiModelProperty(name = "badgeText", value = "价格徽章（App 端价格下方小徽章，如：立省10元、超级福利）", dataType = "String")
+	private String badgeText;
+
 	@TableField("setTime")
 	@ApiModelProperty(name = "setTime", value = "创建时间", dataType = "Date")
 	private Date setTime;

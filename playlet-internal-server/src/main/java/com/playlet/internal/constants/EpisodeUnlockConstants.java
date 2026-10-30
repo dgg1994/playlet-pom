@@ -41,7 +41,7 @@ public final class EpisodeUnlockConstants {
 	/** 解锁范围：只解锁当前集 */
 	public static final String UNLOCK_SCOPE_SINGLE = "SINGLE";
 
-	/** 解锁范围：当前集及之后所有付费集（后续剧集全部解锁） */
+	/** 解锁范围：当前用户所有未解锁的付费集一次性解锁 */
 	public static final String UNLOCK_SCOPE_REMAINING = "REMAINING";
 
 	private EpisodeUnlockConstants() {

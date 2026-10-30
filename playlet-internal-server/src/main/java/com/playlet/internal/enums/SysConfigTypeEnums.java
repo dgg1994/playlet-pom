@@ -19,7 +19,9 @@ public enum SysConfigTypeEnums {
 	CONTACT_US(4, "contact_us", "联系我们", 1, "联系我们", "Contact Us", "聯絡我們", "Contact Us", "お問い合わせ", "Bize Ulaşın",
 			"Contate-nos"),
 	SUPPORT(5, "support", "客服", 2, "客服", "customer service", "客服", "customer service", "カスタマーサービス",
-			"Müşteri Hizmetleri", "atendimento ao Cliente");
+			"Müşteri Hizmetleri", "atendimento ao Cliente"),
+	ACTIVITY_RULE(6, "activity_rule", "活动规则", 1, "活动规则", "activity rule", "活动规则", "activity rule", "イベントルール",
+			"Etkinlik Kuralları", "Regras do evento");
 
 	private Integer index;
 

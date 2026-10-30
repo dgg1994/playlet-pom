@@ -17,7 +17,7 @@ public class EpisodeUnlockReqEntity {
 	@ApiModelProperty(value = "支付方式 COIN=金币（立即解锁）/ CASH=现金（下单待支付）", required = true)
 	private String payType;
 
-	@ApiModelProperty(value = "解锁范围：SINGLE=仅当前集（默认）；REMAINING=当前集及之后全部未解锁付费集（一次性合并计价）")
+	@ApiModelProperty(value = "解锁范围：SINGLE=仅当前集（默认）；REMAINING=当前用户所有未解锁的付费集一次性解锁")
 	private String unlockScope;
 
 	@ApiModelProperty(value = "用户持券ID；可选。payType=COIN 须为 COIN 币种，payType=CASH 须为 YUAN 币种，且适用 COIN_CONSUME/ALL")

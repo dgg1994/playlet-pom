@@ -24,6 +24,7 @@ import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
+import com.playlet.internal.exception.BaseException;
 
 @ControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -135,6 +136,25 @@ public class CommonExceptionHandle extends BaseApiService {
                 ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "未知",
                 ex.getValue());
         return setResult(400, msg, null);
+    }
+
+    /**
+     * 业务自定义异常 - 直接把 message 透传给前端
+     * 例如：EpisodeUnlockApiServiceImpl 里 throw new BaseException("解锁失败")
+     */
+    @ExceptionHandler(BaseException.class)
+    @ResponseBody
+    public ResponseBase handleBaseException(BaseException ex) {
+        // 业务异常不打印完整堆栈，只在异常信息里留根因便于排查
+        String rootCause = "";
+        Throwable cause = ex.getCause();
+        if (cause != null) {
+            rootCause = " [cause: " + cause.getClass().getSimpleName() + ": " + cause.getMessage() + "]";
+        }
+        String logMsg = "BaseException: " + ex.getMessage() + rootCause;
+        // 用 SLF4J 输出（e.printStackTrace 是 Exception.class 兜底用的）
+        org.slf4j.LoggerFactory.getLogger(CommonExceptionHandle.class).warn(logMsg, ex);
+        return setResultError(ex.getMessage());
     }
 
     /**

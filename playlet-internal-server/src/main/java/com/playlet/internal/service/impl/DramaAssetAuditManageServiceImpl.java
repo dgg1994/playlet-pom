@@ -5,6 +5,7 @@ import com.github.pagehelper.PageInfo;
 import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.api.response.DramaAssetAuditEpisodeRespEntity;
 import com.playlet.internal.api.response.DramaAuditDetailRespEntity;
+import com.playlet.internal.api.response.DramaRecordAuditListRespEntity;
 import com.playlet.internal.api.response.DramaWorkAuditListRespEntity;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
@@ -12,21 +13,25 @@ import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.CreatorConstants;
 import com.playlet.internal.dao.creator.CreatorAccountDao;
 import com.playlet.internal.dao.drama.*;
+import com.playlet.internal.dao.system.SysUserDao;
 import com.playlet.internal.dao.template.EmailTemplateDao;
 import com.playlet.internal.entity.creator.CreatorAccountEntity;
-import com.playlet.internal.entity.drama.DramaAssetAuditStepEntity;
-import com.playlet.internal.entity.drama.DramaAssetEntity;
-import com.playlet.internal.entity.drama.DramaAuditStepEntity;
-import com.playlet.internal.entity.drama.DramaEntity;
+import com.playlet.internal.entity.drama.*;
 import com.playlet.internal.entity.template.EmailTemplateEntity;
 import com.playlet.internal.enums.DramaAssetAuditStatusEnums;
 import com.playlet.internal.enums.DramaAssetAuditStepStatusEnums;
 import com.playlet.internal.enums.DramaAssetAuditStepTypeEnums;
+import com.playlet.internal.enums.DramaFilingCategoryEnums;
+import com.playlet.internal.enums.DramaRecordAuditStepStatusEnums;
+import com.playlet.internal.enums.DramaRecordAuditStepTypeEnums;
+import com.playlet.internal.enums.DramaRecordStatusEnums;
 import com.playlet.internal.enums.CreatorSystemMessageTypeEnums;
 import com.playlet.internal.enums.LanguageEnums;
 import com.playlet.internal.enums.MessageEnums;
 import com.playlet.internal.query.drama.DramaAssetAuditHandleQuery;
 import com.playlet.internal.query.drama.DramaAuditHandleQuery;
+import com.playlet.internal.query.drama.DramaRecordAuditQuery;
+import com.playlet.internal.query.drama.DramaRecordHandleQuery;
 import com.playlet.internal.query.drama.DramaWorkAuditQuery;
 import com.playlet.internal.service.DramaAssetAuditManageService;
 import com.playlet.internal.service.DramaAssetAuditService;
@@ -44,6 +49,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 import com.alibaba.fastjson.JSON;
@@ -81,6 +87,16 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
     private CreatorAccountDao creatorAccountDao;
     @Autowired
     private CreatorSystemMessageSendService creatorSystemMessageSendService;
+    @Autowired
+    private DramaRecordAuditDao dramaRecordAuditDao;
+    @Autowired
+    private DramaRecordAuditStepDao dramaRecordAuditStepDao;
+    @Autowired
+    private DramaRecordMaterialDao dramaRecordMaterialDao;
+    @Autowired
+    private DramaRecordAuditLogDao dramaRecordAuditLogDao;
+    @Autowired
+    private SysUserDao sysUserDao;
 
     @Override
     @SysLogAnnotation(module = "作品评审", type = "POST", remark = "作品管理列表")
@@ -566,5 +582,230 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
         private static <T> AuditLoadResult<T> error(ResponseBase error) {
             return new AuditLoadResult<>(null, error);
         }
+    }
+
+    // ===================== 备案审核 =====================
+
+    @Override
+    @SysLogAnnotation(module = "备案审核", type = "POST", remark = "备案审核列表")
+    public ResponseBase findRecordList(@RequestBody DramaRecordAuditQuery query) {
+        if (query == null) {
+            query = new DramaRecordAuditQuery();
+        }
+        PageHelper.startPage(query.getPageNumber(), query.getPageSize());
+        List<DramaRecordAuditListRespEntity> raw = dramaRecordAuditDao.findRecordList(
+                query.getKeyword(), query.getRecordStatus(), query.getFilingCategory());
+        if (raw != null) {
+            for (DramaRecordAuditListRespEntity item : raw) {
+                item.setCoverUrl(mediaUrlService.sign(item.getCoverUrl()));
+                DramaFilingCategoryEnums cat = DramaFilingCategoryEnums.fromCode(item.getFilingCategory());
+                item.setFilingCategoryLabel(cat == null ? null : cat.getLabel());
+                DramaRecordStatusEnums st = DramaRecordStatusEnums.fromCode(item.getRecordStatus());
+                item.setRecordStatusLabel(st == null ? null : st.getLabel());
+                // 当前审核节点：根据 recordStatus 推断
+                if (item.getRecordStatus() != null) {
+                    switch (item.getRecordStatus()) {
+                        case 0: item.setCurrentStepLabel("初审"); break;
+                        case 1:
+                        case 3:
+                        case 4:
+                            // 初审中/初审驳回/复审驳回，都展示当前节点
+                            item.setCurrentStepLabel(item.getRecordStatus() == 1 ? "复审"
+                                    : (item.getRecordStatus() == 3 ? "初审" : "复审"));
+                            break;
+                        default: break;
+                    }
+                }
+            }
+        }
+        return setResultSuccess(new PageInfo<>(raw), I18nUtil.getMessage("base_success"));
+    }
+
+    @Override
+    @SysLogAnnotation(module = "备案审核", type = "POST", remark = "备案审核详情")
+    public ResponseBase recordDetail(@RequestBody DramaEntity entity) {
+        if (entity == null || entity.getId() == null) {
+            return setResultError(I18nUtil.getMessage("base_data_null"));
+        }
+        DramaEntity drama = dramaDao.selectById(entity.getId());
+        if (drama == null) {
+            return setResultError(I18nUtil.getMessage("base_data_null"));
+        }
+        drama.setCoverUrl(mediaUrlService.sign(drama.getCoverUrl()));
+        // 审核步骤
+        DramaRecordAuditStepEntity firstStep = dramaRecordAuditStepDao.findByDramaIdAndStepType(
+                drama.getId(), DramaRecordAuditStepTypeEnums.FIRST.getCode());
+        DramaRecordAuditStepEntity secondStep = dramaRecordAuditStepDao.findByDramaIdAndStepType(
+                drama.getId(), DramaRecordAuditStepTypeEnums.SECOND.getCode());
+        // 备案材料
+        List<com.playlet.internal.entity.drama.DramaRecordMaterialEntity> materials =
+                dramaRecordMaterialDao.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<com.playlet.internal.entity.drama.DramaRecordMaterialEntity>()
+                                .eq("drama_id", drama.getId())
+                                .orderByAsc("material_type"));
+        if (materials != null) {
+            for (com.playlet.internal.entity.drama.DramaRecordMaterialEntity m : materials) {
+                m.setFileKey(mediaUrlService.sign(m.getFileKey()));
+            }
+        }
+        // 审核日志
+        List<com.playlet.internal.entity.drama.DramaRecordAuditLogEntity> logs =
+                dramaRecordAuditLogDao.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<com.playlet.internal.entity.drama.DramaRecordAuditLogEntity>()
+                                .eq("drama_id", drama.getId())
+                                .orderByDesc("setTime"));
+        // 分集列表（取全部集的审核状态）
+        List<com.playlet.internal.entity.drama.DramaAssetEntity> episodes = dramaAssetDao.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<com.playlet.internal.entity.drama.DramaAssetEntity>()
+                        .eq("drama_id", drama.getId())
+                        .orderByAsc("set_num"));
+        // 组装返回
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("drama", drama);
+        data.put("firstStep", firstStep);
+        data.put("secondStep", secondStep);
+        data.put("materials", materials);
+        data.put("logs", logs);
+        data.put("episodes", episodes);
+        // 三类剧不需要复审
+        boolean needSecond = drama.getFilingCategory() != null && drama.getFilingCategory() != 3;
+        data.put("needSecondAudit", needSecond);
+        return setResultSuccess(data, I18nUtil.getMessage("base_success"));
+    }
+
+    @Override
+    @SysLogAnnotation(module = "备案审核", type = "POST", remark = "备案审核处理")
+    public ResponseBase recordHandle(@Valid @RequestBody DramaRecordHandleQuery query, HttpServletRequest request) {
+        try {
+            // 基础校验
+            DramaRecordAuditStepStatusEnums action = DramaRecordAuditStepStatusEnums.fromCode(query.getAction());
+            if (action == null || !DramaRecordAuditStepStatusEnums.isHandleAction(query.getAction())) {
+                return setResultError(I18nUtil.getMessage("audit.action_invalid"));
+            }
+            // 审核状态
+            DramaRecordAuditStepTypeEnums stepType = DramaRecordAuditStepTypeEnums.fromCode(query.getStepType());
+            if (stepType == null) {
+                return setResultError(I18nUtil.getMessage("audit.step_type_invalid"));
+            }
+            if (DramaRecordAuditStepStatusEnums.isReject(query.getAction())
+                    && StringUtils.isEmpty(query.getRemark())) {
+                return setResultError(I18nUtil.getMessage("audit.reject_remark_required"));
+            }
+            // 加载剧 + 步骤
+            DramaEntity drama = dramaDao.selectById(query.getDramaId());
+            if (drama == null) {
+                return setResultError(I18nUtil.getMessage("base_data_null"));
+            }
+            // 备案审核步骤
+            DramaRecordAuditStepEntity step = dramaRecordAuditStepDao.findByDramaIdAndStepType(
+                    drama.getId(), stepType.getCode());
+            if (step == null) {
+                // 自动创建初始待审步骤
+                step = new DramaRecordAuditStepEntity();
+                step.setDramaId(drama.getId());
+                step.setStepType(stepType.getCode());
+                step.setStatus(DramaRecordAuditStepStatusEnums.PENDING.getCode());
+                step.setSetTime(new Date());
+                step.setGmtModified(new Date());
+                dramaRecordAuditStepDao.insert(step);
+            }
+            // 状态前置校验：只能处理待审核步骤
+            if (!DramaRecordAuditStepStatusEnums.isPending(step.getStatus())) {
+                return setResultError(I18nUtil.getMessage("audit.step_not_pending"));
+            }
+            // 复审必须初审先通过
+            if (stepType == DramaRecordAuditStepTypeEnums.SECOND) {
+                DramaRecordAuditStepEntity firstStep = dramaRecordAuditStepDao.findByDramaIdAndStepType(
+                        drama.getId(), DramaRecordAuditStepTypeEnums.FIRST.getCode());
+                if (firstStep == null
+                        || !DramaRecordAuditStepStatusEnums.isPass(firstStep.getStatus())) {
+                    return setResultError("初审必须先通过才能处理复审");
+                }
+            }
+            // 三类剧不允许走复审
+            if (stepType == DramaRecordAuditStepTypeEnums.SECOND
+                    && drama.getFilingCategory() != null
+                    && drama.getFilingCategory() == 3) {
+                return setResultError("三类短剧走平台快速备案通道，无需复审");
+            }
+            // 处理审核员
+            Integer adminId = resolveAdminId(request);
+            if (adminId == null) {
+                return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
+            }
+            // 执行
+            Date now = new Date();
+            step.setStatus(action.getCode());
+            step.setHandlerId(adminId);
+            com.playlet.internal.entity.system.SysUserEntity admin = sysUserDao.selectById(adminId);
+            step.setHandlerName(admin == null ? "未知" : admin.getUsername());
+            step.setHandleRemark(query.getRemark());
+            step.setHandleTime(now);
+            step.setGmtModified(now);
+            dramaRecordAuditStepDao.updateById(step);
+
+            // 更新剧的 recordStatus 聚合状态
+            DramaRecordStatusEnums newStatus;
+            if (DramaRecordAuditStepStatusEnums.isPass(action.getCode())) {
+                if (stepType == DramaRecordAuditStepTypeEnums.FIRST) {
+                    // 初审通过：二类→待复审，三类→直接备案通过（快速通道）
+                    if (drama.getFilingCategory() != null && drama.getFilingCategory() == 3) {
+                        newStatus = DramaRecordStatusEnums.PASSED;
+                        // 生成备案号
+                        if (StringUtils.isEmpty(drama.getRecordNo())) {
+                            drama.setRecordNo(buildRecordNo(drama));
+                        }
+                    } else {
+                        newStatus = DramaRecordStatusEnums.FIRST_PASSED;
+                    }
+                } else {
+                    // 复审通过
+                    newStatus = DramaRecordStatusEnums.PASSED;
+                    if (StringUtils.isEmpty(drama.getRecordNo())) {
+                        drama.setRecordNo(buildRecordNo(drama));
+                    }
+                }
+            } else {
+                // 驳回
+                newStatus = stepType == DramaRecordAuditStepTypeEnums.FIRST
+                        ? DramaRecordStatusEnums.FIRST_REJECTED
+                        : DramaRecordStatusEnums.SECOND_REJECTED;
+            }
+            drama.setRecordStatus(newStatus.getCode());
+            drama.setGmtModified(now);
+            dramaDao.updateById(drama);
+
+            // 写入审核日志
+            com.playlet.internal.entity.drama.DramaRecordAuditLogEntity logEnt =
+                    new com.playlet.internal.entity.drama.DramaRecordAuditLogEntity();
+            logEnt.setDramaId(drama.getId());
+            logEnt.setStepType(stepType.getCode());
+            logEnt.setAction(action.getCode());
+            logEnt.setRemark(query.getRemark());
+            logEnt.setHandlerId(adminId);
+            logEnt.setHandlerName(step.getHandlerName());
+            logEnt.setSetTime(now);
+            dramaRecordAuditLogDao.insert(logEnt);
+
+            // 驳回时通知创作者
+            if (DramaRecordAuditStepStatusEnums.isReject(action.getCode())) {
+                notifyAuditReject(drama.getBelongUser(), drama.getId(), null,
+                        drama.getDramaTitle(), null, query.getRemark(), step.getId());
+            }
+            return setResultSuccess(I18nUtil.getMessage("base_success"));
+        } catch (Exception e) {
+            log.error("record handle error", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * 生成备案号：(网剧)字第YYYYMMDD+3位序号号。
+     */
+    private static String buildRecordNo(DramaEntity drama) {
+        String prefix = drama.getFilingCategory() != null && drama.getFilingCategory() == 3
+                ? "(网微剧)" : "(网剧)";
+        String dateStr = new SimpleDateFormat("yyyyMMdd").format(new Date());
+        return prefix + "字第" + dateStr + "号";
     }
 }

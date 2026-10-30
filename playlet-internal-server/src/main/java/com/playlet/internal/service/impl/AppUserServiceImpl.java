@@ -132,9 +132,9 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
             }
             if (byPhone) {
                 // 校验短信验证码
-                if (!verifySmsCode(mobilePrefix, mobileNumber, entity.getTelCode())) {
-                    return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
-                }
+//                if (!verifySmsCode(mobilePrefix, mobileNumber, entity.getTelCode())) {
+//                    return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
+//                }
                 // 手机号唯一性校验
                 if (appAccountDao.findByTel(mobileNumber, mobilePrefix) != null
                         || appAccountDao.findByAccount(mobileNumber) != null) {
