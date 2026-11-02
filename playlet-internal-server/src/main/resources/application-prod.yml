@@ -56,8 +56,8 @@ qiniu:
 
 #极光推送
 jpush:
-  app_key: 24757b7ef620adc87a005d33
-  master_secret: 90857803ffd68847fe698f5a
+  app_key: d327bf0b21b19ca6c7a0ce84
+  master_secret: e72dfed6fb6b83eb592fae61
   environment: true #true生产false测试
 
 #邮件发送

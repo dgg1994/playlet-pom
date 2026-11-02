@@ -2,6 +2,7 @@ package com.playlet.internal.service.impl;
 
 import com.github.pagehelper.PageInfo;
 import com.github.pagehelper.PageHelper;
+import com.playlet.internal.api.request.WatchHistoryDeleteReqEntity;
 import com.playlet.internal.api.response.TheaterSearchHistoryRespEntity;
 import com.playlet.internal.api.response.TheaterWatchHistoryItemEntity;
 import com.playlet.internal.base.BaseApiService;
@@ -17,10 +18,12 @@ import com.playlet.internal.utils.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.validation.Valid;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -124,20 +127,27 @@ public class TheaterServiceImpl extends BaseApiService implements TheaterService
     }
 
     @Override
-    public ResponseBase deleteWatchHistory(@RequestParam("dramaId") Integer dramaId, HttpServletRequest request) {
+    public ResponseBase deleteWatchHistory(@RequestBody WatchHistoryDeleteReqEntity req,
+            HttpServletRequest request) {
         try {
             Integer uid = AppTokenUtil.resolveUid(request);
             if (uid == null) {
                 return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
             }
-            if (dramaId == null) {
+            List<Integer> dramaIds = req == null ? null : req.getDramaIds();
+            if (dramaIds == null || dramaIds.isEmpty()) {
                 return setResultError(I18nUtil.getMessage("base_error"));
             }
-            userWatchHistoryDao.deleteByUidAndDrama(uid, dramaId);
-            // Redis 写入时 dramaId 为 String
-            String dramaIdStr = String.valueOf(dramaId);
-            redisUtil.lRemove(VIEW_LIST_KEY + uid, 0, dramaIdStr);
-            redisUtil.hdel(VIEW_META_KEY + uid, dramaIdStr);
+            for (Integer dramaId : dramaIds) {
+                if (dramaId == null) {
+                    continue;
+                }
+                userWatchHistoryDao.deleteByUidAndDrama(uid, dramaId);
+                // Redis 写入时 dramaId 为 String
+                String dramaIdStr = String.valueOf(dramaId);
+                redisUtil.lRemove(VIEW_LIST_KEY + uid, 0, dramaIdStr);
+                redisUtil.hdel(VIEW_META_KEY + uid, dramaIdStr);
+            }
             return setResultSuccess(I18nUtil.getMessage("base_success"));
         } catch (Exception e) {
             throw new RuntimeException(e);

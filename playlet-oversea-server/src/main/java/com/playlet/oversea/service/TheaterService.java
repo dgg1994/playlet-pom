@@ -1,5 +1,6 @@
 package com.playlet.oversea.service;
 
+import com.playlet.oversea.api.request.WatchHistoryDeleteReqEntity;
 import com.playlet.oversea.base.ResponseBase;
 import com.playlet.oversea.entity.drama.UserWatchHistoryEntity;
 import io.swagger.annotations.Api;
@@ -7,6 +8,7 @@ import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import javax.servlet.http.HttpServletRequest;
@@ -39,10 +41,9 @@ public interface TheaterService {
 	@ApiOperation(value = "浏览历史列表", notes = "需 x-playlet-token；PageHelper 分页读 MySQL，Redis 写后缓存")
 	ResponseBase watchHistory(UserWatchHistoryEntity entity, HttpServletRequest request);
 
-	@GetMapping("/view/history/delete")
-	@ApiImplicitParam(name = "dramaId", value = "要删除的短剧业务ID", required = true, dataType = "string", paramType = "query")
-	@ApiOperation(value = "删除单条浏览历史", notes = "需 x-playlet-token")
-	ResponseBase deleteWatchHistory(Integer dramaId, HttpServletRequest request);
+	@PostMapping("/view/history/delete")
+	@ApiOperation(value = "删除浏览历史（支持批量）", notes = "需 x-playlet-token；请求体 {\"dramaIds\":[11,12,13]}")
+	ResponseBase deleteWatchHistory(WatchHistoryDeleteReqEntity req, HttpServletRequest request);
 
 	@GetMapping("/view/history/clear")
 	@ApiOperation(value = "清空浏览历史", notes = "需 x-playlet-token")
