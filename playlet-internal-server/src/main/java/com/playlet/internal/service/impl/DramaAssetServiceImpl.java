@@ -158,15 +158,15 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 				String videoUrl = toDefaultMultiRateM3u8Key(key);
 				String videoName = resolveVideoName(item.getVideoName(), key);
 				return EpisodeProcessResult.ok(resetRejectedAssetEntity(asset, drama, item.getSetNum(),
-						item.getRemarkInfo(), videoName, videoUrl, key, item.getUnlockMethod()));
+						item.getRemarkInfo(), videoName, videoUrl, key, item.getUnlockType()));
 			}
 			// 历史集：仅同步集序/备注，不动 video_url
 			asset.setSetNum(item.getSetNum());
 			if (item.getRemarkInfo() != null) {
 				asset.setRemarkInfo(item.getRemarkInfo());
 			}
-			if (!StringUtils.isEmpty(item.getUnlockMethod())) {
-				asset.setUnlockMethod(item.getUnlockMethod());
+			if (item.getUnlockType() != null) {
+				asset.setUnlockType(item.getUnlockType());
 			}
 			GenericityUtil.updateDate(asset);
 			dramaAssetDao.updateById(asset);
@@ -187,10 +187,10 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 				return EpisodeProcessResult.fail(I18nUtil.getMessage("base_info_exist"));
 			}
 			return EpisodeProcessResult.ok(resetRejectedAssetEntity(existing, drama, item.getSetNum(),
-					item.getRemarkInfo(), videoName, videoUrl, key, item.getUnlockMethod()));
+					item.getRemarkInfo(), videoName, videoUrl, key, item.getUnlockType()));
 		}
 		return EpisodeProcessResult.ok(insertNewAssetEntity(drama, item.getSetNum(), item.getRemarkInfo(),
-				videoName, videoUrl, key, item.getUnlockMethod()));
+				videoName, videoUrl, key, item.getUnlockType()));
 	}
 
 	/** 单条剧集处理结果，避免 null 语义不清。 */
@@ -236,7 +236,7 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 	}
 
 	private DramaAssetReleaseRespEntity insertNewAssetEntity(DramaEntity drama, Integer setNum, String remarkInfo,
-			String videoName, String videoUrl, String sourceKey, String unlockMethod) throws Exception {
+			String videoName, String videoUrl, String sourceKey, Integer unlockType) throws Exception {
 		DramaAssetEntity assetEntity = new DramaAssetEntity();
 		assetEntity.setVideoName(videoName);
 		assetEntity.setBelongUser(drama.getBelongUser());
@@ -246,7 +246,7 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 		assetEntity.setSetNum(setNum);
 		assetEntity.setVideoType(drama.getVideoType());
 		assetEntity.setVideoUrl(videoUrl);
-		assetEntity.setUnlockMethod(unlockMethod);
+		assetEntity.setUnlockType(unlockType);
 		assetEntity.setVideoStatus(PublicEnums.ZERO.getIndex());
 		assetEntity.setAuditStatus(DramaAssetAuditStatusEnums.UNDER_REVIEW.getCode());
 		assetEntity.setShelfStatus(DramaAssetShelfStatusEnums.OFF.getCode());
@@ -262,14 +262,14 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 
 	private DramaAssetReleaseRespEntity resetRejectedAssetEntity(DramaAssetEntity asset, DramaEntity drama,
 			Integer setNum, String remarkInfo, String videoName, String videoUrl, String sourceKey,
-			String unlockMethod) throws Exception {
+			Integer unlockType) throws Exception {
 		asset.setSetNum(setNum);
 		asset.setVideoName(videoName);
 		asset.setRemarkInfo(remarkInfo);
 		asset.setVideoType(drama.getVideoType());
 		asset.setVideoUrl(videoUrl);
-		if (!StringUtils.isEmpty(unlockMethod)) {
-			asset.setUnlockMethod(unlockMethod);
+		if (unlockType != null) {
+			asset.setUnlockType(unlockType);
 		}
 		asset.setBelongUser(drama.getBelongUser());
 		asset.setVideoStatus(PublicEnums.ZERO.getIndex());
