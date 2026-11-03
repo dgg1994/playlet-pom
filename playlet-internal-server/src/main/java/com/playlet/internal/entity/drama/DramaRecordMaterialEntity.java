@@ -51,4 +51,8 @@ public class DramaRecordMaterialEntity {
 
 	@TableField("gmtModified")
 	private Date gmtModified;
+
+	@TableField(exist = false)
+	@ApiModelProperty("签名后的访问URL（仅查询出参用）")
+	private String fileUrl;
 }

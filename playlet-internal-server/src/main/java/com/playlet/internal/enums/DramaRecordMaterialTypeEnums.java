@@ -13,11 +13,14 @@ public enum DramaRecordMaterialTypeEnums {
 	SHORT_DRAMA_LICENSE(7, "微短剧发行许可证", 3),
 	RECORD_PUBLIC_DOC(8, "备案公示文件", 3),
 	SPECIAL_THEME(9, "特殊题材材料", 3),
-	OPENING_TRAILER(10, "片头片尾审核", 4);
+	OPENING_TRAILER(10, "片头片尾审核", 4),
+	COMIC_AUTH(11, "漫画/动漫改编授权", 2),
+	OUTLINE_PDF(12, "分集大纲文件", 5),
+	CHARACTER_PDF(13, "人物小传文件", 5);
 
 	private final int code;
 	private final String label;
-	/** 材料分组：1主体信息 2版权材料 3备案材料 4片头片尾 */
+	/** 材料分组：1主体信息 2版权材料 3备案材料 4片头片尾 5剧本材料 */
 	private final int group;
 
 	DramaRecordMaterialTypeEnums(int code, String label, int group) {

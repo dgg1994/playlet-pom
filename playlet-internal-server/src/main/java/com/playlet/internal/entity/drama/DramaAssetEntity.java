@@ -83,6 +83,10 @@ public class DramaAssetEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "priceYuan", value = "付费解锁现金价(元)", required = false, dataType = "BigDecimal")
 	private BigDecimal priceYuan;
 
+	@TableField("unlock_method")
+	@ApiModelProperty(name = "unlockMethod", value = "解锁方式 free/vip/paid（创建向导数据）", required = false, dataType = "String")
+	private String unlockMethod;
+
 	@TableField("exposure_count")
 	@ApiModelProperty(name = "exposureCount", value = "曝光量", required = false, dataType = "Long")
 	private Long exposureCount;

@@ -12,13 +12,19 @@ import java.util.List;
  */
 public interface DramaRecordAuditDao {
 
+	/**
+	 * 统计已生成的备案号数量，用于生成当日流水号。
+	 */
+	@Select("SELECT COUNT(*) FROM drama WHERE record_no LIKE CONCAT(#{prefix}, '%')")
+	int countRecordNoByPrefix(@Param("prefix") String prefix);
+
 	@Select("<script>" +
 		"SELECT d.id AS dramaId, d.drama_title AS dramaTitle, d.cover_url AS coverUrl, " +
 		"d.producer_firm AS producerFirm, d.filing_category AS filingCategory, " +
 		"d.total_episodes AS totalEpisodes, d.record_status AS recordStatus, " +
 		"d.record_no AS recordNo, d.setTime AS uploadDate " +
 		"FROM drama d " +
-		"WHERE d.delete_state = 0 AND d.filing_category IN (1, 2, 3) " +
+		"WHERE d.delete_state = 0 " +
 		"<if test='keyword != null and keyword != \"\"'>" +
 		"  AND (d.drama_title LIKE CONCAT('%', #{keyword}, '%') OR d.producer_firm LIKE CONCAT('%', #{keyword}, '%'))" +
 		"</if>" +

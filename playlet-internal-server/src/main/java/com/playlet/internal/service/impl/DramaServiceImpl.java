@@ -9,22 +9,23 @@ import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.TheaterConstants;
-import com.playlet.internal.dao.drama.DramaAssetDao;
-import com.playlet.internal.dao.drama.DramaDao;
-import com.playlet.internal.dao.drama.DramaTagRelDao;
-import com.playlet.internal.dao.drama.TagDao;
+import com.playlet.internal.dao.drama.*;
 import com.playlet.internal.entity.drama.DramaEntity;
+import com.playlet.internal.entity.drama.DramaRecordMaterialEntity;
 import com.playlet.internal.entity.drama.DramaTagRelEntity;
 import com.playlet.internal.entity.drama.TagEntity;
 import com.playlet.internal.enums.*;
 import com.playlet.internal.query.drama.AddDramaQuery;
+import com.playlet.internal.query.drama.DramaMaterialItemQuery;
 import com.playlet.internal.query.drama.QueryDramaQuery;
 import com.playlet.internal.query.drama.UpdateDramaQuery;
 import com.playlet.internal.service.DramaAuditService;
 import com.playlet.internal.service.DramaService;
 import com.playlet.internal.service.MediaUrlService;
-import com.playlet.internal.service.RankAlgoService;
-import com.playlet.internal.utils.*;
+import com.playlet.internal.utils.GenericityUtil;
+import com.playlet.internal.utils.I18nUtil;
+import com.playlet.internal.utils.QiniuUploadUtils;
+import com.playlet.internal.utils.TheaterHomeCacheHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,8 +36,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.validation.Valid;
-import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @RestController
@@ -60,17 +62,21 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 	private MediaUrlService mediaUrlService;
 
 	@Autowired
-	private RankAlgoService rankAlgoService;
-
-	@Autowired
 	private TheaterHomeCacheHelper theaterHomeCacheHelper;
 
 	@Autowired
 	private DramaAuditService dramaAuditService;
 
+	@Autowired
+	private DramaRecordMaterialDao dramaRecordMaterialDao;
+
 	@Override
 	public ResponseBase addDrama(@Valid AddDramaQuery createPay, MultipartFile file) {
 		try {
+			log.info("[addDrama] investmentAmount={}, filingCategory={}, defaultUnlockMethod={}, storySynopsis={}",
+				createPay.getInvestmentAmount(), createPay.getFilingCategory(),
+				createPay.getDefaultUnlockMethod(),
+				createPay.getStorySynopsis() != null ? createPay.getStorySynopsis().substring(0, Math.min(30, createPay.getStorySynopsis().length())) : null);
 			//上传图片
 			if(file == null) {
 				return setResultError(I18nUtil.getMessage("cover_not_null"));
@@ -99,6 +105,8 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			String url = QiniuUploadUtils.uploadFile(file,path);
 			entity.setCoverUrl(url);
 			dramaDao.updateById(entity);
+			// 保存创建向导提交的备案材料
+			saveMaterials(entity.getId(), createPay.getMaterials());
 			// 剧评审：封面/简介/标签进入 AI 默认通过 + A/B 待审
 			dramaAuditService.initAuditSteps(entity.getId());
 			return setResultSuccess(entity,I18nUtil.getMessage("base_success"));
@@ -112,6 +120,8 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 	@Override
 	public ResponseBase update(@Valid UpdateDramaQuery createPay, MultipartFile file) {
 		try {
+			log.info("[update] id={}, investmentAmount={}, filingCategory={}, defaultUnlockMethod={}",
+				createPay.getId(), createPay.getInvestmentAmount(), createPay.getFilingCategory(), createPay.getDefaultUnlockMethod());
 			DramaEntity entity = dramaDao.selectById(createPay.getId());
 			if(entity == null) {
 				return  setResultError(I18nUtil.getMessage("base_error"));
@@ -134,6 +144,14 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			entity.setDescriptionInfo(createPay.getDescriptionInfo());
 			entity.setBelongUser(createPay.getBelongUser());
 			entity.setIsAi(createPay.getIsAi());
+			// 创建向导扩展字段
+			entity.setFilingCategory(createPay.getFilingCategory());
+			entity.setInvestmentAmount(createPay.getInvestmentAmount());
+			entity.setDefaultUnlockMethod(createPay.getDefaultUnlockMethod());
+			entity.setStorySynopsis(createPay.getStorySynopsis());
+			entity.setEpisodeOutline(createPay.getEpisodeOutline());
+			entity.setFemaleLead(createPay.getFemaleLead());
+			entity.setMaleLead(createPay.getMaleLead());
 			if (file != null) {
 				String path = String.format(Constants.FILE_UPLOAD_SITE, entity.getId());
 				String url = QiniuUploadUtils.uploadFile(file, path);
@@ -163,6 +181,10 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 				entity.setAppealTime(null);
 			}
 			dramaDao.updateById(entity);
+			// 创建向导提交的备案材料（全量替换）
+			if (createPay.getMaterials() != null) {
+				saveMaterials(entity.getId(), createPay.getMaterials());
+			}
 			if (auditResetRequired) {
 				dramaAuditService.initAuditSteps(entity.getId());
 			}
@@ -307,10 +329,49 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			List<DramaAssetRespEntity> list = dramaAssetDao.findByDramaId(id);
 			entity.setVoideList(list);
 			entity.setCoverUrl(mediaUrlService.sign(entity.getCoverUrl()));
-			return setResultSuccess(entity, I18nUtil.getMessage("base_success")); 
+			// 创建向导材料回显
+			List<DramaRecordMaterialEntity> materials = dramaRecordMaterialDao.selectList(
+					new QueryWrapper<DramaRecordMaterialEntity>()
+							.eq("drama_id", entity.getId())
+							.orderByAsc("material_type"));
+			if (materials != null) {
+				for (DramaRecordMaterialEntity m : materials) {
+					m.setFileUrl(mediaUrlService.sign(m.getFileKey()));
+				}
+			}
+			entity.setMaterialList(materials);
+			return setResultSuccess(entity, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			log.error("service error", e);
 			throw new RuntimeException(e);
+		}
+	}
+
+	/** 保存创建向导提交的备案材料：先清空该短剧旧材料，再全量写入。 */
+	private void saveMaterials(Integer dramaId, List<DramaMaterialItemQuery> materials) throws Exception {
+		if (dramaId == null || materials == null) {
+			return;
+		}
+		dramaRecordMaterialDao.delete(new QueryWrapper<DramaRecordMaterialEntity>().eq("drama_id", dramaId));
+		// uk_drama_material 为 (drama_id, material_type)，同一类型仅保留首条
+		Set<Integer> savedTypes = new HashSet<>();
+		for (DramaMaterialItemQuery item : materials) {
+			if (item.getMaterialType() == null || item.getFileKey() == null || item.getFileKey().isEmpty()) {
+				continue;
+			}
+			if (!savedTypes.add(item.getMaterialType())) {
+				continue;
+			}
+			DramaRecordMaterialEntity material = new DramaRecordMaterialEntity();
+			material.setDramaId(dramaId);
+			material.setMaterialType(item.getMaterialType());
+			DramaRecordMaterialTypeEnums typeEnum = DramaRecordMaterialTypeEnums.fromCode(item.getMaterialType());
+			material.setMaterialLabel(typeEnum == null ? "" : typeEnum.getLabel());
+			material.setFileKey(item.getFileKey());
+			material.setFileName(item.getFileName());
+			material.setRequired(item.getRequired() == null ? 0 : item.getRequired());
+			GenericityUtil.setDate(material);
+			dramaRecordMaterialDao.insert(material);
 		}
 	}
 

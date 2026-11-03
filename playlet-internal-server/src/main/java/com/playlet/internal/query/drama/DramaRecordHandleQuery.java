@@ -25,4 +25,9 @@ public class DramaRecordHandleQuery {
 
 	@ApiModelProperty(name = "remark", value = "审核意见/驳回原因（驳回时必填）", dataType = "String")
 	private String remark;
+
+	@ApiModelProperty(name = "filingCategory",
+			value = "备案分类判定：1一类（官方备案）2二类（官方备案）3三类（平台备案）；通过前必须判定",
+			dataType = "Integer")
+	private Integer filingCategory;
 }

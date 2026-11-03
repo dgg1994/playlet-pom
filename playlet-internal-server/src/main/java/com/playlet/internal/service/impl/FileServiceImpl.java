@@ -30,4 +30,12 @@ public class FileServiceImpl extends BaseApiService implements FileService {
 		return setResultSuccess(mediaUrlService.sign(key), I18nUtil.getMessage("base_success"));
 	}
 
+	@Override
+	public ResponseBase uploadKey(MultipartFile file) {
+		// 备案材料等场景：返回七牛原始 key，由后端在展示时统一签名，避免库里存过期签名URL
+		String key = QiniuUploadUtils.uploadFile(file, "VD_1/material/");
+		log.info("file uploaded key={}", key);
+		return setResultSuccess(key, I18nUtil.getMessage("base_success"));
+	}
+
 }

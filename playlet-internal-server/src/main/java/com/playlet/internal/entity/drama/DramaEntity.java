@@ -12,6 +12,7 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 
@@ -172,11 +173,31 @@ public class DramaEntity extends PageQueryHelperEntity {
 
 	@TableField("investment_amount")
 	@ApiModelProperty(name = "investmentAmount", value = "投资额（元）", required = false, dataType = "Long")
-	private Long investmentAmount;
+	private BigDecimal investmentAmount;
 
 	@TableField("theme_partition")
 	@ApiModelProperty(name = "themePartition", value = "题材分区：女频/男频", required = false, dataType = "String")
 	private String themePartition;
+
+	@TableField("default_unlock_method")
+	@ApiModelProperty(name = "defaultUnlockMethod",value = "默认解锁方式 free/vip/paid（创建向导）",required = false,dataType = "String")
+	private String defaultUnlockMethod;
+
+	@TableField("story_synopsis")
+	@ApiModelProperty(name = "storySynopsis",value = "故事梗概",required = false,dataType = "String")
+	private String storySynopsis;
+
+	@TableField("episode_outline")
+	@ApiModelProperty(name = "episodeOutline",value = "分集大纲JSON数组字符串 [{range,text}]",required = false,dataType = "String")
+	private String episodeOutline;
+
+	@TableField("female_lead")
+	@ApiModelProperty(name = "femaleLead",value = "女主角介绍",required = false,dataType = "String")
+	private String femaleLead;
+
+	@TableField("male_lead")
+	@ApiModelProperty(name = "maleLead",value = "男主角介绍",required = false,dataType = "String")
+	private String maleLead;
 
 	@TableField("setTime")
 	@ApiModelProperty(name = "setTime",value = "创建时间",required = false,dataType = "Date")
@@ -186,6 +207,10 @@ public class DramaEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "gmtModified",value = "更新时间",required = false,dataType = "Date")
 	private Date gmtModified;
 	
+	@TableField(exist = false)
+	@ApiModelProperty(name = "materialList",value = "备案材料列表",required = false,dataType = "List<DramaRecordMaterialEntity>")
+	private List<DramaRecordMaterialEntity> materialList;
+
 	@TableField(exist = false)
 	@ApiModelProperty(name = "tagList",value = "标签类型集合",required = false,dataType = "List<Integer>")
 	private List<TagEntity> tagList;

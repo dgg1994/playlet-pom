@@ -1,16 +1,14 @@
 package com.playlet.internal.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.playlet.internal.dao.drama.DramaAssetDao;
 import com.playlet.internal.dao.drama.DramaAuditStepDao;
 import com.playlet.internal.dao.drama.DramaDao;
+import com.playlet.internal.dao.drama.DramaRecordAuditStepDao;
 import com.playlet.internal.entity.drama.DramaAuditStepEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
-import com.playlet.internal.enums.DramaAppealStatusEnums;
-import com.playlet.internal.enums.DramaAssetAuditStatusEnums;
-import com.playlet.internal.enums.DramaAssetAuditStepStatusEnums;
-import com.playlet.internal.enums.DramaAssetAuditStepTypeEnums;
-import com.playlet.internal.enums.DramaAssetShelfStatusEnums;
-import com.playlet.internal.enums.VerifyStateEnums;
+import com.playlet.internal.entity.drama.DramaRecordAuditStepEntity;
+import com.playlet.internal.enums.*;
 import com.playlet.internal.service.DramaAuditService;
 import com.playlet.internal.service.RankAlgoService;
 import com.playlet.internal.utils.GenericityUtil;
@@ -19,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.Date;
 import java.util.List;
 
@@ -33,6 +32,8 @@ public class DramaAuditServiceImpl implements DramaAuditService {
 	private DramaDao dramaDao;
 	@Autowired
 	private DramaAuditStepDao dramaAuditStepDao;
+	@Autowired
+	private DramaRecordAuditStepDao dramaRecordAuditStepDao;
 	@Autowired
 	private DramaAssetDao dramaAssetDao;
 	@Autowired
@@ -54,27 +55,63 @@ public class DramaAuditServiceImpl implements DramaAuditService {
 			ai.setHandlerId(0);
 			ai.setHandleRemark(AI_PASS_REMARK);
 			ai.setHandleTime(now);
-			safeSetDate(ai);
+			GenericityUtil.setDate(ai);
 			dramaAuditStepDao.insert(ai);
 
 			DramaAuditStepEntity groupA = new DramaAuditStepEntity();
 			groupA.setDramaId(dramaId);
 			groupA.setStepType(DramaAssetAuditStepTypeEnums.GROUP_A.getCode());
 			groupA.setStatus(DramaAssetAuditStepStatusEnums.PENDING.getCode());
-			safeSetDate(groupA);
+			GenericityUtil.setDate(groupA);
 			dramaAuditStepDao.insert(groupA);
 
 			DramaAuditStepEntity groupB = new DramaAuditStepEntity();
 			groupB.setDramaId(dramaId);
 			groupB.setStepType(DramaAssetAuditStepTypeEnums.GROUP_B.getCode());
 			groupB.setStatus(DramaAssetAuditStepStatusEnums.PENDING.getCode());
-			safeSetDate(groupB);
+			GenericityUtil.setDate(groupB);
 			dramaAuditStepDao.insert(groupB);
+
+			initRecordAuditSteps(dramaId, now);
 
 			refreshAggregateAndAutoShelf(dramaId);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
+	}
+
+	/**
+	 * 初始化备案审核步骤，与剧评审同步重置：初审待审；一/二类追加复审待审（三类走平台快速通道只审一次）。
+	 * 同时把备案状态拉回待初审并清空旧备案号，等待重新备案。
+	 */
+	private void initRecordAuditSteps(Integer dramaId, Date now) throws InvocationTargetException, IllegalAccessException {
+		dramaRecordAuditStepDao.deleteByDramaId(dramaId);
+		DramaEntity drama = dramaDao.selectById(dramaId);
+		DramaFilingCategoryEnums category = drama == null ? null
+				: DramaFilingCategoryEnums.fromCode(drama.getFilingCategory());
+
+		DramaRecordAuditStepEntity first = new DramaRecordAuditStepEntity();
+		first.setDramaId(dramaId);
+		first.setStepType(DramaRecordAuditStepTypeEnums.FIRST.getCode());
+		first.setStatus(DramaRecordAuditStepStatusEnums.PENDING.getCode());
+		GenericityUtil.setDate(first);
+		dramaRecordAuditStepDao.insert(first);
+
+		if (category == DramaFilingCategoryEnums.FIRST || category == DramaFilingCategoryEnums.SECOND) {
+			DramaRecordAuditStepEntity second = new DramaRecordAuditStepEntity();
+			second.setDramaId(dramaId);
+			second.setStepType(DramaRecordAuditStepTypeEnums.SECOND.getCode());
+			second.setStatus(DramaRecordAuditStepStatusEnums.PENDING.getCode());
+			GenericityUtil.setDate(second);
+			dramaRecordAuditStepDao.insert(second);
+		}
+
+		UpdateWrapper<DramaEntity> uw = new UpdateWrapper<>();
+		uw.eq("id", dramaId)
+				.set("record_status", DramaRecordStatusEnums.PENDING_FIRST.getCode())
+				.set("record_no", "")
+				.set("gmtModified", now);
+		dramaDao.update(null, uw);
 	}
 
 	@Override
@@ -258,13 +295,5 @@ public class DramaAuditServiceImpl implements DramaAuditService {
 		}
 		return drama.getAppealStatus() != null
 				&& drama.getAppealStatus().equals(DramaAppealStatusEnums.APPEALING.getCode());
-	}
-
-	private void safeSetDate(Object entity) {
-		try {
-			GenericityUtil.setDate(entity);
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
 	}
 }

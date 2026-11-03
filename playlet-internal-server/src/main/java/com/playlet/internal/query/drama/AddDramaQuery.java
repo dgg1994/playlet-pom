@@ -54,4 +54,28 @@ public class AddDramaQuery {
 	@ApiModelProperty(name = "tagGroupIdList",value = "标签语言分组Id类型集合",required = false,dataType = "List<Integer>")
 	private List<String> tagGroupIdList;
 
+	@ApiModelProperty(name = "filingCategory",value = "备案分类 1一类 2二类 3三类",required = false,dataType = "Integer")
+	private Integer filingCategory;
+
+	@ApiModelProperty(name = "investmentAmount",value = "投资额（元）",required = false,dataType = "Long")
+	private Long investmentAmount;
+
+	@ApiModelProperty(name = "defaultUnlockMethod",value = "默认解锁方式 free/vip/paid",required = false,dataType = "String")
+	private String defaultUnlockMethod;
+
+	@ApiModelProperty(name = "storySynopsis",value = "故事梗概",required = false,dataType = "String")
+	private String storySynopsis;
+
+	@ApiModelProperty(name = "episodeOutline",value = "分集大纲JSON数组字符串 [{range,text}]",required = false,dataType = "String")
+	private String episodeOutline;
+
+	@ApiModelProperty(name = "femaleLead",value = "女主角介绍",required = false,dataType = "String")
+	private String femaleLead;
+
+	@ApiModelProperty(name = "maleLead",value = "男主角介绍",required = false,dataType = "String")
+	private String maleLead;
+
+	@ApiModelProperty(name = "materials",value = "备案材料列表",required = false,dataType = "List<DramaMaterialItemQuery>")
+	private List<DramaMaterialItemQuery> materials;
+
 }

@@ -1,5 +1,6 @@
 package com.playlet.internal.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import com.playlet.internal.aop.SysLogAnnotation;
@@ -599,7 +600,7 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
             for (DramaRecordAuditListRespEntity item : raw) {
                 item.setCoverUrl(mediaUrlService.sign(item.getCoverUrl()));
                 DramaFilingCategoryEnums cat = DramaFilingCategoryEnums.fromCode(item.getFilingCategory());
-                item.setFilingCategoryLabel(cat == null ? null : cat.getLabel());
+                item.setFilingCategoryLabel(cat == null ? "未分类" : cat.getLabel());
                 DramaRecordStatusEnums st = DramaRecordStatusEnums.fromCode(item.getRecordStatus());
                 item.setRecordStatusLabel(st == null ? null : st.getLabel());
                 // 当前审核节点：根据 recordStatus 推断
@@ -640,7 +641,7 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
         // 备案材料
         List<com.playlet.internal.entity.drama.DramaRecordMaterialEntity> materials =
                 dramaRecordMaterialDao.selectList(
-                        new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<com.playlet.internal.entity.drama.DramaRecordMaterialEntity>()
+                        new QueryWrapper<DramaRecordMaterialEntity>()
                                 .eq("drama_id", drama.getId())
                                 .orderByAsc("material_type"));
         if (materials != null) {
@@ -667,8 +668,9 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
         data.put("materials", materials);
         data.put("logs", logs);
         data.put("episodes", episodes);
-        // 三类剧不需要复审
-        boolean needSecond = drama.getFilingCategory() != null && drama.getFilingCategory() != 3;
+        // 一/二类走官方备案需复审；三类走平台备案仅初审
+        boolean needSecond = drama.getFilingCategory() != null
+                && (drama.getFilingCategory() == 1 || drama.getFilingCategory() == 2);
         data.put("needSecondAudit", needSecond);
         return setResultSuccess(data, I18nUtil.getMessage("base_success"));
     }
@@ -695,6 +697,20 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
             DramaEntity drama = dramaDao.selectById(query.getDramaId());
             if (drama == null) {
                 return setResultError(I18nUtil.getMessage("base_data_null"));
+            }
+            // 备案分类判定：一类/二类走官方备案，三类走平台备案
+            Integer judgedCategory = query.getFilingCategory();
+            if (judgedCategory != null) {
+                if (judgedCategory < 1 || judgedCategory > 3) {
+                    return setResultError("备案分类取值非法：1一类 2二类 3三类");
+                }
+                if (DramaRecordStatusEnums.isPassed(drama.getRecordStatus())
+                        && !judgedCategory.equals(drama.getFilingCategory())) {
+                    return setResultError("该短剧已备案通过，不能修改备案分类");
+                }
+                if (!judgedCategory.equals(drama.getFilingCategory())) {
+                    drama = applyFilingCategory(drama, judgedCategory);
+                }
             }
             // 备案审核步骤
             DramaRecordAuditStepEntity step = dramaRecordAuditStepDao.findByDramaIdAndStepType(
@@ -728,6 +744,12 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
                     && drama.getFilingCategory() == 3) {
                 return setResultError("三类短剧走平台快速备案通道，无需复审");
             }
+            // 通过前必须已判定备案分类，否则无法确定官方/平台备案号
+            if (DramaRecordAuditStepStatusEnums.isPass(query.getAction())
+                    && (drama.getFilingCategory() == null
+                    || drama.getFilingCategory() < 1 || drama.getFilingCategory() > 3)) {
+                return setResultError("请先判定备案分类（一类/二类/三类）后再通过");
+            }
             // 处理审核员
             Integer adminId = resolveAdminId(request);
             if (adminId == null) {
@@ -744,6 +766,10 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
             step.setGmtModified(now);
             dramaRecordAuditStepDao.updateById(step);
 
+            // 通过时同步备案类型：一类/二类=官方备案，三类=平台备案
+            if (DramaRecordAuditStepStatusEnums.isPass(action.getCode())) {
+                drama.setRecordType(resolveRecordType(drama.getFilingCategory()));
+            }
             // 更新剧的 recordStatus 聚合状态
             DramaRecordStatusEnums newStatus;
             if (DramaRecordAuditStepStatusEnums.isPass(action.getCode())) {
@@ -800,12 +826,65 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
     }
 
     /**
-     * 生成备案号：(网剧)字第YYYYMMDD+3位序号号。
+     * 生成备案号：
+     * 一类/二类 → 官方备案号：(网剧)字第yyyyMMdd+3位流水号号
+     * 三类 → 平台备案号：(网微剧)字第yyyyMMdd+3位流水号号
      */
-    private static String buildRecordNo(DramaEntity drama) {
-        String prefix = drama.getFilingCategory() != null && drama.getFilingCategory() == 3
-                ? "(网微剧)" : "(网剧)";
-        String dateStr = new SimpleDateFormat("yyyyMMdd").format(new Date());
-        return prefix + "字第" + dateStr + "号";
+    private String buildRecordNo(DramaEntity drama) {
+        boolean platform = drama.getFilingCategory() != null && drama.getFilingCategory() == 3;
+        String prefix = platform ? "(网微剧)" : "(网剧)";
+        String head = prefix + "字第" + new SimpleDateFormat("yyyyMMdd").format(new Date());
+        int serial = dramaRecordAuditDao.countRecordNoByPrefix(head) + 1;
+        return head + String.format("%03d", serial) + "号";
+    }
+
+    /**
+     * 备案类型：一类/二类走官方备案，三类走平台备案。
+     */
+    private static String resolveRecordType(Integer filingCategory) {
+        if (filingCategory == null) {
+            return null;
+        }
+        return filingCategory == 3 ? "平台备案" : "官方备案";
+    }
+
+    /**
+     * 审核员判定备案分类：写回分类与备案类型，并按分类调整后续步骤。
+     * 一类/二类：确保存在复审步骤；三类：初审已通过则直接备案通过并生成平台备案号。
+     */
+    private DramaEntity applyFilingCategory(DramaEntity drama, Integer category) {
+        Date now = new Date();
+        drama.setFilingCategory(category);
+        drama.setRecordType(resolveRecordType(category));
+        drama.setGmtModified(now);
+        dramaDao.updateById(drama);
+
+        if (category == 3) {
+            DramaRecordAuditStepEntity first = dramaRecordAuditStepDao.findByDramaIdAndStepType(
+                    drama.getId(), DramaRecordAuditStepTypeEnums.FIRST.getCode());
+            if (first != null && DramaRecordAuditStepStatusEnums.isPass(first.getStatus())
+                    && !DramaRecordStatusEnums.isPassed(drama.getRecordStatus())) {
+                drama.setRecordStatus(DramaRecordStatusEnums.PASSED.getCode());
+                if (StringUtils.isEmpty(drama.getRecordNo())) {
+                    drama.setRecordNo(buildRecordNo(drama));
+                }
+                drama.setGmtModified(now);
+                dramaDao.updateById(drama);
+            }
+            return drama;
+        }
+
+        // 一/二类需复审：缺少复审步骤时补建待审
+        if (dramaRecordAuditStepDao.findByDramaIdAndStepType(drama.getId(),
+                DramaRecordAuditStepTypeEnums.SECOND.getCode()) == null) {
+            DramaRecordAuditStepEntity second = new DramaRecordAuditStepEntity();
+            second.setDramaId(drama.getId());
+            second.setStepType(DramaRecordAuditStepTypeEnums.SECOND.getCode());
+            second.setStatus(DramaRecordAuditStepStatusEnums.PENDING.getCode());
+            second.setSetTime(now);
+            second.setGmtModified(now);
+            dramaRecordAuditStepDao.insert(second);
+        }
+        return drama;
     }
 }

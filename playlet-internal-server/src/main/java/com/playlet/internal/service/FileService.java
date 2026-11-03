@@ -12,4 +12,7 @@ public interface FileService {
 	@PostMapping("/upload")
 	ResponseBase upload(MultipartFile file);
 
+	@PostMapping("/uploadKey")
+	ResponseBase uploadKey(MultipartFile file);
+
 }

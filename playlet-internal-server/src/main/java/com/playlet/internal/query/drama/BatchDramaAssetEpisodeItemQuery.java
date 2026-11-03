@@ -26,6 +26,9 @@ public class BatchDramaAssetEpisodeItemQuery {
 	@ApiModelProperty(value = "原始文件名")
 	private String videoName;
 
+	@ApiModelProperty(value = "解锁方式 free/vip/paid（创建向导数据）")
+	private String unlockMethod;
+
 	@ApiModelProperty(value = "备注")
 	private String remarkInfo;
 }
