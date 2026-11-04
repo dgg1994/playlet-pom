@@ -20,6 +20,9 @@ public interface CreatorAccountDao extends BaseMapper<CreatorAccountEntity> {
 	@Select("select * from creator_account where user_account = #{userAccount} limit 1")
 	CreatorAccountEntity findByAccount(@Param("userAccount") String userAccount);
 
+	@Select("select count(1) from creator_account where mobile_prefix = #{prefix} and mobile_number = #{number}")
+	int countByMobile(@Param("prefix") String prefix, @Param("number") String number);
+
 	@Select("<script>"
 			+ "select * from creator_account where id in "
 			+ "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
@@ -62,7 +65,7 @@ public interface CreatorAccountDao extends BaseMapper<CreatorAccountEntity> {
 			+ "ca.avatar as avatarUrl, ca.user_state as userState, "
 			+ "ca.coin_balance as coinBalance, ca.frozen_coin_balance as frozenCoinBalance, "
 			+ "ca.total_income_coin as totalIncomeCoin, ca.last_login_time as lastLoginTime, ca.setTime, "
-			+ "cp.identity_type as identityType, cp.real_name as realName, cp.audit_status as auditStatus "
+			+ "cp.identity_type as identityType, cp.real_name as realName, cp.audit_status as auditStatus, cp.id as profileId "
 			+ "from creator_account ca "
 			+ "left join creator_profile cp on cp.creator_id = ca.id "
 			+ "where 1=1 "

@@ -49,6 +49,9 @@ public class CreatorAccountManageItemEntity {
 	@ApiModelProperty("入驻审核文案")
 	private String auditStatusLabel;
 
+	@ApiModelProperty("入驻申请 id（creator_profile.id）")
+	private Integer profileId;
+
 	@ApiModelProperty("可用金币（总余额-冻结）")
 	private Long availableCoin;
 

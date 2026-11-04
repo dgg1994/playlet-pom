@@ -343,6 +343,9 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         if (query.getIdentityType() != null) {
             profile.setIdentityType(query.getIdentityType());
         }
+        if (query.getCreatorRole() != null) {
+            profile.setCreatorRole(query.getCreatorRole());
+        }
         profile.setIdCardFront(trimToNull(query.getIdCardFront()));
         profile.setIdCardBack(trimToNull(query.getIdCardBack()));
         profile.setBillAddress(trimToNull(query.getBillAddress()));
@@ -355,6 +358,8 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         CreatorProfileEntity profile = new CreatorProfileEntity();
         profile.setCreatorId(creatorId);
         profile.setIdentityType(CreatorIdentityTypeEnums.PERSONAL.getCode());
+        // 默认独立创作者
+        profile.setCreatorRole(3);
         profile.setAuditStatus(CreatorProfileAuditStatusEnums.PENDING.getCode());
         profile.setSetTime(now);
         profile.setGmtModified(now);
@@ -364,6 +369,9 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
     private void applyProfileUpdate(CreatorProfileEntity profile, CreatorUpdateInfoQuery query, Date now) {
         if (query.getIdentityType() != null) {
             profile.setIdentityType(query.getIdentityType());
+        }
+        if (query.getCreatorRole() != null) {
+            profile.setCreatorRole(query.getCreatorRole());
         }
         if (query.getIdCardFront() != null) {
             profile.setIdCardFront(trimToNull(query.getIdCardFront()));

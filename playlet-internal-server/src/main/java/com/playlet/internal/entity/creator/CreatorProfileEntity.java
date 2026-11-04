@@ -30,6 +30,10 @@ public class CreatorProfileEntity {
 	@ApiModelProperty(name = "identityType", value = "1个人创作者 2创作机构")
 	private Integer identityType;
 
+	@TableField("creator_role")
+	@ApiModelProperty(name = "creatorRole", value = "入驻身份 1出品方 2MCN机构 3独立创作者")
+	private Integer creatorRole;
+
 	@TableField("real_name")
 	@ApiModelProperty(name = "realName", value = "真实姓名/法人姓名")
 	private String realName;

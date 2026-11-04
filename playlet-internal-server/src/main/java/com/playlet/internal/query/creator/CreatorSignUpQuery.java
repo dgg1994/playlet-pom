@@ -37,6 +37,9 @@ public class CreatorSignUpQuery {
 	@ApiModelProperty(name = "identityType", value = "1个人创作者 2创作机构")
 	private Integer identityType;
 
+	@ApiModelProperty(name = "creatorRole", value = "入驻身份 1出品方 2MCN机构 3独立创作者")
+	private Integer creatorRole;
+
 	@ApiModelProperty(name = "idCardFront", value = "证件正面图")
 	private String idCardFront;
 
