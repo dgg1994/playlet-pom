@@ -11,7 +11,9 @@ import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.RankBoardGroupConstants;
 import com.playlet.internal.constants.TheaterConstants;
+import com.playlet.internal.dao.banner.BannerManageDao;
 import com.playlet.internal.dao.drama.*;
+import com.playlet.internal.entity.banner.BannerManageEntity;
 import com.playlet.internal.entity.drama.*;
 import com.playlet.internal.enums.DeleteStateEnum;
 import com.playlet.internal.enums.PlaylistMatchModeEnums;
@@ -51,6 +53,8 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 
 	@Autowired
 	private RankBoardDao rankBoardDao;
+	@Autowired
+	private BannerManageDao bannerManageDao;
 	@Autowired
 	private RankListDao rankListDao;
 	@Autowired
@@ -98,6 +102,26 @@ public class TheaterApiServiceImpl extends BaseApiService implements TheaterApiS
 			resp = buildPlaylistHome(langue);
 		} else if (TheaterHomeTabEnums.HOT.equals(tabEnum)) {
 			resp = buildHotHome(langue);
+			// 热榜：查询 position=2（首页轮播）投放中的 Banner，有则前端优先用
+			try {
+				List<BannerManageEntity> bannerList = bannerManageDao.findActiveByPosition(2);
+				if (bannerList != null && !bannerList.isEmpty()) {
+					List<BannerCarouselItemResp> bannerItems = new ArrayList<>(bannerList.size());
+					for (BannerManageEntity banner : bannerList) {
+						BannerCarouselItemResp item = new BannerCarouselItemResp();
+						item.setTitle(banner.getTitle());
+						item.setPreviewText(banner.getPreviewText());
+						item.setImageUrl(mediaUrlService.sign(banner.getImageUrl()));
+						item.setJumpType(banner.getJumpType());
+						item.setJumpValue(banner.getJumpValue());
+						bannerItems.add(item);
+					}
+					resp.setBannerCarousels(bannerItems);
+				}
+			} catch (Exception e) {
+				// Banner 查询失败不影响主流程，降级为原始短剧轮播
+				log.warn("banner active query failed, fallback to drama carousels", e);
+			}
 		} else {
 			resp = buildRecommendHome(pageNumber, pageSize, seed, request);
 		}
