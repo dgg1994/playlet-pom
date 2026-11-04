@@ -179,6 +179,22 @@ public class DramaEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "themePartition", value = "题材分区：女频/男频", required = false, dataType = "String")
 	private String themePartition;
 
+	@TableField("drama_type")
+	@ApiModelProperty(name = "dramaType", value = "剧类型 1真人短剧 2AI漫剧", required = false, dataType = "Integer")
+	private Integer dramaType;
+
+	@TableField("special_theme")
+	@ApiModelProperty(name = "specialTheme", value = "特殊题材，逗号分隔：公安/司法/军事/民族/宗教", required = false, dataType = "String")
+	private String specialTheme;
+
+	@TableField("other_characters")
+	@ApiModelProperty(name = "otherCharacters", value = "其他人物简介", required = false, dataType = "String")
+	private String otherCharacters;
+
+	@TableField("project_share_ratio")
+	@ApiModelProperty(name = "projectShareRatio", value = "关联项目分账比例（%）", required = false, dataType = "BigDecimal")
+	private BigDecimal projectShareRatio;
+
 	@TableField("default_unlock_method")
 	@ApiModelProperty(name = "defaultUnlockMethod",value = "默认解锁方式 free/vip/paid（创建向导）",required = false,dataType = "String")
 	private String defaultUnlockMethod;

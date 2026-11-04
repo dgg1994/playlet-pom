@@ -26,8 +26,14 @@ public class BatchDramaAssetEpisodeItemQuery {
 	@ApiModelProperty(value = "原始文件名")
 	private String videoName;
 
-	@ApiModelProperty(value = "解锁方式 0免费 1广告 2付费")
+	@ApiModelProperty(value = "解锁方式 0免费 1广告 2付费 3会员")
 	private Integer unlockType;
+
+	@ApiModelProperty(value = "金币价格（付费集）")
+	private Integer priceCoin;
+
+	@ApiModelProperty(value = "现金价格（元，付费集）")
+	private java.math.BigDecimal priceYuan;
 
 	@ApiModelProperty(value = "备注")
 	private String remarkInfo;

@@ -3,6 +3,8 @@ package com.playlet.internal.service;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.query.creator.CreatorDramaAnalyticsQuery;
 import com.playlet.internal.query.creator.CreatorDramaListQuery;
+import com.playlet.internal.query.drama.AddDramaQuery;
+import com.playlet.internal.query.drama.BatchDramaAssetReleaseQuery;
 import com.playlet.internal.query.drama.DramaAppealQuery;
 import com.playlet.internal.query.drama.DramaAssetAppealQuery;
 import com.playlet.internal.query.drama.DramaAssetBatchShelfQuery;
@@ -12,10 +14,12 @@ import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.validation.Valid;
 
 /**
  * 作家端作品：列表/详情/申诉/集上下架。
@@ -23,6 +27,15 @@ import javax.servlet.http.HttpServletRequest;
 @RequestMapping("/creator/drama")
 @Api(value = "作家端作品", tags = "作家端作品")
 public interface CreatorDramaService {
+
+    @PostMapping("/create")
+    @ApiOperation(value = "创作者建剧", notes = "JSON 提交；belongUser 取当前登录作家；封面 coverUrl 为七牛 key（前端直传返回）。"
+            + "备案分类由服务端按投资额/剧类型/特殊题材计算。")
+    ResponseBase createDrama(@Valid @RequestBody AddDramaQuery query, HttpServletRequest request);
+
+    @PostMapping("/release")
+    @ApiOperation(value = "创作者发布剧集", notes = "需剧归属当前作家；复用运营端剧集登记逻辑，支持集级 unlockType(0/1/2/3) 与 priceYuan/priceCoin。")
+    ResponseBase release(@Valid @RequestBody BatchDramaAssetReleaseQuery query, HttpServletRequest request);
 
     @PostMapping("/findList")
     @ApiOperation(value = "我的作品列表", notes = "剧卡片：封面/标题/总集数/审核状态/驳回原因/更新时间。剧集走 GET /findInfo?id=")

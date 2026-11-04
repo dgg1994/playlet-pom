@@ -22,13 +22,17 @@ import com.playlet.internal.enums.DramaAssetShelfStatusEnums;
 import com.playlet.internal.enums.PublicEnums;
 import com.playlet.internal.query.creator.CreatorDramaAnalyticsQuery;
 import com.playlet.internal.query.creator.CreatorDramaListQuery;
+import com.playlet.internal.query.drama.AddDramaQuery;
+import com.playlet.internal.query.drama.BatchDramaAssetReleaseQuery;
 import com.playlet.internal.query.drama.DramaAppealQuery;
 import com.playlet.internal.query.drama.DramaAssetAppealQuery;
 import com.playlet.internal.query.drama.DramaAssetBatchShelfQuery;
 import com.playlet.internal.query.drama.DramaAssetShelfQuery;
 import com.playlet.internal.service.CreatorDramaService;
 import com.playlet.internal.service.DramaAssetAuditService;
+import com.playlet.internal.service.DramaAssetService;
 import com.playlet.internal.service.DramaAuditService;
+import com.playlet.internal.service.DramaService;
 import com.playlet.internal.service.MediaUrlService;
 import com.playlet.internal.utils.CreatorTokenUtil;
 import com.playlet.internal.utils.I18nUtil;
@@ -74,6 +78,47 @@ public class CreatorDramaServiceImpl extends BaseApiService implements CreatorDr
 	private DramaAuditService dramaAuditService;
 	@Autowired
 	private DramaAssetAuditService dramaAssetAuditService;
+	@Autowired
+	private DramaService dramaService;
+	@Autowired
+	private DramaAssetService dramaAssetService;
+
+	@Override
+	public ResponseBase createDrama(@Valid @RequestBody AddDramaQuery query, HttpServletRequest request) {
+		CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
+		if (account == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		if (query == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		// 归属强制取当前登录作家，忽略外部传入
+		query.setBelongUser(account.getId());
+		ResponseBase resp = dramaService.addDrama(query, null);
+		log.info("creator drama create creatorId={} dramaTitle={}", account.getId(), query.getDramaTitle());
+		return resp;
+	}
+
+	@Override
+	public ResponseBase release(@Valid @RequestBody BatchDramaAssetReleaseQuery query, HttpServletRequest request) {
+		CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
+		if (account == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		if (query == null || query.getDramaId() == null) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		DramaEntity drama = dramaDao.selectById(query.getDramaId());
+		if (drama == null || DeleteStateEnum.DELETE.getIndex().equals(drama.getDeleteState())) {
+			return setResultError(I18nUtil.getMessage("drama_null"));
+		}
+		if (drama.getBelongUser() == null || !drama.getBelongUser().equals(account.getId())) {
+			return setResultError(I18nUtil.getMessage("purview_error_null"));
+		}
+		ResponseBase resp = dramaAssetService.addDrama(query);
+		log.info("creator drama release creatorId={} dramaId={}", account.getId(), query.getDramaId());
+		return resp;
+	}
 
 	@Override
 	public ResponseBase findList(@RequestBody(required = false) CreatorDramaListQuery query,

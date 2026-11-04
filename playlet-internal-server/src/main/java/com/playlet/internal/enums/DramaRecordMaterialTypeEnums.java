@@ -16,7 +16,12 @@ public enum DramaRecordMaterialTypeEnums {
 	OPENING_TRAILER(10, "片头片尾审核", 4),
 	COMIC_AUTH(11, "漫画/动漫改编授权", 2),
 	OUTLINE_PDF(12, "分集大纲文件", 5),
-	CHARACTER_PDF(13, "人物小传文件", 5);
+	CHARACTER_PDF(13, "人物小传文件", 5),
+	PRODUCTION_LICENSE(14, "制作经营许可证", 3),
+	OTHER(15, "其他材料", 2),
+	ARTIST_COPYRIGHT(16, "画师著作权声明", 2),
+	COMIC_CHARACTER_AUTH(17, "漫画人物形象授权", 2),
+	PROJECT_CONTRACT(18, "关联项目合同", 2);
 
 	private final int code;
 	private final String label;

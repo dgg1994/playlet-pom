@@ -78,11 +78,19 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 				createPay.getDefaultUnlockMethod(),
 				createPay.getStorySynopsis() != null ? createPay.getStorySynopsis().substring(0, Math.min(30, createPay.getStorySynopsis().length())) : null);
 			//上传图片
-			if(file == null) {
+			if(file == null && (createPay.getCoverUrl() == null || createPay.getCoverUrl().trim().isEmpty())) {
 				return setResultError(I18nUtil.getMessage("cover_not_null"));
 			}
 			DramaEntity entity = new DramaEntity();
 			BeanUtils.copyProperties(createPay, entity);
+			// 剧类型：显式 dramaType 优先，兼容老字段 isAi
+			Integer dramaType = createPay.getDramaType() != null ? createPay.getDramaType()
+					: (Integer.valueOf(1).equals(createPay.getIsAi()) ? 2 : 1);
+			entity.setDramaType(dramaType);
+			entity.setIsAi(Integer.valueOf(2).equals(dramaType) ? 1 : 0);
+			// 备案分类以服务端为准，避免前端漏传/传错
+			entity.setFilingCategory(computeFilingCategory(createPay.getInvestmentAmount(), dramaType,
+					createPay.getSpecialTheme()));
 			//新增短剧基础信息
 			entity.setRecommendedCarousel(RecommendedCarouselEnums.NOT_RECOMMENDED.getIndex());
 			entity.setVerifyStatus(VerifyStateEnums.REMOVED_SHELVES.getIndex());
@@ -101,9 +109,11 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 					dramaTagRelDao.insert(dramaTagRelEntity);
 				}
 			}
-			String path = String.format(Constants.FILE_UPLOAD_SITE, entity.getId());
-			String url = QiniuUploadUtils.uploadFile(file,path);
-			entity.setCoverUrl(url);
+			if (file != null) {
+				String path = String.format(Constants.FILE_UPLOAD_SITE, entity.getId());
+				String url = QiniuUploadUtils.uploadFile(file, path);
+				entity.setCoverUrl(url);
+			}
 			dramaDao.updateById(entity);
 			// 保存创建向导提交的备案材料
 			saveMaterials(entity.getId(), createPay.getMaterials());
@@ -144,8 +154,19 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			entity.setDescriptionInfo(createPay.getDescriptionInfo());
 			entity.setBelongUser(createPay.getBelongUser());
 			entity.setIsAi(createPay.getIsAi());
+			// 剧类型：显式 dramaType 优先，兼容老字段 isAi
+			Integer dramaType = createPay.getDramaType() != null ? createPay.getDramaType()
+					: (Integer.valueOf(1).equals(createPay.getIsAi()) ? 2 : 1);
+			entity.setDramaType(dramaType);
+			entity.setIsAi(Integer.valueOf(2).equals(dramaType) ? 1 : 0);
+			entity.setSpecialTheme(createPay.getSpecialTheme());
+			entity.setThemePartition(createPay.getThemePartition());
+			entity.setOtherCharacters(createPay.getOtherCharacters());
+			entity.setProjectShareRatio(createPay.getProjectShareRatio());
+			// 备案分类以服务端为准
+			entity.setFilingCategory(computeFilingCategory(createPay.getInvestmentAmount(), dramaType,
+					createPay.getSpecialTheme()));
 			// 创建向导扩展字段
-			entity.setFilingCategory(createPay.getFilingCategory());
 			entity.setInvestmentAmount(createPay.getInvestmentAmount());
 			entity.setDefaultUnlockMethod(createPay.getDefaultUnlockMethod());
 			entity.setStorySynopsis(createPay.getStorySynopsis());
@@ -345,6 +366,27 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			log.error("service error", e);
 			throw new RuntimeException(e);
 		}
+	}
+
+	/**
+	 * 备案分类判定（服务端权威计算）。
+	 * 特殊题材命中一类；真人短剧：≥300万一类、100万(含)~300万二类、<100万三类；
+	 * AI漫剧：≥80万一类、30万(含)~80万二类、<30万三类。
+	 */
+	private Integer computeFilingCategory(java.math.BigDecimal investmentAmount, Integer dramaType,
+			String specialTheme) {
+		if (specialTheme != null && !specialTheme.trim().isEmpty()) {
+			return 1;
+		}
+		long amount = investmentAmount == null ? 0L : investmentAmount.longValue();
+		if (Integer.valueOf(2).equals(dramaType)) {
+			if (amount >= 800000L) return 1;
+			if (amount >= 300000L) return 2;
+			return 3;
+		}
+		if (amount >= 3000000L) return 1;
+		if (amount >= 1000000L) return 2;
+		return 3;
 	}
 
 	/** 保存创建向导提交的备案材料：先清空该短剧旧材料，再全量写入。 */

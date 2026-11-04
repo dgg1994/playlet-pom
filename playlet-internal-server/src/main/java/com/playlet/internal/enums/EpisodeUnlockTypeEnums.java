@@ -7,7 +7,8 @@ public enum EpisodeUnlockTypeEnums {
 
 	FREE(0, "免费"),
 	AD(1, "广告解锁"),
-	PAY(2, "付费解锁");
+	PAY(2, "付费解锁"),
+	MEMBER(3, "会员解锁");
 
 	private final Integer index;
 	private final String name;
@@ -35,5 +36,9 @@ public enum EpisodeUnlockTypeEnums {
 
 	public static boolean isPay(Integer unlockType) {
 		return PAY.getIndex().equals(unlockType);
+	}
+
+	public static boolean isMember(Integer unlockType) {
+		return MEMBER.getIndex().equals(unlockType);
 	}
 }

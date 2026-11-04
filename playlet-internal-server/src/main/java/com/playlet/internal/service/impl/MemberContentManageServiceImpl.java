@@ -61,9 +61,6 @@ public class MemberContentManageServiceImpl implements MemberContentManageServic
 			log.info("setMemberDrama dramaId={} isMemberDrama={} rows={}",
 					query.getDramaId(), query.getIsMemberDrama(), rows);
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
-		} catch (BaseException e) {
-			log.error("setMemberDrama biz error dramaId={}", query == null ? null : query.getDramaId(), e);
-			throw e;
 		} catch (Exception e) {
 			log.error("setMemberDrama failed dramaId={}", query == null ? null : query.getDramaId(), e);
 			throw new BaseException("操作失败", e);
@@ -91,9 +88,6 @@ public class MemberContentManageServiceImpl implements MemberContentManageServic
 			Map<String, Object> data = new HashMap<>(2);
 			data.put("affected", rows);
 			return setResultSuccess(data, I18nUtil.getMessage("base_success"));
-		} catch (BaseException e) {
-			log.error("updateUnlock biz error assetId={}", query == null ? null : query.getAssetId(), e);
-			throw e;
 		} catch (Exception e) {
 			log.error("updateUnlock failed assetId={}", query == null ? null : query.getAssetId(), e);
 			throw new BaseException("操作失败", e);
@@ -127,9 +121,6 @@ public class MemberContentManageServiceImpl implements MemberContentManageServic
 			Map<String, Object> data = new HashMap<>(2);
 			data.put("affected", rows);
 			return setResultSuccess(data, I18nUtil.getMessage("base_success"));
-		} catch (BaseException e) {
-			log.error("batchUnlock biz error dramaId={}", query == null ? null : query.getDramaId(), e);
-			throw e;
 		} catch (Exception e) {
 			log.error("batchUnlock failed dramaId={}", query == null ? null : query.getDramaId(), e);
 			throw new BaseException("操作失败", e);
@@ -145,9 +136,10 @@ public class MemberContentManageServiceImpl implements MemberContentManageServic
 		}
 		boolean knownType = EpisodeUnlockTypeEnums.isFree(query.getUnlockType())
 				|| EpisodeUnlockTypeEnums.isAd(query.getUnlockType())
-				|| EpisodeUnlockTypeEnums.isPay(query.getUnlockType());
+				|| EpisodeUnlockTypeEnums.isPay(query.getUnlockType())
+				|| EpisodeUnlockTypeEnums.isMember(query.getUnlockType());
 		if (!knownType) {
-			return "unlockType 仅支持 0/1/2";
+			return "unlockType 仅支持 0/1/2/3";
 		}
 		if (EpisodeUnlockTypeEnums.isPay(query.getUnlockType())) {
 			boolean hasCoin = query.getPriceCoin() != null && query.getPriceCoin() > 0;

@@ -381,7 +381,7 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 			+ "WHERE (d.delete_state = 0 OR d.delete_state IS NULL) "
 			+ "  AND ( "
 			+ "    d.is_member_drama = 1 "
-			+ "    OR EXISTS (SELECT 1 FROM drama_asset x WHERE x.drama_id = d.id AND x.unlock_type IN (1, 2) "
+			+ "    OR EXISTS (SELECT 1 FROM drama_asset x WHERE x.drama_id = d.id AND x.unlock_type IN (1, 2, 3) "
 			+ "      AND (x.delete_state = 0 OR x.delete_state IS NULL)) "
 			+ "    OR EXISTS (SELECT 1 FROM user_episode_unlock u "
 			+ "      WHERE u.drama_id = d.id AND u.unlock_way IN ('COIN','CASH')) "

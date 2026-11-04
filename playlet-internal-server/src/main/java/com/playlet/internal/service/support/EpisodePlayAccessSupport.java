@@ -126,6 +126,19 @@ public class EpisodePlayAccessSupport {
 					: EpisodeUnlockConstants.BLOCK_NEED_PAY);
 			return result;
 		}
+		// 会员解锁集：VIP 可播，非会员需开通会员
+		if (EpisodeUnlockTypeEnums.isMember(unlockType)) {
+			if (member) {
+				result.setCanPlay(true);
+				result.setBlockReason(null);
+				return result;
+			}
+			result.setCanPlay(false);
+			result.setBlockReason(uid == null
+					? EpisodeUnlockConstants.BLOCK_NEED_LOGIN
+					: EpisodeUnlockConstants.BLOCK_NEED_MEMBER);
+			return result;
+		}
 
 		// 未知类型按免费
 		result.setCanPlay(true);

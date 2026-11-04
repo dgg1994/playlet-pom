@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.validation.Valid;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -158,7 +159,8 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 				String videoUrl = toDefaultMultiRateM3u8Key(key);
 				String videoName = resolveVideoName(item.getVideoName(), key);
 				return EpisodeProcessResult.ok(resetRejectedAssetEntity(asset, drama, item.getSetNum(),
-						item.getRemarkInfo(), videoName, videoUrl, key, item.getUnlockType()));
+						item.getRemarkInfo(), videoName, videoUrl, key, item.getUnlockType(),
+						item.getPriceCoin(), item.getPriceYuan()));
 			}
 			// 历史集：仅同步集序/备注，不动 video_url
 			asset.setSetNum(item.getSetNum());
@@ -167,6 +169,12 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			}
 			if (item.getUnlockType() != null) {
 				asset.setUnlockType(item.getUnlockType());
+			}
+			if (item.getPriceCoin() != null) {
+				asset.setPriceCoin(item.getPriceCoin());
+			}
+			if (item.getPriceYuan() != null) {
+				asset.setPriceYuan(item.getPriceYuan());
 			}
 			GenericityUtil.updateDate(asset);
 			dramaAssetDao.updateById(asset);
@@ -187,10 +195,11 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 				return EpisodeProcessResult.fail(I18nUtil.getMessage("base_info_exist"));
 			}
 			return EpisodeProcessResult.ok(resetRejectedAssetEntity(existing, drama, item.getSetNum(),
-					item.getRemarkInfo(), videoName, videoUrl, key, item.getUnlockType()));
+					item.getRemarkInfo(), videoName, videoUrl, key, item.getUnlockType(),
+					item.getPriceCoin(), item.getPriceYuan()));
 		}
 		return EpisodeProcessResult.ok(insertNewAssetEntity(drama, item.getSetNum(), item.getRemarkInfo(),
-				videoName, videoUrl, key, item.getUnlockType()));
+				videoName, videoUrl, key, item.getUnlockType(), item.getPriceCoin(), item.getPriceYuan()));
 	}
 
 	/** 单条剧集处理结果，避免 null 语义不清。 */
@@ -236,7 +245,8 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 	}
 
 	private DramaAssetReleaseRespEntity insertNewAssetEntity(DramaEntity drama, Integer setNum, String remarkInfo,
-			String videoName, String videoUrl, String sourceKey, Integer unlockType) throws Exception {
+			String videoName, String videoUrl, String sourceKey, Integer unlockType,
+			Integer priceCoin, BigDecimal priceYuan) throws Exception {
 		DramaAssetEntity assetEntity = new DramaAssetEntity();
 		assetEntity.setVideoName(videoName);
 		assetEntity.setBelongUser(drama.getBelongUser());
@@ -246,7 +256,9 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 		assetEntity.setSetNum(setNum);
 		assetEntity.setVideoType(drama.getVideoType());
 		assetEntity.setVideoUrl(videoUrl);
-		assetEntity.setUnlockType(unlockType);
+		assetEntity.setUnlockType(unlockType == null ? EpisodeUnlockTypeEnums.FREE.getIndex() : unlockType);
+		assetEntity.setPriceCoin(priceCoin == null ? 0 : priceCoin);
+		assetEntity.setPriceYuan(priceYuan);
 		assetEntity.setVideoStatus(PublicEnums.ZERO.getIndex());
 		assetEntity.setAuditStatus(DramaAssetAuditStatusEnums.UNDER_REVIEW.getCode());
 		assetEntity.setShelfStatus(DramaAssetShelfStatusEnums.OFF.getCode());
@@ -262,7 +274,7 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 
 	private DramaAssetReleaseRespEntity resetRejectedAssetEntity(DramaAssetEntity asset, DramaEntity drama,
 			Integer setNum, String remarkInfo, String videoName, String videoUrl, String sourceKey,
-			Integer unlockType) throws Exception {
+			Integer unlockType, Integer priceCoin, BigDecimal priceYuan) throws Exception {
 		asset.setSetNum(setNum);
 		asset.setVideoName(videoName);
 		asset.setRemarkInfo(remarkInfo);
@@ -270,6 +282,12 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 		asset.setVideoUrl(videoUrl);
 		if (unlockType != null) {
 			asset.setUnlockType(unlockType);
+		}
+		if (priceCoin != null) {
+			asset.setPriceCoin(priceCoin);
+		}
+		if (priceYuan != null) {
+			asset.setPriceYuan(priceYuan);
 		}
 		asset.setBelongUser(drama.getBelongUser());
 		asset.setVideoStatus(PublicEnums.ZERO.getIndex());
@@ -318,7 +336,7 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			String newUrl = toDefaultMultiRateM3u8Key(key);
 			String videoName = resolveVideoName(query.getVideoName(), key);
 			DramaAssetReleaseRespEntity data = resetRejectedAssetEntity(current, drama, query.getSetNum(),
-					query.getRemarkInfo(), videoName, newUrl, key, null);
+					query.getRemarkInfo(), videoName, newUrl, key, null, null, null);
 			return setResultSuccess(data, I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
 			log.error("update drama asset error", e);
