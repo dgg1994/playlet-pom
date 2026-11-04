@@ -10,8 +10,10 @@ import com.playlet.internal.aop.SysLogAnnotation;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.dao.creator.CreatorAccountDao;
 import com.playlet.internal.dao.creator.CreatorSettleApplyDao;
+import com.playlet.internal.dao.system.SysUserDao;
 import com.playlet.internal.entity.creator.CreatorAccountEntity;
 import com.playlet.internal.entity.creator.CreatorProfileEntity;
+import com.playlet.internal.entity.system.SysUserEntity;
 import com.playlet.internal.enums.UserStateEnums;
 import com.playlet.internal.query.creator.CreatorSettleApplyQuery;
 import com.playlet.internal.service.CreatorSettleApplyManageService;
@@ -30,6 +32,9 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -55,11 +60,15 @@ public class CreatorSettleApplyManageServiceImpl implements CreatorSettleApplyMa
     public static final int STATUS_APPROVED = 2;
     /** 已驳回 */
     public static final int STATUS_REJECTED = 3;
+    /** sys_user.user_type：创作者 */
+    private static final Integer CREATOR_USER_TYPE = 2;
 
     @Autowired
     private CreatorSettleApplyDao creatorSettleApplyDao;
     @Autowired
     private CreatorAccountDao creatorAccountDao;
+    @Autowired
+    private SysUserDao sysUserDao;
     @Autowired
     private MediaUrlService mediaUrlService;
 
@@ -162,7 +171,7 @@ public class CreatorSettleApplyManageServiceImpl implements CreatorSettleApplyMa
         if (identityType == 2 && StringUtils.isEmpty(query.getOrgName())) {
             return setResultError("团队认证请填写机构名称");
         }
-        if (creatorAccountDao.findByAccount(email) != null) {
+        if (sysUserDao.findCreatorByAcctive(email) != null) {
             return setResultError(I18nUtil.getMessage("user.account_exist"));
         }
         String mobilePrefix = trimToNull(query.getMobilePrefix());
@@ -172,9 +181,23 @@ public class CreatorSettleApplyManageServiceImpl implements CreatorSettleApplyMa
         }
 
         Date now = new Date();
+        String encodedPwd = PasswordHashUtils.encode(query.getUserPassword());
+        // 统一账号：创作者登录身份写入 sys_user（user_type=2）
+        SysUserEntity sysUser = new SysUserEntity();
+        sysUser.setAcctive(email);
+        sysUser.setPassword(encodedPwd);
+        sysUser.setUsername(StringUtils.isEmpty(trimToNull(query.getNickname())) ? email : trimToNull(query.getNickname()));
+        sysUser.setTel(mobileNumber);
+        sysUser.setUserState(UserStateEnums.NORMAL.getIndex());
+        sysUser.setUserType(CREATOR_USER_TYPE);
+        sysUser.setCreateTime(formatTime(now));
+        sysUser.setLoginTime(now);
+        sysUserDao.insert(sysUser);
+
         CreatorAccountEntity account = new CreatorAccountEntity();
         account.setUserAccount(email);
-        account.setUserPassword(PasswordHashUtils.encode(query.getUserPassword()));
+        account.setSysUserId(sysUser.getId());
+        account.setUserPassword(encodedPwd);
         account.setMobilePrefix(mobilePrefix);
         account.setMobileNumber(mobileNumber);
         account.setNickname(trimToNull(query.getNickname()));
@@ -296,5 +319,10 @@ public class CreatorSettleApplyManageServiceImpl implements CreatorSettleApplyMa
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static String formatTime(Date time) {
+        return LocalDateTime.ofInstant(time.toInstant(), ZoneId.systemDefault())
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
     }
 }

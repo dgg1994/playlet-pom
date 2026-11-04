@@ -17,8 +17,12 @@ import java.util.List;
 @Repository
 public interface CreatorAccountDao extends BaseMapper<CreatorAccountEntity> {
 
-	@Select("select * from creator_account where user_account = #{userAccount} limit 1")
+	@Select("select ca.* from creator_account ca inner join sys_user su on su.id = ca.sys_user_id "
+			+ "where su.acctive = #{userAccount} and su.user_type = 2 limit 1")
 	CreatorAccountEntity findByAccount(@Param("userAccount") String userAccount);
+
+	@Select("select * from creator_account where sys_user_id = #{sysUserId} limit 1")
+	CreatorAccountEntity findBySysUserId(@Param("sysUserId") Integer sysUserId);
 
 	@Select("select count(1) from creator_account where mobile_prefix = #{prefix} and mobile_number = #{number}")
 	int countByMobile(@Param("prefix") String prefix, @Param("number") String number);
@@ -60,19 +64,20 @@ public interface CreatorAccountDao extends BaseMapper<CreatorAccountEntity> {
 
 	/** 管理端创作者用户分页列表 */
 	@Select("<script>"
-			+ "select ca.id, ca.user_account as userAccount, ca.nickname, "
+			+ "select ca.id, su.acctive as userAccount, ca.nickname, "
 			+ "concat(ifnull(ca.mobile_prefix,''), ifnull(ca.mobile_number,'')) as mobile, "
 			+ "ca.avatar as avatarUrl, ca.user_state as userState, "
 			+ "ca.coin_balance as coinBalance, ca.frozen_coin_balance as frozenCoinBalance, "
 			+ "ca.total_income_coin as totalIncomeCoin, ca.last_login_time as lastLoginTime, ca.setTime, "
 			+ "cp.identity_type as identityType, cp.real_name as realName, cp.audit_status as auditStatus, cp.id as profileId "
 			+ "from creator_account ca "
+			+ "inner join sys_user su on su.id = ca.sys_user_id and su.user_type = 2 "
 			+ "left join creator_profile cp on cp.creator_id = ca.id "
 			+ "where 1=1 "
 			+ "<if test='query.userState != null'> and ca.user_state = #{query.userState} </if>"
 			+ "<if test='query.auditStatus != null'> and cp.audit_status = #{query.auditStatus} </if>"
 			+ "<if test='query.keyword != null and query.keyword != \"\"'> "
-			+ "  and (ca.user_account like concat('%',#{query.keyword},'%') "
+			+ "  and (su.acctive like concat('%',#{query.keyword},'%') "
 			+ "    or ca.nickname like concat('%',#{query.keyword},'%') "
 			+ "    or ca.mobile_number like concat('%',#{query.keyword},'%')) "
 			+ "</if>"

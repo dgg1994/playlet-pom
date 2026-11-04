@@ -20,10 +20,10 @@ public interface SysUserDao extends BaseMapper<SysUserEntity>{
     @Select("select perms from sys_menu where perms is not null and perms != '' and menu_id in "
             + "(select menu_id from sys_role_menu where role_id in "
             + "(select role_id from sys_user_role where user_id = "
-            + "(select id from sys_user where acctive = #{acctive} and user_state = #{userState})))")
+            + "(select id from sys_user where acctive = #{acctive} and user_state = #{userState} and user_type = 1)))")
     List<String> findMenuCodeByUserName(@Param("acctive") String acctive,@Param("userState") Integer userState);
 
-    @Select("select * from sys_user where  acctive = #{acctive} || tel =#{tel}") //user_state = #{state} and
+    @Select("select * from sys_user where user_type = 1 and ( acctive = #{acctive} || tel =#{tel})") //user_state = #{state} and
     List<SysUserEntity> findByAcctiveAndTel(@Param("acctive") String acctive,@Param("tel")String tel);//,@Param("state") Integer state
 
     /**
@@ -33,7 +33,7 @@ public interface SysUserDao extends BaseMapper<SysUserEntity>{
      * @return
      */
     @Select("<script>"
-            + "select * from sys_user where 1=1 and user_state = 1 "
+            + "select * from sys_user where 1=1 and user_state = 1 and user_type = 1 "
             + "<if test = 'deleteState != null' > and user_state != #{deleteState}</if>"
             + "<if test = 'adminRole != null'> and id not in (select user_id from sys_user_role where role_id = #{adminRole})</if>"
             + "<if test = 'username != null'> and username like concat('%',#{username},'%') </if>"
@@ -81,11 +81,32 @@ public interface SysUserDao extends BaseMapper<SysUserEntity>{
     @Select("select perms from sys_menu where perms is not null and perms != '' ")
 	List<String> findMenuPermsAll();
 
-    @Select("select * from sys_user where user_state = #{state} and id != #{id} and ( acctive = #{acctive} || tel =#{tel})")
+    @Select("select * from sys_user where user_state = #{state} and id != #{id} and user_type = 1 and ( acctive = #{acctive} || tel =#{tel})")
 	List<SysUserEntity> findByNoAcctiveAndTel(@Param("acctive")String acctive, @Param("tel")String tel, @Param("id")Integer id, @Param("state")Integer state);
 
-    @Select("select * from sys_user where acctive = #{acctive} and user_state = #{userState}")
+    @Select("select * from sys_user where acctive = #{acctive} and user_state = #{userState} and user_type = 1")
 	SysUserEntity findByAcctiveState(@Param("acctive")String acctive,@Param("userState") Integer userState);
+
+    /* ============ 创作者统一账号（user_type = 2） ============ */
+
+    @Select("select * from sys_user where acctive = #{acctive} and user_type = 2 limit 1")
+    SysUserEntity findCreatorByAcctive(@Param("acctive") String acctive);
+
+    @Update("update sys_user set password = #{pwd} where id = #{id} and user_type = 2")
+    int updateCreatorPassword(@Param("id") Integer id, @Param("pwd") String pwd);
+
+    @Update("update sys_user set user_state = #{state} where id = #{id} and user_type = 2")
+    int updateCreatorState(@Param("id") Integer id, @Param("state") Integer state);
+
+    @Update("update sys_user set login_time = now() where id = #{id} and user_type = 2")
+    int updateCreatorLoginTime(@Param("id") Integer id);
+
+    @Update("<script>update sys_user <set>"
+            + "<if test='nickname != null'> username = #{nickname},</if>"
+            + "<if test='avatar != null'> head_pic = #{avatar}</if>"
+            + "</set> where id = #{id} and user_type = 2</script>")
+    int updateCreatorIdentity(@Param("id") Integer id, @Param("nickname") String nickname,
+                              @Param("avatar") String avatar);
 
     @Select("select group_concat(role_name) from sys_role where role_id in(select role_id from sys_user_role where user_id = #{userId})")
 	String findUserRoleName(@Param("userId")Integer userId);
@@ -97,7 +118,7 @@ public interface SysUserDao extends BaseMapper<SysUserEntity>{
 	List<Integer> findUserRoleId(@Param("userId")Integer userId);
 
     @Select("<script>"
-    		+ "select * from sys_user where 1=1 "
+    		+ "select * from sys_user where 1=1 and user_type = 1 "
     		+ "<if test = 'roleId != null'> and id in (select user_id from sys_user_role where role_id in "
             + "<foreach item='item' index='index' collection='roleId' open='(' separator=',' close=')'>"
             + "#{item}"

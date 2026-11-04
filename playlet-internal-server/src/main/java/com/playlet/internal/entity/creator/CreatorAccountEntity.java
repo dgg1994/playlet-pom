@@ -26,6 +26,10 @@ public class CreatorAccountEntity {
 	@ApiModelProperty(name = "userAccount", value = "登录账号（邮箱）")
 	private String userAccount;
 
+	@TableField("sys_user_id")
+	@ApiModelProperty(name = "sysUserId", value = "关联统一账号 sys_user.id（user_type=2）")
+	private Integer sysUserId;
+
 	@TableField("user_password")
 	@ApiModelProperty(name = "userPassword", value = "登录密码")
 	@com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)

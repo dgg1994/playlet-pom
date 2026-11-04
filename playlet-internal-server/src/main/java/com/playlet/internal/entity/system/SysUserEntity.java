@@ -43,6 +43,10 @@ public class SysUserEntity extends PageQueryHelperEntity {
     @Schema(description = "用户状态，2：离职，1：正常，0：账号注销")
     private Integer userState;
 
+    @TableField("user_type")
+    @Schema(description = "账号类型，1：系统用户，2：创作者")
+    private Integer userType;
+
     @TableField("password")
     @Schema(description = "密码")
     @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)

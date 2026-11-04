@@ -7,6 +7,7 @@ import com.playlet.internal.api.response.CreatorAccountManageItemEntity;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.creator.CreatorAccountDao;
+import com.playlet.internal.dao.system.SysUserDao;
 import com.playlet.internal.entity.creator.CreatorAccountEntity;
 import com.playlet.internal.enums.CreatorIdentityTypeEnums;
 import com.playlet.internal.enums.CreatorProfileAuditStatusEnums;
@@ -45,6 +46,8 @@ public class CreatorAccountManageServiceImpl implements CreatorAccountManageServ
 
 	@Autowired
 	private CreatorAccountDao creatorAccountDao;
+	@Autowired
+	private SysUserDao sysUserDao;
 	@Autowired
 	private MediaUrlService mediaUrlService;
 
@@ -93,6 +96,10 @@ public class CreatorAccountManageServiceImpl implements CreatorAccountManageServ
 			int rows = creatorAccountDao.updateUserState(id, UserStateEnums.LOGOUT.getIndex());
 			if (rows <= 0) {
 				return setResultError(I18nUtil.getMessage("base_error"));
+			}
+			// 同步统一账号状态，确保无法再登录
+			if (account.getSysUserId() != null) {
+				sysUserDao.updateCreatorState(account.getSysUserId(), UserStateEnums.LOGOUT.getIndex());
 			}
 			// 踢下线：吊销 Redis 会话
 			CreatorTokenUtil.invalidateSession(account.getUserAccount());

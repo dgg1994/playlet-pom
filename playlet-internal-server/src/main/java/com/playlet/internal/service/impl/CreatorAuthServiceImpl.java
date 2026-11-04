@@ -9,9 +9,11 @@ import com.playlet.internal.constants.CreatorConstants;
 import com.playlet.internal.constants.RedisKeyConstants;
 import com.playlet.internal.dao.creator.CreatorAccountDao;
 import com.playlet.internal.dao.creator.CreatorProfileDao;
+import com.playlet.internal.dao.system.SysUserDao;
 import com.playlet.internal.dao.template.EmailTemplateDao;
 import com.playlet.internal.entity.creator.CreatorAccountEntity;
 import com.playlet.internal.entity.creator.CreatorProfileEntity;
+import com.playlet.internal.entity.system.SysUserEntity;
 import com.playlet.internal.entity.template.EmailTemplateEntity;
 import com.playlet.internal.enums.*;
 import com.playlet.internal.exception.BaseException;
@@ -33,6 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.concurrent.ThreadLocalRandom;
@@ -48,9 +51,13 @@ import java.util.regex.Pattern;
 public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAuthService {
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile(CreatorConstants.EMAIL_REGEX);
+    /** sys_user.user_type：创作者 */
+    private static final Integer CREATOR_USER_TYPE = 2;
 
     @Autowired
     private CreatorAccountDao creatorAccountDao;
+    @Autowired
+    private SysUserDao sysUserDao;
     @Autowired
     private CreatorProfileDao creatorProfileDao;
     @Autowired
@@ -118,17 +125,31 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         if (query.getIdentityType() != null && !CreatorIdentityTypeEnums.isValid(query.getIdentityType())) {
             return setResultError(I18nUtil.getMessage("base_error"));
         }
-        if (creatorAccountDao.findByAccount(email) != null) {
+        if (sysUserDao.findCreatorByAcctive(email) != null) {
             return setResultError(I18nUtil.getMessage("user.account_exist"));
         }
         Date now = new Date();
+        String encodedPwd = PasswordHashUtils.encode(query.getUserPassword());
+        // 统一账号：创作者登录身份写入 sys_user（user_type=2）
+        SysUserEntity sysUser = new SysUserEntity();
+        sysUser.setAcctive(email);
+        sysUser.setPassword(encodedPwd);
+        sysUser.setUsername(resolveNickname(query.getNickname(), email));
+        sysUser.setTel(trimToNull(query.getMobileNumber()));
+        sysUser.setUserState(UserStateEnums.NORMAL.getIndex());
+        sysUser.setUserType(CREATOR_USER_TYPE);
+        sysUser.setCreateTime(formatTime(now));
+        sysUser.setLoginTime(now);
+        sysUserDao.insert(sysUser);
+
         CreatorAccountEntity account = new CreatorAccountEntity();
         account.setUserAccount(email);
-        account.setUserPassword(PasswordHashUtils.encode(query.getUserPassword()));
+        account.setSysUserId(sysUser.getId());
+        account.setUserPassword(encodedPwd);
         account.setMobilePrefix(trimToNull(query.getMobilePrefix()));
         account.setMobileNumber(trimToNull(query.getMobileNumber()));
         // 注册昵称与 C 端一致：user_ + yyMMddHHmmss + 3 位随机数
-        account.setNickname(query.getNickname());
+        account.setNickname(sysUser.getUsername());
         account.setUserState(UserStateEnums.NORMAL.getIndex());
         account.setCoinBalance(0L);
         account.setFrozenCoinBalance(0L);
@@ -156,23 +177,29 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         if (!isEmail(email) || StringUtils.isEmpty(query.getUserPassword())) {
             return setResultError(I18nUtil.getMessage("base_error"));
         }
-        CreatorAccountEntity account = creatorAccountDao.findByAccount(email);
+        SysUserEntity sysUser = sysUserDao.findCreatorByAcctive(email);
+        if (sysUser == null) {
+            return setResultError(I18nUtil.getMessage("user.account_error"));
+        }
+        if (UserStateEnums.LOGOUT.getIndex().equals(sysUser.getUserState())) {
+            return setResultError(I18nUtil.getMessage("user.account_null"));
+        }
+        if (UserStateEnums.DISABLE.getIndex().equals(sysUser.getUserState())) {
+            return setResultError(I18nUtil.getMessage("creator.account_frozen"));
+        }
+        if (!PasswordHashUtils.matches(query.getUserPassword(), sysUser.getPassword())) {
+            return setResultError(I18nUtil.getMessage("user.password_error"));
+        }
+        CreatorAccountEntity account = creatorAccountDao.findBySysUserId(sysUser.getId());
         if (account == null) {
             return setResultError(I18nUtil.getMessage("user.account_error"));
         }
-        if (UserStateEnums.LOGOUT.getIndex().equals(account.getUserState())) {
-            return setResultError(I18nUtil.getMessage("user.account_null"));
-        }
-        if (UserStateEnums.DISABLE.getIndex().equals(account.getUserState())) {
-            return setResultError(I18nUtil.getMessage("creator.account_frozen"));
-        }
-        if (!PasswordHashUtils.matches(query.getUserPassword(), account.getUserPassword())) {
-            return setResultError(I18nUtil.getMessage("user.password_error"));
-        }
-        if (PasswordHashUtils.needsRehash(account.getUserPassword())) {
-            account.setUserPassword(PasswordHashUtils.encode(query.getUserPassword()));
+        if (PasswordHashUtils.needsRehash(sysUser.getPassword())) {
+            String encodedPwd = PasswordHashUtils.encode(query.getUserPassword());
+            account.setUserPassword(encodedPwd);
             account.setGmtModified(new Date());
             try {
+                sysUserDao.updateCreatorPassword(sysUser.getId(), encodedPwd);
                 creatorAccountDao.updateById(account);
             } catch (Exception e) {
                 log.error("creator rehash password failed creatorId={}", account.getId(), e);
@@ -181,6 +208,7 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         }
         try {
             creatorAccountDao.updateLastLoginTime(account.getId());
+            sysUserDao.updateCreatorLoginTime(sysUser.getId());
         } catch (Exception e) {
             log.error("creator update last login failed creatorId={}", account.getId(), e);
             throw new BaseException(I18nUtil.getMessage("base_error"), e);
@@ -199,21 +227,26 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         if (!verifyCode(email, query.getEmailCode())) {
             return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
         }
-        CreatorAccountEntity account = creatorAccountDao.findByAccount(email);
-        if (account == null) {
+        SysUserEntity sysUser = sysUserDao.findCreatorByAcctive(email);
+        if (sysUser == null) {
             return setResultError(I18nUtil.getMessage("user.account_error"));
         }
-        account.setUserPassword(PasswordHashUtils.encode(query.getNewPassword()));
-        account.setGmtModified(new Date());
+        String encodedPwd = PasswordHashUtils.encode(query.getNewPassword());
+        CreatorAccountEntity account = creatorAccountDao.findBySysUserId(sysUser.getId());
         try {
-            creatorAccountDao.updateById(account);
+            sysUserDao.updateCreatorPassword(sysUser.getId(), encodedPwd);
+            if (account != null) {
+                account.setUserPassword(encodedPwd);
+                account.setGmtModified(new Date());
+                creatorAccountDao.updateById(account);
+            }
         } catch (Exception e) {
-            log.error("creator forgetPassword failed creatorId={}", account.getId(), e);
+            log.error("creator forgetPassword failed sysUserId={}", sysUser.getId(), e);
             throw new BaseException(I18nUtil.getMessage("base_error"), e);
         }
         consumeCode(email);
         CreatorTokenUtil.invalidateSession(email);
-        log.info("creator forgetPassword creatorId={}", account.getId());
+        log.info("creator forgetPassword sysUserId={}", sysUser.getId());
         return setResultSuccess(I18nUtil.getMessage("base_success"));
     }
 
@@ -226,10 +259,14 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         if (!PasswordHashUtils.matches(query.getFormerPassword(), account.getUserPassword())) {
             return setResultError(I18nUtil.getMessage("old_password_error"));
         }
-        account.setUserPassword(PasswordHashUtils.encode(query.getNewPassword()));
+        String encodedPwd = PasswordHashUtils.encode(query.getNewPassword());
+        account.setUserPassword(encodedPwd);
         account.setGmtModified(new Date());
         try {
             creatorAccountDao.updateById(account);
+            if (account.getSysUserId() != null) {
+                sysUserDao.updateCreatorPassword(account.getSysUserId(), encodedPwd);
+            }
         } catch (Exception e) {
             log.error("creator updatePwd failed creatorId={}", account.getId(), e);
             throw new BaseException(I18nUtil.getMessage("base_error"), e);
@@ -283,6 +320,9 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         try {
             creatorAccountDao.updateById(account);
             creatorProfileDao.updateById(profile);
+            if (account.getSysUserId() != null) {
+                sysUserDao.updateCreatorIdentity(account.getSysUserId(), account.getNickname(), account.getAvatar());
+            }
         } catch (DuplicateKeyException e) {
             log.error("creator update duplicate creatorId={}", account.getId(), e);
             return setResultError(I18nUtil.getMessage("base_info_exist"));
@@ -464,6 +504,11 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         }
         String trim = value.trim();
         return trim.isEmpty() ? null : trim;
+    }
+
+    private static String formatTime(Date time) {
+        return LocalDateTime.ofInstant(time.toInstant(), ZoneId.systemDefault())
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
     }
 
     private static long nvl(Long value) {
