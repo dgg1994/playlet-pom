@@ -5,7 +5,7 @@ package com.playlet.internal.enums;
  */
 public enum DramaRecordMaterialTypeEnums {
 	BUSINESS_LICENSE(1, "营业执照（盖章扫描件）", 1),
-	CREATOR_ID_CARD(2, "创作者身份证（正反面）", 1),
+	CREATOR_ID_CARD(2, "身份证正面照片", 1),
 	COPYRIGHT_PROMISE(3, "内容合规及版权承诺书", 1),
 	SCRIPT_AUTH(4, "剧本授权文件", 2),
 	ACTOR_PORTRAIT_AUTH(5, "演员肖像权授权协议", 2),
@@ -21,7 +21,8 @@ public enum DramaRecordMaterialTypeEnums {
 	OTHER(15, "其他材料", 2),
 	ARTIST_COPYRIGHT(16, "画师著作权声明", 2),
 	COMIC_CHARACTER_AUTH(17, "漫画人物形象授权", 2),
-	PROJECT_CONTRACT(18, "关联项目合同", 2);
+	PROJECT_CONTRACT(18, "关联项目合同", 2),
+	ID_CARD_BACK(19, "身份证反面照片", 1);
 
 	private final int code;
 	private final String label;

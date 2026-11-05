@@ -660,6 +660,12 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
                 new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<com.playlet.internal.entity.drama.DramaAssetEntity>()
                         .eq("drama_id", drama.getId())
                         .orderByAsc("set_num"));
+        // 视频地址转签名 URL，供审核页播放样片
+        if (episodes != null) {
+            for (com.playlet.internal.entity.drama.DramaAssetEntity episode : episodes) {
+                episode.setVideoUrl(mediaUrlService.signVideo(episode.getVideoUrl()));
+            }
+        }
         // 组装返回
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("drama", drama);

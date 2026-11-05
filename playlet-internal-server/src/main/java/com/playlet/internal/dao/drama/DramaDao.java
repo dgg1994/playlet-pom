@@ -161,14 +161,7 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 	 * 管理端短剧列表：producerFirm 取 creator_account.nickname（按 belong_user 关联）。
 	 */
 	@Select("<script>"
-	        + "select d.id, d.drama_title, d.cover_url, d.score_num, d.hot_score, d.collect_score,"
-	        + "  d.share_score, d.like_score, d.discuss_score, d.hot_score_text, d.total_episodes,"
-	        + "  d.finished_state, d.video_type, d.video_width, d.video_height, d.description_info,"
-	        + "  d.verify_status, d.audit_status, d.shelf_status, d.audit_reject_reason, d.audit_pass_time,"
-	        + "  d.appeal_status, d.appeal_reason, d.appeal_time, d.shelf_time, d.delete_state,"
-	        + "  d.recommended_carousel, d.offline_reason, d.remark_info, d.belong_user, d.is_ai,"
-	        + "  d.is_member_drama,"
-	        + "  d.setTime, d.gmtModified,"
+	        + "select d.*,"
 	        + "  ca.nickname as producer_firm"
 	        + " from drama d"
 	        + " left join creator_account ca on ca.id = d.belong_user"
