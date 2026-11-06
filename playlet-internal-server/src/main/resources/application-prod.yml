@@ -1,93 +1,15 @@
 spring:
+  config:
+    import:
+      - nacos:playlet-internal-server-prod.yml
   cloud:
     nacos:
+      config:
+        server-addr: http://127.0.0.1:8848
+        namespace: 1c50f6c5-e4b0-4ea0-8679-05182dfda2c6
+        group: DEFAULT_GROUP
+        file-extension: yml
+        refresh-enabled: true
       discovery:
         server-addr: http://127.0.0.1:8848
         namespace: 1c50f6c5-e4b0-4ea0-8679-05182dfda2c6
-
-
-  datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://127.0.0.1:3306/playlet_internal?useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT%2B8
-    username: playlet_internal
-    password: nkLLCKxGStfcTeGi
-    type: com.alibaba.druid.pool.DruidDataSource
-    initialSize: 30
-    minIdle: 30
-    maxActive: 50
-    maxWait: 100000
-    timeBetweenEvictionRunsMillis: 30000  # 改为30秒
-    minEvictableIdleTimeMillis: 50000     # 改为50秒（小于60秒）
-    validationQuery: SELECT 1
-    testWhileIdle: true
-    testOnBorrow: true   # 获取连接时验证，保证拿到的连接可用
-    testOnReturn: false
-    connectionErrorRetryAttempts: 3
-    breakAfterAcquireFailure: false
-
-  redis:
-    timeout: 5000
-    cluster:
-      nodes:
-        - 127.0.0.1:7000
-        - 127.0.0.1:7001
-        - 127.0.0.1:7002
-        - 127.0.0.1:7003
-        - 127.0.0.1:7004
-        - 127.0.0.1:7005
-      max-redirects: 3
-    jedis:
-      pool:
-        max-active: 8
-        max-wait: -1
-        max-idle: 8
-        min-idle: 0
-
-qiniu:
-  access-key: aIVqHJJg5vLcDvm0tITYpvJzbyduH6mDqLMdezmL
-  secret-key: aVQRmkTTjALfOXxrVIGLwzA5ukVYHEgLUNeX40hq
-  bucket: strawberryplaylets
-  domain: https://cn.yingchuanmedia.com # 访问域名；库内存 key，读时再拼域名/签名
-  private-enabled: true           # 空间改为私有后设为 true
-  url-expire-seconds: 3600         # 封面等签名有效期（秒）
-  video-expire-seconds: 7200       #
-  pm3u8-expires-seconds: 43200     # pm3u8 为 ts 分片批量授权的有效期（秒）
-  upload-url: https://upload-z2.qiniup.com # 前端直传入口
-
-#极光推送
-jpush:
-  app_key: d327bf0b21b19ca6c7a0ce84
-  master_secret: e72dfed6fb6b83eb592fae61
-  environment: true #true生产false测试
-
-#邮件发送
-yunmail:
-  host: smtp.ezmail.vip  # 改为正确的 SMTP 服务器
-  port: 465              # 或尝试 587（如果465不行）
-  username: support@1token.me #账号
-  password: "Aasd147258!@#$"  # 用引号包裹
-  sendeName: BerryV #发件人名称
-  # 可选：添加以下配置
-  auth: true
-  ssl:
-    enable: true
-telegram:
-  mornitor_bot_token: '8931320158:AAHvOdGbghcCEvuHCJLRy98dWbejjrDSvSU'
-  notice_group_id: '-1003786742166'
-#短信发送
-sms:
-  # 通道：auto=区号86走阿里云、其他走国际通道；aliyun=全走阿里云；santo=全走国际通道
-  provider: auto
-  url: http://api2.santo.cc/submit
-  account: D4fHZloE
-  password: LpQaKN8a
-  #阿里云短信（国内通道）：需先报备签名与验证码模板
-  aliyun:
-    access-key-id: ${SMS_ALIYUN_AK:}           # RAM 子账号 AccessKeyId，通过环境变量 SMS_ALIYUN_AK 注入
-    access-key-secret: ${SMS_ALIYUN_AK_SECRET:}      # RAM 子账号 AccessKeySecret，通过环境变量 SMS_ALIYUN_AK_SECRET 注入
-    region-id: cn-hangzhou
-    endpoint: dysmsapi.aliyuncs.com
-    sign-name: 山东映川文化传媒                # 已报备签名，如 剧好看
-    template-code: SMS_338927523            # 已报备验证码模板 CODE，如 SMS_123456789
-    template-param: code
-
