@@ -5,8 +5,8 @@ package com.playlet.internal.enums;
  */
 public enum DramaAssetAuditStepTypeEnums {
 	AI(1, "AI审核"),
-	GROUP_A(2, "A组审核"),
-	GROUP_B(3, "B组审核");
+	GROUP_A(2, "初审"),
+	GROUP_B(3, "复审");
 
 	private final int code;
 	private final String label;

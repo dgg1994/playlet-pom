@@ -15,7 +15,7 @@ import java.util.Date;
 @Data
 @EqualsAndHashCode(callSuper = true)
 @TableName("drama_audit_step")
-@ApiModel(value = "短剧评审步骤", description = "剧级 AI/A组/B组审核步骤")
+@ApiModel(value = "短剧评审步骤", description = "剧级 AI/初审/复审审核步骤")
 public class DramaAuditStepEntity extends PageQueryHelperEntity {
 
 	@TableId(type = IdType.AUTO)
@@ -26,7 +26,7 @@ public class DramaAuditStepEntity extends PageQueryHelperEntity {
 	private Integer dramaId;
 
 	@TableField("step_type")
-	@ApiModelProperty("步骤类型 1AI 2A组 3B组")
+	@ApiModelProperty("步骤类型 1AI 2初审 3复审")
 	private Integer stepType;
 
 	@TableField("status")

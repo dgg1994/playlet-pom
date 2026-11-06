@@ -76,16 +76,16 @@ public class DramaWorkAuditListRespEntity {
 	@ApiModelProperty("AI预审备注")
 	private String aiHandleRemark;
 
-	@ApiModelProperty("A组状态")
+	@ApiModelProperty("初审状态")
 	private Integer groupAStatus = 0;
 
-	@ApiModelProperty("A组审核备注")
+	@ApiModelProperty("初审备注")
 	private String groupAHandleRemark;
 
-	@ApiModelProperty("B组状态")
+	@ApiModelProperty("复审状态")
 	private Integer groupBStatus = 0;
 
-	@ApiModelProperty("B组审核备注")
+	@ApiModelProperty("复审备注")
 	private String groupBHandleRemark;
 
 	@ApiModelProperty("上传/创建日期")

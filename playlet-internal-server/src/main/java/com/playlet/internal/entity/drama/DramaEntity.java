@@ -248,7 +248,7 @@ public class DramaEntity extends PageQueryHelperEntity {
 	private List<DramaAssetRespEntity> voideList;
 
 	@TableField(exist = false)
-	@ApiModelProperty(name = "dramaSteps", value = "剧评审步骤：AI / A组 / B组", required = false)
+	@ApiModelProperty(name = "dramaSteps", value = "剧评审步骤：AI / 初审 / 复审", required = false)
 	private List<DramaAuditStepEntity> dramaSteps;
 
 	/** 当前用户是否最近观看过该剧：1是0否（剧场首页轮播等展示用，非表字段） */

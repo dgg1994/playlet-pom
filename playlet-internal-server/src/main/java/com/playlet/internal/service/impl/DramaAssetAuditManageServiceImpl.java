@@ -211,6 +211,18 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
             DramaHandleContext ctx = loadResult.data;
             applyStepHandle(ctx.step, query.getAction(), adminId, query.getRemark());
             dramaAuditStepDao.updateById(ctx.step);
+            // 合同审核：复审通过时可核定项目分成比例
+            if (DramaAssetAuditStepStatusEnums.PASS.getCode().equals(query.getAction())
+                    && DramaAssetAuditStepTypeEnums.GROUP_B.getCode() == query.getStepType()
+                    && query.getProjectShareRatio() != null) {
+                java.math.BigDecimal ratio = query.getProjectShareRatio();
+                if (ratio.compareTo(java.math.BigDecimal.ZERO) < 0
+                        || ratio.compareTo(new java.math.BigDecimal("100")) > 0) {
+                    return setResultError("项目分成比例取值范围 0~100");
+                }
+                ctx.drama.setProjectShareRatio(ratio);
+                dramaDao.updateById(ctx.drama);
+            }
             dramaAuditService.refreshAggregateAndAutoShelf(ctx.drama.getId());
             if (isRejectAction(query.getAction())) {
                 notifyAuditReject(ctx.drama.getBelongUser(), ctx.drama.getId(), null, ctx.drama.getDramaTitle(),

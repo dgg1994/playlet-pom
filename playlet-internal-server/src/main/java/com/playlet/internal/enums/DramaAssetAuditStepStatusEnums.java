@@ -8,15 +8,15 @@ public enum DramaAssetAuditStepStatusEnums {
 	PASS(1, "通过"),
 	REJECT(2, "驳回");
 
-	private final int code;
+	private final Integer code;
 	private final String label;
 
-	DramaAssetAuditStepStatusEnums(int code, String label) {
+	DramaAssetAuditStepStatusEnums(Integer code, String label) {
 		this.code = code;
 		this.label = label;
 	}
 
-	public int getCode() {
+	public Integer getCode() {
 		return code;
 	}
 

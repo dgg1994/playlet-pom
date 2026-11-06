@@ -13,6 +13,6 @@ import java.util.List;
 @ApiModel(value = "集评审列表项（含步骤）", description = "集基础信息 + 该集 AI/A/B steps")
 public class DramaAssetAuditEpisodeRespEntity extends DramaWorkAuditListRespEntity {
 
-	@ApiModelProperty("集评审步骤：AI / A组 / B组")
+	@ApiModelProperty("集评审步骤：AI / 初审 / 复审")
 	private List<DramaAssetAuditStepEntity> steps;
 }

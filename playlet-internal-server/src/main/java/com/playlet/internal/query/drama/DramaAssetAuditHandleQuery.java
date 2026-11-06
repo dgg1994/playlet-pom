@@ -13,7 +13,7 @@ public class DramaAssetAuditHandleQuery {
 	private Integer assetId;
 
 	@NotNull(message = "审核组不能为空")
-	@ApiModelProperty(name = "stepType", value = "审核组：2=A组 3=B组", required = true, dataType = "Integer")
+	@ApiModelProperty(name = "stepType", value = "审核组：2=初审 3=复审", required = true, dataType = "Integer")
 	private Integer stepType;
 
 	@NotNull(message = "审核动作不能为空")

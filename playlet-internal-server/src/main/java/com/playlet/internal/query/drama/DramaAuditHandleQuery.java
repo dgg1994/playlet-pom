@@ -13,7 +13,7 @@ public class DramaAuditHandleQuery {
 	private Integer dramaId;
 
 	@NotNull(message = "审核组不能为空")
-	@ApiModelProperty(name = "stepType", value = "审核组：2=A组 3=B组", required = true, dataType = "Integer")
+	@ApiModelProperty(name = "stepType", value = "审核组：2=初审 3=复审", required = true, dataType = "Integer")
 	private Integer stepType;
 
 	@NotNull(message = "审核动作不能为空")
@@ -22,4 +22,7 @@ public class DramaAuditHandleQuery {
 
 	@ApiModelProperty(name = "remark", value = "评审反馈", required = false, dataType = "String")
 	private String remark;
+
+	@ApiModelProperty(name = "projectShareRatio", value = "合同审核-项目分成比例(%)，复审通过时可录入，0~100", required = false, dataType = "BigDecimal")
+	private java.math.BigDecimal projectShareRatio;
 }
