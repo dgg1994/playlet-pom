@@ -74,6 +74,9 @@ public class UpdateDramaQuery {
 	@ApiModelProperty(name = "defaultUnlockMethod",value = "默认解锁方式 free/vip/paid",required = false,dataType = "String")
 	private String defaultUnlockMethod;
 
+	@ApiModelProperty(name = "unlockPrice",value = "剧集解锁金额（元）",required = false,dataType = "BigDecimal")
+	private BigDecimal unlockPrice;
+
 	@ApiModelProperty(name = "storySynopsis",value = "故事梗概",required = false,dataType = "String")
 	private String storySynopsis;
 

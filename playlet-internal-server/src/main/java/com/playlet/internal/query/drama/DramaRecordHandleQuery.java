@@ -30,4 +30,7 @@ public class DramaRecordHandleQuery {
 			value = "备案分类判定：1一类（官方备案）2二类（官方备案）3三类（平台备案）；通过前必须判定",
 			dataType = "Integer")
 	private Integer filingCategory;
+
+	@ApiModelProperty(name = "unlockPrice", value = "剧集解锁金额（元），审核时可修改", dataType = "BigDecimal")
+	private java.math.BigDecimal unlockPrice;
 }

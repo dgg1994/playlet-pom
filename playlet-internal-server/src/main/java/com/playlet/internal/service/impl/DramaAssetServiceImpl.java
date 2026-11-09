@@ -12,6 +12,7 @@ import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.enums.*;
 import com.playlet.internal.query.drama.*;
 import com.playlet.internal.service.*;
+import com.playlet.internal.service.support.CoinRateSupport;
 import com.playlet.internal.utils.GenericityUtil;
 import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.QiniuUploadUtils;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.validation.Valid;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -54,6 +56,9 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 
 	@Autowired
 	private DramaAssetDurationService dramaAssetDurationService;
+
+	@Autowired
+	private CoinRateSupport coinRateSupport;
 
 	@Override
 	public ResponseBase uploadToken(@Valid @RequestBody DramaVideoUploadTokenQuery query) {
@@ -172,9 +177,14 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 			}
 			if (item.getPriceCoin() != null) {
 				asset.setPriceCoin(item.getPriceCoin());
+			} else if (Integer.valueOf(2).equals(item.getUnlockType())) {
+				asset.setPriceCoin(resolvePriceCoin(drama, item.getUnlockType(), null));
 			}
 			if (item.getPriceYuan() != null) {
 				asset.setPriceYuan(item.getPriceYuan());
+			} else if (Integer.valueOf(2).equals(item.getUnlockType()) && drama.getUnlockPrice() != null) {
+				// 付费解锁且未单独设价时，沿用剧级解锁金额
+				asset.setPriceYuan(drama.getUnlockPrice());
 			}
 			GenericityUtil.updateDate(asset);
 			dramaAssetDao.updateById(asset);
@@ -233,6 +243,32 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 		}
 	}
 
+	/** 付费解锁未单独设价时，默认取剧级解锁金额 */
+	private BigDecimal resolvePriceYuan(DramaEntity drama, Integer unlockType, BigDecimal priceYuan) {
+		if (priceYuan != null) {
+			return priceYuan;
+		}
+		if (Integer.valueOf(2).equals(unlockType) && drama != null) {
+			return drama.getUnlockPrice();
+		}
+		return null;
+	}
+
+	/** 付费解锁未单独设金币价时，按系统汇率由剧级解锁金额换算 */
+	private Integer resolvePriceCoin(DramaEntity drama, Integer unlockType, Integer priceCoin) {
+		if (priceCoin != null) {
+			return priceCoin;
+		}
+		if (!Integer.valueOf(2).equals(unlockType) || drama == null || drama.getUnlockPrice() == null) {
+			return priceCoin;
+		}
+		BigDecimal rate = coinRateSupport.resolveCoinPerYuan();
+		if (rate == null || rate.compareTo(BigDecimal.ZERO) <= 0) {
+			return null;
+		}
+		return drama.getUnlockPrice().multiply(rate).setScale(0, RoundingMode.HALF_UP).intValue();
+	}
+
 	private DramaAssetEntity loadDramaAsset(Integer assetId, Integer dramaId) {
 		DramaAssetEntity asset = dramaAssetDao.selectById(assetId);
 		if (asset == null || DeleteStateEnum.DELETE.getIndex().equals(asset.getDeleteState())) {
@@ -257,8 +293,8 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 		assetEntity.setVideoType(drama.getVideoType());
 		assetEntity.setVideoUrl(videoUrl);
 		assetEntity.setUnlockType(unlockType == null ? EpisodeUnlockTypeEnums.FREE.getIndex() : unlockType);
-		assetEntity.setPriceCoin(priceCoin == null ? 0 : priceCoin);
-		assetEntity.setPriceYuan(priceYuan);
+		assetEntity.setPriceCoin(resolvePriceCoin(drama, unlockType, priceCoin));
+		assetEntity.setPriceYuan(resolvePriceYuan(drama, unlockType, priceYuan));
 		assetEntity.setVideoStatus(PublicEnums.ZERO.getIndex());
 		assetEntity.setAuditStatus(DramaAssetAuditStatusEnums.UNDER_REVIEW.getCode());
 		assetEntity.setShelfStatus(DramaAssetShelfStatusEnums.OFF.getCode());
@@ -285,9 +321,13 @@ public class DramaAssetServiceImpl extends BaseApiService implements DramaAssetS
 		}
 		if (priceCoin != null) {
 			asset.setPriceCoin(priceCoin);
+		} else if (Integer.valueOf(2).equals(unlockType)) {
+			asset.setPriceCoin(resolvePriceCoin(drama, unlockType, null));
 		}
 		if (priceYuan != null) {
 			asset.setPriceYuan(priceYuan);
+		} else if (Integer.valueOf(2).equals(unlockType) && drama.getUnlockPrice() != null) {
+			asset.setPriceYuan(drama.getUnlockPrice());
 		}
 		asset.setBelongUser(drama.getBelongUser());
 		asset.setVideoStatus(PublicEnums.ZERO.getIndex());

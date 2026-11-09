@@ -199,6 +199,10 @@ public class DramaEntity extends PageQueryHelperEntity {
 	@ApiModelProperty(name = "defaultUnlockMethod",value = "默认解锁方式 free/vip/paid（创建向导）",required = false,dataType = "String")
 	private String defaultUnlockMethod;
 
+	@TableField("unlock_price")
+	@ApiModelProperty(name = "unlockPrice",value = "剧集解锁金额（元），付费解锁时按集计费",required = false,dataType = "BigDecimal")
+	private BigDecimal unlockPrice;
+
 	@TableField("story_synopsis")
 	@ApiModelProperty(name = "storySynopsis",value = "故事梗概",required = false,dataType = "String")
 	private String storySynopsis;

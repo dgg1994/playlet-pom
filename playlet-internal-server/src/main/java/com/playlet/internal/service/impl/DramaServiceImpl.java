@@ -169,6 +169,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			// 创建向导扩展字段
 			entity.setInvestmentAmount(createPay.getInvestmentAmount());
 			entity.setDefaultUnlockMethod(createPay.getDefaultUnlockMethod());
+			entity.setUnlockPrice(createPay.getUnlockPrice());
 			entity.setStorySynopsis(createPay.getStorySynopsis());
 			entity.setEpisodeOutline(createPay.getEpisodeOutline());
 			entity.setFemaleLead(createPay.getFemaleLead());

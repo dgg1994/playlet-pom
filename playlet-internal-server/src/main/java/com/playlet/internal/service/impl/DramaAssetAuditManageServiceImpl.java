@@ -1,6 +1,7 @@
 package com.playlet.internal.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import com.playlet.internal.aop.SysLogAnnotation;
@@ -38,6 +39,7 @@ import com.playlet.internal.service.DramaAssetAuditManageService;
 import com.playlet.internal.service.DramaAssetAuditService;
 import com.playlet.internal.service.DramaAuditService;
 import com.playlet.internal.service.MediaUrlService;
+import com.playlet.internal.service.support.CoinRateSupport;
 import com.playlet.internal.service.CreatorSystemMessageSendService;
 import com.playlet.internal.utils.*;
 import lombok.extern.slf4j.Slf4j;
@@ -50,6 +52,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
+import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -74,6 +77,8 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
     private DramaAuditService dramaAuditService;
     @Autowired
     private DramaAssetDao dramaAssetDao;
+    @Autowired
+    private CoinRateSupport coinRateSupport;
     @Autowired
     private DramaAssetAuditStepDao dramaAssetAuditStepDao;
     @Autowired
@@ -222,6 +227,26 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
                 }
                 ctx.drama.setProjectShareRatio(ratio);
                 dramaDao.updateById(ctx.drama);
+            }
+            // 审核时可调整剧集解锁金额，并同步到已上传的付费剧集
+            if (query.getUnlockPrice() != null) {
+                BigDecimal price = query.getUnlockPrice();
+                if (price.compareTo(BigDecimal.ZERO) < 0) {
+                    return setResultError("解锁金额不能为负数");
+                }
+                ctx.drama.setUnlockPrice(price);
+                dramaDao.updateById(ctx.drama);
+
+                LambdaUpdateWrapper<DramaAssetEntity> priceWrapper = new LambdaUpdateWrapper<>();
+                priceWrapper.eq(DramaAssetEntity::getDramaId, ctx.drama.getId())
+                        .eq(DramaAssetEntity::getUnlockType, 2)
+                        .set(DramaAssetEntity::getPriceYuan, price);
+                BigDecimal coinRate = coinRateSupport.resolveCoinPerYuan();
+                if (coinRate != null && coinRate.compareTo(BigDecimal.ZERO) > 0) {
+                    priceWrapper.set(DramaAssetEntity::getPriceCoin,
+                            price.multiply(coinRate).setScale(0, java.math.RoundingMode.HALF_UP).intValue());
+                }
+                dramaAssetDao.update(null, priceWrapper);
             }
             dramaAuditService.refreshAggregateAndAutoShelf(ctx.drama.getId());
             if (isRejectAction(query.getAction())) {
@@ -816,6 +841,25 @@ public class DramaAssetAuditManageServiceImpl implements DramaAssetAuditManageSe
                         : DramaRecordStatusEnums.SECOND_REJECTED;
             }
             drama.setRecordStatus(newStatus.getCode());
+            // 审核时可调整剧集解锁金额
+            if (query.getUnlockPrice() != null) {
+                if (query.getUnlockPrice().compareTo(java.math.BigDecimal.ZERO) < 0) {
+                    return setResultError("解锁金额不能为负数");
+                }
+                drama.setUnlockPrice(query.getUnlockPrice());
+                // 同步已上传的付费剧集解锁金额
+                LambdaUpdateWrapper<DramaAssetEntity> priceWrapper = new LambdaUpdateWrapper<>();
+                priceWrapper.eq(DramaAssetEntity::getDramaId, drama.getId())
+                        .eq(DramaAssetEntity::getUnlockType, 2)
+                        .set(DramaAssetEntity::getPriceYuan, query.getUnlockPrice());
+                BigDecimal coinRate = coinRateSupport.resolveCoinPerYuan();
+                if (coinRate != null && coinRate.compareTo(BigDecimal.ZERO) > 0) {
+                    priceWrapper.set(DramaAssetEntity::getPriceCoin,
+                            query.getUnlockPrice().multiply(coinRate)
+                                    .setScale(0, java.math.RoundingMode.HALF_UP).intValue());
+                }
+                dramaAssetDao.update(null, priceWrapper);
+            }
             drama.setGmtModified(now);
             dramaDao.updateById(drama);
 

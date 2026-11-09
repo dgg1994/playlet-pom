@@ -25,4 +25,7 @@ public class DramaAuditHandleQuery {
 
 	@ApiModelProperty(name = "projectShareRatio", value = "合同审核-项目分成比例(%)，复审通过时可录入，0~100", required = false, dataType = "BigDecimal")
 	private java.math.BigDecimal projectShareRatio;
+
+	@ApiModelProperty(name = "unlockPrice", value = "剧集解锁金额（元），审核时可修改", required = false, dataType = "BigDecimal")
+	private java.math.BigDecimal unlockPrice;
 }
