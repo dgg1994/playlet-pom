@@ -34,3 +34,9 @@ springdoc:
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
+
+# 剧本市场
+script:
+  contact:
+    # 联系电话 AES-256 密钥（Base64），生产环境用环境变量覆盖
+    aes-key: ${SCRIPT_CONTACT_AES_KEY:cvGWYbem1CmjD+0x4Ju5qQChRrc0eiMHz7XkgAw1RtU=}
