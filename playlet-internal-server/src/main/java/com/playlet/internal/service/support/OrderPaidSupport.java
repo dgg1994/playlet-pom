@@ -1,4 +1,6 @@
 package com.playlet.internal.service.support;
+import com.playlet.internal.service.member.MemberApiService;
+
 
 import com.playlet.internal.api.request.EpisodeUnlockCashNotifyReqEntity;
 import com.playlet.internal.base.ResponseBase;
@@ -7,7 +9,7 @@ import com.playlet.internal.dao.member.EpisodeUnlockOrderDao;
 import com.playlet.internal.dao.member.MemberOrderDao;
 import com.playlet.internal.enums.RechargeProductTypeEnums;
 import com.playlet.internal.exception.BaseException;
-import com.playlet.internal.service.EpisodeUnlockApiService;
+import com.playlet.internal.service.drama.EpisodeUnlockApiService;
 import com.playlet.internal.service.support.member.MemberPaidSupport;
 import com.playlet.internal.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;

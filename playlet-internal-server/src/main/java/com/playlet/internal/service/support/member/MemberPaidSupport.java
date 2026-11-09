@@ -1,4 +1,6 @@
 package com.playlet.internal.service.support.member;
+import com.playlet.internal.service.member.impl.MemberApiServiceImpl;
+
 
 import com.playlet.internal.constants.MemberConstants;
 import com.playlet.internal.dao.member.MemberOrderDao;

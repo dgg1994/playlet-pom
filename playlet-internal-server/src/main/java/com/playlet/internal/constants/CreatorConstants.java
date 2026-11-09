@@ -1,4 +1,6 @@
 package com.playlet.internal.constants;
+import com.playlet.internal.service.account.impl.AppUserServiceImpl;
+
 
 /**
  * 作家端账号常量。

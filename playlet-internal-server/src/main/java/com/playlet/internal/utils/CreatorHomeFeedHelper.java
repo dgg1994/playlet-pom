@@ -13,7 +13,7 @@ import com.playlet.internal.dao.creator.CreatorHomeDao;
 import com.playlet.internal.dao.drama.DramaRankStatDailyDao;
 import com.playlet.internal.enums.CreatorHomeRankTypeEnums;
 import com.playlet.internal.enums.LanguageEnums;
-import com.playlet.internal.service.MediaUrlService;
+import com.playlet.internal.service.common.MediaUrlService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 

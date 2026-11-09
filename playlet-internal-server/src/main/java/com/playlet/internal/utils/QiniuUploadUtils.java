@@ -1,4 +1,6 @@
 package com.playlet.internal.utils;
+import com.playlet.internal.service.common.MediaUrlService;
+
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
@@ -141,7 +143,7 @@ public class QiniuUploadUtils {
 
 	/**
 	 * 读时访问地址（私有则签名）。
-	 * @deprecated 业务侧优先注入 {@link com.playlet.internal.service.MediaUrlService}
+	 * @deprecated 业务侧优先注入 {@link com.playlet.internal.service.common.MediaUrlService}
 	 */
 	@Deprecated
 	public static String getFileUrl(String fileName) {
