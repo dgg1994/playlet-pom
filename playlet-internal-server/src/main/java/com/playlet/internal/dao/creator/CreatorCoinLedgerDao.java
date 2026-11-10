@@ -38,4 +38,10 @@ public interface CreatorCoinLedgerDao extends BaseMapper<CreatorCoinLedgerEntity
 	@Select("select * from creator_coin_ledger where creator_id = #{creatorId} "
 			+ "order by setTime desc, id desc")
 	List<CreatorCoinLedgerEntity> findByCreatorId(@Param("creatorId") Integer creatorId);
+
+	/** 自然月内正入账合计（本月收益） */
+	@Select("select ifnull(sum(change_amt), 0) from creator_coin_ledger "
+			+ "where creator_id = #{creatorId} and change_amt > 0 "
+			+ "and date_format(setTime, '%Y-%m') = #{monthStr}")
+	Long sumPositiveIncomeByMonth(@Param("creatorId") Integer creatorId, @Param("monthStr") String monthStr);
 }

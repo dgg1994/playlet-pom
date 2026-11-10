@@ -36,4 +36,24 @@ public class CreatorHomeStatsRespEntity {
 
 	@ApiModelProperty("在播剧集数（已上架集）")
 	private Integer onAirEpisodeCount;
+
+	// ---------- 个人中心扩展 ----------
+
+	@ApiModelProperty("可提现余额（当前可用余额金币数）")
+	private BigDecimal availableWithdrawYuan;
+
+	@ApiModelProperty("本月累计收益（金币）")
+	private BigDecimal monthIncomeYuan;
+
+	@ApiModelProperty("我的作品总数")
+	private Integer workTotalCount;
+
+	@ApiModelProperty("审核中作品数（audit_status in 0/1/4）")
+	private Integer workAuditingCount;
+
+	@ApiModelProperty("进行中合作数（一期返回 0）")
+	private Integer coopOngoingCount;
+
+	@ApiModelProperty("待确认合作数（一期返回 0）")
+	private Integer coopPendingCount;
 }

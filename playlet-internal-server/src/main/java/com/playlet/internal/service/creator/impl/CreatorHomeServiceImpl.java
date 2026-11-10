@@ -116,9 +116,11 @@ public class CreatorHomeServiceImpl extends BaseApiService implements CreatorHom
 		LocalDate today = CreatorBizUtils.today();
 		String todayStr = CreatorBizUtils.formatDate(today);
 		String yesterdayStr = CreatorBizUtils.formatDate(today.minusDays(1));
+		String monthStr = today.toString().substring(0, 7); // YYYY-MM
 
 		Long todayIncomeCoin = creatorCoinLedgerDao.sumPositiveIncomeByDate(account.getId(), todayStr);
 		Long yesterdayIncomeCoin = creatorCoinLedgerDao.sumPositiveIncomeByDate(account.getId(), yesterdayStr);
+		Long monthIncomeCoin = creatorCoinLedgerDao.sumPositiveIncomeByMonth(account.getId(), monthStr);
 		long coinBalance = account.getCoinBalance() == null ? 0L : account.getCoinBalance();
 		long frozen = account.getFrozenCoinBalance() == null ? 0L : account.getFrozenCoinBalance();
 		long available = Math.max(coinBalance - frozen, 0L);
@@ -128,9 +130,10 @@ public class CreatorHomeServiceImpl extends BaseApiService implements CreatorHom
 		Long yesterdayPlay = creatorHomeDao.sumPlayPvByCreatorAndDate(account.getId(), yesterdayStr);
 		Integer onAirDrama = creatorHomeDao.countOnAirDrama(account.getId());
 		Integer onAirEpisode = creatorHomeDao.countOnAirEpisode(account.getId());
+		Integer workTotal = creatorHomeDao.countAllDrama(account.getId());
+		Integer workAuditing = creatorHomeDao.countAuditingDrama(account.getId());
 
 		CreatorHomeStatsRespEntity stats = new CreatorHomeStatsRespEntity();
-		// 字段名保持 *Yuan，数值直接为金币（不做比例兑换）
 		stats.setTodayIncomeYuan(BigDecimal.valueOf(todayIncomeCoin == null ? 0L : todayIncomeCoin));
 		stats.setYesterdayIncomeYuan(BigDecimal.valueOf(yesterdayIncomeCoin == null ? 0L : yesterdayIncomeCoin));
 		stats.setBalanceYuan(BigDecimal.valueOf(available));
@@ -139,6 +142,13 @@ public class CreatorHomeServiceImpl extends BaseApiService implements CreatorHom
 		stats.setYesterdayPlayCount(yesterdayPlay == null ? 0L : yesterdayPlay);
 		stats.setOnAirDramaCount(onAirDrama == null ? 0 : onAirDrama);
 		stats.setOnAirEpisodeCount(onAirEpisode == null ? 0 : onAirEpisode);
+		// 个人中心扩展字段
+		stats.setAvailableWithdrawYuan(BigDecimal.valueOf(available));
+		stats.setMonthIncomeYuan(BigDecimal.valueOf(monthIncomeCoin == null ? 0L : monthIncomeCoin));
+		stats.setWorkTotalCount(workTotal == null ? 0 : workTotal);
+		stats.setWorkAuditingCount(workAuditing == null ? 0 : workAuditing);
+		stats.setCoopOngoingCount(0);
+		stats.setCoopPendingCount(0);
 		return stats;
 	}
 

@@ -109,4 +109,15 @@ public interface CreatorHomeDao {
 			@Param("prevTo") String prevTo,
 			@Param("minRecentSeconds") int minRecentSeconds,
 			@Param("limit") int limit);
+
+	/** 全部作品数（本人） */
+	@Select("select ifnull(count(1), 0) from drama "
+			+ "where belong_user = #{creatorId} and ifnull(delete_state, 0) = 0")
+	Integer countAllDrama(@Param("creatorId") Integer creatorId);
+
+	/** 审核中作品数：audit_status in (0/1/4) 即待审/审核中/申诉中 */
+	@Select("select ifnull(count(1), 0) from drama "
+			+ "where belong_user = #{creatorId} and ifnull(delete_state, 0) = 0 "
+			+ "and ifnull(audit_status, 0) in (0, 1, 4)")
+	Integer countAuditingDrama(@Param("creatorId") Integer creatorId);
 }
