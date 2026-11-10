@@ -28,9 +28,13 @@ public enum DramaFilingCategoryEnums {
 	}
 
 	public static DramaFilingCategoryEnums fromCode(Integer code) {
-		if (code == null) return null;
+		if (code == null) {
+			return null;
+		}
 		for (DramaFilingCategoryEnums item : values()) {
-			if (item.code == code) return item;
+			if (item.code == code) {
+				return item;
+			}
 		}
 		return null;
 	}

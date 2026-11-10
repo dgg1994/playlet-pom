@@ -48,9 +48,13 @@ public enum DramaRecordMaterialTypeEnums {
 	}
 
 	public static DramaRecordMaterialTypeEnums fromCode(Integer code) {
-		if (code == null) return null;
+		if (code == null) {
+			return null;
+		}
 		for (DramaRecordMaterialTypeEnums item : values()) {
-			if (item.code == code) return item;
+			if (item.code == code) {
+				return item;
+			}
 		}
 		return null;
 	}

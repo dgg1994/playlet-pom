@@ -24,9 +24,13 @@ public enum DramaRecordAuditStepTypeEnums {
 	}
 
 	public static DramaRecordAuditStepTypeEnums fromCode(Integer code) {
-		if (code == null) return null;
+		if (code == null) {
+			return null;
+		}
 		for (DramaRecordAuditStepTypeEnums item : values()) {
-			if (item.code == code) return item;
+			if (item.code == code) {
+				return item;
+			}
 		}
 		return null;
 	}

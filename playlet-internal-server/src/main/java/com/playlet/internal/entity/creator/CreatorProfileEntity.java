@@ -27,12 +27,24 @@ public class CreatorProfileEntity {
 	private Integer creatorId;
 
 	@TableField("identity_type")
-	@ApiModelProperty(name = "identityType", value = "1个人创作者 2创作机构")
+	@ApiModelProperty(name = "identityType", value = "1个人创作者 2公司机构 3工作室团队")
 	private Integer identityType;
 
 	@TableField("creator_role")
 	@ApiModelProperty(name = "creatorRole", value = "入驻身份 1出品方 2MCN机构 3独立创作者")
 	private Integer creatorRole;
+
+	@TableField("city")
+	@ApiModelProperty(name = "city", value = "所在城市")
+	private String city;
+
+	@TableField("expertise")
+	@ApiModelProperty(name = "expertise", value = "擅长领域，顿号分隔")
+	private String expertise;
+
+	@TableField("intro")
+	@ApiModelProperty(name = "intro", value = "个人/团队简介")
+	private String intro;
 
 	@TableField("real_name")
 	@ApiModelProperty(name = "realName", value = "真实姓名/法人姓名")

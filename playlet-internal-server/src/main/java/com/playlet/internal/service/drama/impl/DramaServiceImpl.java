@@ -381,12 +381,20 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 		}
 		long amount = investmentAmount == null ? 0L : investmentAmount.longValue();
 		if (Integer.valueOf(2).equals(dramaType)) {
-			if (amount >= 800000L) return 1;
-			if (amount >= 300000L) return 2;
+			if (amount >= 800000L) {
+				return 1;
+			}
+			if (amount >= 300000L) {
+				return 2;
+			}
 			return 3;
 		}
-		if (amount >= 3000000L) return 1;
-		if (amount >= 1000000L) return 2;
+		if (amount >= 3000000L) {
+			return 1;
+		}
+		if (amount >= 1000000L) {
+			return 2;
+		}
 		return 3;
 	}
 

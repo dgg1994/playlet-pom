@@ -428,6 +428,15 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         if (query.getOrgLicense() != null) {
             profile.setOrgLicense(trimToNull(query.getOrgLicense()));
         }
+        if (query.getCity() != null) {
+            profile.setCity(trimToNull(query.getCity()));
+        }
+        if (query.getExpertise() != null) {
+            profile.setExpertise(trimToNull(query.getExpertise()));
+        }
+        if (query.getIntro() != null) {
+            profile.setIntro(trimToNull(query.getIntro()));
+        }
         profile.setGmtModified(now);
     }
 

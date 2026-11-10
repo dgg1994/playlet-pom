@@ -108,6 +108,12 @@ public interface SysUserDao extends BaseMapper<SysUserEntity>{
     int updateCreatorIdentity(@Param("id") Integer id, @Param("nickname") String nickname,
                               @Param("avatar") String avatar);
 
+    @Update("update sys_user set acctive = #{email} where id = #{id} and user_type = 2")
+    int updateCreatorEmail(@Param("id") Integer id, @Param("email") String email);
+
+    @Update("update sys_user set tel = #{mobile} where id = #{id} and user_type = 2")
+    int updateCreatorMobile(@Param("id") Integer id, @Param("prefix") String prefix, @Param("mobile") String mobile);
+
     @Select("select group_concat(role_name) from sys_role where role_id in(select role_id from sys_user_role where user_id = #{userId})")
 	String findUserRoleName(@Param("userId")Integer userId);
     

@@ -43,4 +43,13 @@ public class CreatorUpdateInfoQuery {
 
 	@ApiModelProperty(name = "orgLicense", value = "营业执照图")
 	private String orgLicense;
+
+	@ApiModelProperty(name = "city", value = "所在城市")
+	private String city;
+
+	@ApiModelProperty(name = "expertise", value = "擅长领域，顿号分隔")
+	private String expertise;
+
+	@ApiModelProperty(name = "intro", value = "个人/团队简介")
+	private String intro;
 }

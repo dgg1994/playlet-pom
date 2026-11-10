@@ -59,6 +59,10 @@ public class RedisKeyConstants {
     public static final long SMS_COOLDOWN_SEC = 60L;
     /** 作家端邮箱验证码：后缀为登录邮箱 */
     public static final String CREATOR_EMAIL_CODE_KEY = PROJECT_PREFIX + "creator:email:code:";
+    /** 作家端短信验证码：后缀为 区号+手机号 */
+    public static final String CREATOR_SMS_CODE_KEY = PROJECT_PREFIX + "creator:sms:code:";
+    /** 作家端微信绑定 scene：后缀为 scene */
+    public static final String CREATOR_WECHAT_BIND_SCENE = PROJECT_PREFIX + "creator:wechat:bind:";
     /** 接口幂等：后缀为 requestId */
     public static final String IDEMPOTENT_KEY = PROJECT_PREFIX + "idempotent:";
     /** 访问限流：后缀为 ip+url */
