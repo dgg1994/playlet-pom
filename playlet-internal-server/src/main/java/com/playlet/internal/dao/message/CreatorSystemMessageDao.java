@@ -57,7 +57,7 @@ public interface CreatorSystemMessageDao extends BaseMapper<CreatorSystemMessage
 			+ "    0 AS priority, IFNULL(m.is_read,0) AS isRead, m.setTime AS setTime"
 			+ "  FROM creator_system_message m"
 			+ "  WHERE m.to_creator_id = #{toCreatorId} AND m.status = #{statusValid}"
-			+ "  <if test=\"types != null and types.size() > 0\">"
+			+ "  <if test=\"types != null and types.length > 0\">"
 			+ "    AND m.message_type IN"
 			+ "    <foreach collection=\"types\" item=\"type\" open=\"(\" separator=\",\" close=\")\">#{type}</foreach>"
 			+ "  </if>"
@@ -69,7 +69,7 @@ public interface CreatorSystemMessageDao extends BaseMapper<CreatorSystemMessage
 			@Param("langue") String langue, @Param("cursor") Long cursor,
 			@Param("siteType") String siteType, @Param("inboxSource") String inboxSource,
 			@Param("broadcastSource") String broadcastSource, @Param("statusValid") Integer statusValid,
-			@Param("fallbackLangue") String fallbackLangue, @Param("types") List<String> types,
+			@Param("fallbackLangue") String fallbackLangue, @Param("types") String[] types,
 			@Param("includeBroadcast") boolean includeBroadcast,
 			@Param("startTime") String startTime, @Param("endTime") String endTime);
 

@@ -65,6 +65,8 @@ public class CreatorMessageServiceImpl extends BaseApiService implements Creator
 		String langue = resolveLangue();
 		long cursor = resolveCursor(account);
 		List<String> types = CreatorMessageCategoryEnums.typesOf(page.getCategory());
+		// 数组入参，避免 OGNL 对 List 反射调用 size()
+		String[] typeArr = types == null ? null : types.toArray(new String[0]);
 		boolean includeBroadcast = types == null
 				|| types.contains(CreatorSystemMessageTypeEnums.SITE.getCode());
 		PageHelper.startPage(page.getPageNumber(), page.getPageSize());
@@ -74,7 +76,7 @@ public class CreatorMessageServiceImpl extends BaseApiService implements Creator
 				CreatorConstants.MSG_SOURCE_INBOX,
 				CreatorConstants.MSG_SOURCE_BROADCAST,
 				CreatorConstants.MSG_STATUS_VALID,
-				LanguageEnums.DEFAULT_LANGUE, types, includeBroadcast,
+				LanguageEnums.DEFAULT_LANGUE, typeArr, includeBroadcast,
 				page.getStartTime(), page.getEndTime());
 		if (pageList != null) {
 			for (CreatorMessageItemRespEntity item : pageList) {
@@ -108,9 +110,6 @@ public class CreatorMessageServiceImpl extends BaseApiService implements Creator
 			if (publishId != null && publishId > resolveCursor(account)) {
 				creatorAccountDao.updateSysMsgReadCursor(account.getId(), publishId);
 			}
-		} catch (BaseException e) {
-			log.error("creator message read biz error creatorId={} id={} publishId={}", account.getId(), id, publishId, e);
-			throw e;
 		} catch (Exception e) {
 			log.error("creator message read failed creatorId={} id={} publishId={}", account.getId(), id, publishId, e);
 			throw new BaseException("操作失败", e);
@@ -131,9 +130,6 @@ public class CreatorMessageServiceImpl extends BaseApiService implements Creator
 			if (maxId != null && maxId > 0) {
 				creatorAccountDao.updateSysMsgReadCursor(account.getId(), maxId);
 			}
-		} catch (BaseException e) {
-			log.error("creator message readAll biz error creatorId={}", account.getId(), e);
-			throw e;
 		} catch (Exception e) {
 			log.error("creator message readAll failed creatorId={}", account.getId(), e);
 			throw new BaseException("操作失败", e);
