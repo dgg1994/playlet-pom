@@ -54,22 +54,22 @@ public class MenuServiceImpl extends BaseApiService implements MenuService {
 	public ResponseBase findByUser(Integer userId) {
 		List<SysUserRoleEntity> roleList = sysUserDao.findUserRoleJoin(userId);
 		boolean temp = false;
-		if(roleList != null && roleList.size() > 0) {
+		if (roleList != null && roleList.size() > 0) {
 			for (int i = 0; i < roleList.size(); i++) {
-				if(roleList.get(i).getRoleId().equals(RoleTypeEnums.ADMIN.getIndex())) {//管理员
+				if (roleList.get(i).getRoleId().equals(RoleTypeEnums.ADMIN.getIndex())) {//管理员
 					temp = true;
 				}
 			}
-		}else {
+		} else {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
-		if(temp) {
+		if (temp) {
 			List<SysMenuEntity> list = sysMenuDao.findByParentId(Constants.ZERO_INT);
 		    if (list != null && !list.isEmpty()) {
 		    	addChildren(list);
 		    }
 		    return setResultSuccess(buildMenus(list));
-		}else {
+		} else {
 			List<SysMenuEntity> list = sysMenuDao.findUserParentMenu(userId, Constants.ZERO_INT);
 		    if (list != null && !list.isEmpty()) {
 		    	addUserChildren(list,userId);
@@ -340,9 +340,9 @@ public class MenuServiceImpl extends BaseApiService implements MenuService {
 			try {
 				entity.setCreateTime(new Date());
 				int temp = sysMenuDao.insert(entity);
-				if(temp > 0) {
+				if (temp > 0) {
 					return setResultSuccess(I18nUtil.getMessage("base_success"));
-				}else {
+				} else {
 					return setResultError(I18nUtil.getMessage("base_error"));
 				}
 			} catch (Exception e) {
@@ -356,9 +356,9 @@ public class MenuServiceImpl extends BaseApiService implements MenuService {
 		public ResponseBase findById(Integer menuId) {
 			try {
 				SysMenuEntity entity = sysMenuDao.selectById(menuId);
-				if(entity != null) {
+				if (entity != null) {
 					return setResultSuccess(JSON.toJSON(entity),I18nUtil.getMessage("base_success"));
-				}else {
+				} else {
 					return setResultError(I18nUtil.getMessage("base_data_null"));
 				}
 			} catch (Exception e) {
@@ -372,14 +372,14 @@ public class MenuServiceImpl extends BaseApiService implements MenuService {
 		public ResponseBase update(@RequestBody SysMenuEntity entity) {
 			try {
 				SysMenuEntity menuEntity = sysMenuDao.selectById(entity.getMenuId());
-				if(menuEntity != null) {
+				if (menuEntity != null) {
 					int temp = sysMenuDao.updateById(entity);
-					if(temp > 0) {
+					if (temp > 0) {
 						return setResultSuccess(I18nUtil.getMessage("base_success"));
-					}else {
+					} else {
 						return setResultError(I18nUtil.getMessage("base_error"));
 					}
-				}else {
+				} else {
 					return setResultError(I18nUtil.getMessage("base_data_null"));
 				}
 			} catch (Exception e) {
@@ -393,25 +393,25 @@ public class MenuServiceImpl extends BaseApiService implements MenuService {
 		public ResponseBase delete(Integer menuId) {
 			try {
 				SysMenuEntity entity = sysMenuDao.selectById(menuId);
-				if(entity != null) {
+				if (entity != null) {
 					//判断是否有子菜单
 					List<SysMenuEntity> clientList = sysMenuDao.findByParentId(menuId);
-					if(clientList != null && clientList.size() > 0) {
+					if (clientList != null && clientList.size() > 0) {
 						return setResultError(I18nUtil.getMessage("menu_son_yes"));
 					}
 					//判断菜单是否已分配
 					List<SysRoleMenuEntity> roleMenuList = sysRoleMenuDao.findMenuId(menuId);
-					if(roleMenuList != null && clientList.size() > 0) {
+					if (roleMenuList != null && clientList.size() > 0) {
 						return setResultError(I18nUtil.getMessage("menu_allot_yes"));
 					}
 					
 					int temp = sysMenuDao.deleteById(menuId);
-					if(temp > 0) {
+					if (temp > 0) {
 						return setResultSuccess(I18nUtil.getMessage("base_success"));
-					}else {
+					} else {
 						return setResultError(I18nUtil.getMessage("base_error"));
 					}
-				}else {
+				} else {
 					return setResultError(I18nUtil.getMessage("base_data_null"));
 				}
 			} catch (Exception e) {

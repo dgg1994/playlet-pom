@@ -77,15 +77,15 @@ public class GenericityUtil {
     	} else {
     		pageSize = Math.min(pageSize, Constants.MAX_PAGESIZE);
     	}
-    	if(pageSize >= list.size()) {
+    	if (pageSize >= list.size()) {
     		pageNumber = Constants.PAGENUMBER ;
 		}
 		int indexNum = (pageNumber-1 )*pageSize;
 		int endNum = (pageNumber -1 )*pageSize+pageSize;
-		if(endNum > list.size()) {
+		if (endNum > list.size()) {
 			endNum  = list.size();
 		}
-		if( indexNum > endNum) {
+		if ( indexNum > endNum) {
 			indexNum = (Constants.PAGENUMBER -1 )*Constants.PAGESIZE;
 			endNum = (Constants.PAGENUMBER -1 )*Constants.PAGESIZE+Constants.PAGESIZE;
 			if (endNum > list.size()) {

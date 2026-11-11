@@ -213,10 +213,18 @@ public class CreatorRepresentativeServiceImpl extends BaseApiService implements 
 	}
 
 	private static String auditStatusText(Integer auditStatus) {
-		if (auditStatus == null) return "";
-		if (CreatorIdentityAuditStatusEnums.REVIEWING.getCode() == auditStatus) return "审核中";
-		if (CreatorIdentityAuditStatusEnums.PASS.getCode() == auditStatus) return "审核通过";
-		if (CreatorIdentityAuditStatusEnums.REJECT.getCode() == auditStatus) return "审核驳回";
+		if (auditStatus == null) {
+			return "";
+		}
+		if (CreatorIdentityAuditStatusEnums.REVIEWING.getCode() == auditStatus) {
+			return "审核中";
+		}
+		if (CreatorIdentityAuditStatusEnums.PASS.getCode() == auditStatus) {
+			return "审核通过";
+		}
+		if (CreatorIdentityAuditStatusEnums.REJECT.getCode() == auditStatus) {
+			return "审核驳回";
+		}
 		return "待审核";
 	}
 

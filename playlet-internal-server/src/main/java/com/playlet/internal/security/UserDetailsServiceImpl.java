@@ -44,10 +44,10 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         if (sysUser == null) {
         	CustomUtils.sendJsonMessage(response, JsonData.Error("账号密码错误！！"));
         	throw new UsernameNotFoundException("账号密码错误");
-        }else {
+        } else {
             if (sysUser.getUserState()== UserStateEnums.NORMAL.getIndex()) {
                 return new User(sysUser.getUsername(), sysUser.getPassword(), emptyList());
-            }else{
+            } else{
                 CustomUtils.sendJsonMessage(response, JsonData.Error("账号已注销！！"));
                 throw new UsernameNotFoundException("账号已注销！！");
             }

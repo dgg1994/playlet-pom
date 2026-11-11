@@ -71,7 +71,7 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 				if (entity.getPassword() != null && entity.getPassword().length() > 0) {
 					entity.setPassword(PasswordHashUtils.encode(entity.getPassword()));
 				} 
-				if(entity.getGoogleSecretkey() == null || entity.getGoogleSecretkey().isEmpty()) {
+				if (entity.getGoogleSecretkey() == null || entity.getGoogleSecretkey().isEmpty()) {
 					entity.setGoogleSecretkey(Constants.user_googleKey);
 				}
 				sysUserDao.insert(entity);
@@ -268,7 +268,7 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 			} else {
 				return setResultError(I18nUtil.getMessage("base_data_null"));
 			}
-		}else {
+		} else {
 			return setResultError(I18nUtil.getMessage("base_data_null"));
 		}
 	}
@@ -279,7 +279,7 @@ public class SysUserServiceImpl extends BaseApiService implements SysUserService
 	public ResponseBase upGoogleSecretkey(@RequestParam("userId") Integer userId, @RequestParam("googleSecretkey") String googleSecretkey) {
 		try {
 			SysUserEntity userEntity = sysUserDao.selectById(userId);
-			if(userEntity != null) {
+			if (userEntity != null) {
 				userEntity.setGoogleSecretkey(googleSecretkey);
 				sysUserDao.updateById(userEntity);
 				return setResultSuccess(I18nUtil.getMessage("base_success"));

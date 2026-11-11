@@ -156,7 +156,7 @@ public class DramaTagServiceImpl implements DramaTagService {
                     tagEntity.setGmtModified(new Date());
                     tagEntity.setSortWeight(tag.getSortWeight());
                     tagDao.updateById(tagEntity);
-                }else {
+                } else {
                     tagEntity = new TagEntity();
                     tagEntity.setLangue(tag.getLangue());
                     tagEntity.setTagName(tag.getTagName());

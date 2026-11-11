@@ -43,17 +43,17 @@ public class DicServiceImpl extends BaseApiService implements DicService{
 	@SysLogAnnotation(module = "字典管理", type = "get", remark = "国家省市级联")
 	public ResponseBase findCountry(Integer parentId) {
 		String language = LanguageContext.getLanguage();
-		if(parentId == null) {
+		if (parentId == null) {
 			parentId = 0;
 		}
 		List<SysFaCountryEntity> list = sysFaCountryDao.findParent(parentId);
-		if(list != null && list.size() > 0) {
+		if (list != null && list.size() > 0) {
 			for (int i = 0; i < list.size(); i++) {
-				if(LanguageEnums.ZH_CN.getName().equals(language)) {
+				if (LanguageEnums.ZH_CN.getName().equals(language)) {
 					list.get(i).setName(list.get(i).getCname());
-				}else if(LanguageEnums.EN_US.getName().equals(language)){
+				} else if (LanguageEnums.EN_US.getName().equals(language)){
 					list.get(i).setName(list.get(i).getEname());
-				}else if(LanguageEnums.ZH_TW.getName().equals(language)){
+				} else if (LanguageEnums.ZH_TW.getName().equals(language)){
 					list.get(i).setName(list.get(i).getTname());
 				}
 				list.get(i).setEname(null);

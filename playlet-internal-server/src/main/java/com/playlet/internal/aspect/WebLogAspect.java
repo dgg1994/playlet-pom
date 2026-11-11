@@ -62,7 +62,7 @@ public class WebLogAspect {
     @Before("webLog()")
     public void doBefore(JoinPoint joinPoint) throws Throwable {
         ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        if(attributes != null) {
+        if (attributes != null) {
         	 HttpServletRequest request = attributes.getRequest();
              log.info("##################### 请求开始 ####################");
              log.info("URL : " + request.getRequestURL().toString());

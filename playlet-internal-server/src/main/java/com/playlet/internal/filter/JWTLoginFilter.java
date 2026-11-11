@@ -71,7 +71,7 @@ public class JWTLoginFilter extends UsernamePasswordAuthenticationFilter {
 			throws AuthenticationException {
 		try {
 			boolean isAllowed = true;
-			if(isAllowed) {
+			if (isAllowed) {
 				SysUserEntity sysUserLoginDTO = new ObjectMapper().readValue(req.getInputStream(), SysUserEntity.class);
 				if (sysUserLoginDTO.getGoogleCode() == null) {
 					throw new BadCredentialsException("请输入谷歌验证码");
@@ -84,7 +84,7 @@ public class JWTLoginFilter extends UsernamePasswordAuthenticationFilter {
 				redisUtil.set(codeKey, sysUserLoginDTO.getGoogleCode(), GOOGLE_CODE_TTL_SEC);
 				return authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(
 						sysUserLoginDTO.getUsername().trim(), sysUserLoginDTO.getPassword(), new ArrayList<>()));
-			}else {
+			} else {
 				throw new BadCredentialsException("对不起，你的IP地址没有访问权限");
 			}
 		} catch (IOException e) {

@@ -83,7 +83,7 @@ public class WelfareTaskApiServiceImpl extends BaseApiService implements Welfare
 			// 今日收益
 			BigDecimal todayEarnings = userCoinLedgerDao.selectTodayEarningsByUid(uid);
 			resp.setTodayEarnings(todayEarnings == null ? BigDecimal.ZERO : todayEarnings);
-		}else {
+		} else {
 			resp.setCoinBalance(0L);
 			resp.setTodayEarnings(BigDecimal.ZERO);
 		}

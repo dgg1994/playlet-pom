@@ -167,12 +167,12 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 	public void addDiscussScore(DramaVideoCommentEntity entity){
 		//视频、短剧添加评论量
 		DramaEntity dramaEntity = dramaDao.selectById(entity.getDramaId());
-		if(dramaEntity != null) {
+		if (dramaEntity != null) {
 			dramaEntity.setDiscussScore(dramaEntity.getDiscussScore() + 1);
 			dramaDao.updateById(dramaEntity);
 		}
 		DramaAssetEntity dramaAssetEntity= dramaAssetDao.selectById(entity.getVideoId());
-		if(dramaAssetEntity != null) {
+		if (dramaAssetEntity != null) {
 			dramaAssetEntity.setDiscussScore(dramaAssetEntity.getDiscussScore() + 1);
 			dramaAssetDao.updateById(dramaAssetEntity);
 		}
@@ -182,21 +182,21 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 	public ResponseBase giveLike(@RequestBody CommentGiveLikeQuery giveLikeQuery) {
 		try {
 			DramaVideoCommentEntity commentEntity = dramaVideoCommentDao.selectById(giveLikeQuery.getCommentId());
-			if(commentEntity == null) {
+			if (commentEntity == null) {
 				return  setResultError(I18nUtil.getMessage("base_error"));
 			}
 			DramaCommentLikeEntity exist = dramaCommentLikeDao.findOne(
 					giveLikeQuery.getCommentId(), giveLikeQuery.getUserId());
-			if(PublicEnums.ONE.getIndex().equals(giveLikeQuery.getOperationType())) {
+			if (PublicEnums.ONE.getIndex().equals(giveLikeQuery.getOperationType())) {
 				if (exist != null) {
 					return setResultSuccess(I18nUtil.getMessage("base_success"));
 				}
 				DramaCommentLikeEntity commentLikeEntity = new DramaCommentLikeEntity();
 				commentLikeEntity.setCommentId(commentEntity.getId());
 				commentLikeEntity.setDramaId(commentEntity.getDramaId());
-				if(PublicEnums.ZERO.getIndex().equals(commentEntity.getParentId())) {
+				if (PublicEnums.ZERO.getIndex().equals(commentEntity.getParentId())) {
 					commentLikeEntity.setLikeType(PublicEnums.ONE.getIndex());
-				}else {
+				} else {
 					commentLikeEntity.setLikeType(PublicEnums.TOW.getIndex());
 				}
 				commentLikeEntity.setUserId(giveLikeQuery.getUserId());
@@ -216,7 +216,7 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 						commentEntity.getCommentInfo(),
 						"video_comment_like:" + commentEntity.getId() + ":" + giveLikeQuery.getUserId());
 				return setResultSuccess(I18nUtil.getMessage("base_success"));
-			}else {
+			} else {
 				if (exist == null) {
 					return setResultSuccess(I18nUtil.getMessage("base_success"));
 				}
@@ -237,16 +237,16 @@ public class DramaVideoCommentServiceImpl extends BaseApiService implements Dram
 	public ResponseBase delete(Integer id) {
 		try {
 			DramaVideoCommentEntity commentEntity = dramaVideoCommentDao.selectById(id);
-			if(commentEntity != null) {
+			if (commentEntity != null) {
 				dramaVideoCommentDao.deleteById(id);
 				//视频、短剧删除评论
 				DramaEntity dramaEntity = dramaDao.selectById(commentEntity.getDramaId());
-				if(dramaEntity != null) {
+				if (dramaEntity != null) {
 					dramaEntity.setDiscussScore(dramaEntity.getDiscussScore() - 1);
 					dramaDao.updateById(dramaEntity);
 				}
 				DramaAssetEntity dramaAssetEntity= dramaAssetDao.selectById(commentEntity.getVideoId());
-				if(dramaAssetEntity != null) {
+				if (dramaAssetEntity != null) {
 					dramaAssetEntity.setDiscussScore(dramaAssetEntity.getDiscussScore() - 1);
 					dramaAssetDao.updateById(dramaAssetEntity);
 				}

@@ -63,12 +63,12 @@ public class RoleServiceImpl extends BaseApiService implements RoleService{
 	public ResponseBase add(@RequestBody SysRoleEntity entity) {
 		try {
 			SysRoleEntity roleEntity = sysRoleDao.findName(entity.getRoleName(),RoleStateEnums.ROLE_DEL_FLAG_NORMAL.getIndex());
-			if(roleEntity != null) {
+			if (roleEntity != null) {
 				return setResultError(I18nUtil.getMessage("base_info_exist"));
-			}else {
+			} else {
 				entity.setCreateTime(new Date());
 				sysRoleDao.insert(entity);
-				if(entity.getMenuIds() != null && entity.getMenuIds().length > 0) {
+				if (entity.getMenuIds() != null && entity.getMenuIds().length > 0) {
 					for (int i = 0; i < entity.getMenuIds().length; i++) {
 						SysRoleMenuEntity roleMenuEntity = new SysRoleMenuEntity();
 						roleMenuEntity.setCreateTime(new Date());
@@ -90,15 +90,15 @@ public class RoleServiceImpl extends BaseApiService implements RoleService{
 	public ResponseBase update(@RequestBody SysRoleEntity entity) {
 		try {
 			SysRoleEntity roleEntity = sysRoleDao.selectById(entity.getRoleId());
-			if(roleEntity != null) {
+			if (roleEntity != null) {
 				SysRoleEntity role = sysRoleDao.findRoleIdName(entity.getRoleId(),entity.getRoleName(),RoleStateEnums.ROLE_DEL_FLAG_NORMAL.getIndex());
-				if(role != null) {
+				if (role != null) {
 					return setResultError(I18nUtil.getMessage("base_info_exist"));
 				}
 				entity.setUpdateTime(new Date());
 				int temp = sysRoleDao.updateById(entity);
-				if(temp > 0) {
-					if(entity.getMenuIds() != null && entity.getMenuIds().length > 0) {
+				if (temp > 0) {
+					if (entity.getMenuIds() != null && entity.getMenuIds().length > 0) {
 						sysRoleMenuDao.deleteRoleId(entity.getRoleId());
 						for (int i = 0; i <entity.getMenuIds().length; i++) {
 							SysRoleMenuEntity roleMenuEntity = new SysRoleMenuEntity();
@@ -110,7 +110,7 @@ public class RoleServiceImpl extends BaseApiService implements RoleService{
 					}
 				}
 				return setResultSuccess(I18nUtil.getMessage("base_success"));
-			}else {
+			} else {
 				return setResultError(I18nUtil.getMessage("base_data_null"));
 			}
 		} catch (Exception e) {
@@ -124,11 +124,11 @@ public class RoleServiceImpl extends BaseApiService implements RoleService{
 	public ResponseBase delete(Integer roleId) {
 		try {
 			SysRoleEntity entity = sysRoleDao.selectById(roleId);
-			if(entity != null) {
+			if (entity != null) {
 				entity.setDelFlag(RoleStateEnums.ROLE_DEL_FLAG_DELETE.getIndex());
 				sysRoleDao.updateById(entity);
 				return setResultSuccess(I18nUtil.getMessage("base_success"));
-			}else {
+			} else {
 				return setResultError(I18nUtil.getMessage("base_data_null"));
 			}
 		} catch (Exception e) {
@@ -142,11 +142,11 @@ public class RoleServiceImpl extends BaseApiService implements RoleService{
 	public ResponseBase changeStatus(Integer roleId, String status) {
 		try {
 			SysRoleEntity entity = sysRoleDao.selectById(roleId);
-			if(entity != null) {
+			if (entity != null) {
 				entity.setStatus(status);
 				sysRoleDao.updateById(entity);
 				return setResultSuccess(I18nUtil.getMessage("base_success"));
-			}else {
+			} else {
 				return setResultError(I18nUtil.getMessage("base_data_null"));
 			}
 		} catch (Exception e) {

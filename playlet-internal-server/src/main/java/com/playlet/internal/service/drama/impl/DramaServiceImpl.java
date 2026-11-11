@@ -78,7 +78,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 				createPay.getDefaultUnlockMethod(),
 				createPay.getStorySynopsis() != null ? createPay.getStorySynopsis().substring(0, Math.min(30, createPay.getStorySynopsis().length())) : null);
 			//上传图片
-			if(file == null && (createPay.getCoverUrl() == null || createPay.getCoverUrl().trim().isEmpty())) {
+			if (file == null && (createPay.getCoverUrl() == null || createPay.getCoverUrl().trim().isEmpty())) {
 				return setResultError(I18nUtil.getMessage("cover_not_null"));
 			}
 			DramaEntity entity = new DramaEntity();
@@ -100,7 +100,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			GenericityUtil.setDate(entity);
 			dramaDao.insert(entity);
 			//添加短剧标签关联
-			if(createPay.getTagGroupIdList() != null && createPay.getTagGroupIdList().size() > 0) {
+			if (createPay.getTagGroupIdList() != null && createPay.getTagGroupIdList().size() > 0) {
 				for (int i = 0; i < createPay.getTagGroupIdList().size(); i++) {
 					DramaTagRelEntity dramaTagRelEntity = new DramaTagRelEntity();
 					dramaTagRelEntity.setDramaId(entity.getId());
@@ -133,7 +133,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			log.info("[update] id={}, investmentAmount={}, filingCategory={}, defaultUnlockMethod={}",
 				createPay.getId(), createPay.getInvestmentAmount(), createPay.getFilingCategory(), createPay.getDefaultUnlockMethod());
 			DramaEntity entity = dramaDao.selectById(createPay.getId());
-			if(entity == null) {
+			if (entity == null) {
 				return  setResultError(I18nUtil.getMessage("base_error"));
 			}
 			// 仅剧名、简介、封面变更才触发重审；标签/集数等其它字段不影响审核状态
@@ -225,7 +225,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 			PageHelper.startPage(entity.getPageNumber(), entity.getPageSize());
 			entity.setDeleteState(DeleteStateEnum.NORMAL.getIndex());
 			List<DramaEntity> list = dramaDao.findList(entity);
-			if(list != null && list.size() > 0) {
+			if (list != null && list.size() > 0) {
 				for (int i = 0; i < list.size(); i++) {
 					List<TagEntity> tagList = tagDao.findGroupLang(language,list.get(i).getId());
 					list.get(i).setTagList(tagList);
@@ -247,7 +247,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 	public ResponseBase delete(Integer id) {
 		try {
 			DramaEntity entity = dramaDao.selectById(id);
-			if(entity == null) {
+			if (entity == null) {
 				return  setResultError(I18nUtil.getMessage("base_error"));
 			}
 			entity.setDeleteState(DeleteStateEnum.DELETE.getIndex());
@@ -324,7 +324,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 	public ResponseBase findVideo(Integer id) {
 		try {
 			DramaEntity entity = dramaDao.selectById(id);
-			if(entity == null) {
+			if (entity == null) {
 				return  setResultError(I18nUtil.getMessage("base_error"));
 			}
 			List<DramaAssetRespEntity> list = dramaAssetDao.findByDramaId(id);
@@ -341,7 +341,7 @@ public class DramaServiceImpl extends BaseApiService implements DramaService{
 		try {
 			String language = LanguageContext.getLanguage();
 			DramaEntity entity = dramaDao.selectById(id);
-			if(entity == null) {
+			if (entity == null) {
 				return  setResultError(I18nUtil.getMessage("base_error"));
 			}
 			List<TagEntity> tagList = tagDao.findGroupLang(language,entity.getId());

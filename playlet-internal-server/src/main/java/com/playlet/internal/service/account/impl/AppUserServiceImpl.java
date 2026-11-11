@@ -212,9 +212,9 @@ public class AppUserServiceImpl extends BaseApiService implements AppUserService
 			Integer loginType = entity.getLoginType() == null
 					? PublicEnums.TOW.getIndex() : entity.getLoginType();
 			AppAccountEntity appUserEntity = null;
-			if(PublicEnums.ONE.getIndex().equals(loginType)) {//邮箱登录
+			if (PublicEnums.ONE.getIndex().equals(loginType)) {//邮箱登录
 				appUserEntity = appAccountDao.findByEmail(entity.getUserAccount());
-			}else if(PublicEnums.TOW.getIndex().equals(loginType)) {//手机号登录
+			} else if (PublicEnums.TOW.getIndex().equals(loginType)) {//手机号登录
 				appUserEntity = appAccountDao.findByTel(entity.getUserAccount(),entity.getMobilePrefix());
 			}
 			if (appUserEntity == null) {

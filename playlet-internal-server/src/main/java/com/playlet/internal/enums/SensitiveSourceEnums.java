@@ -49,9 +49,9 @@ public enum SensitiveSourceEnums {
      * 根据code获取枚举
      */
     public static SensitiveSourceEnums getByCode(Integer code){
-        for(SensitiveSourceEnums item:
+        for (SensitiveSourceEnums item:
                 SensitiveSourceEnums.values()){
-            if(item.getCode().equals(code)){
+            if (item.getCode().equals(code)){
                 return item;
             }
         }
