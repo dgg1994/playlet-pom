@@ -23,4 +23,12 @@ public class ScriptFavoriteItemRespEntity {
 	private Integer saleStatus;
 	private String saleStatusText;
 	private Date favoritedAt;
+	@ApiModelProperty("题材标签")
+	private String topic;
+	@ApiModelProperty("作者")
+	private String authorName;
+	@ApiModelProperty("报价方式：固定报价/议价")
+	private String priceModeText;
+	@ApiModelProperty("收藏时间文案 yyyy-MM-dd")
+	private String favoritedAtText;
 }

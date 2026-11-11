@@ -1,7 +1,7 @@
 package com.playlet.internal.service.script;
 
 import com.playlet.internal.base.ResponseBase;
-import com.playlet.internal.query.pub.PageQueryHelperEntity;
+import com.playlet.internal.query.script.ScriptFavoriteQuery;
 import com.playlet.internal.query.script.ScriptMarketListQuery;
 import com.playlet.internal.query.script.ScriptTradeApplyQuery;
 import io.swagger.annotations.Api;
@@ -55,7 +55,7 @@ public interface ScriptMarketService {
 
 	@GetMapping("/favorite/list")
 	@ApiOperation(value = "我的收藏", notes = "分页返回，额外 favoritedAt")
-	ResponseBase favoriteList(PageQueryHelperEntity query, HttpServletRequest request);
+	ResponseBase favoriteList(ScriptFavoriteQuery query, HttpServletRequest request);
 
 	@PostMapping("/trade/apply")
 	@ApiOperation(value = "购买/议价申请", notes = "不能申请自己的剧本；仅待售/议价中；同人同剧本仅一条待处理")

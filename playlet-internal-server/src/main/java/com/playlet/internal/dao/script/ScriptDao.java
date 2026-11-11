@@ -105,12 +105,19 @@ public interface ScriptDao extends BaseMapper<ScriptEntity> {
 			+ "</script>")
 	List<ScriptMarketCardRespEntity> findMarketList(@Param("q") ScriptMarketListQuery q);
 
-	@Select("select s.id as id, s.script_name as title, s.cover_url as coverUrl, s.episodes as episodes, "
-			+ "  s.price_yuan as price, s.sale_status as saleStatus, f.setTime as favoritedAt "
+	@Select("<script>"
+			+ "select s.id as id, s.script_name as title, s.cover_url as coverUrl, s.episodes as episodes, "
+			+ "  s.price_yuan as price, s.sale_status as saleStatus, s.topic as topic, "
+			+ "  ca.nickname as authorName, f.setTime as favoritedAt "
 			+ "from script_favorite f join script s on s.id = f.script_id "
+			+ "left join creator_account ca on ca.id = s.author_id "
 			+ "where f.uid = #{uid} and ifnull(s.delete_state,0) = 0 "
-			+ "order by f.setTime desc, f.id desc")
-	List<ScriptFavoriteItemRespEntity> findFavoriteList(@Param("uid") Integer uid);
+			+ "<if test='keyword != null and keyword != \"\"'> and s.script_name like concat('%', #{keyword}, '%') </if>"
+			+ "<if test='topic != null and topic != \"\"'> and s.topic = #{topic} </if>"
+			+ "order by f.setTime desc, f.id desc"
+			+ "</script>")
+	List<ScriptFavoriteItemRespEntity> findFavoriteList(@Param("uid") Integer uid,
+			@Param("keyword") String keyword, @Param("topic") String topic);
 
 	@Select("<script>"
 			+ "select s.id as id, s.script_name as title, s.cover_url as coverUrl, s.episodes as episodes, "

@@ -29,7 +29,7 @@ import com.playlet.internal.enums.ScriptLicenseTypeEnums;
 import com.playlet.internal.enums.ScriptSaleStatusEnums;
 import com.playlet.internal.enums.ScriptTradeApplyStatusEnums;
 import com.playlet.internal.enums.ScriptTradeApplyTypeEnums;
-import com.playlet.internal.query.pub.PageQueryHelperEntity;
+import com.playlet.internal.query.script.ScriptFavoriteQuery;
 import com.playlet.internal.query.script.ScriptMarketListQuery;
 import com.playlet.internal.query.script.ScriptTradeApplyQuery;
 import com.playlet.internal.service.common.MediaUrlService;
@@ -295,20 +295,23 @@ public class ScriptMarketServiceImpl extends BaseApiService implements ScriptMar
 	}
 
 	@Override
-	public ResponseBase favoriteList(PageQueryHelperEntity query, HttpServletRequest request) {
+	public ResponseBase favoriteList(ScriptFavoriteQuery query, HttpServletRequest request) {
 		Integer uid = AppTokenUtil.resolveUid(request);
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
 		if (query == null) {
-			query = new PageQueryHelperEntity();
+			query = new ScriptFavoriteQuery();
 		}
 		PageHelper.startPage(query.getPageNumber(), query.getPageSize());
-		List<ScriptFavoriteItemRespEntity> list = scriptDao.findFavoriteList(uid);
+		List<ScriptFavoriteItemRespEntity> list = scriptDao.findFavoriteList(uid, query.getKeyword(), query.getTopic());
 		if (list != null) {
 			for (ScriptFavoriteItemRespEntity item : list) {
 				item.setCoverUrl(mediaUrlService.sign(item.getCoverUrl()));
 				item.setSaleStatusText(scriptSupportService.saleStatusText(item.getSaleStatus()));
+				item.setPriceModeText(item.getPrice() != null && item.getPrice().doubleValue() > 0 ? "固定报价" : "议价");
+				item.setFavoritedAtText(item.getFavoritedAt() == null ? ""
+						: new java.text.SimpleDateFormat("yyyy-MM-dd").format(item.getFavoritedAt()));
 			}
 		}
 		return setResultSuccess(new PageInfo<>(list));
