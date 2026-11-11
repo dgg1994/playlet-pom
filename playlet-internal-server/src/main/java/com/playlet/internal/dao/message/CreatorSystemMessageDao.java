@@ -21,6 +21,7 @@ public interface CreatorSystemMessageDao extends BaseMapper<CreatorSystemMessage
 
 	/**
 	 * 站务广播（读扩散）+ 个人收件箱合并流，供 PageHelper 分页。
+	 * types 为空表示不限类型；includeBroadcast=false 时忽略站务广播。
 	 */
 	@Select("<script>"
 			+ "SELECT * FROM ("
@@ -42,6 +43,13 @@ public interface CreatorSystemMessageDao extends BaseMapper<CreatorSystemMessage
 			+ "    AND (p.valid_start IS NULL OR p.valid_start &lt;= NOW())"
 			+ "    AND (p.valid_end IS NULL OR p.valid_end &gt; NOW())"
 			+ "    AND COALESCE(i_pref.title, i_def.title, i_zh.title) IS NOT NULL"
+			+ "  <if test=\"!includeBroadcast\"> AND 1 = 0 </if>"
+			+ "  <if test=\"startTime != null and startTime != ''\">"
+			+ "    AND COALESCE(p.schedule_time, p.valid_start, p.gmtModified, p.setTime) &gt;= CONCAT(#{startTime}, ' 00:00:00')"
+			+ "  </if>"
+			+ "  <if test=\"endTime != null and endTime != ''\">"
+			+ "    AND COALESCE(p.schedule_time, p.valid_start, p.gmtModified, p.setTime) &lt;= CONCAT(#{endTime}, ' 23:59:59')"
+			+ "  </if>"
 			+ "  UNION ALL"
 			+ "  SELECT #{inboxSource} AS source, m.id AS id, m.id AS inboxId, m.publish_id AS publishId,"
 			+ "    m.message_type AS messageType, m.title AS title, m.content AS content, m.cover_url AS coverUrl,"
@@ -49,13 +57,21 @@ public interface CreatorSystemMessageDao extends BaseMapper<CreatorSystemMessage
 			+ "    0 AS priority, IFNULL(m.is_read,0) AS isRead, m.setTime AS setTime"
 			+ "  FROM creator_system_message m"
 			+ "  WHERE m.to_creator_id = #{toCreatorId} AND m.status = #{statusValid}"
+			+ "  <if test=\"types != null and types.size() > 0\">"
+			+ "    AND m.message_type IN"
+			+ "    <foreach collection=\"types\" item=\"type\" open=\"(\" separator=\",\" close=\")\">#{type}</foreach>"
+			+ "  </if>"
+			+ "  <if test=\"startTime != null and startTime != ''\"> AND m.setTime &gt;= CONCAT(#{startTime}, ' 00:00:00') </if>"
+			+ "  <if test=\"endTime != null and endTime != ''\"> AND m.setTime &lt;= CONCAT(#{endTime}, ' 23:59:59') </if>"
 			+ ") t ORDER BY t.priority DESC, t.setTime DESC, t.id DESC"
 			+ "</script>")
 	List<CreatorMessageItemRespEntity> findMergedFeed(@Param("toCreatorId") Integer toCreatorId,
 			@Param("langue") String langue, @Param("cursor") Long cursor,
 			@Param("siteType") String siteType, @Param("inboxSource") String inboxSource,
 			@Param("broadcastSource") String broadcastSource, @Param("statusValid") Integer statusValid,
-			@Param("fallbackLangue") String fallbackLangue);
+			@Param("fallbackLangue") String fallbackLangue, @Param("types") List<String> types,
+			@Param("includeBroadcast") boolean includeBroadcast,
+			@Param("startTime") String startTime, @Param("endTime") String endTime);
 
 	@Select("select count(1) from creator_system_message where to_creator_id = #{toCreatorId} "
 			+ "and status = #{statusValid} and ifnull(is_read,0) = #{unread}")

@@ -25,8 +25,11 @@ public class CreatorMessageItemRespEntity {
 	@ApiModelProperty("发布单ID，评审直发可空")
 	private Long publishId;
 
-	@ApiModelProperty("AUDIT评审 SITE站务")
+	@ApiModelProperty("AUDIT评审 SITE系统公告 COOP合作 SUBMIT征稿投稿 CONTRACT合同 INCOME收益结算")
 	private String messageType;
+
+	@ApiModelProperty("分类展示名，如 系统公告消息")
+	private String categoryName;
 
 	@ApiModelProperty("标题")
 	private String title;
@@ -57,4 +60,7 @@ public class CreatorMessageItemRespEntity {
 
 	@ApiModelProperty("创建时间")
 	private Date setTime;
+
+	@ApiModelProperty("创建时间文案 yyyy-MM-dd HH:mm")
+	private String timeText;
 }

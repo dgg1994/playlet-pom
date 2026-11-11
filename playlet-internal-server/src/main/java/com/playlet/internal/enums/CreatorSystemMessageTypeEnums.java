@@ -5,7 +5,11 @@ package com.playlet.internal.enums;
  */
 public enum CreatorSystemMessageTypeEnums {
 	AUDIT("AUDIT", "评审通知"),
-	SITE("SITE", "站务通知");
+	SITE("SITE", "系统公告消息"),
+	COOP("COOP", "合作消息"),
+	SUBMIT("SUBMIT", "征稿投稿消息"),
+	CONTRACT("CONTRACT", "合同消息"),
+	INCOME("INCOME", "收益结算通知");
 
 	private final String code;
 	private final String desc;
@@ -21,6 +25,21 @@ public enum CreatorSystemMessageTypeEnums {
 
 	public String getDesc() {
 		return desc;
+	}
+
+	/**
+	 * 类型对应的页面分类名，用于消息列表展示。
+	 */
+	public static String displayName(String code) {
+		if (code == null) {
+			return "";
+		}
+		for (CreatorSystemMessageTypeEnums item : values()) {
+			if (item.code.equals(code)) {
+				return item.desc;
+			}
+		}
+		return "";
 	}
 
 	/**

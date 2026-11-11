@@ -27,6 +27,8 @@ public class CreatorSettingResp {
 		private Integer systemNotice;
 		private Integer coopMessage;
 		private Integer activityPush;
+		private Integer submitMessage;
+		private Integer contractMessage;
 		private Integer auditMessage;
 		private Integer incomeNotice;
 	}

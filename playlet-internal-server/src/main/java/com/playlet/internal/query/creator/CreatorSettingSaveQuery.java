@@ -31,6 +31,12 @@ public class CreatorSettingSaveQuery {
 	@ApiModelProperty(name = "pushActivity")
 	private Integer pushActivity;
 
+	@ApiModelProperty(name = "pushSubmit", value = "征稿投稿消息推送 1开 0关")
+	private Integer pushSubmit;
+
+	@ApiModelProperty(name = "pushContract", value = "合同消息推送 1开 0关")
+	private Integer pushContract;
+
 	@ApiModelProperty(name = "pushAudit")
 	private Integer pushAudit;
 

@@ -47,6 +47,14 @@ public class CreatorSettingEntity {
 	@TableField("push_activity")
 	private Integer pushActivity;
 
+	/** 征稿投稿消息推送 1开 0关 */
+	@TableField("push_submit")
+	private Integer pushSubmit;
+
+	/** 合同消息推送 1开 0关 */
+	@TableField("push_contract")
+	private Integer pushContract;
+
 	/** 审核消息推送 1开 0关 */
 	@TableField("push_audit")
 	private Integer pushAudit;

@@ -437,6 +437,8 @@ public class CreatorAccountServiceImpl extends BaseApiService implements Creator
 		int pSys = s == null || s.getPushSystem() == null ? 1 : s.getPushSystem();
 		int pCoop = s == null || s.getPushCoop() == null ? 1 : s.getPushCoop();
 		int pAct = s == null || s.getPushActivity() == null ? 0 : s.getPushActivity();
+		int pSubmit = s == null || s.getPushSubmit() == null ? 1 : s.getPushSubmit();
+		int pContract = s == null || s.getPushContract() == null ? 1 : s.getPushContract();
 		int pAudit = s == null || s.getPushAudit() == null ? 1 : s.getPushAudit();
 		int pInc = s == null || s.getPushIncome() == null ? 1 : s.getPushIncome();
 		CreatorSettingResp.Privacy privacy = new CreatorSettingResp.Privacy();
@@ -447,6 +449,8 @@ public class CreatorAccountServiceImpl extends BaseApiService implements Creator
 		push.setSystemNotice(pSys);
 		push.setCoopMessage(pCoop);
 		push.setActivityPush(pAct);
+		push.setSubmitMessage(pSubmit);
+		push.setContractMessage(pContract);
 		push.setAuditMessage(pAudit);
 		push.setIncomeNotice(pInc);
 		resp.setPrivacy(privacy);
@@ -471,6 +475,8 @@ public class CreatorAccountServiceImpl extends BaseApiService implements Creator
 			s.setPushSystem(1);
 			s.setPushCoop(1);
 			s.setPushActivity(0);
+			s.setPushSubmit(1);
+			s.setPushContract(1);
 			s.setPushAudit(1);
 			s.setPushIncome(1);
 			s.setSetTime(now);
@@ -492,6 +498,12 @@ public class CreatorAccountServiceImpl extends BaseApiService implements Creator
 		}
 		if (query.getPushActivity() != null) {
 			s.setPushActivity(query.getPushActivity());
+		}
+		if (query.getPushSubmit() != null) {
+			s.setPushSubmit(query.getPushSubmit());
+		}
+		if (query.getPushContract() != null) {
+			s.setPushContract(query.getPushContract());
 		}
 		if (query.getPushAudit() != null) {
 			s.setPushAudit(query.getPushAudit());

@@ -12,10 +12,11 @@ import com.playlet.internal.dao.creator.CreatorAccountDao;
 import com.playlet.internal.dao.message.CreatorSystemMessageDao;
 import com.playlet.internal.dao.message.SystemMessagePublishDao;
 import com.playlet.internal.entity.creator.CreatorAccountEntity;
+import com.playlet.internal.enums.CreatorMessageCategoryEnums;
 import com.playlet.internal.enums.CreatorSystemMessageTypeEnums;
 import com.playlet.internal.enums.LanguageEnums;
 import com.playlet.internal.exception.BaseException;
-import com.playlet.internal.query.pub.PageQueryHelperEntity;
+import com.playlet.internal.query.creator.CreatorMessageQuery;
 import com.playlet.internal.service.creator.CreatorMessageService;
 import com.playlet.internal.service.common.MediaUrlService;
 import com.playlet.internal.utils.CreatorTokenUtil;
@@ -53,16 +54,19 @@ public class CreatorMessageServiceImpl extends BaseApiService implements Creator
 	private MediaUrlService mediaUrlService;
 
 	@Override
-	public ResponseBase findList(@RequestBody PageQueryHelperEntity page, HttpServletRequest request) {
+	public ResponseBase findList(@RequestBody CreatorMessageQuery page, HttpServletRequest request) {
 		CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
 		if (account == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
 		if (page == null) {
-			page = new PageQueryHelperEntity();
+			page = new CreatorMessageQuery();
 		}
 		String langue = resolveLangue();
 		long cursor = resolveCursor(account);
+		List<String> types = CreatorMessageCategoryEnums.typesOf(page.getCategory());
+		boolean includeBroadcast = types == null
+				|| types.contains(CreatorSystemMessageTypeEnums.SITE.getCode());
 		PageHelper.startPage(page.getPageNumber(), page.getPageSize());
 		List<CreatorMessageItemRespEntity> pageList = creatorSystemMessageDao.findMergedFeed(
 				account.getId(), langue, cursor,
@@ -70,11 +74,14 @@ public class CreatorMessageServiceImpl extends BaseApiService implements Creator
 				CreatorConstants.MSG_SOURCE_INBOX,
 				CreatorConstants.MSG_SOURCE_BROADCAST,
 				CreatorConstants.MSG_STATUS_VALID,
-				LanguageEnums.DEFAULT_LANGUE);
+				LanguageEnums.DEFAULT_LANGUE, types, includeBroadcast,
+				page.getStartTime(), page.getEndTime());
 		if (pageList != null) {
 			for (CreatorMessageItemRespEntity item : pageList) {
 				if (item != null) {
 					item.setCoverUrl(mediaUrlService.sign(item.getCoverUrl()));
+					item.setCategoryName(CreatorSystemMessageTypeEnums.displayName(item.getMessageType()));
+					item.setTimeText(formatTime(item.getSetTime()));
 				}
 			}
 		}
@@ -84,22 +91,28 @@ public class CreatorMessageServiceImpl extends BaseApiService implements Creator
 	}
 
 	@Override
-	public ResponseBase read(Long id, HttpServletRequest request) {
+	public ResponseBase read(Long id, Long publishId, HttpServletRequest request) {
 		CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
 		if (account == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
-		if (id == null) {
+		if (id == null && publishId == null) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
 		try {
-			creatorSystemMessageDao.readOne(id, account.getId(),
-					CreatorConstants.MSG_READ, CreatorConstants.MSG_STATUS_VALID);
+			if (id != null) {
+				creatorSystemMessageDao.readOne(id, account.getId(),
+						CreatorConstants.MSG_READ, CreatorConstants.MSG_STATUS_VALID);
+			}
+			// 站务广播：游标只前进不后退
+			if (publishId != null && publishId > resolveCursor(account)) {
+				creatorAccountDao.updateSysMsgReadCursor(account.getId(), publishId);
+			}
 		} catch (BaseException e) {
-			log.error("creator message read biz error creatorId={} id={}", account.getId(), id, e);
+			log.error("creator message read biz error creatorId={} id={} publishId={}", account.getId(), id, publishId, e);
 			throw e;
 		} catch (Exception e) {
-			log.error("creator message read failed creatorId={} id={}", account.getId(), id, e);
+			log.error("creator message read failed creatorId={} id={} publishId={}", account.getId(), id, publishId, e);
 			throw new BaseException("操作失败", e);
 		}
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
@@ -157,5 +170,9 @@ public class CreatorMessageServiceImpl extends BaseApiService implements Creator
 	private static String resolveLangue() {
 		String lang = LanguageContext.getLanguage();
 		return StringUtils.isEmpty(lang) ? LanguageEnums.DEFAULT_LANGUE : lang;
+	}
+
+	private static String formatTime(java.util.Date time) {
+		return time == null ? "" : new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(time);
 	}
 }
