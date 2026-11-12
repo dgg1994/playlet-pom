@@ -84,4 +84,17 @@ public class CallSquareConstants {
 	public static final String ERROR_ENDED_JOIN = "该征稿已结束，无法参与";
 	/** 发布成功但进入审核的提示 */
 	public static final String PUBLISH_SUCCESS_MSG = "发布成功，进入审核流程，通过后将对外展示";
+
+	// ======= 参与征稿（投稿）默认值与提示 =======
+
+	/** 投稿兜底昵称（账号昵称为空时使用） */
+	public static final String DEFAULT_SUBMITTER = "创作者";
+	/** 请求体为空错误提示 */
+	public static final String ERROR_EMPTY_BODY = "请求体不能为空";
+	/** 投稿已结束错误提示 */
+	public static final String ERROR_ENDED_SUBMIT = "该征稿已结束，无法投稿";
+	/** 重复投稿错误提示 */
+	public static final String ERROR_REPEAT_SUBMIT = "您已投稿该征稿，请勿重复提交";
+	/** 投稿成功提示 */
+	public static final String SUBMIT_SUCCESS_MSG = "投稿成功，请在消息通知中查看选稿进度";
 }

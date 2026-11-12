@@ -2,6 +2,7 @@ package com.playlet.internal.service.creator;
 
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.entity.creator.CreatorCallEntity;
+import com.playlet.internal.entity.creator.CreatorCallSubmissionEntity;
 import com.playlet.internal.query.creator.CallSquareListQuery;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
@@ -34,6 +35,10 @@ public interface CallSquareService {
 	@ApiImplicitParam(name = "id", value = "征稿ID", required = true, dataType = "Integer", paramType = "query")
 	@ApiOperation(value = "参与征稿", notes = "需登录；重复参与幂等返回，已结束征稿不允许参与")
 	ResponseBase join(@RequestParam("id") Integer id, HttpServletRequest request);
+
+	@PostMapping("/submission/submit")
+	@ApiOperation(value = "提交投稿", notes = "需登录；必填：征稿ID、剧本名称、剧本简介；同一征稿仅可投稿一次，投稿成功自动补记参与关系")
+	ResponseBase submit(@RequestBody CreatorCallSubmissionEntity body, HttpServletRequest request);
 
 	@PostMapping("/publish")
 	@ApiOperation(value = "发布征稿", notes = "需登录；必填字段：标题、题材、总奖金、需求稿件数、截止日期、授权方式、卡片摘要")

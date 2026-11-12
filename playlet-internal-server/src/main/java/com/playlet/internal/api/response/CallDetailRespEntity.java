@@ -105,12 +105,15 @@ public class CallDetailRespEntity {
 	@ApiModelProperty(name = "attachments", value = "相关附件 [{name}]")
 	private List<Map<String, Object>> attachments;
 
-	@ApiModelProperty(name = "submissions", value = "已投稿剧本 [{title,user,time}]")
-	private List<Map<String, Object>> submissions;
+	@ApiModelProperty(name = "submissions", value = "已投稿剧本 [{title,user,time,intro,attachments}]")
+	private List<CallSubmissionRespEntity> submissions;
 
 	@ApiModelProperty(name = "related", value = "相关征稿 [{id,title,need,amount,deadlineText}]")
 	private List<Map<String, Object>> related;
 
 	@ApiModelProperty(name = "joined", value = "当前登录创作者是否已参与")
 	private Boolean joined;
+
+	@ApiModelProperty(name = "submitted", value = "当前登录创作者是否已投稿")
+	private Boolean submitted;
 }

@@ -7,14 +7,18 @@ import com.github.pagehelper.PageInfo;
 import com.playlet.internal.api.response.CallCardRespEntity;
 import com.playlet.internal.api.response.CallDetailRespEntity;
 import com.playlet.internal.api.response.CallPublishRespEntity;
+import com.playlet.internal.api.response.CallSubmissionRespEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.CallSquareConstants;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.creator.CreatorCallDao;
 import com.playlet.internal.dao.creator.CreatorCallJoinDao;
+import com.playlet.internal.dao.creator.CreatorCallSubmissionDao;
+import com.playlet.internal.entity.creator.CreatorAccountEntity;
 import com.playlet.internal.entity.creator.CreatorCallEntity;
 import com.playlet.internal.entity.creator.CreatorCallJoinEntity;
+import com.playlet.internal.entity.creator.CreatorCallSubmissionEntity;
 import com.playlet.internal.query.creator.CallSquareListQuery;
 import com.playlet.internal.service.creator.CallSquareService;
 import com.playlet.internal.utils.CreatorTokenUtil;
@@ -51,6 +55,8 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 	private CreatorCallDao creatorCallDao;
 	@Resource
 	private CreatorCallJoinDao creatorCallJoinDao;
+	@Resource
+	private CreatorCallSubmissionDao creatorCallSubmissionDao;
 
 	@Override
 	public ResponseBase list(CallSquareListQuery query, HttpServletRequest request) {
@@ -94,6 +100,7 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 			Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
 			CallDetailRespEntity resp = toDetail(entity);
 			resp.setJoined(creatorId != null && creatorCallJoinDao.countJoin(id, creatorId) > 0);
+			resp.setSubmitted(creatorId != null && creatorCallSubmissionDao.countByCallAndCreator(id, creatorId) > 0);
 			resp.setRelated(buildRelated(entity));
 			return setResultSuccess(resp);
 		} catch (Exception e) {
@@ -135,6 +142,75 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 	}
 
 	/**
+	 * 参与征稿：提交稿件。
+	 * 需登录；校验征稿存在且未结束；同一征稿同一创作者仅可投稿一次；
+	 * 投稿成功后自动补记参与关系并累加参与人数。
+	 */
+	@Override
+	public ResponseBase submit(CreatorCallSubmissionEntity body, HttpServletRequest request) {
+		try {
+			CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
+			if (account == null) {
+				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+			}
+			if (body == null) {
+				return setResultError(Constants.HTTP_RES_CODE_400, CallSquareConstants.ERROR_EMPTY_BODY);
+			}
+
+			List<String> missing = new ArrayList<>();
+			if (body.getCallId() == null) {
+				missing.add("征稿");
+			}
+			if (isBlank(body.getTitle())) {
+				missing.add("剧本名称");
+			}
+			if (isBlank(body.getIntro())) {
+				missing.add("剧本简介");
+			}
+			if (!missing.isEmpty()) {
+				return setResultError(Constants.HTTP_RES_CODE_400, "请填写：" + String.join("、", missing));
+			}
+
+			CreatorCallEntity call = creatorCallDao.findVisibleById(body.getCallId());
+			if (call == null) {
+				return setResultError(Constants.HTTP_RES_CODE_404, I18nUtil.getMessage("base_data_null"));
+			}
+			if (statusOf(call) == CallSquareConstants.STATUS_ENDED) {
+				return setResultError(Constants.HTTP_RES_CODE_400, CallSquareConstants.ERROR_ENDED_SUBMIT);
+			}
+			if (creatorCallSubmissionDao.countByCallAndCreator(call.getId(), account.getId()) > 0) {
+				return setResultError(Constants.HTTP_RES_CODE_400, CallSquareConstants.ERROR_REPEAT_SUBMIT);
+			}
+
+			CreatorCallSubmissionEntity entity = new CreatorCallSubmissionEntity();
+			entity.setCallId(call.getId());
+			entity.setCreatorId(account.getId());
+			entity.setCreatorName(isBlank(account.getNickname())
+					? CallSquareConstants.DEFAULT_SUBMITTER : account.getNickname().trim());
+			entity.setTitle(body.getTitle().trim());
+			entity.setIntro(body.getIntro().trim());
+			entity.setAttachments(trimToJson(body.getAttachments()));
+			// status / delete_state 未显式赋值，依赖 DB DEFAULT 1 / 0
+			creatorCallSubmissionDao.insert(entity);
+
+			// 投稿即视为参与：参与记录不存在时补一条并累加人数
+			if (creatorCallJoinDao.countJoin(call.getId(), account.getId()) == 0) {
+				CreatorCallJoinEntity join = new CreatorCallJoinEntity();
+				join.setCallId(call.getId());
+				join.setCreatorId(account.getId());
+				creatorCallJoinDao.insert(join);
+				creatorCallDao.update(null, Wrappers.<CreatorCallEntity>lambdaUpdate()
+						.eq(CreatorCallEntity::getId, call.getId())
+						.setSql("participants = participants + 1"));
+			}
+			return setResultSuccess(CallSquareConstants.SUBMIT_SUCCESS_MSG);
+		} catch (Exception e) {
+			log.error("call square submit error", e);
+			return setResultError(Constants.HTTP_RES_CODE_500, I18nUtil.getMessage("base_error"));
+		}
+	}
+
+	/**
 	 * 发布征稿：需登录；必填字段校验；JSON 字段二次序列化；写 publisher 与当前日期。
 	 * 新发布默认下架（shelf_status=0），等审核通过后再上架，避免脏数据污染列表。
 	 */
@@ -146,7 +222,7 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 			}
 			if (body == null) {
-				return setResultError(Constants.HTTP_RES_CODE_400, "请求体不能为空");
+				return setResultError(Constants.HTTP_RES_CODE_400, CallSquareConstants.ERROR_EMPTY_BODY);
 			}
 
 			List<String> missing = new ArrayList<>();
@@ -299,8 +375,42 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 		resp.setBenchmarkNote(entity.getBenchmarkNote());
 		resp.setExtraNote(entity.getExtraNote());
 		resp.setAttachments(parseMapArray(entity.getAttachments()));
-		resp.setSubmissions(parseMapArray(entity.getSubmissions()));
+		resp.setSubmissions(buildSubmissions(entity));
 		return resp;
+	}
+
+	/**
+	 * 已投稿剧本：优先取真实投稿记录；没有真实记录时回退展示征稿内置的演示投稿，
+	 * 保证演示数据的详情页仍有内容。
+	 */
+	private List<CallSubmissionRespEntity> buildSubmissions(CreatorCallEntity entity) {
+		List<CallSubmissionRespEntity> result = new ArrayList<>();
+		List<CreatorCallSubmissionEntity> rows = creatorCallSubmissionDao.findByCallId(entity.getId());
+		if (rows != null && !rows.isEmpty()) {
+			for (CreatorCallSubmissionEntity row : rows) {
+				CallSubmissionRespEntity item = new CallSubmissionRespEntity();
+				item.setTitle(row.getTitle());
+				item.setUser(row.getCreatorName());
+				item.setTime(formatDate(row.getSetTime()));
+				item.setIntro(row.getIntro());
+				item.setAttachments(parseMapArray(row.getAttachments()));
+				result.add(item);
+			}
+			return result;
+		}
+		for (Map<String, Object> row : parseMapArray(entity.getSubmissions())) {
+			CallSubmissionRespEntity item = new CallSubmissionRespEntity();
+			item.setTitle(textOf(row.get("title")));
+			item.setUser(textOf(row.get("user")));
+			item.setTime(textOf(row.get("time")));
+			result.add(item);
+		}
+		return result;
+	}
+
+	/** 任意值转字符串，null 返回空串 */
+	private String textOf(Object value) {
+		return value == null ? "" : String.valueOf(value);
 	}
 
 	/** 相关征稿：同题材优先，最多 3 条 */
