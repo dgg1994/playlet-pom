@@ -3,6 +3,7 @@ package com.playlet.internal.service.creator;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.entity.creator.CreatorCallEntity;
 import com.playlet.internal.entity.creator.CreatorCallSubmissionEntity;
+import com.playlet.internal.query.creator.CallFavoriteQuery;
 import com.playlet.internal.query.creator.CallSquareListQuery;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
@@ -43,4 +44,18 @@ public interface CallSquareService {
 	@PostMapping("/publish")
 	@ApiOperation(value = "发布征稿", notes = "需登录；必填字段：标题、题材、总奖金、需求稿件数、截止日期、授权方式、卡片摘要")
 	ResponseBase publish(@RequestBody CreatorCallEntity body, HttpServletRequest request);
+
+	@PostMapping("/favorite/add")
+	@ApiImplicitParam(name = "callId", value = "征稿ID", required = true, dataType = "Integer", paramType = "query")
+	@ApiOperation(value = "收藏征稿", notes = "需登录；幂等")
+	ResponseBase favoriteAdd(@RequestParam("callId") Integer callId, HttpServletRequest request);
+
+	@PostMapping("/favorite/cancel")
+	@ApiImplicitParam(name = "callId", value = "征稿ID", required = true, dataType = "Integer", paramType = "query")
+	@ApiOperation(value = "取消收藏征稿", notes = "需登录；幂等")
+	ResponseBase favoriteCancel(@RequestParam("callId") Integer callId, HttpServletRequest request);
+
+	@GetMapping("/favorite/list")
+	@ApiOperation(value = "我的征稿收藏列表", notes = "分页；支持标题关键字和题材筛选；只返回仍在架的征稿")
+	ResponseBase favoriteList(CallFavoriteQuery query, HttpServletRequest request);
 }

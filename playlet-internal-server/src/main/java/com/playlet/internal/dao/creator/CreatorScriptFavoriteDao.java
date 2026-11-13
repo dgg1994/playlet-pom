@@ -28,6 +28,10 @@ public interface CreatorScriptFavoriteDao {
 	@Delete("delete from creator_script_favorite where creator_id = #{creatorId} and script_id = #{scriptId}")
 	int deleteByCreatorAndScript(@Param("creatorId") Integer creatorId, @Param("scriptId") Integer scriptId);
 
+	/** 判断是否已收藏 */
+	@Select("select count(1) from creator_script_favorite where creator_id = #{creatorId} and script_id = #{scriptId}")
+	int countByCreatorAndScript(@Param("creatorId") Integer creatorId, @Param("scriptId") Integer scriptId);
+
 	/**
 	 * 剧本收藏列表：剧本基础信息 + 作者昵称。
 	 */

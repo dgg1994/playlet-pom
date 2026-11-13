@@ -6,6 +6,7 @@ import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import com.playlet.internal.api.response.CallCardRespEntity;
 import com.playlet.internal.api.response.CallDetailRespEntity;
+import com.playlet.internal.api.response.CallFavoriteItemRespEntity;
 import com.playlet.internal.api.response.CallPublishRespEntity;
 import com.playlet.internal.api.response.CallSubmissionRespEntity;
 import com.playlet.internal.base.BaseApiService;
@@ -13,12 +14,14 @@ import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.CallSquareConstants;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.creator.CreatorCallDao;
+import com.playlet.internal.dao.creator.CreatorCallFavoriteDao;
 import com.playlet.internal.dao.creator.CreatorCallJoinDao;
 import com.playlet.internal.dao.creator.CreatorCallSubmissionDao;
 import com.playlet.internal.entity.creator.CreatorAccountEntity;
 import com.playlet.internal.entity.creator.CreatorCallEntity;
 import com.playlet.internal.entity.creator.CreatorCallJoinEntity;
 import com.playlet.internal.entity.creator.CreatorCallSubmissionEntity;
+import com.playlet.internal.query.creator.CallFavoriteQuery;
 import com.playlet.internal.query.creator.CallSquareListQuery;
 import com.playlet.internal.service.creator.CallSquareService;
 import com.playlet.internal.utils.CreatorTokenUtil;
@@ -57,6 +60,8 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 	private CreatorCallJoinDao creatorCallJoinDao;
 	@Resource
 	private CreatorCallSubmissionDao creatorCallSubmissionDao;
+	@Resource
+	private CreatorCallFavoriteDao creatorCallFavoriteDao;
 
 	@Override
 	public ResponseBase list(CallSquareListQuery query, HttpServletRequest request) {
@@ -67,13 +72,14 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 			normalizeListQuery(query);
 			Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
 			Set<Integer> joinedIds = loadJoinedIds(creatorId);
+			Set<Integer> favoriteIds = loadFavoriteIds(creatorId);
 
 			PageHelper.startPage(query.getPageNumber(), query.getPageSize());
 			List<CreatorCallEntity> list = creatorCallDao.findSquareList(query);
 			List<CallCardRespEntity> cards = new ArrayList<>();
 			if (list != null) {
 				for (CreatorCallEntity entity : list) {
-					cards.add(toCard(entity, joinedIds));
+					cards.add(toCard(entity, joinedIds, favoriteIds));
 				}
 			}
 			PageInfo<CreatorCallEntity> pageInfo = new PageInfo<>(list);
@@ -101,6 +107,7 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 			CallDetailRespEntity resp = toDetail(entity);
 			resp.setJoined(creatorId != null && creatorCallJoinDao.countJoin(id, creatorId) > 0);
 			resp.setSubmitted(creatorId != null && creatorCallSubmissionDao.countByCallAndCreator(id, creatorId) > 0);
+			resp.setFavorited(creatorId != null && creatorCallFavoriteDao.countByCreatorAndCall(creatorId, id) > 0);
 			resp.setRelated(buildRelated(entity));
 			return setResultSuccess(resp);
 		} catch (Exception e) {
@@ -291,6 +298,107 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 		}
 	}
 
+	/**
+	 * 收藏征稿。
+	 * 需登录；幂等（insert ignore）；征稿不存在返回 404。
+	 */
+	@Override
+	public ResponseBase favoriteAdd(Integer callId, HttpServletRequest request) {
+		try {
+			Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
+			if (creatorId == null) {
+				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+			}
+			if (creatorCallDao.findVisibleById(callId) == null) {
+				return setResultError(Constants.HTTP_RES_CODE_404, I18nUtil.getMessage("base_data_null"));
+			}
+			creatorCallFavoriteDao.insertIgnore(creatorId, callId);
+			return setResultSuccess(true);
+		} catch (Exception e) {
+			log.error("call favorite add error callId={}", callId, e);
+			return setResultError(Constants.HTTP_RES_CODE_500, I18nUtil.getMessage("base_error"));
+		}
+	}
+
+	/**
+	 * 取消收藏征稿。
+	 * 需登录；幂等。
+	 */
+	@Override
+	public ResponseBase favoriteCancel(Integer callId, HttpServletRequest request) {
+		try {
+			Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
+			if (creatorId == null) {
+				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+			}
+			creatorCallFavoriteDao.deleteByCreatorAndCall(creatorId, callId);
+			return setResultSuccess(true);
+		} catch (Exception e) {
+			log.error("call favorite cancel error callId={}", callId, e);
+			return setResultError(Constants.HTTP_RES_CODE_500, I18nUtil.getMessage("base_error"));
+		}
+	}
+
+	/**
+	 * 我的征稿收藏列表。
+	 * 需登录；分页；支持 keyword（标题）+ topic 筛选。
+	 * 只返回仍在架上、未删除的征稿；已下架/删除的收藏记录自动隐藏。
+	 */
+	@Override
+	public ResponseBase favoriteList(CallFavoriteQuery query, HttpServletRequest request) {
+		try {
+			Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
+			if (creatorId == null) {
+				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+			}
+			if (query == null) {
+				query = new CallFavoriteQuery();
+			}
+			query.setKeyword(CallSquareConstants.normalizeText(query.getKeyword()));
+			query.setTopic(CallSquareConstants.normalizeText(query.getTopic()));
+
+			PageHelper.startPage(query.getPageNumber(), query.getPageSize());
+			List<CallFavoriteItemRespEntity> list = creatorCallFavoriteDao.findFavoriteList(
+					creatorId, query.getKeyword(), query.getTopic());
+			if (list != null) {
+				for (CallFavoriteItemRespEntity item : list) {
+					postProcessFavoriteItem(item);
+				}
+			}
+			return setResultSuccess(new PageInfo<>(list));
+		} catch (Exception e) {
+			log.error("call favorite list error", e);
+			return setResultError(Constants.HTTP_RES_CODE_500, I18nUtil.getMessage("base_error"));
+		}
+	}
+
+	/** 列表行后处理：剩余天数 + 状态 + 收藏时间文案 */
+	private void postProcessFavoriteItem(CallFavoriteItemRespEntity item) {
+		if (item == null) {
+			return;
+		}
+		java.util.Date deadlineRaw = item.getDeadline();
+
+		int daysLeft = 0;
+		int status = CallSquareConstants.STATUS_OPEN;
+		if (deadlineRaw != null) {
+			LocalDate deadline = deadlineRaw.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+			long days = ChronoUnit.DAYS.between(LocalDate.now(), deadline);
+			daysLeft = (int) Math.max(0, days);
+			if (days < 0) {
+				status = CallSquareConstants.STATUS_ENDED;
+			} else if (days <= CallSquareConstants.SOON_DAYS) {
+				status = CallSquareConstants.STATUS_SOON;
+			}
+		}
+		item.setDaysLeft(daysLeft);
+		item.setStatus(CallSquareConstants.statusLabelOf(status));
+
+		if (item.getFavoritedAt() != null) {
+			item.setFavoritedAtText(formatDate(item.getFavoritedAt()));
+		}
+	}
+
 	/** 入参规范化：空串/全部 视为不筛，默认排序兜底 */
 	private void normalizeListQuery(CallSquareListQuery query) {
 		query.setKeyword(CallSquareConstants.normalizeText(query.getKeyword()));
@@ -320,7 +428,20 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 		return joinedIds;
 	}
 
-	private CallCardRespEntity toCard(CreatorCallEntity entity, Set<Integer> joinedIds) {
+	/** 当前创作者已收藏的征稿 id 集合 */
+	private Set<Integer> loadFavoriteIds(Integer creatorId) {
+		Set<Integer> favoriteIds = new HashSet<>();
+		if (creatorId == null) {
+			return favoriteIds;
+		}
+		List<Integer> ids = creatorCallFavoriteDao.findFavoriteCallIds(creatorId);
+		if (ids != null) {
+			favoriteIds.addAll(ids);
+		}
+		return favoriteIds;
+	}
+
+	private CallCardRespEntity toCard(CreatorCallEntity entity, Set<Integer> joinedIds, Set<Integer> favoriteIds) {
 		CallCardRespEntity card = new CallCardRespEntity();
 		card.setId(entity.getId());
 		card.setTitle(entity.getTitle());
@@ -338,6 +459,7 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 		card.setEpisodes(entity.getEpisodes());
 		card.setStatus(CallSquareConstants.statusLabelOf(statusOf(entity)));
 		card.setJoined(joinedIds.contains(entity.getId()));
+		card.setFavorited(favoriteIds.contains(entity.getId()));
 		return card;
 	}
 

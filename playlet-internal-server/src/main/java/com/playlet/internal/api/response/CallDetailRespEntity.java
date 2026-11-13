@@ -116,4 +116,7 @@ public class CallDetailRespEntity {
 
 	@ApiModelProperty(name = "submitted", value = "当前登录创作者是否已投稿")
 	private Boolean submitted;
+
+	@ApiModelProperty(name = "favorited", value = "当前登录创作者是否已收藏")
+	private Boolean favorited;
 }

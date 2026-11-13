@@ -15,6 +15,7 @@ import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.ScriptConstants;
 import com.playlet.internal.dao.account.UserFollowDao;
+import com.playlet.internal.dao.creator.CreatorScriptFavoriteDao;
 import com.playlet.internal.dao.script.ScriptDao;
 import com.playlet.internal.dao.script.ScriptFavoriteDao;
 import com.playlet.internal.dao.script.ScriptStatDao;
@@ -36,6 +37,7 @@ import com.playlet.internal.service.common.MediaUrlService;
 import com.playlet.internal.service.script.ScriptMarketService;
 import com.playlet.internal.service.script.ScriptSupportService;
 import com.playlet.internal.utils.AppTokenUtil;
+import com.playlet.internal.utils.CreatorTokenUtil;
 import com.playlet.internal.utils.I18nUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -76,6 +78,8 @@ public class ScriptMarketServiceImpl extends BaseApiService implements ScriptMar
 	@Resource
 	private ScriptFavoriteDao scriptFavoriteDao;
 	@Resource
+	private CreatorScriptFavoriteDao creatorScriptFavoriteDao;
+	@Resource
 	private ScriptTradeApplyDao scriptTradeApplyDao;
 	@Resource
 	private UserFollowDao userFollowDao;
@@ -84,6 +88,29 @@ public class ScriptMarketServiceImpl extends BaseApiService implements ScriptMar
 	@Resource
 	private ScriptSupportService scriptSupportService;
 
+	/**
+	 * 优先解析 CreatorAccount 登录态；拿不到再 fallback 到 AppAccount。
+	 * 短剧创作平台前端登录写入 Creator 表，脚本收藏等业务默认按 creator_id 存。
+	 */
+	private Integer resolveCreatorId(HttpServletRequest request) {
+		Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
+		if (creatorId != null) {
+			return creatorId;
+		}
+		return AppTokenUtil.resolveUid(request);
+	}
+
+	/**
+	 * 同时兼容 C 端 AppAccount 和 创作者 CreatorAccount 登录态。
+	 * 议价申请等还在 script_trade_apply.buyer_id（存 app 风格 id）里，暂时沿用。
+	 */
+	private Integer resolveAnyUid(HttpServletRequest request) {
+		Integer uid = AppTokenUtil.resolveUid(request);
+		if (uid != null) {
+			return uid;
+		}
+		return CreatorTokenUtil.resolveCreatorId(request);
+	}
 
 	@Override
 	public ResponseBase filters() {
@@ -205,7 +232,7 @@ public class ScriptMarketServiceImpl extends BaseApiService implements ScriptMar
 
 	@Override
 	public ResponseBase detail(@RequestParam("id") Integer id, HttpServletRequest request) {
-		Integer uid = AppTokenUtil.resolveUid(request);
+		Integer creatorId = resolveCreatorId(request);
 		ScriptEntity script = scriptDao.findVisibleById(id);
 		if (script == null) {
 			return setResultError(Constants.HTTP_RES_CODE_404, I18nUtil.getMessage("base_data_null"));
@@ -213,7 +240,9 @@ public class ScriptMarketServiceImpl extends BaseApiService implements ScriptMar
 		scriptStatDao.initIfAbsent(id);
 		scriptStatDao.incrView(id);
 		ScriptMarketDetailRespEntity resp = new ScriptMarketDetailRespEntity();
-		scriptSupportService.fillDetail(resp, script, uid);
+		// fillDetail 里 favorited 查 script_favorite（app 端老表），覆盖为 creator_script_favorite 的结果
+		scriptSupportService.fillDetail(resp, script, creatorId);
+		resp.setFavorited(creatorId != null && creatorScriptFavoriteDao.countByCreatorAndScript(creatorId, id) > 0);
 		return setResultSuccess(resp);
 	}
 
@@ -221,7 +250,7 @@ public class ScriptMarketServiceImpl extends BaseApiService implements ScriptMar
 	public ResponseBase recommendAuthors(@RequestParam(value = "limit", required = false) Integer limit,
 			HttpServletRequest request) {
 		int size = normalizeLimit(limit);
-		Integer uid = AppTokenUtil.resolveUid(request);
+		Integer uid = resolveAnyUid(request);
 		// 返回剧本编剧信息
 		List<ScriptAuthorRespEntity> authors = scriptDao.findRecommendAuthors(size);
 		Set<Integer> followedIds = new HashSet<>();
@@ -265,14 +294,14 @@ public class ScriptMarketServiceImpl extends BaseApiService implements ScriptMar
 
 	@Override
 	public ResponseBase favoriteAdd(@RequestParam("scriptId") Integer scriptId, HttpServletRequest request) {
-		Integer uid = AppTokenUtil.resolveUid(request);
-		if (uid == null) {
+		Integer creatorId = resolveCreatorId(request);
+		if (creatorId == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
 		if (scriptDao.findVisibleById(scriptId) == null) {
 			return setResultError(Constants.HTTP_RES_CODE_404, I18nUtil.getMessage("base_data_null"));
 		}
-		int inserted = scriptFavoriteDao.insertIgnore(uid, scriptId);
+		int inserted = creatorScriptFavoriteDao.insertIgnore(creatorId, scriptId);
 		if (inserted > 0) {
 			scriptStatDao.initIfAbsent(scriptId);
 			scriptStatDao.incrFavorite(scriptId, 1);
@@ -282,11 +311,11 @@ public class ScriptMarketServiceImpl extends BaseApiService implements ScriptMar
 
 	@Override
 	public ResponseBase favoriteCancel(@RequestParam("scriptId") Integer scriptId, HttpServletRequest request) {
-		Integer uid = AppTokenUtil.resolveUid(request);
-		if (uid == null) {
+		Integer creatorId = resolveCreatorId(request);
+		if (creatorId == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
-		int deleted = scriptFavoriteDao.deleteByUidAndScriptId(uid, scriptId);
+		int deleted = creatorScriptFavoriteDao.deleteByCreatorAndScript(creatorId, scriptId);
 		if (deleted > 0) {
 			scriptStatDao.initIfAbsent(scriptId);
 			scriptStatDao.incrFavorite(scriptId, -1);
@@ -296,15 +325,16 @@ public class ScriptMarketServiceImpl extends BaseApiService implements ScriptMar
 
 	@Override
 	public ResponseBase favoriteList(ScriptFavoriteQuery query, HttpServletRequest request) {
-		Integer uid = AppTokenUtil.resolveUid(request);
-		if (uid == null) {
+		Integer creatorId = resolveCreatorId(request);
+		if (creatorId == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
 		if (query == null) {
 			query = new ScriptFavoriteQuery();
 		}
 		PageHelper.startPage(query.getPageNumber(), query.getPageSize());
-		List<ScriptFavoriteItemRespEntity> list = scriptDao.findFavoriteList(uid, query.getKeyword(), query.getTopic());
+		List<ScriptFavoriteItemRespEntity> list = creatorScriptFavoriteDao.findFavoriteList(
+				creatorId, query.getKeyword(), query.getTopic());
 		if (list != null) {
 			for (ScriptFavoriteItemRespEntity item : list) {
 				item.setCoverUrl(mediaUrlService.sign(item.getCoverUrl()));
@@ -319,7 +349,7 @@ public class ScriptMarketServiceImpl extends BaseApiService implements ScriptMar
 
 	@Override
 	public ResponseBase tradeApply(@Valid @RequestBody ScriptTradeApplyQuery query, HttpServletRequest request) {
-		Integer uid = AppTokenUtil.resolveUid(request);
+		Integer uid = resolveAnyUid(request);
 		if (uid == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}

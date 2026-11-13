@@ -61,4 +61,7 @@ public class CallCardRespEntity {
 
 	@ApiModelProperty(name = "joined", value = "当前登录创作者是否已参与")
 	private Boolean joined;
+
+	@ApiModelProperty(name = "favorited", value = "当前登录创作者是否已收藏")
+	private Boolean favorited;
 }
