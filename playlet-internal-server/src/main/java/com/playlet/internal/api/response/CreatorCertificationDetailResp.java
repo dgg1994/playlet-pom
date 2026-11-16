@@ -21,6 +21,8 @@ public class CreatorCertificationDetailResp {
 	private String rejectReason;
 	private Date submitTime;
 	private Date auditTime;
+	@ApiModelProperty(value = "申请编号")
+	private String applyNo;
 
 	@ApiModelProperty(value = "已选认证身份编码列表")
 	private List<Integer> identityTypes;

@@ -61,6 +61,11 @@ public interface CreatorAccountService {
 	@ApiOperation("提交身份认证")
 	ResponseBase applyIdentity(CreatorIdentityApplyQuery query, HttpServletRequest request);
 
+	/** 注册认证一次性提交（最后一步「提交审核」） */
+	@PostMapping("/register/submit")
+	@ApiOperation("注册认证提交审核")
+	ResponseBase submitRegister(CreatorRegisterSubmitQuery query, HttpServletRequest request);
+
 	/** 隐私 + 推送设置 */
 	@GetMapping("/account/setting")
 	@ApiOperation("隐私+推送设置")

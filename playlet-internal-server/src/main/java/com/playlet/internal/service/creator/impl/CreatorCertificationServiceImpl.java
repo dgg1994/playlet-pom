@@ -10,12 +10,17 @@ import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.creator.CreatorCertificationDao;
 import com.playlet.internal.dao.creator.CreatorCertificationRecordDao;
+import com.playlet.internal.dao.creator.CreatorIdentityDao;
+import com.playlet.internal.dao.creator.CreatorProfileDao;
 import com.playlet.internal.entity.creator.CreatorAccountEntity;
 import com.playlet.internal.entity.creator.CreatorCertificationEntity;
 import com.playlet.internal.entity.creator.CreatorCertificationRecordEntity;
+import com.playlet.internal.entity.creator.CreatorIdentityEntity;
+import com.playlet.internal.entity.creator.CreatorProfileEntity;
 import com.playlet.internal.enums.CreatorCertificationCategoryEnums;
 import com.playlet.internal.enums.CreatorCertificationRecordStatusEnums;
 import com.playlet.internal.enums.CreatorIdentityAuditStatusEnums;
+import com.playlet.internal.enums.CreatorProfileAuditStatusEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.query.creator.CreatorCertificationSaveQuery;
 import com.playlet.internal.service.common.MediaUrlService;
@@ -80,6 +85,10 @@ public class CreatorCertificationServiceImpl extends BaseApiService implements C
 	@Autowired
 	private CreatorCertificationRecordDao creatorCertificationRecordDao;
 	@Autowired
+	private CreatorProfileDao creatorProfileDao;
+	@Autowired
+	private CreatorIdentityDao creatorIdentityDao;
+	@Autowired
 	private MediaUrlService mediaUrlService;
 
 	@Value("${creator.identity.aes-key:${script.contact.aes-key:}}")
@@ -117,9 +126,40 @@ public class CreatorCertificationServiceImpl extends BaseApiService implements C
 		resp.setWorks(new ArrayList<>());
 		CreatorCertificationEntity e = creatorCertificationDao.findByCreatorAndCategory(account.getId(), category);
 		if (e == null) {
-			resp.setSubmitStatus(0);
-			resp.setAuditStatus(CreatorIdentityAuditStatusEnums.PENDING.getCode());
-			resp.setAuditStatusText(CreatorIdentityAuditStatusEnums.PENDING.getLabel());
+			// 注册页提交的是 creator_profile，这里兜底回显审核状态
+			CreatorProfileEntity profile = creatorProfileDao.findByCreatorId(account.getId());
+			if (profile == null || profile.getAuditStatus() == null
+					|| profile.getAuditStatus() == CreatorProfileAuditStatusEnums.PENDING.getCode()) {
+				resp.setSubmitStatus(0);
+				resp.setAuditStatus(CreatorIdentityAuditStatusEnums.PENDING.getCode());
+				resp.setAuditStatusText(CreatorIdentityAuditStatusEnums.PENDING.getLabel());
+				return setResultSuccess(resp);
+			}
+			resp.setSubmitStatus(1);
+			resp.setAuditStatus(profile.getAuditStatus());
+			resp.setAuditStatusText(auditStatusText(profile.getAuditStatus()));
+			resp.setRejectReason(profile.getAuditRejectReason());
+			resp.setSubmitTime(profile.getSetTime());
+			resp.setAuditTime(profile.getAuditPassTime());
+			resp.setApplyNo(applyNo(account.getId(), profile.getSetTime()));
+			resp.setIdentityTypes(parseIdentityCodes(profile.getIdentityCodes()));
+			resp.setRealName(profile.getRealName());
+			resp.setIdCardMask(maskIdCard(profile.getIdCardNoCipher()));
+			resp.setIdCardFront(profile.getIdCardFront());
+			resp.setIdCardFrontUrl(mediaUrlService.sign(profile.getIdCardFront()));
+			resp.setIdCardBack(profile.getIdCardBack());
+			resp.setIdCardBackUrl(mediaUrlService.sign(profile.getIdCardBack()));
+			resp.setOrgName(profile.getOrgName());
+			resp.setOrgLicense(profile.getOrgLicense());
+			resp.setOrgLicenseUrl(mediaUrlService.sign(profile.getOrgLicense()));
+			resp.setCity(profile.getCity());
+			resp.setWechat(profile.getWechat());
+			resp.setGenreType(profile.getGenreType());
+			resp.setMarket(profile.getMarket());
+			resp.setField(profile.getExpertise());
+			resp.setServices(parseStrList(profile.getServices()));
+			resp.setPrice(profile.getPriceRange());
+			resp.setWorks(parseWorks(profile.getWorks()));
 			return setResultSuccess(resp);
 		}
 		resp.setSubmitStatus(e.getSubmitStatus());
@@ -128,6 +168,7 @@ public class CreatorCertificationServiceImpl extends BaseApiService implements C
 		resp.setRejectReason(e.getRejectReason());
 		resp.setSubmitTime(e.getSubmitTime());
 		resp.setAuditTime(e.getAuditTime());
+		resp.setApplyNo(applyNo(account.getId(), e.getSubmitTime()));
 		resp.setIdentityTypes(parseIntList(e.getIdentityTypes()));
 		resp.setRealName(e.getRealName());
 		resp.setIdCardMask(maskIdCard(e.getIdCardNoCipher()));
@@ -235,6 +276,57 @@ public class CreatorCertificationServiceImpl extends BaseApiService implements C
 			resp.add(item);
 		}
 		return setResultSuccess(resp);
+	}
+
+	/** 申请编号：RZ + 提交日期 + 创作者ID */
+	private String applyNo(Integer creatorId, Date submitTime) {
+		if (submitTime == null) {
+			return "";
+		}
+		return "RZ" + LocalDateTime.ofInstant(submitTime.toInstant(), ZoneId.systemDefault())
+				.format(DateTimeFormatter.ofPattern("yyyyMMdd")) + String.format("%04d", creatorId);
+	}
+
+	/** 注册页身份编码 ("writer"/"actor"/"director"/"writer-org") -> 类别内编码 */
+	private List<Integer> parseIdentityCodes(String json) {
+		List<Integer> list = new ArrayList<>();
+		if (StringUtils.isEmpty(json)) {
+			return list;
+		}
+		try {
+			List<String> codes = MAPPER.readValue(json, new TypeReference<List<String>>() {});
+			for (String code : codes) {
+				Integer type = identityCodeToType(code);
+				if (type != null && !list.contains(type)) {
+					list.add(type);
+				}
+			}
+		} catch (Exception ex) {
+			log.warn("parse identityCodes failed json={}", json, ex);
+		}
+		return list;
+	}
+
+	private Integer identityCodeToType(String code) {
+		if (code == null) {
+			return null;
+		}
+		switch (code) {
+			case "writer":
+			case "writer-org":
+				return 1;
+			case "actor":
+			case "actor-org":
+				return 2;
+			case "director":
+			case "director-org":
+				return 3;
+			case "copyright":
+			case "copyright-org":
+				return 4;
+			default:
+				return null;
+		}
 	}
 
 	/** 审核中的申请不允许修改；返回已有记录（无则 null），类别非法返回 null 且由调用方判错 */

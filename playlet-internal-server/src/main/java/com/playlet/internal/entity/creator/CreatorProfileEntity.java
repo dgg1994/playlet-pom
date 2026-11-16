@@ -86,6 +86,38 @@ public class CreatorProfileEntity {
 	@ApiModelProperty(name = "orgLicense", value = "营业执照图")
 	private String orgLicense;
 
+	@TableField("identity_codes")
+	@ApiModelProperty(name = "identityCodes", value = "注册时选择的身份 JSON 数组，如 [\"writer\",\"actor\"]")
+	private String identityCodes;
+
+	@TableField("genre_type")
+	@ApiModelProperty(name = "genreType", value = "题材类型 实拍/动画/二次元/虚拟拍摄")
+	private String genreType;
+
+	@TableField("market")
+	@ApiModelProperty(name = "market", value = "发行市场 国内/海外/国内+海外")
+	private String market;
+
+	@TableField("price_range")
+	@ApiModelProperty(name = "priceRange", value = "期望合作单价")
+	private String priceRange;
+
+	@TableField("services")
+	@ApiModelProperty(name = "services", value = "承接服务 JSON 数组")
+	private String services;
+
+	@TableField("taboo")
+	@ApiModelProperty(name = "taboo", value = "创作雷点/其他补充说明")
+	private String taboo;
+
+	@TableField("wechat")
+	@ApiModelProperty(name = "wechat", value = "联系微信")
+	private String wechat;
+
+	@TableField("works")
+	@ApiModelProperty(name = "works", value = "以往作品 JSON [{name,link,cover}]")
+	private String works;
+
 	@TableField("audit_status")
 	@ApiModelProperty(name = "auditStatus", value = "入驻审核 0待审 1审核中 2通过 3驳回")
 	private Integer auditStatus;

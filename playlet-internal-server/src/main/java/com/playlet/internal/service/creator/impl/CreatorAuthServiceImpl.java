@@ -3,23 +3,25 @@ package com.playlet.internal.service.creator.impl;
 import com.playlet.internal.api.response.CreatorInfoRespEntity;
 import com.playlet.internal.base.BaseApiService;
 import com.playlet.internal.base.ResponseBase;
-import com.playlet.internal.config.heard.LanguageContext;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.constants.CreatorConstants;
 import com.playlet.internal.constants.RedisKeyConstants;
 import com.playlet.internal.dao.creator.CreatorAccountDao;
 import com.playlet.internal.dao.creator.CreatorProfileDao;
 import com.playlet.internal.dao.system.SysUserDao;
-import com.playlet.internal.dao.template.EmailTemplateDao;
 import com.playlet.internal.entity.creator.CreatorAccountEntity;
 import com.playlet.internal.entity.creator.CreatorProfileEntity;
 import com.playlet.internal.entity.system.SysUserEntity;
-import com.playlet.internal.entity.template.EmailTemplateEntity;
-import com.playlet.internal.enums.*;
+import com.playlet.internal.enums.CreatorIdentityTypeEnums;
+import com.playlet.internal.enums.CreatorProfileAuditStatusEnums;
+import com.playlet.internal.enums.UserStateEnums;
 import com.playlet.internal.exception.BaseException;
-import com.playlet.internal.query.creator.*;
-import com.playlet.internal.service.creator.CreatorAuthService;
+import com.playlet.internal.query.creator.CreatorMobileLoginQuery;
+import com.playlet.internal.query.creator.CreatorMobileSignUpQuery;
+import com.playlet.internal.query.creator.CreatorUpdateInfoQuery;
+import com.playlet.internal.query.creator.CreatorUpdatePwdQuery;
 import com.playlet.internal.service.common.MediaUrlService;
+import com.playlet.internal.service.creator.CreatorAuthService;
 import com.playlet.internal.utils.*;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -29,7 +31,6 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
@@ -50,7 +51,10 @@ import java.util.regex.Pattern;
 @Transactional(rollbackFor = Exception.class)
 public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAuthService {
 
-    private static final Pattern EMAIL_PATTERN = Pattern.compile(CreatorConstants.EMAIL_REGEX);
+    /** 手机号（不含区号） */
+    private static final Pattern MOBILE_PATTERN = Pattern.compile("^\\d{5,20}$");
+    /** 国家区号，允许 86 或 +86 */
+    private static final Pattern MOBILE_PREFIX_PATTERN = Pattern.compile("^\\+?\\d{1,5}$");
     /** sys_user.user_type：创作者 */
     private static final Integer CREATOR_USER_TYPE = 2;
 
@@ -61,81 +65,43 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
     @Autowired
     private CreatorProfileDao creatorProfileDao;
     @Autowired
-    private EmailTemplateDao emailTemplateDao;
-    @Autowired
     private RedisUtil redisUtil;
     @Autowired
     private MediaUrlService mediaUrlService;
 
     @Override
-    public ResponseBase sendEmailCode(@RequestParam("userAccount") String userAccount,
-                                      @RequestParam(value = "scene", required = false) Integer scene) {
-        String email = normalizeEmail(userAccount);
-        if (!isEmail(email)) {
-            return setResultError(I18nUtil.getMessage("creator.email_invalid"));
-        }
-        CreatorEmailCodeSceneEnums sceneEnum = CreatorEmailCodeSceneEnums.fromCode(scene);
-        if (sceneEnum == null) {
-            return setResultError(I18nUtil.getMessage("base_error"));
-        }
-        CreatorAccountEntity exist = creatorAccountDao.findByAccount(email);
-        if (sceneEnum == CreatorEmailCodeSceneEnums.REGISTER && exist != null) {
-            return setResultError(I18nUtil.getMessage("user.account_exist"));
-        }
-        if (sceneEnum == CreatorEmailCodeSceneEnums.RESET_PWD && exist == null) {
-            return setResultError(I18nUtil.getMessage("user.account_error"));
-        }
-        try {
-            String language = LanguageContext.getLanguage();
-            EmailTemplateEntity templateEntity = emailTemplateDao.findByNum(
-                    MessageEnums.SEND_CODE_ZH.getIndex(), language);
-            if (templateEntity == null || StringUtils.isEmpty(templateEntity.getTemplateContent())) {
-                return setResultError(I18nUtil.getMessage("Template_null"));
-            }
-            String code = OrderCodeFactory.getRandomStr(6);
-            String htmlContent = MessageFormatUtils.format(
-                    templateEntity.getTemplateContent(),
-                    HtmlSanitizeUtils.plain(email),
-                    HtmlSanitizeUtils.plain(code));
-            String html = MessageFormatUtils.saveHtml(htmlContent, language);
-            EmailUtil.sendEmail(email, templateEntity.getTemplateSubject(), html);
-            redisUtil.set(RedisKeyConstants.CREATOR_EMAIL_CODE_KEY + email, code, Constants.CODE_EXPIRE_TIME);
-            log.info("creator email code sent scene={} email={}", sceneEnum.getCode(), maskEmail(email));
-            return setResultSuccess(I18nUtil.getMessage("send_success"));
-        } catch (Exception e) {
-            log.error("creator send email code failed email={}", maskEmail(email), e);
-            throw new BaseException(I18nUtil.getMessage("base_error"), e);
-        }
-    }
-
-    @Override
     @SuppressWarnings("deprecation")
-    public ResponseBase signUp(@Valid @RequestBody CreatorSignUpQuery query) {
-        String email = normalizeEmail(query.getUserAccount());
-        if (!isEmail(email) || StringUtils.isEmpty(query.getUserPassword())) {
-            return setResultError(I18nUtil.getMessage("base_error"));
+    public ResponseBase signUpByMobile(@Valid @RequestBody CreatorMobileSignUpQuery query) {
+        String prefix = normalizeMobilePrefix(query.getMobilePrefix());
+        String mobile = trimToNull(query.getMobileNumber());
+        if (!isValidMobile(prefix, mobile) || StringUtils.isEmpty(query.getUserPassword())) {
+            return setResultError(I18nUtil.getMessage("phone_format_error"));
         }
         if (StringUtils.isNotEmpty(query.getConfirmPassword())
                 && !query.getUserPassword().equals(query.getConfirmPassword())) {
             return setResultError(I18nUtil.getMessage("creator.password_not_match"));
         }
-        if (!verifyCode(email, query.getEmailCode())) {
-            return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
-        }
+//        if (!verifySmsCode(prefix, mobile, query.getSmsCode())) {
+//            return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
+//        }
         if (query.getIdentityType() != null && !CreatorIdentityTypeEnums.isValid(query.getIdentityType())) {
             return setResultError(I18nUtil.getMessage("base_error"));
         }
-        if (sysUserDao.findCreatorByAcctive(email) != null) {
+        if (sysUserDao.findCreatorByAcctive(mobile) != null
+                || creatorAccountDao.countByMobile(prefix, mobile) > 0) {
             return setResultError(I18nUtil.getMessage("user.account_exist"));
         }
         Date now = new Date();
         String encodedPwd = PasswordHashUtils.encode(query.getUserPassword());
-        // 统一账号：创作者登录身份写入 sys_user（user_type=2）
+        String nickname = StringUtils.isNotEmpty(query.getNickname())
+                ? HtmlSanitizeUtils.plain(query.getNickname().trim())
+                : generateAutoNickname();
+        // 统一账号：创作者登录身份写入 sys_user（user_type=2），手机号即登录账号
         SysUserEntity sysUser = new SysUserEntity();
-        sysUser.setAcctive(email);
+        sysUser.setAcctive(mobile);
         sysUser.setPassword(encodedPwd);
-        sysUser.setUsername(resolveNickname(query.getNickname(), email));
-        sysUser.setTel(trimToNull(query.getMobileNumber()));
+        sysUser.setUsername(nickname);
+        sysUser.setTel(mobile);
         sysUser.setUserState(UserStateEnums.NORMAL.getIndex());
         sysUser.setUserType(CREATOR_USER_TYPE);
         sysUser.setCreateTime(formatTime(now));
@@ -143,13 +109,12 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         sysUserDao.insert(sysUser);
 
         CreatorAccountEntity account = new CreatorAccountEntity();
-        account.setUserAccount(email);
+        account.setUserAccount(mobile);
         account.setSysUserId(sysUser.getId());
         account.setUserPassword(encodedPwd);
-        account.setMobilePrefix(trimToNull(query.getMobilePrefix()));
-        account.setMobileNumber(trimToNull(query.getMobileNumber()));
-        // 注册昵称与 C 端一致：user_ + yyMMddHHmmss + 3 位随机数
-        account.setNickname(sysUser.getUsername());
+        account.setMobilePrefix(prefix);
+        account.setMobileNumber(mobile);
+        account.setNickname(nickname);
         account.setUserState(UserStateEnums.NORMAL.getIndex());
         account.setCoinBalance(0L);
         account.setFrozenCoinBalance(0L);
@@ -159,25 +124,34 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         account.setGmtModified(now);
         try {
             creatorAccountDao.insert(account);
-            creatorProfileDao.insert(buildProfile(account.getId(), query, now));
+            CreatorProfileEntity profile = emptyProfile(account.getId(), now);
+            if (query.getIdentityType() != null) {
+                profile.setIdentityType(query.getIdentityType());
+            }
+            creatorProfileDao.insert(profile);
         } catch (Exception e) {
-            log.error("creator signUp failed email={}", maskEmail(email), e);
+            log.error("creator signUpByMobile failed mobile={}", maskMobile(mobile), e);
             throw new BaseException(I18nUtil.getMessage("base_error"), e);
         }
-        consumeCode(email);
-        String token = issueToken(email);
-        log.info("creator signUp creatorId={} email={}", account.getId(), maskEmail(email));
+        consumeSmsCode(prefix, mobile);
+        String token = issueToken(mobile);
+        log.info("creator signUpByMobile creatorId={} mobile={}", account.getId(), maskMobile(mobile));
         return setResultSuccess(token, I18nUtil.getMessage("base_success"));
     }
 
     @Override
     @SuppressWarnings("deprecation")
-    public ResponseBase login(@Valid @RequestBody CreatorLoginQuery query) {
-        String email = normalizeEmail(query.getUserAccount());
-        if (!isEmail(email) || StringUtils.isEmpty(query.getUserPassword())) {
+    public ResponseBase loginByMobile(@Valid @RequestBody CreatorMobileLoginQuery query) {
+        String prefix = normalizeMobilePrefix(query.getMobilePrefix());
+        String mobile = trimToNull(query.getMobileNumber());
+        if (!isValidMobile(prefix, mobile)) {
+            return setResultError(I18nUtil.getMessage("phone_format_error"));
+        }
+        boolean byCode = StringUtils.isNotEmpty(query.getSmsCode());
+        if (!byCode && StringUtils.isEmpty(query.getUserPassword())) {
             return setResultError(I18nUtil.getMessage("base_error"));
         }
-        SysUserEntity sysUser = sysUserDao.findCreatorByAcctive(email);
+        SysUserEntity sysUser = sysUserDao.findCreatorByAcctive(mobile);
         if (sysUser == null) {
             return setResultError(I18nUtil.getMessage("user.account_error"));
         }
@@ -187,14 +161,18 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         if (UserStateEnums.DISABLE.getIndex().equals(sysUser.getUserState())) {
             return setResultError(I18nUtil.getMessage("creator.account_frozen"));
         }
-        if (!PasswordHashUtils.matches(query.getUserPassword(), sysUser.getPassword())) {
+        if (byCode) {
+            if (!verifySmsCode(prefix, mobile, query.getSmsCode())) {
+                return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
+            }
+        } else if (!PasswordHashUtils.matches(query.getUserPassword(), sysUser.getPassword())) {
             return setResultError(I18nUtil.getMessage("user.password_error"));
         }
         CreatorAccountEntity account = creatorAccountDao.findBySysUserId(sysUser.getId());
         if (account == null) {
             return setResultError(I18nUtil.getMessage("user.account_error"));
         }
-        if (PasswordHashUtils.needsRehash(sysUser.getPassword())) {
+        if (!byCode && PasswordHashUtils.needsRehash(sysUser.getPassword())) {
             String encodedPwd = PasswordHashUtils.encode(query.getUserPassword());
             account.setUserPassword(encodedPwd);
             account.setGmtModified(new Date());
@@ -213,41 +191,12 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
             log.error("creator update last login failed creatorId={}", account.getId(), e);
             throw new BaseException(I18nUtil.getMessage("base_error"), e);
         }
-        String token = issueToken(email);
-        log.info("creator login creatorId={}", account.getId());
+        if (byCode) {
+            consumeSmsCode(prefix, mobile);
+        }
+        String token = issueToken(mobile);
+        log.info("creator loginByMobile creatorId={}", account.getId());
         return setResultSuccess(token, I18nUtil.getMessage("base_success"));
-    }
-
-    @Override
-    public ResponseBase forgetPassword(@Valid @RequestBody CreatorForgetPwdQuery query) {
-        String email = normalizeEmail(query.getUserAccount());
-        if (!isEmail(email) || StringUtils.isEmpty(query.getNewPassword())) {
-            return setResultError(I18nUtil.getMessage("base_error"));
-        }
-        if (!verifyCode(email, query.getEmailCode())) {
-            return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
-        }
-        SysUserEntity sysUser = sysUserDao.findCreatorByAcctive(email);
-        if (sysUser == null) {
-            return setResultError(I18nUtil.getMessage("user.account_error"));
-        }
-        String encodedPwd = PasswordHashUtils.encode(query.getNewPassword());
-        CreatorAccountEntity account = creatorAccountDao.findBySysUserId(sysUser.getId());
-        try {
-            sysUserDao.updateCreatorPassword(sysUser.getId(), encodedPwd);
-            if (account != null) {
-                account.setUserPassword(encodedPwd);
-                account.setGmtModified(new Date());
-                creatorAccountDao.updateById(account);
-            }
-        } catch (Exception e) {
-            log.error("creator forgetPassword failed sysUserId={}", sysUser.getId(), e);
-            throw new BaseException(I18nUtil.getMessage("base_error"), e);
-        }
-        consumeCode(email);
-        CreatorTokenUtil.invalidateSession(email);
-        log.info("creator forgetPassword sysUserId={}", sysUser.getId());
-        return setResultSuccess(I18nUtil.getMessage("base_success"));
     }
 
     @Override
@@ -366,32 +315,38 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         return bearer;
     }
 
-    private boolean verifyCode(String email, String code) {
+    /** 短信验证码 Redis key：与 C 端/换绑手机共用同一 key，区号+手机号，保证跨国同号不串 */
+    private String smsCodeKey(String mobilePrefix, String mobileNumber) {
+        return RedisKeyConstants.SMS_CODE_KEY + mobilePrefix + mobileNumber;
+    }
+
+    private boolean verifySmsCode(String mobilePrefix, String mobileNumber, String code) {
         if (StringUtils.isEmpty(code)) {
             return false;
         }
-        Object cache = redisUtil.get(RedisKeyConstants.CREATOR_EMAIL_CODE_KEY + email);
-        return cache != null && cache.toString().equals(code);
+        Object cache = redisUtil.get(smsCodeKey(mobilePrefix, mobileNumber));
+        return cache != null && cache.toString().equals(code.trim());
     }
 
-    private void consumeCode(String email) {
-        redisUtil.del(RedisKeyConstants.CREATOR_EMAIL_CODE_KEY + email);
+    private void consumeSmsCode(String mobilePrefix, String mobileNumber) {
+        redisUtil.del(smsCodeKey(mobilePrefix, mobileNumber));
     }
 
-    private CreatorProfileEntity buildProfile(Integer creatorId, CreatorSignUpQuery query, Date now) {
-        CreatorProfileEntity profile = emptyProfile(creatorId, now);
-        if (query.getIdentityType() != null) {
-            profile.setIdentityType(query.getIdentityType());
+    /** 区号：仅去空格，保持与库里 mobile_prefix 一致的写法 */
+    private static String normalizeMobilePrefix(String mobilePrefix) {
+        return mobilePrefix == null ? "" : mobilePrefix.trim();
+    }
+
+    private static boolean isValidMobile(String mobilePrefix, String mobileNumber) {
+        return MOBILE_PREFIX_PATTERN.matcher(mobilePrefix).matches()
+                && mobileNumber != null && MOBILE_PATTERN.matcher(mobileNumber).matches();
+    }
+
+    private static String maskMobile(String mobile) {
+        if (mobile == null || mobile.length() < 7) {
+            return mobile;
         }
-        if (query.getCreatorRole() != null) {
-            profile.setCreatorRole(query.getCreatorRole());
-        }
-        profile.setIdCardFront(trimToNull(query.getIdCardFront()));
-        profile.setIdCardBack(trimToNull(query.getIdCardBack()));
-        profile.setBillAddress(trimToNull(query.getBillAddress()));
-        profile.setOrgName(trimToNull(query.getOrgName()));
-        profile.setOrgLicense(trimToNull(query.getOrgLicense()));
-        return profile;
+        return mobile.substring(0, 3) + "****" + mobile.substring(mobile.length() - 4);
     }
 
     private CreatorProfileEntity emptyProfile(Integer creatorId, Date now) {
@@ -499,14 +454,6 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         return prefix;
     }
 
-    private static String normalizeEmail(String email) {
-        return email == null ? null : email.trim().toLowerCase();
-    }
-
-    private static boolean isEmail(String email) {
-        return StringUtils.isNotEmpty(email) && EMAIL_PATTERN.matcher(email).matches();
-    }
-
     private static String trimToNull(String value) {
         if (value == null) {
             return null;
@@ -524,16 +471,4 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         return value == null ? 0L : value;
     }
 
-    private static String maskEmail(String email) {
-        if (email == null || !email.contains("@")) {
-            return "***";
-        }
-        int at = email.indexOf('@');
-        String name = email.substring(0, at);
-        String domain = email.substring(at);
-        if (name.length() <= 1) {
-            return "*" + domain;
-        }
-        return name.charAt(0) + "***" + domain;
-    }
 }

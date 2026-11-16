@@ -1,7 +1,7 @@
 package com.playlet.internal.service.creator.impl;
 
-import com.playlet.internal.api.response.CreatorAccountDetailResp;
-import com.playlet.internal.api.response.CreatorIdentityDetailResp;
+import com.alibaba.fastjson.JSON;
+import com.playlet.internal.api.response.CreatorAccountDetailResp;import com.playlet.internal.api.response.CreatorIdentityDetailResp;
 import com.playlet.internal.api.response.CreatorSettingResp;
 import com.playlet.internal.api.response.CreatorWechatBindResp;
 import com.playlet.internal.base.BaseApiService;
@@ -157,8 +157,10 @@ public class CreatorAccountServiceImpl extends BaseApiService implements Creator
 			item.setIcon(identityIcon(type));
 			CreatorIdentityEntity e = map.get(type);
 			if (e == null) {
-				item.setStatus(CreatorIdentityAuditStatusEnums.PENDING.getCode());
-				item.setStatusText(CreatorIdentityAuditStatusEnums.PENDING.getLabel());
+				// 注册提交写入的是 profile，这里兜底展示其审核状态
+				Integer derived = deriveIdentityStatus(profile, type);
+				item.setStatus(derived != null ? derived : CreatorIdentityAuditStatusEnums.PENDING.getCode());
+				item.setStatusText(derived != null ? statusText(derived) : CreatorIdentityAuditStatusEnums.PENDING.getLabel());
 				item.setEnabled(true);
 			} else {
 				item.setStatus(e.getAuditStatus());
@@ -352,7 +354,24 @@ public class CreatorAccountServiceImpl extends BaseApiService implements Creator
 		}
 		CreatorIdentityEntity e = creatorIdentityDao.findByCreatorAndType(account.getId(), identityType);
 		if (e == null) {
-			return setResultError(I18nUtil.getMessage("record_not_exist"));
+			// 注册提交写入的是 profile，无身份记录时按 profile 回显
+			CreatorProfileEntity profile = creatorProfileDao.findByCreatorId(account.getId());
+			Integer derived = deriveIdentityStatus(profile, identityType);
+			if (derived == null) {
+				return setResultError(I18nUtil.getMessage("record_not_exist"));
+			}
+			CreatorIdentityDetailResp fallback = new CreatorIdentityDetailResp();
+			fallback.setIdentityType(identityType);
+			fallback.setStatus(derived);
+			fallback.setStatusText(statusText(derived));
+			fallback.setRealName(profile.getRealName());
+			fallback.setIdCardMask(maskIdCard2(profile.getIdCardNoCipher(), safeAesKey()));
+			fallback.setIdCardFrontUrl(mediaUrlService.sign(profile.getIdCardFront()));
+			fallback.setIdCardBackUrl(mediaUrlService.sign(profile.getIdCardBack()));
+			fallback.setOrgName(profile.getOrgName());
+			fallback.setOrgLicenseUrl(mediaUrlService.sign(profile.getOrgLicense()));
+			fallback.setApplyTime(profile.getSetTime());
+			return setResultSuccess(fallback);
 		}
 		CreatorIdentityDetailResp resp = new CreatorIdentityDetailResp();
 		resp.setIdentityType(e.getIdentityType());
@@ -421,6 +440,183 @@ public class CreatorAccountServiceImpl extends BaseApiService implements Creator
 		}
 		log.info("creator applyIdentity creatorId={} type={}", account.getId(), query.getIdentityType());
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	@Override
+	public ResponseBase submitRegister(@Valid @RequestBody CreatorRegisterSubmitQuery query, HttpServletRequest request) {
+		CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
+		if (account == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		Date now = new Date();
+		CreatorProfileEntity profile = creatorProfileDao.findByCreatorId(account.getId());
+		boolean create = profile == null;
+		if (create) {
+			profile = new CreatorProfileEntity();
+			profile.setCreatorId(account.getId());
+			// 默认独立创作者
+			profile.setCreatorRole(3);
+			profile.setSetTime(now);
+		}
+		if (query.getIdentityType() != null) {
+			profile.setIdentityType(query.getIdentityType());
+		}
+		profile.setIdentityCodes(JSON.toJSONString(query.getIdentities() == null ? new ArrayList<String>() : query.getIdentities()));
+		profile.setRealName(StringUtils.trim(query.getRealName()));
+		if (StringUtils.isNotEmpty(query.getIdNumber())) {
+			try {
+				profile.setIdCardNoCipher(AesUtils.encrypt(query.getIdNumber(), safeAesKey()));
+				profile.setIdCardHash(sha256(query.getIdNumber()));
+			} catch (Exception ex) {
+				log.error("encrypt idCard failed", ex);
+				throw new BaseException(I18nUtil.getMessage("base_error"), ex);
+			}
+		}
+		profile.setIdCardFront(StringUtils.trim(query.getIdCardFront()));
+		profile.setIdCardBack(StringUtils.trim(query.getIdCardBack()));
+		profile.setCity(StringUtils.trim(query.getCity()));
+		profile.setExpertise(StringUtils.trim(query.getExpertise()));
+		profile.setWechat(StringUtils.trim(query.getWechat()));
+		profile.setGenreType(StringUtils.trim(query.getGenreType()));
+		profile.setMarket(StringUtils.trim(query.getMarket()));
+		profile.setPriceRange(StringUtils.trim(query.getPriceRange()));
+		profile.setServices(JSON.toJSONString(query.getServices() == null ? new ArrayList<String>() : query.getServices()));
+		profile.setTaboo(StringUtils.trim(query.getTaboo()));
+		profile.setIntro(StringUtils.trim(query.getIntro()));
+		profile.setWorks(JSON.toJSONString(query.getWorks() == null ? new ArrayList<CreatorRegisterSubmitQuery.WorkItem>() : query.getWorks()));
+		profile.setOrgName(StringUtils.trim(query.getOrgName()));
+		profile.setOrgLicense(StringUtils.trim(query.getOrgLicense()));
+		profile.setBillAddress(StringUtils.trim(query.getBillAddress()));
+		// 提交即进入审核
+		profile.setAuditStatus(CreatorProfileAuditStatusEnums.UNDER_REVIEW.getCode());
+		profile.setAuditRejectReason("");
+		profile.setGmtModified(now);
+		try {
+			if (create) {
+				creatorProfileDao.insert(profile);
+			} else {
+				creatorProfileDao.updateById(profile);
+			}
+			// 昵称/头像同步到账号
+			boolean accountChanged = false;
+			if (StringUtils.isNotEmpty(query.getNickname())) {
+				account.setNickname(query.getNickname().trim());
+				accountChanged = true;
+			}
+			if (StringUtils.isNotEmpty(query.getAvatar())) {
+				account.setAvatar(query.getAvatar());
+				accountChanged = true;
+				accountChanged = true;
+			}
+			if (accountChanged) {
+				account.setGmtModified(now);
+				creatorAccountDao.updateById(account);
+			}
+			// 账号信息页的身份卡片读的是 creator_identity，注册提交后同步为审核中
+			syncIdentityAudit(account, query, now);
+		} catch (Exception e) {
+			log.error("submitRegister creatorId={}", account.getId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+		log.info("creator submitRegister creatorId={} identityType={}", account.getId(), query.getIdentityType());
+		return setResultSuccess(I18nUtil.getMessage("base_success"));
+	}
+
+	/** 注册提交后把选中的身份写入 creator_identity，状态置为审核中 */
+	private void syncIdentityAudit(CreatorAccountEntity account, CreatorRegisterSubmitQuery query, Date now) {
+		if (query.getIdentities() == null || query.getIdentities().isEmpty()) {
+			return;
+		}
+		Map<Integer, CreatorIdentityEntity> existing = new HashMap<>();
+		for (CreatorIdentityEntity e : creatorIdentityDao.findByCreatorId(account.getId())) {
+			existing.put(e.getIdentityType(), e);
+		}
+		Set<Integer> processed = new HashSet<>();
+		for (String code : query.getIdentities()) {
+			Integer type = mapIdentityType(code);
+			if (type == null || !processed.add(type)) {
+				continue;
+			}
+			CreatorIdentityEntity old = existing.get(type);
+			if (old != null && CreatorIdentityAuditStatusEnums.REVIEWING.getCode() == old.getAuditStatus()) {
+				continue;
+			}
+			CreatorIdentityEntity entity = new CreatorIdentityEntity();
+			entity.setCreatorId(account.getId());
+			entity.setIdentityType(type);
+			entity.setRealName(StringUtils.trim(query.getRealName()));
+			entity.setIdCardFront(StringUtils.trim(query.getIdCardFront()));
+			entity.setIdCardBack(StringUtils.trim(query.getIdCardBack()));
+			entity.setOrgName(StringUtils.trim(query.getOrgName()));
+			entity.setOrgLicense(StringUtils.trim(query.getOrgLicense()));
+			if (StringUtils.isNotEmpty(query.getIdNumber())) {
+				try {
+					entity.setIdCardNoCipher(AesUtils.encrypt(query.getIdNumber(), safeAesKey()));
+					entity.setIdCardHash(sha256(query.getIdNumber()));
+				} catch (Exception ex) {
+					log.error("encrypt idCard failed", ex);
+					throw new BaseException(I18nUtil.getMessage("base_error"), ex);
+				}
+			}
+			entity.setAuditStatus(CreatorIdentityAuditStatusEnums.REVIEWING.getCode());
+			entity.setSetTime(now);
+			entity.setGmtModified(now);
+			if (old != null) {
+				entity.setId(old.getId());
+				creatorIdentityDao.updateById(entity);
+			} else {
+				creatorIdentityDao.insert(entity);
+			}
+		}
+	}
+
+	/** 注册页身份编码 -> 账号页身份类型：1编剧 2演员 3导演/制作 4编剧机构 */
+	private Integer mapIdentityType(String code) {
+		if (code == null) {
+			return null;
+		}
+		switch (code) {
+			case "writer":
+				return 1;
+			case "actor":
+				return 2;
+			case "director":
+				return 3;
+			case "writer-org":
+				return 4;
+			default:
+				return null;
+		}
+	}
+
+	/** 无 creator_identity 记录时，按注册提交的 profile 状态兜底 */
+	private Integer deriveIdentityStatus(CreatorProfileEntity profile, Integer identityType) {
+		if (profile == null || profile.getAuditStatus() == null
+				|| profile.getIdentityCodes() == null || profile.getIdentityCodes().isEmpty()) {
+			return null;
+		}
+		int status = profile.getAuditStatus();
+		if (status == CreatorProfileAuditStatusEnums.PENDING.getCode()) {
+			return null;
+		}
+		try {
+			List<String> codes = JSON.parseArray(profile.getIdentityCodes(), String.class);
+			for (String code : codes) {
+				if (!identityType.equals(mapIdentityType(code))) {
+					continue;
+				}
+				if (status == CreatorProfileAuditStatusEnums.APPROVED.getCode()) {
+					return CreatorIdentityAuditStatusEnums.PASS.getCode();
+				}
+				if (status == CreatorProfileAuditStatusEnums.REJECTED.getCode()) {
+					return CreatorIdentityAuditStatusEnums.REJECT.getCode();
+				}
+				return CreatorIdentityAuditStatusEnums.REVIEWING.getCode();
+			}
+		} catch (Exception ex) {
+			log.warn("parse identityCodes failed creatorId={}", profile.getCreatorId(), ex);
+		}
+		return null;
 	}
 
 	@Override
