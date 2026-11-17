@@ -13,6 +13,7 @@ import com.playlet.internal.entity.creator.CreatorRepresentativeEntity;
 import com.playlet.internal.enums.CreatorIdentityAuditStatusEnums;
 import com.playlet.internal.enums.ScriptShelfStatusEnums;
 import com.playlet.internal.query.creator.CreatorRepresentativeSaveQuery;
+import com.playlet.internal.query.creator.CreatorRepresentativeShelfQuery;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
 import com.playlet.internal.service.common.MediaUrlService;
 import com.playlet.internal.service.creator.CreatorRepresentativeService;
@@ -156,24 +157,35 @@ public class CreatorRepresentativeServiceImpl extends BaseApiService implements 
 	}
 
 	@Override
-	public ResponseBase toggleShelf(@RequestParam("id") Integer id,
-									@RequestParam("on") Boolean on,
-									HttpServletRequest request) {
+	public ResponseBase toggleShelf(@Valid @RequestBody CreatorRepresentativeShelfQuery query, HttpServletRequest request) {
 		CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
 		if (account == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
-		CreatorRepresentativeEntity exist = dao.selectById(id);
+		if (query == null || query.getId() == null || query.getShelfStatus() == null) {
+			return setResultError("参数错误");
+		}
+		ScriptShelfStatusEnums shelfStatus = ScriptShelfStatusEnums.fromCode(query.getShelfStatus());
+		if (shelfStatus == null) {
+			return setResultError("上下架状态无效");
+		}
+		CreatorRepresentativeEntity exist = dao.selectById(query.getId());
 		if (exist == null || !exist.getCreatorId().equals(account.getId())) {
 			return setResultError("作品不存在");
 		}
-		// 仅审核通过可上架
-		if (Boolean.TRUE.equals(on) && CreatorIdentityAuditStatusEnums.PASS.getCode() != exist.getAuditStatus()) {
+		boolean shelfOn = shelfStatus == ScriptShelfStatusEnums.ON;
+		// 仅审核通过可上架；下架始终允许
+		if (shelfOn && CreatorIdentityAuditStatusEnums.PASS.getCode() != exist.getAuditStatus()) {
 			return setResultError("仅审核通过的作品可上架");
 		}
-		exist.setDisplayStatus(Boolean.TRUE.equals(on) ? ScriptShelfStatusEnums.ON.getCode() : ScriptShelfStatusEnums.OFF.getCode());
+		// 幂等：目标状态与当前一致直接成功
+		if (exist.getDisplayStatus() != null && exist.getDisplayStatus() == shelfStatus.getCode()) {
+			return setResultSuccess(I18nUtil.getMessage("base_success"));
+		}
+		exist.setDisplayStatus(shelfStatus.getCode());
 		exist.setGmtModified(new Date());
 		dao.updateById(exist);
+		log.info("representative toggleShelf creatorId={} id={} shelfStatus={}", account.getId(), exist.getId(), shelfStatus.getCode());
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 

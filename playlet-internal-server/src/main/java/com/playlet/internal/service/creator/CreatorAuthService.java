@@ -41,6 +41,6 @@ public interface CreatorAuthService {
 	ResponseBase findInfo(HttpServletRequest request);
 
 	@GetMapping("/signOut")
-	@ApiOperation("退出登录")
+	@ApiOperation(value = "退出登录", notes = "吊销当前作家会话；未登录也返回成功，便于前端幂等清理")
 	ResponseBase signOut(HttpServletRequest request);
 }

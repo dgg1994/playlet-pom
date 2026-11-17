@@ -2,6 +2,7 @@ package com.playlet.internal.service.creator;
 
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.query.creator.CreatorRepresentativeSaveQuery;
+import com.playlet.internal.query.creator.CreatorRepresentativeShelfQuery;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -33,8 +34,8 @@ public interface CreatorRepresentativeService {
 	ResponseBase delete(@RequestBody CreatorRepresentativeSaveQuery query, HttpServletRequest request);
 
 	@PostMapping("/toggleShelf")
-	@ApiOperation("上架/下架")
-	ResponseBase toggleShelf(@RequestParam("id") Integer id, @RequestParam("on") Boolean on, HttpServletRequest request);
+	@ApiOperation(value = "上架/下架", notes = "body: {id, shelfStatus}；shelfStatus=1 上架（仅审核通过可上架），0 下架")
+	ResponseBase toggleShelf(@RequestBody CreatorRepresentativeShelfQuery query, HttpServletRequest request);
 
 	@GetMapping("/categories")
 	@ApiOperation("备案分类字典")

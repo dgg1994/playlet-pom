@@ -295,11 +295,13 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
     @Override
     public ResponseBase signOut(HttpServletRequest request) {
         CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
-        if (account == null) {
-            return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+        if (account != null) {
+            CreatorTokenUtil.invalidateSession(account.getUserAccount());
+            log.info("creator signOut creatorId={}", account.getId());
+            return setResultSuccess(I18nUtil.getMessage("base_success"));
         }
-        CreatorTokenUtil.invalidateSession(account.getUserAccount());
-        log.info("creator signOut creatorId={}", account.getId());
+        // 未登录或会话已失效：退出接口仍返回成功，便于前端幂等清理本地态
+        log.info("creator signOut skipped: not logged in");
         return setResultSuccess(I18nUtil.getMessage("base_success"));
     }
 
