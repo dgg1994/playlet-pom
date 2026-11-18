@@ -55,13 +55,14 @@ public class CreatorSystemMessageSendServiceImpl implements CreatorSystemMessage
 			GenericityUtil.setDate(row);
 			creatorSystemMessageDao.insert(row);
 		} catch (DuplicateKeyException e) {
+			// 幂等：已发送过
 			return false;
 		} catch (BaseException e) {
 			log.error("creator inbox insert biz error creatorId={} bizId={}", toCreatorId, bizId, e);
 			throw e;
 		} catch (Exception e) {
 			log.error("creator inbox insert failed creatorId={} bizId={}", toCreatorId, bizId, e);
-			return false;
+			throw new BaseException("站内信发送失败", e);
 		}
 		log.info("creator inbox sent creatorId={} bizId={} messageType={}", toCreatorId, bizId, messageType);
 		return true;

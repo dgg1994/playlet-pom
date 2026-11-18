@@ -16,6 +16,7 @@ import com.playlet.internal.entity.creator.CreatorCoinLedgerEntity;
 import com.playlet.internal.entity.creator.CreatorWithdrawApplyEntity;
 import com.playlet.internal.enums.CreatorCoinBizTypeEnums;
 import com.playlet.internal.enums.CreatorWithdrawStatusEnums;
+import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.query.creator.CreatorWalletApplyQuery;
 import com.playlet.internal.query.creator.CreatorWalletQuery;
 import com.playlet.internal.service.creator.CreatorWalletService;
@@ -35,6 +36,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * 我的钱包实现。
@@ -174,17 +176,22 @@ public class CreatorWalletServiceImpl extends BaseApiService implements CreatorW
 		// 2) 冻结（SQL 内二次校验，防并发超提；失败则抛异常回滚申请单）
 		int rows = creatorAccountDao.freezeCoinBalance(account.getId(), (int) amount);
 		if (rows == 0) {
-			throw new IllegalStateException("可提现金额不足");
+			throw new BaseException("可提现金额不足");
 		}
 
-		// 3) 冻结流水（余额未扣减，仅冻结增加；成功/失败由管理端处理）
+		// 3) 冻结后回读真实余额写账本，避免并发提现导致流水快照错乱
+		CreatorAccountEntity fresh = creatorAccountDao.selectById(account.getId());
+		long balanceAfter = nvl(fresh == null ? null : fresh.getCoinBalance());
+		long frozenAfter = nvl(fresh == null ? null : fresh.getFrozenCoinBalance());
+		long frozenBefore = Math.max(0L, frozenAfter - amount);
+
 		CreatorCoinLedgerEntity ledger = new CreatorCoinLedgerEntity();
 		ledger.setCreatorId(account.getId());
 		ledger.setChangeAmt(-amount);
-		ledger.setBalanceBefore(balance);
-		ledger.setBalanceAfter(balance);
-		ledger.setFrozenBefore(frozen);
-		ledger.setFrozenAfter(frozen + amount);
+		ledger.setBalanceBefore(balanceAfter);
+		ledger.setBalanceAfter(balanceAfter);
+		ledger.setFrozenBefore(frozenBefore);
+		ledger.setFrozenAfter(frozenAfter);
 		ledger.setBizType(CreatorCoinBizTypeEnums.WITHDRAW.getBizType());
 		ledger.setBizId(String.valueOf(apply.getId()));
 		ledger.setRemark("提现至" + bankName + (tail.isEmpty() ? "" : "尾号" + tail));
@@ -272,9 +279,10 @@ public class CreatorWalletServiceImpl extends BaseApiService implements CreatorW
 		return data;
 	}
 
+	/** 申请单号：时间 + 短 UUID，降低并发碰撞 */
 	private static String buildApplyNo(Date time) {
-		return "TX" + new SimpleDateFormat("yyyyMMddHHmmss").format(time)
-				+ String.format("%03d", (int) (System.currentTimeMillis() % 1000));
+		String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+		return "TX" + new SimpleDateFormat("yyyyMMddHHmmss").format(time) + suffix;
 	}
 
 	private static Integer parseId(String value) {

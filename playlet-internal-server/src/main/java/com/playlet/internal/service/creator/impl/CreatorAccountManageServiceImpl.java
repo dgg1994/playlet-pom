@@ -7,10 +7,12 @@ import com.playlet.internal.api.response.CreatorAccountManageItemEntity;
 import com.playlet.internal.base.ResponseBase;
 import com.playlet.internal.constants.Constants;
 import com.playlet.internal.dao.creator.CreatorAccountDao;
+import com.playlet.internal.dao.creator.CreatorWithdrawApplyDao;
 import com.playlet.internal.dao.system.SysUserDao;
 import com.playlet.internal.entity.creator.CreatorAccountEntity;
 import com.playlet.internal.enums.CreatorIdentityTypeEnums;
 import com.playlet.internal.enums.CreatorProfileAuditStatusEnums;
+import com.playlet.internal.enums.CreatorWithdrawStatusEnums;
 import com.playlet.internal.enums.UserStateEnums;
 import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.query.creator.CreatorAccountManageQuery;
@@ -47,6 +49,8 @@ public class CreatorAccountManageServiceImpl implements CreatorAccountManageServ
 	@Autowired
 	private CreatorAccountDao creatorAccountDao;
 	@Autowired
+	private CreatorWithdrawApplyDao creatorWithdrawApplyDao;
+	@Autowired
 	private SysUserDao sysUserDao;
 	@Autowired
 	private MediaUrlService mediaUrlService;
@@ -72,27 +76,33 @@ public class CreatorAccountManageServiceImpl implements CreatorAccountManageServ
 	}
 
 	@Override
-	@SysLogAnnotation(module = "创作者用户管理", type = "GET", remark = "删除用户")
+	@SysLogAnnotation(module = "创作者用户管理", type = "POST", remark = "删除用户")
 	public ResponseBase delete(@RequestParam("id") Integer id, HttpServletRequest request) {
+		Integer adminId = SysUserTokenUtil.resolveAdminId(request);
+		if (adminId == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
+		}
+		if (id == null || id <= 0) {
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
+		CreatorAccountEntity account = creatorAccountDao.selectById(id);
+		if (account == null) {
+			return setResultError(I18nUtil.getMessage("base_data_null"));
+		}
+		if (UserStateEnums.LOGOUT.getIndex().equals(account.getUserState())) {
+			return setResultError(I18nUtil.getMessage("creator_account_already_deleted"));
+		}
+		long frozen = account.getFrozenCoinBalance() == null ? 0L : account.getFrozenCoinBalance();
+		if (frozen > 0) {
+			return setResultError(I18nUtil.getMessage("creator_account_frozen_balance"));
+		}
+		// 有进行中提现不允许删号
+		int processing = creatorWithdrawApplyDao.countByCreatorAndStatus(id,
+				CreatorWithdrawStatusEnums.PROCESSING.getCode());
+		if (processing > 0) {
+			return setResultError(I18nUtil.getMessage("creator_account_frozen_balance"));
+		}
 		try {
-			Integer adminId = SysUserTokenUtil.resolveAdminId(request);
-			if (adminId == null) {
-				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("token_error"));
-			}
-			if (id == null || id <= 0) {
-				return setResultError(I18nUtil.getMessage("base_error"));
-			}
-			CreatorAccountEntity account = creatorAccountDao.selectById(id);
-			if (account == null) {
-				return setResultError(I18nUtil.getMessage("base_data_null"));
-			}
-			if (UserStateEnums.LOGOUT.getIndex().equals(account.getUserState())) {
-				return setResultError(I18nUtil.getMessage("creator_account_already_deleted"));
-			}
-			long frozen = account.getFrozenCoinBalance() == null ? 0L : account.getFrozenCoinBalance();
-			if (frozen > 0) {
-				return setResultError(I18nUtil.getMessage("creator_account_frozen_balance"));
-			}
 			int rows = creatorAccountDao.updateUserState(id, UserStateEnums.LOGOUT.getIndex());
 			if (rows <= 0) {
 				return setResultError(I18nUtil.getMessage("base_error"));
@@ -101,9 +111,9 @@ public class CreatorAccountManageServiceImpl implements CreatorAccountManageServ
 			if (account.getSysUserId() != null) {
 				sysUserDao.updateCreatorState(account.getSysUserId(), UserStateEnums.LOGOUT.getIndex());
 			}
-			// 踢下线：吊销 Redis 会话
-			CreatorTokenUtil.invalidateSession(account.getUserAccount());
-			log.info("creator account deleted adminId={} creatorId={} email={}", adminId, id,
+			// 踢下线：按登录会话 key（手机号优先）吊销
+			CreatorTokenUtil.invalidateAccountSession(account);
+			log.info("creator account deleted adminId={} creatorId={} account={}", adminId, id,
 					maskEmail(account.getUserAccount()));
 			return setResultSuccess(I18nUtil.getMessage("base_success"));
 		} catch (Exception e) {
@@ -137,13 +147,8 @@ public class CreatorAccountManageServiceImpl implements CreatorAccountManageServ
 		if (type == null) {
 			return "";
 		}
-		if (CreatorIdentityTypeEnums.PERSONAL.getCode() == type) {
-			return CreatorIdentityTypeEnums.PERSONAL.getLabel();
-		}
-		if (CreatorIdentityTypeEnums.ORG.getCode() == type) {
-			return CreatorIdentityTypeEnums.ORG.getLabel();
-		}
-		return "";
+		CreatorIdentityTypeEnums identity = CreatorIdentityTypeEnums.fromCode(type);
+		return identity == null ? "" : identity.getLabel();
 	}
 
 	private static String resolveAuditLabel(Integer status) {

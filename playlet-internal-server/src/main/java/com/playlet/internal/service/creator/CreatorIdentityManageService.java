@@ -5,6 +5,8 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
+
 /**
  * 管理端：创作者身份资质审核。
  */
@@ -23,11 +25,11 @@ public interface CreatorIdentityManageService {
 						  @RequestParam(value = "pageNumber", defaultValue = "1") Integer pageNumber,
 						  @RequestParam(value = "pageSize", defaultValue = "10") Integer pageSize);
 
-	/** 审核（通过 / 驳回） */
+	/** 审核（通过 / 驳回）；auditorId 取自登录态，勿由客户端传入 */
 	@PostMapping("/audit")
 	@ApiOperation("身份资质审核")
 	ResponseBase audit(@RequestParam("id") Integer id,
 					  @RequestParam("auditStatus") Integer auditStatus,
 					  @RequestParam(value = "rejectReason", required = false) String rejectReason,
-					  @RequestParam(value = "auditorId", required = false) Integer auditorId);
+					  HttpServletRequest request);
 }

@@ -20,4 +20,8 @@ public interface CreatorWithdrawApplyDao extends BaseMapper<CreatorWithdrawApply
 			+ "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
 			+ "</script>")
 	List<CreatorWithdrawApplyEntity> findByIds(@Param("ids") List<Integer> ids);
+
+	/** 进行中提现笔数（管理端删号拦截） */
+	@Select("select count(1) from creator_withdraw_apply where creator_id = #{creatorId} and status = #{status}")
+	int countByCreatorAndStatus(@Param("creatorId") Integer creatorId, @Param("status") Integer status);
 }

@@ -169,4 +169,13 @@ public interface DramaVideoCommentDao extends BaseMapper<DramaVideoCommentEntity
 	int updatePinState(@Param("id") Integer id,
 			@Param("pinFlag") Integer pinFlag,
 			@Param("pinTime") Date pinTime);
+
+	/** 父评回复数原子 +1 */
+	@Update("update drama_video_comment set reply_count = ifnull(reply_count,0) + 1, gmtModified = now() where id = #{id}")
+	int incrReplyCount(@Param("id") Integer id);
+
+	/** 父评回复数原子 -1（下限 0） */
+	@Update("update drama_video_comment set reply_count = greatest(ifnull(reply_count,0) - 1, 0), gmtModified = now() "
+			+ "where id = #{id}")
+	int decrReplyCount(@Param("id") Integer id);
 }

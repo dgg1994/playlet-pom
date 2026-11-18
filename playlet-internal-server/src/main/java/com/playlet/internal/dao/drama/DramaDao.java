@@ -216,6 +216,12 @@ public interface DramaDao extends BaseMapper<DramaEntity> {
 	@Update("update drama set hot_score = ifnull(hot_score,0) + #{delta}, gmtModified = now() where id = #{dramaId}")
 	int incrHotScore(@Param("dramaId") Integer dramaId, @Param("delta") long delta);
 
+	@Update("update drama set discuss_score = ifnull(discuss_score,0) + 1, gmtModified = now() where id = #{dramaId}")
+	int incrDiscussScore(@Param("dramaId") Integer dramaId);
+
+	@Update("update drama set discuss_score = greatest(ifnull(discuss_score,0) - 1, 0), gmtModified = now() where id = #{dramaId}")
+	int decrDiscussScore(@Param("dramaId") Integer dramaId);
+
 	/**
 	 * 推荐流：无偏好时按 seed 打散；有偏好时命中优先再 seed。
 	 */

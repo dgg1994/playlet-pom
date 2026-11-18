@@ -24,9 +24,11 @@ import com.playlet.internal.entity.creator.CreatorCallSubmissionEntity;
 import com.playlet.internal.query.creator.CallFavoriteQuery;
 import com.playlet.internal.query.creator.CallSquareListQuery;
 import com.playlet.internal.service.creator.CallSquareService;
+import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.utils.CreatorTokenUtil;
 import com.playlet.internal.utils.I18nUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -65,75 +67,66 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 
 	@Override
 	public ResponseBase list(CallSquareListQuery query, HttpServletRequest request) {
-		try {
-			if (query == null) {
-				query = new CallSquareListQuery();
-			}
-			normalizeListQuery(query);
-			Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
-			Set<Integer> joinedIds = loadJoinedIds(creatorId);
-			Set<Integer> favoriteIds = loadFavoriteIds(creatorId);
-
-			PageHelper.startPage(query.getPageNumber(), query.getPageSize());
-			List<CreatorCallEntity> list = creatorCallDao.findSquareList(query);
-			List<CallCardRespEntity> cards = new ArrayList<>();
-			if (list != null) {
-				for (CreatorCallEntity entity : list) {
-					cards.add(toCard(entity, joinedIds, favoriteIds));
-				}
-			}
-			PageInfo<CreatorCallEntity> pageInfo = new PageInfo<>(list);
-			PageInfo<CallCardRespEntity> respPage = new PageInfo<>();
-			respPage.setTotal(pageInfo.getTotal());
-			respPage.setPageNum(pageInfo.getPageNum());
-			respPage.setPageSize(pageInfo.getPageSize());
-			respPage.setPages(pageInfo.getPages());
-			respPage.setList(cards);
-			return setResultSuccess(respPage);
-		} catch (Exception e) {
-			log.error("call square list error", e);
-			return setResultError(Constants.HTTP_RES_CODE_500, I18nUtil.getMessage("base_error"));
+		if (query == null) {
+			query = new CallSquareListQuery();
 		}
+		normalizeListQuery(query);
+		Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
+		Set<Integer> joinedIds = loadJoinedIds(creatorId);
+		Set<Integer> favoriteIds = loadFavoriteIds(creatorId);
+
+		PageHelper.startPage(query.getPageNumber(), query.getPageSize());
+		List<CreatorCallEntity> list = creatorCallDao.findSquareList(query);
+		List<CallCardRespEntity> cards = new ArrayList<>();
+		if (list != null) {
+			for (CreatorCallEntity entity : list) {
+				cards.add(toCard(entity, joinedIds, favoriteIds));
+			}
+		}
+		PageInfo<CreatorCallEntity> pageInfo = new PageInfo<>(list);
+		PageInfo<CallCardRespEntity> respPage = new PageInfo<>();
+		respPage.setTotal(pageInfo.getTotal());
+		respPage.setPageNum(pageInfo.getPageNum());
+		respPage.setPageSize(pageInfo.getPageSize());
+		respPage.setPages(pageInfo.getPages());
+		respPage.setList(cards);
+		return setResultSuccess(respPage);
 	}
 
 	@Override
 	public ResponseBase detail(Integer id, HttpServletRequest request) {
-		try {
-			CreatorCallEntity entity = creatorCallDao.findVisibleById(id);
-			if (entity == null) {
-				return setResultError(Constants.HTTP_RES_CODE_404, I18nUtil.getMessage("base_data_null"));
-			}
-			Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
-			CallDetailRespEntity resp = toDetail(entity);
-			resp.setJoined(creatorId != null && creatorCallJoinDao.countJoin(id, creatorId) > 0);
-			resp.setSubmitted(creatorId != null && creatorCallSubmissionDao.countByCallAndCreator(id, creatorId) > 0);
-			resp.setFavorited(creatorId != null && creatorCallFavoriteDao.countByCreatorAndCall(creatorId, id) > 0);
-			resp.setRelated(buildRelated(entity));
-			return setResultSuccess(resp);
-		} catch (Exception e) {
-			log.error("call square detail error id={}", id, e);
-			return setResultError(Constants.HTTP_RES_CODE_500, I18nUtil.getMessage("base_error"));
+		CreatorCallEntity entity = creatorCallDao.findVisibleById(id);
+		if (entity == null) {
+			return setResultError(Constants.HTTP_RES_CODE_404, I18nUtil.getMessage("base_data_null"));
 		}
+		Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
+		CallDetailRespEntity resp = toDetail(entity);
+		resp.setJoined(creatorId != null && creatorCallJoinDao.countJoin(id, creatorId) > 0);
+		resp.setSubmitted(creatorId != null && creatorCallSubmissionDao.countByCallAndCreator(id, creatorId) > 0);
+		resp.setFavorited(creatorId != null && creatorCallFavoriteDao.countByCreatorAndCall(creatorId, id) > 0);
+		resp.setRelated(buildRelated(entity));
+		return setResultSuccess(resp);
 	}
 
 	@Override
+	@Transactional(rollbackFor = Exception.class)
 	public ResponseBase join(Integer id, HttpServletRequest request) {
+		Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
+		if (creatorId == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		CreatorCallEntity entity = creatorCallDao.findVisibleById(id);
+		if (entity == null) {
+			return setResultError(Constants.HTTP_RES_CODE_404, I18nUtil.getMessage("base_data_null"));
+		}
+		if (statusOf(entity) == CallSquareConstants.STATUS_ENDED) {
+			return setResultError(Constants.HTTP_RES_CODE_500, CallSquareConstants.ERROR_ENDED_JOIN);
+		}
+		// 重复参与幂等处理，不重复累计人数
+		if (creatorCallJoinDao.countJoin(id, creatorId) > 0) {
+			return setResultSuccess(true);
+		}
 		try {
-			Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
-			if (creatorId == null) {
-				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
-			}
-			CreatorCallEntity entity = creatorCallDao.findVisibleById(id);
-			if (entity == null) {
-				return setResultError(Constants.HTTP_RES_CODE_404, I18nUtil.getMessage("base_data_null"));
-			}
-			if (statusOf(entity) == CallSquareConstants.STATUS_ENDED) {
-				return setResultError(Constants.HTTP_RES_CODE_500, CallSquareConstants.ERROR_ENDED_JOIN);
-			}
-			// 重复参与幂等处理，不重复累计人数
-			if (creatorCallJoinDao.countJoin(id, creatorId) > 0) {
-				return setResultSuccess(true);
-			}
 			CreatorCallJoinEntity join = new CreatorCallJoinEntity();
 			join.setCallId(id);
 			join.setCreatorId(creatorId);
@@ -141,11 +134,11 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 			creatorCallDao.update(null, Wrappers.<CreatorCallEntity>lambdaUpdate()
 					.eq(CreatorCallEntity::getId, id)
 					.setSql("participants = participants + 1"));
-			return setResultSuccess(true);
 		} catch (Exception e) {
-			log.error("call square join error id={}", id, e);
-			return setResultError(Constants.HTTP_RES_CODE_500, I18nUtil.getMessage("base_error"));
+			log.error("call square join error id={} creatorId={}", id, creatorId, e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
+		return setResultSuccess(true);
 	}
 
 	/**
@@ -154,41 +147,42 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 	 * 投稿成功后自动补记参与关系并累加参与人数。
 	 */
 	@Override
+	@Transactional(rollbackFor = Exception.class)
 	public ResponseBase submit(CreatorCallSubmissionEntity body, HttpServletRequest request) {
+		CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
+		if (account == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		if (body == null) {
+			return setResultError(Constants.HTTP_RES_CODE_400, CallSquareConstants.ERROR_EMPTY_BODY);
+		}
+
+		List<String> missing = new ArrayList<>();
+		if (body.getCallId() == null) {
+			missing.add("征稿");
+		}
+		if (isBlank(body.getTitle())) {
+			missing.add("剧本名称");
+		}
+		if (isBlank(body.getIntro())) {
+			missing.add("剧本简介");
+		}
+		if (!missing.isEmpty()) {
+			return setResultError(Constants.HTTP_RES_CODE_400, "请填写：" + String.join("、", missing));
+		}
+
+		CreatorCallEntity call = creatorCallDao.findVisibleById(body.getCallId());
+		if (call == null) {
+			return setResultError(Constants.HTTP_RES_CODE_404, I18nUtil.getMessage("base_data_null"));
+		}
+		if (statusOf(call) == CallSquareConstants.STATUS_ENDED) {
+			return setResultError(Constants.HTTP_RES_CODE_400, CallSquareConstants.ERROR_ENDED_SUBMIT);
+		}
+		if (creatorCallSubmissionDao.countByCallAndCreator(call.getId(), account.getId()) > 0) {
+			return setResultError(Constants.HTTP_RES_CODE_400, CallSquareConstants.ERROR_REPEAT_SUBMIT);
+		}
+
 		try {
-			CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
-			if (account == null) {
-				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
-			}
-			if (body == null) {
-				return setResultError(Constants.HTTP_RES_CODE_400, CallSquareConstants.ERROR_EMPTY_BODY);
-			}
-
-			List<String> missing = new ArrayList<>();
-			if (body.getCallId() == null) {
-				missing.add("征稿");
-			}
-			if (isBlank(body.getTitle())) {
-				missing.add("剧本名称");
-			}
-			if (isBlank(body.getIntro())) {
-				missing.add("剧本简介");
-			}
-			if (!missing.isEmpty()) {
-				return setResultError(Constants.HTTP_RES_CODE_400, "请填写：" + String.join("、", missing));
-			}
-
-			CreatorCallEntity call = creatorCallDao.findVisibleById(body.getCallId());
-			if (call == null) {
-				return setResultError(Constants.HTTP_RES_CODE_404, I18nUtil.getMessage("base_data_null"));
-			}
-			if (statusOf(call) == CallSquareConstants.STATUS_ENDED) {
-				return setResultError(Constants.HTTP_RES_CODE_400, CallSquareConstants.ERROR_ENDED_SUBMIT);
-			}
-			if (creatorCallSubmissionDao.countByCallAndCreator(call.getId(), account.getId()) > 0) {
-				return setResultError(Constants.HTTP_RES_CODE_400, CallSquareConstants.ERROR_REPEAT_SUBMIT);
-			}
-
 			CreatorCallSubmissionEntity entity = new CreatorCallSubmissionEntity();
 			entity.setCallId(call.getId());
 			entity.setCreatorId(account.getId());
@@ -210,11 +204,11 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 						.eq(CreatorCallEntity::getId, call.getId())
 						.setSql("participants = participants + 1"));
 			}
-			return setResultSuccess(CallSquareConstants.SUBMIT_SUCCESS_MSG);
 		} catch (Exception e) {
-			log.error("call square submit error", e);
-			return setResultError(Constants.HTTP_RES_CODE_500, I18nUtil.getMessage("base_error"));
+			log.error("call square submit error creatorId={} callId={}", account.getId(), body.getCallId(), e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
+		return setResultSuccess(CallSquareConstants.SUBMIT_SUCCESS_MSG);
 	}
 
 	/**
@@ -222,42 +216,43 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 	 * 新发布默认下架（shelf_status=0），等审核通过后再上架，避免脏数据污染列表。
 	 */
 	@Override
+	@Transactional(rollbackFor = Exception.class)
 	public ResponseBase publish(CreatorCallEntity body, HttpServletRequest request) {
+		Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
+		if (creatorId == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
+		}
+		if (body == null) {
+			return setResultError(Constants.HTTP_RES_CODE_400, CallSquareConstants.ERROR_EMPTY_BODY);
+		}
+
+		List<String> missing = new ArrayList<>();
+		if (isBlank(body.getTitle())) {
+			missing.add("标题");
+		}
+		if (isBlank(body.getTopic())) {
+			missing.add("题材");
+		}
+		if (body.getAmount() == null || body.getAmount() <= 0) {
+			missing.add("总奖金");
+		}
+		if (body.getNeedCount() == null || body.getNeedCount() <= 0) {
+			missing.add("需求稿件数");
+		}
+		if (body.getDeadline() == null) {
+			missing.add("截止日期");
+		}
+		if (body.getExclusive() == null) {
+			missing.add("授权方式");
+		}
+		if (isBlank(body.getIntro())) {
+			missing.add("卡片摘要");
+		}
+		if (!missing.isEmpty()) {
+			return setResultError(Constants.HTTP_RES_CODE_400, "请填写：" + String.join("、", missing));
+		}
+
 		try {
-			Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
-			if (creatorId == null) {
-				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
-			}
-			if (body == null) {
-				return setResultError(Constants.HTTP_RES_CODE_400, CallSquareConstants.ERROR_EMPTY_BODY);
-			}
-
-			List<String> missing = new ArrayList<>();
-			if (isBlank(body.getTitle())) {
-				missing.add("标题");
-			}
-			if (isBlank(body.getTopic())) {
-				missing.add("题材");
-			}
-			if (body.getAmount() == null || body.getAmount() <= 0) {
-				missing.add("总奖金");
-			}
-			if (body.getNeedCount() == null || body.getNeedCount() <= 0) {
-				missing.add("需求稿件数");
-			}
-			if (body.getDeadline() == null) {
-				missing.add("截止日期");
-			}
-			if (body.getExclusive() == null) {
-				missing.add("授权方式");
-			}
-			if (isBlank(body.getIntro())) {
-				missing.add("卡片摘要");
-			}
-			if (!missing.isEmpty()) {
-				return setResultError(Constants.HTTP_RES_CODE_400, "请填写：" + String.join("、", missing));
-			}
-
 			CreatorCallEntity entity = new CreatorCallEntity();
 			entity.setPublisherId(creatorId);
 			// publisher 优先使用请求体传入值（前端可传"笔名/工作室名"），否则兜底为默认昵称
@@ -293,8 +288,8 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 			resp.setMsg(CallSquareConstants.PUBLISH_SUCCESS_MSG);
 			return setResultSuccess(resp);
 		} catch (Exception e) {
-			log.error("call square publish error", e);
-			return setResultError(Constants.HTTP_RES_CODE_500, I18nUtil.getMessage("base_error"));
+			log.error("call square publish error creatorId={}", creatorId, e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 	}
 
@@ -304,20 +299,20 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 	 */
 	@Override
 	public ResponseBase favoriteAdd(Integer callId, HttpServletRequest request) {
-		try {
-			Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
-			if (creatorId == null) {
-				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
-			}
-			if (creatorCallDao.findVisibleById(callId) == null) {
-				return setResultError(Constants.HTTP_RES_CODE_404, I18nUtil.getMessage("base_data_null"));
-			}
-			creatorCallFavoriteDao.insertIgnore(creatorId, callId);
-			return setResultSuccess(true);
-		} catch (Exception e) {
-			log.error("call favorite add error callId={}", callId, e);
-			return setResultError(Constants.HTTP_RES_CODE_500, I18nUtil.getMessage("base_error"));
+		Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
+		if (creatorId == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
+		if (creatorCallDao.findVisibleById(callId) == null) {
+			return setResultError(Constants.HTTP_RES_CODE_404, I18nUtil.getMessage("base_data_null"));
+		}
+		try {
+			creatorCallFavoriteDao.insertIgnore(creatorId, callId);
+		} catch (Exception e) {
+			log.error("call favorite add error callId={} creatorId={}", callId, creatorId, e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+		return setResultSuccess(true);
 	}
 
 	/**
@@ -326,17 +321,17 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 	 */
 	@Override
 	public ResponseBase favoriteCancel(Integer callId, HttpServletRequest request) {
-		try {
-			Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
-			if (creatorId == null) {
-				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
-			}
-			creatorCallFavoriteDao.deleteByCreatorAndCall(creatorId, callId);
-			return setResultSuccess(true);
-		} catch (Exception e) {
-			log.error("call favorite cancel error callId={}", callId, e);
-			return setResultError(Constants.HTTP_RES_CODE_500, I18nUtil.getMessage("base_error"));
+		Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
+		if (creatorId == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
+		try {
+			creatorCallFavoriteDao.deleteByCreatorAndCall(creatorId, callId);
+		} catch (Exception e) {
+			log.error("call favorite cancel error callId={} creatorId={}", callId, creatorId, e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
+		}
+		return setResultSuccess(true);
 	}
 
 	/**
@@ -346,30 +341,25 @@ public class CallSquareServiceImpl extends BaseApiService implements CallSquareS
 	 */
 	@Override
 	public ResponseBase favoriteList(CallFavoriteQuery query, HttpServletRequest request) {
-		try {
-			Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
-			if (creatorId == null) {
-				return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
-			}
-			if (query == null) {
-				query = new CallFavoriteQuery();
-			}
-			query.setKeyword(CallSquareConstants.normalizeText(query.getKeyword()));
-			query.setTopic(CallSquareConstants.normalizeText(query.getTopic()));
-
-			PageHelper.startPage(query.getPageNumber(), query.getPageSize());
-			List<CallFavoriteItemRespEntity> list = creatorCallFavoriteDao.findFavoriteList(
-					creatorId, query.getKeyword(), query.getTopic());
-			if (list != null) {
-				for (CallFavoriteItemRespEntity item : list) {
-					postProcessFavoriteItem(item);
-				}
-			}
-			return setResultSuccess(new PageInfo<>(list));
-		} catch (Exception e) {
-			log.error("call favorite list error", e);
-			return setResultError(Constants.HTTP_RES_CODE_500, I18nUtil.getMessage("base_error"));
+		Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
+		if (creatorId == null) {
+			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
+		if (query == null) {
+			query = new CallFavoriteQuery();
+		}
+		query.setKeyword(CallSquareConstants.normalizeText(query.getKeyword()));
+		query.setTopic(CallSquareConstants.normalizeText(query.getTopic()));
+
+		PageHelper.startPage(query.getPageNumber(), query.getPageSize());
+		List<CallFavoriteItemRespEntity> list = creatorCallFavoriteDao.findFavoriteList(
+				creatorId, query.getKeyword(), query.getTopic());
+		if (list != null) {
+			for (CallFavoriteItemRespEntity item : list) {
+				postProcessFavoriteItem(item);
+			}
+		}
+		return setResultSuccess(new PageInfo<>(list));
 	}
 
 	/** 列表行后处理：剩余天数 + 状态 + 收藏时间文案 */

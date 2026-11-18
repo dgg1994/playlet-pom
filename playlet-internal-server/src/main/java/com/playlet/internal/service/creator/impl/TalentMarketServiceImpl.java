@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -39,55 +39,38 @@ public class TalentMarketServiceImpl extends BaseApiService implements TalentMar
 	@Resource
 	private MediaUrlService mediaUrlService;
 
-	/** 兜底详情区块的标题池 */
-	private static final String[] WORK_TITLE_POOL = {
-			"逆袭千金归来", "豪门弃女的复仇", "重回十八岁", "穿书后我成了团宠",
-			"总裁的替嫁新娘", "都市最强赘婿", "娘娘她总想造反", "神医下山",
-			"闪婚后被宠上天", "乡村小医仙", "战神的贴身女医", "重生之豪门主母"
-	};
-
 	@Override
 	public ResponseBase list(TalentMarketListQuery query, HttpServletRequest request) {
-		try {
-			if (query == null) {
-				query = new TalentMarketListQuery();
-			}
-			normalizeListQuery(query);
-			Integer qualType = TalentConstants.qualCodeOf(query.getQualification());
-			PageHelper.startPage(query.getPageNumber(), query.getPageSize());
-			List<CreatorMarketInfoEntity> list = creatorMarketInfoDao.findMarketList(query, qualType);
-			List<TalentMarketCardRespEntity> cards = new ArrayList<>();
-			if (list != null) {
-				for (CreatorMarketInfoEntity entity : list) {
-					cards.add(toCard(entity));
-				}
-			}
-			PageInfo<CreatorMarketInfoEntity> pageInfo = new PageInfo<>(list);
-			PageInfo<TalentMarketCardRespEntity> respPage = new PageInfo<>();
-			respPage.setTotal(pageInfo.getTotal());
-			respPage.setPageNum(pageInfo.getPageNum());
-			respPage.setPageSize(pageInfo.getPageSize());
-			respPage.setPages(pageInfo.getPages());
-			respPage.setList(cards);
-			return setResultSuccess(respPage);
-		} catch (Exception e) {
-			log.error("talent market list error", e);
-			return setResultError(Constants.HTTP_RES_CODE_500, I18nUtil.getMessage("base_error"));
+		if (query == null) {
+			query = new TalentMarketListQuery();
 		}
+		normalizeListQuery(query);
+		Integer qualType = TalentConstants.qualCodeOf(query.getQualification());
+		PageHelper.startPage(query.getPageNumber(), query.getPageSize());
+		List<CreatorMarketInfoEntity> list = creatorMarketInfoDao.findMarketList(query, qualType);
+		List<TalentMarketCardRespEntity> cards = new ArrayList<>();
+		if (list != null) {
+			for (CreatorMarketInfoEntity entity : list) {
+				cards.add(toCard(entity));
+			}
+		}
+		PageInfo<CreatorMarketInfoEntity> pageInfo = new PageInfo<>(list);
+		PageInfo<TalentMarketCardRespEntity> respPage = new PageInfo<>();
+		respPage.setTotal(pageInfo.getTotal());
+		respPage.setPageNum(pageInfo.getPageNum());
+		respPage.setPageSize(pageInfo.getPageSize());
+		respPage.setPages(pageInfo.getPages());
+		respPage.setList(cards);
+		return setResultSuccess(respPage);
 	}
 
 	@Override
 	public ResponseBase detail(Integer id, HttpServletRequest request) {
-		try {
-			CreatorMarketInfoEntity entity = creatorMarketInfoDao.findVisibleById(id);
-			if (entity == null) {
-				return setResultError(Constants.HTTP_RES_CODE_404, I18nUtil.getMessage("base_data_null"));
-			}
-			return setResultSuccess(toDetail(entity));
-		} catch (Exception e) {
-			log.error("talent market detail error id={}", id, e);
-			return setResultError(Constants.HTTP_RES_CODE_500, I18nUtil.getMessage("base_error"));
+		CreatorMarketInfoEntity entity = creatorMarketInfoDao.findVisibleById(id);
+		if (entity == null) {
+			return setResultError(Constants.HTTP_RES_CODE_404, I18nUtil.getMessage("base_data_null"));
 		}
+		return setResultSuccess(toDetail(entity));
 	}
 
 	/** 列表入参规范化：全部/空串 -> null，默认值兜底 */
@@ -181,7 +164,8 @@ public class TalentMarketServiceImpl extends BaseApiService implements TalentMar
 		List<TalentMarketDetailRespEntity.StatItem> stats = new ArrayList<>();
 		if (isCreator) {
 			stats.add(stat("综合评分", String.valueOf(entity.getScore()), "分", "orange"));
-			stats.add(stat("合作评价", (entity.getPraiseRate() == null ? 98 : entity.getPraiseRate()) + "%", "好评率", null));
+			// 好评率无真实值，无数据则展示 0%，禁止虚构 98%
+			stats.add(stat("合作评价", (entity.getPraiseRate() == null ? 0 : entity.getPraiseRate()) + "%", "好评率", null));
 			stats.add(stat("所在地", entity.getCity(), null, null));
 			stats.add(stat("成交单数", String.valueOf(entity.getDeals() == null ? 0 : entity.getDeals()), "单", null));
 		} else {
@@ -208,9 +192,8 @@ public class TalentMarketServiceImpl extends BaseApiService implements TalentMar
 		if (entity.getIntro() != null && !entity.getIntro().trim().isEmpty()) {
 			return entity.getIntro();
 		}
-		// 兜底简介
-		return entity.getName() + "，深耕短剧行业多年，擅长" + String.join("、", tags)
-				+ "等题材，交付准时，配合度高，支持修改完善。";
+		// 无真实简介时返回空，不编造营销文案
+		return "";
 	}
 
 	private List<TalentMarketDetailRespEntity.SideRow> buildSideRows(CreatorMarketInfoEntity entity,
@@ -218,7 +201,8 @@ public class TalentMarketServiceImpl extends BaseApiService implements TalentMar
 		List<TalentMarketDetailRespEntity.SideRow> rows = new ArrayList<>();
 		if (isCreator) {
 			rows.add(sideRow("入驻时间", entity.getJoinDate(), null));
-			rows.add(sideRow("平均交付周期", (entity.getAvgDeliveryDays() == null ? 15 : entity.getAvgDeliveryDays()) + " 天", null));
+			rows.add(sideRow("平均交付周期",
+					entity.getAvgDeliveryDays() == null ? "-" : entity.getAvgDeliveryDays() + " 天", null));
 			String acceptLabel = TalentConstants.acceptLabelOf(entity.getAcceptStatus());
 			rows.add(sideRow("接单状态", acceptLabel,
 					entity.getAcceptStatus() != null && entity.getAcceptStatus() == TalentConstants.ACCEPT_OPEN ? "green" : null));
@@ -226,9 +210,10 @@ public class TalentMarketServiceImpl extends BaseApiService implements TalentMar
 			rows.add(sideRow("代表作品", (entity.getWorks() == null ? 0 : entity.getWorks()) + " 部", null));
 		} else {
 			rows.add(sideRow("成交单数", (entity.getDeals() == null ? 0 : entity.getDeals()) + " 单", null));
-			rows.add(sideRow("好评率", (entity.getPraiseRate() == null ? 98 : entity.getPraiseRate()) + "%", null));
+			rows.add(sideRow("好评率", (entity.getPraiseRate() == null ? 0 : entity.getPraiseRate()) + "%", null));
 			rows.add(sideRow("入驻时间", entity.getJoinDate(), null));
-			rows.add(sideRow("平均交付周期", (entity.getAvgDeliveryDays() == null ? 15 : entity.getAvgDeliveryDays()) + " 天", null));
+			rows.add(sideRow("平均交付周期",
+					entity.getAvgDeliveryDays() == null ? "-" : entity.getAvgDeliveryDays() + " 天", null));
 			rows.add(sideRow("身份认证", "已认证", "green"));
 		}
 		return rows;
@@ -247,28 +232,20 @@ public class TalentMarketServiceImpl extends BaseApiService implements TalentMar
 		List<TalentMarketDetailRespEntity.Section> sections = new ArrayList<>();
 		if (isCreator) {
 			List<Map<String, Object>> packages = parseMapArray(entity.getPackages());
-			if (packages == null) {
-				packages = fallbackPackages(entity);
-			}
-			sections.add(section("服务套餐", "packages", packages));
+			sections.add(section("服务套餐", "packages",
+					packages == null ? Collections.emptyList() : packages));
 
 			List<Map<String, Object>> worksList = parseMapArray(entity.getWorksList());
-			if (worksList == null) {
-				worksList = fallbackCreatorWorks(entity, tags);
-			}
-			sections.add(section("制作过的剧本", "list", worksList));
+			sections.add(section("制作过的剧本", "list",
+					worksList == null ? Collections.emptyList() : worksList));
 		} else {
 			List<Map<String, Object>> worksList = parseMapArray(entity.getWorksList());
-			if (worksList == null) {
-				worksList = fallbackWriterWorks(entity, tags);
-			}
-			sections.add(section("已上线作品", "list", worksList));
+			sections.add(section("已上线作品", "list",
+					worksList == null ? Collections.emptyList() : worksList));
 
 			List<Map<String, Object>> scriptsList = parseMapArray(entity.getScriptsList());
-			if (scriptsList == null) {
-				scriptsList = fallbackScripts(entity, tags);
-			}
-			sections.add(section("在售剧本", "cards", scriptsList));
+			sections.add(section("在售剧本", "cards",
+					scriptsList == null ? Collections.emptyList() : scriptsList));
 		}
 		return sections;
 	}
@@ -279,83 +256,6 @@ public class TalentMarketServiceImpl extends BaseApiService implements TalentMar
 		section.setKind(kind);
 		section.setItems(items);
 		return section;
-	}
-
-	/** 兜底：编剧已上线作品 */
-	private List<Map<String, Object>> fallbackCreatorWorks(CreatorMarketInfoEntity entity, List<String> tags) {
-		List<Map<String, Object>> items = new ArrayList<>();
-		int offset = entity.getId() == null ? 0 : entity.getId();
-		for (int i = 0; i < 4; i++) {
-			Map<String, Object> item = new LinkedHashMap<>();
-			item.put("title", WORK_TITLE_POOL[(offset + i) % WORK_TITLE_POOL.length]);
-			String tag = tags.isEmpty() ? "都市" : tags.get(i % tags.size());
-			item.put("meta", tag + " · " + (20 + i * 8) + "集");
-			item.put("rightLabel", "评分");
-			item.put("rightValue", String.format("%.1f", 8.6 + (i % 4) * 0.2));
-			item.put("highlight", true);
-			items.add(item);
-		}
-		return items;
-	}
-
-	/** 兜底：编剧已上线作品（播放量维度） */
-	private List<Map<String, Object>> fallbackWriterWorks(CreatorMarketInfoEntity entity, List<String> tags) {
-		List<Map<String, Object>> items = new ArrayList<>();
-		int offset = entity.getId() == null ? 0 : entity.getId();
-		for (int i = 0; i < 4; i++) {
-			Map<String, Object> item = new LinkedHashMap<>();
-			item.put("title", WORK_TITLE_POOL[(offset + i) % WORK_TITLE_POOL.length]);
-			String tag = tags.isEmpty() ? "都市" : tags.get(i % tags.size());
-			item.put("meta", tag + " · " + (30 + i * 10) + "集");
-			item.put("rightLabel", "平台播放量");
-			item.put("rightValue", (9 - i) + "." + (i % 5) + "千万");
-			items.add(item);
-		}
-		return items;
-	}
-
-	/** 兜底：编剧在售剧本 */
-	private List<Map<String, Object>> fallbackScripts(CreatorMarketInfoEntity entity, List<String> tags) {
-		List<Map<String, Object>> items = new ArrayList<>();
-		int offset = entity.getId() == null ? 0 : entity.getId();
-		for (int i = 0; i < 4; i++) {
-			Map<String, Object> item = new LinkedHashMap<>();
-			item.put("title", WORK_TITLE_POOL[(offset + 4 + i) % WORK_TITLE_POOL.length]);
-			item.put("tags", tags.size() > 3 ? tags.subList(0, 3) : tags);
-			item.put("meta", "全本约 " + String.format("%.1f", 3 + i * 0.3) + " 万字 / " + (28 + i * 6) + "集");
-			items.add(item);
-		}
-		return items;
-	}
-
-	/** 兜底：创作者服务套餐 */
-	private List<Map<String, Object>> fallbackPackages(CreatorMarketInfoEntity entity) {
-		long price = entity.getPrice() == null ? 0 : entity.getPrice().longValue();
-		String unit = entity.getPriceUnit() == null ? "部" : entity.getPriceUnit();
-		List<String> skills = parseStrArray(entity.getSkills());
-
-		List<Map<String, Object>> items = new ArrayList<>();
-		Map<String, Object> full = new LinkedHashMap<>();
-		full.put("title", "全流程制作");
-		full.put("desc", "包含" + String.join("、", skills.size() > 3 ? skills.subList(0, 3) : skills) + "全流程服务");
-		full.put("price", price);
-		full.put("priceUnit", unit);
-		items.add(full);
-
-		Map<String, Object> polish = new LinkedHashMap<>();
-		polish.put("title", "精剪+调色包装");
-		polish.put("desc", "素材精剪、电影感调色、片头片尾特效包装");
-		polish.put("price", Math.round(price * 0.3));
-		polish.put("priceUnit", "集");
-		items.add(polish);
-
-		Map<String, Object> single = new LinkedHashMap<>();
-		single.put("title", "单集定制剪辑");
-		single.put("desc", "单集单独剪辑优化，调整节奏、提升质感");
-		single.put("price", Math.round(price * 0.2));
-		single.put("priceUnit", "集");
-		items.add(single);
-		return items;
 	}
 
 	/** 解析 JSON 字符串数组，异常/为空返回空列表 */

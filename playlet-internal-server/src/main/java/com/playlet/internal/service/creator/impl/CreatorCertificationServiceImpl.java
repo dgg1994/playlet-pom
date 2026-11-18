@@ -307,13 +307,13 @@ public class CreatorCertificationServiceImpl extends BaseApiService implements C
 		return list;
 	}
 
+	/** 与账号页 mapIdentityType 对齐：1编剧 2演员 3导演/制作 4编剧机构 */
 	private Integer identityCodeToType(String code) {
 		if (code == null) {
 			return null;
 		}
 		switch (code) {
 			case "writer":
-			case "writer-org":
 				return 1;
 			case "actor":
 			case "actor-org":
@@ -321,6 +321,7 @@ public class CreatorCertificationServiceImpl extends BaseApiService implements C
 			case "director":
 			case "director-org":
 				return 3;
+			case "writer-org":
 			case "copyright":
 			case "copyright-org":
 				return 4;

@@ -24,8 +24,28 @@ public interface CreatorAccountDao extends BaseMapper<CreatorAccountEntity> {
 	@Select("select * from creator_account where sys_user_id = #{sysUserId} limit 1")
 	CreatorAccountEntity findBySysUserId(@Param("sysUserId") Integer sysUserId);
 
+	/** 管理端身份审核 keyword：昵称/账号/手机 */
+	@Select("<script>"
+			+ "select ca.id from creator_account ca "
+			+ "left join sys_user su on su.id = ca.sys_user_id and su.user_type = 2 "
+			+ "where ca.nickname like concat('%',#{keyword},'%') "
+			+ "   or ca.user_account like concat('%',#{keyword},'%') "
+			+ "   or ca.mobile_number like concat('%',#{keyword},'%') "
+			+ "   or su.acctive like concat('%',#{keyword},'%') "
+			+ "</script>")
+	List<Integer> findIdsByKeyword(@Param("keyword") String keyword);
+
 	@Select("select count(1) from creator_account where mobile_prefix = #{prefix} and mobile_number = #{number}")
 	int countByMobile(@Param("prefix") String prefix, @Param("number") String number);
+
+	/** 联系邮箱占用：user_account 存邮箱时查重（排除自身） */
+	@Select("select count(1) from creator_account where user_account = #{userAccount} and id != #{excludeId}")
+	int countByUserAccountExcludeId(@Param("userAccount") String userAccount, @Param("excludeId") Integer excludeId);
+
+	/** 手机号占用（排除自身） */
+	@Select("select count(1) from creator_account where mobile_prefix = #{prefix} and mobile_number = #{number} and id != #{excludeId}")
+	int countByMobileExcludeId(@Param("prefix") String prefix, @Param("number") String number,
+			@Param("excludeId") Integer excludeId);
 
 	@Select("<script>"
 			+ "select * from creator_account where id in "

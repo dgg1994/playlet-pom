@@ -20,6 +20,7 @@ import com.playlet.internal.enums.DramaAppealStatusEnums;
 import com.playlet.internal.enums.DramaAssetAuditStatusEnums;
 import com.playlet.internal.enums.DramaAssetShelfStatusEnums;
 import com.playlet.internal.enums.PublicEnums;
+import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.query.creator.CreatorDramaAnalyticsQuery;
 import com.playlet.internal.query.creator.CreatorDramaListQuery;
 import com.playlet.internal.query.drama.AddDramaQuery;
@@ -39,6 +40,7 @@ import com.playlet.internal.utils.I18nUtil;
 import com.playlet.internal.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -168,6 +170,7 @@ public class CreatorDramaServiceImpl extends BaseApiService implements CreatorDr
 	}
 
 	@Override
+	@Transactional(rollbackFor = Exception.class)
 	public ResponseBase appeal(@Valid @RequestBody DramaAppealQuery query, HttpServletRequest request) {
 		CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
 		if (account == null) {
@@ -186,10 +189,9 @@ public class CreatorDramaServiceImpl extends BaseApiService implements CreatorDr
 				|| !drama.getAuditStatus().equals(DramaAssetAuditStatusEnums.REJECTED.getCode())) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
-		// 申诉中不可重复提交
-		if (DramaAssetAuditStatusEnums.isAppealing(drama.getAuditStatus())
-				|| (drama.getAppealStatus() != null
-				&& drama.getAppealStatus().equals(DramaAppealStatusEnums.APPEALING.getCode()))) {
+		// 申诉中不可重复提交（audit 已限定 REJECTED，此处主要拦 appealStatus）
+		if (drama.getAppealStatus() != null
+				&& drama.getAppealStatus().equals(DramaAppealStatusEnums.APPEALING.getCode())) {
 			return setResultError(I18nUtil.getMessage("base_info_exist"));
 		}
 		Date now = new Date();
@@ -205,13 +207,14 @@ public class CreatorDramaServiceImpl extends BaseApiService implements CreatorDr
 		} catch (Exception e) {
 			log.error("creator drama appeal failed creatorId={} dramaId={}", account.getId(),
 					query.getDramaId(), e);
-			throw new RuntimeException(e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 		log.info("creator drama appeal submitted creatorId={} dramaId={}", account.getId(), drama.getId());
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
 
 	@Override
+	@Transactional(rollbackFor = Exception.class)
 	public ResponseBase assetAppeal(@Valid @RequestBody DramaAssetAppealQuery query, HttpServletRequest request) {
 		CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
 		if (account == null) {
@@ -234,10 +237,9 @@ public class CreatorDramaServiceImpl extends BaseApiService implements CreatorDr
 				|| !asset.getAuditStatus().equals(DramaAssetAuditStatusEnums.REJECTED.getCode())) {
 			return setResultError(I18nUtil.getMessage("base_error"));
 		}
-		// 申诉中不可重复提交
-		if (DramaAssetAuditStatusEnums.isAppealing(asset.getAuditStatus())
-				|| (asset.getAppealStatus() != null
-				&& asset.getAppealStatus().equals(DramaAppealStatusEnums.APPEALING.getCode()))) {
+		// 申诉中不可重复提交（audit 已限定 REJECTED，此处主要拦 appealStatus）
+		if (asset.getAppealStatus() != null
+				&& asset.getAppealStatus().equals(DramaAppealStatusEnums.APPEALING.getCode())) {
 			return setResultError(I18nUtil.getMessage("base_info_exist"));
 		}
 		Date now = new Date();
@@ -253,7 +255,7 @@ public class CreatorDramaServiceImpl extends BaseApiService implements CreatorDr
 		} catch (Exception e) {
 			log.error("creator drama asset appeal failed creatorId={} assetId={}", account.getId(),
 					query.getAssetId(), e);
-			throw new RuntimeException(e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 		log.info("creator drama asset appeal submitted creatorId={} assetId={} dramaId={}",
 				account.getId(), asset.getId(), asset.getDramaId());
@@ -261,6 +263,7 @@ public class CreatorDramaServiceImpl extends BaseApiService implements CreatorDr
 	}
 
 	@Override
+	@Transactional(rollbackFor = Exception.class)
 	public ResponseBase shelf(@Valid @RequestBody DramaAssetShelfQuery query, HttpServletRequest request) {
 		Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
 		if (creatorId == null) {
@@ -282,11 +285,12 @@ public class CreatorDramaServiceImpl extends BaseApiService implements CreatorDr
 		} catch (Exception e) {
 			log.error("creator drama asset shelf failed creatorId={} assetId={} shelfStatus={}",
 					creatorId, query.getAssetId(), query.getShelfStatus(), e);
-			throw new RuntimeException(e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 	}
 
 	@Override
+	@Transactional(rollbackFor = Exception.class)
 	public ResponseBase batchShelf(@Valid @RequestBody DramaAssetBatchShelfQuery query,
 			HttpServletRequest request) {
 		Integer creatorId = CreatorTokenUtil.resolveCreatorId(request);
@@ -333,7 +337,7 @@ public class CreatorDramaServiceImpl extends BaseApiService implements CreatorDr
 		} catch (Exception e) {
 			log.error("creator drama asset batchShelf failed creatorId={} shelfStatus={}",
 					creatorId, query.getShelfStatus(), e);
-			throw new RuntimeException(e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 	}
 

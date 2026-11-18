@@ -81,9 +81,10 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
                 && !query.getUserPassword().equals(query.getConfirmPassword())) {
             return setResultError(I18nUtil.getMessage("creator.password_not_match"));
         }
-//        if (!verifySmsCode(prefix, mobile, query.getSmsCode())) {
-//            return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
-//        }
+		// 注册必须校验短信验证码，防止刷号
+		if (!verifySmsCode(prefix, mobile, query.getSmsCode())) {
+			return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
+		}
         if (query.getIdentityType() != null && !CreatorIdentityTypeEnums.isValid(query.getIdentityType())) {
             return setResultError(I18nUtil.getMessage("base_error"));
         }
@@ -220,7 +221,7 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
             log.error("creator updatePwd failed creatorId={}", account.getId(), e);
             throw new BaseException(I18nUtil.getMessage("base_error"), e);
         }
-        CreatorTokenUtil.invalidateSession(account.getUserAccount());
+        CreatorTokenUtil.invalidateAccountSession(account);
         log.info("creator updatePwd creatorId={}", account.getId());
         return setResultSuccess(I18nUtil.getMessage("base_success"));
     }
@@ -248,12 +249,7 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
         if (query.getAvatar() != null) {
             account.setAvatar(trimToNull(query.getAvatar()));
         }
-        if (query.getMobilePrefix() != null) {
-            account.setMobilePrefix(trimToNull(query.getMobilePrefix()));
-        }
-        if (query.getMobileNumber() != null) {
-            account.setMobileNumber(trimToNull(query.getMobileNumber()));
-        }
+		// 手机号改绑须走 changeMobile（短信+唯一校验），资料接口禁止直接改号
         account.setGmtModified(now);
         CreatorProfileEntity profile = creatorProfileDao.findByCreatorId(account.getId());
         if (profile == null) {
@@ -296,7 +292,7 @@ public class CreatorAuthServiceImpl extends BaseApiService implements CreatorAut
     public ResponseBase signOut(HttpServletRequest request) {
         CreatorAccountEntity account = CreatorTokenUtil.resolveAccount(request);
         if (account != null) {
-            CreatorTokenUtil.invalidateSession(account.getUserAccount());
+            CreatorTokenUtil.invalidateAccountSession(account);
             log.info("creator signOut creatorId={}", account.getId());
             return setResultSuccess(I18nUtil.getMessage("base_success"));
         }

@@ -212,23 +212,27 @@ public class CreatorAccountServiceImpl extends BaseApiService implements Creator
 		if (code == null || !code.toString().equals(query.getEmailCode())) {
 			return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
 		}
+		// 登录身份保持手机号（sys_user.acctive）；邮箱仅写入 user_account 作联系方式
 		if (sysUserDao.findCreatorByAcctive(newEmail) != null) {
 			return setResultError(I18nUtil.getMessage("user.account_exist"));
 		}
+		if (creatorAccountDao.countByUserAccountExcludeId(newEmail, account.getId()) > 0) {
+			return setResultError(I18nUtil.getMessage("user.account_exist"));
+		}
+		String loginKey = CreatorTokenUtil.sessionLoginKey(account);
 		Date now = new Date();
 		account.setUserAccount(newEmail);
 		account.setGmtModified(now);
 		try {
+			// 故意不调用 updateCreatorEmail：避免把 acctive 改成邮箱导致手机登录失效
 			creatorAccountDao.updateById(account);
-			if (account.getSysUserId() != null) {
-				sysUserDao.updateCreatorEmail(account.getSysUserId(), newEmail);
-			}
 		} catch (Exception e) {
 			log.error("changeEmail creatorId={}", account.getId(), e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 		redisUtil.del(cacheKey);
-		CreatorTokenUtil.invalidateSession(account.getUserAccount());
+		// 敏感操作：吊销旧登录会话（按手机号 key，不是新邮箱）
+		CreatorTokenUtil.invalidateSession(loginKey);
 		log.info("creator changeEmail creatorId={}", account.getId());
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
@@ -239,30 +243,44 @@ public class CreatorAccountServiceImpl extends BaseApiService implements Creator
 		if (account == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
-		String cacheKey = RedisKeyConstants.SMS_CODE_KEY + query.getMobilePrefix() + query.getMobileNumber();
+		String prefix = query.getMobilePrefix() == null ? "" : query.getMobilePrefix().trim();
+		String mobile = query.getMobileNumber() == null ? "" : query.getMobileNumber().trim();
+		String cacheKey = RedisKeyConstants.SMS_CODE_KEY + prefix + mobile;
 		Object code = redisUtil.get(cacheKey);
 		if (code == null || !code.toString().equals(query.getCode())) {
 			return setResultError(I18nUtil.getMessage("incorrect_or_expired__verification_code"));
 		}
-		int count = creatorAccountDao.countByMobile(query.getMobilePrefix(), query.getMobileNumber());
-		if (count > 0 && !Objects.equals(account.getMobilePrefix(), query.getMobilePrefix())
-				&& !Objects.equals(account.getMobileNumber(), query.getMobileNumber())) {
+		boolean sameAsSelf = Objects.equals(account.getMobilePrefix(), prefix)
+				&& Objects.equals(account.getMobileNumber(), mobile);
+		// 已被他人占用则拒绝（自身原号放行）
+		if (!sameAsSelf && creatorAccountDao.countByMobileExcludeId(prefix, mobile, account.getId()) > 0) {
 			return setResultError(I18nUtil.getMessage("user.mobile_exist"));
 		}
+		if (!sameAsSelf && sysUserDao.findCreatorByAcctive(mobile) != null) {
+			return setResultError(I18nUtil.getMessage("user.mobile_exist"));
+		}
+		String oldLoginKey = CreatorTokenUtil.sessionLoginKey(account);
+		String oldMobile = account.getMobileNumber();
 		Date now = new Date();
-		account.setMobilePrefix(query.getMobilePrefix());
-		account.setMobileNumber(query.getMobileNumber());
+		account.setMobilePrefix(prefix);
+		account.setMobileNumber(mobile);
+		// user_account 仍是旧手机号时，随登录身份一起迁移；已绑邮箱联系方式则保留
+		if (account.getUserAccount() == null || Objects.equals(account.getUserAccount(), oldMobile)
+				|| Objects.equals(account.getUserAccount(), oldLoginKey)) {
+			account.setUserAccount(mobile);
+		}
 		account.setGmtModified(now);
 		try {
 			creatorAccountDao.updateById(account);
 			if (account.getSysUserId() != null) {
-				sysUserDao.updateCreatorMobile(account.getSysUserId(), query.getMobilePrefix(), query.getMobileNumber());
+				sysUserDao.updateCreatorMobile(account.getSysUserId(), prefix, mobile);
 			}
 		} catch (Exception e) {
 			log.error("changeMobile creatorId={}", account.getId(), e);
 			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 		redisUtil.del(cacheKey);
+		CreatorTokenUtil.invalidateSession(oldLoginKey);
 		log.info("creator changeMobile creatorId={}", account.getId());
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
 	}
@@ -290,14 +308,26 @@ public class CreatorAccountServiceImpl extends BaseApiService implements Creator
 		if (account == null) {
 			return setResultError(Constants.HTTP_RES_CODE_403, I18nUtil.getMessage("login_required"));
 		}
+		if (StringUtils.isEmpty(scene)) {
+			return setResultError(I18nUtil.getMessage("param_not_null"));
+		}
+		String creatorKey = RedisKeyConstants.CREATOR_WECHAT_BIND_SCENE + scene + ":creatorId";
+		Object owner = redisUtil.get(creatorKey);
+		// scene 必须归属当前登录创作者，防止他人认领绑定结果
+		if (owner != null && !Objects.equals(String.valueOf(account.getId()), String.valueOf(owner))) {
+			log.info("wechat status scene owner mismatch creatorId={} scene={}", account.getId(), scene);
+			return setResultError(I18nUtil.getMessage("base_error"));
+		}
 		String bindKey = RedisKeyConstants.CREATOR_WECHAT_BIND_SCENE + scene + ":bound";
 		Object value = redisUtil.get(bindKey);
 		if (value == null) {
-			String creatorKey = RedisKeyConstants.CREATOR_WECHAT_BIND_SCENE + scene + ":creatorId";
-			if (redisUtil.get(creatorKey) == null) {
+			if (owner == null) {
 				return setResultSuccess(-1); // 已过期
 			}
 			return setResultSuccess(0); // 待扫码
+		}
+		if (owner == null) {
+			return setResultSuccess(-1);
 		}
 		// 已绑定，落库
 		String[] parts = value.toString().split("\\|", 3);
@@ -318,7 +348,7 @@ public class CreatorAccountServiceImpl extends BaseApiService implements Creator
 			} else {
 				creatorSocialBindDao.insert(entity);
 			}
-			redisUtil.del(RedisKeyConstants.CREATOR_WECHAT_BIND_SCENE + scene);
+			redisUtil.del(creatorKey, bindKey);
 		} catch (DuplicateKeyException e) {
 			log.warn("wechat bind duplicate creatorId={}", account.getId());
 			return setResultSuccess(2);
@@ -343,7 +373,17 @@ public class CreatorAccountServiceImpl extends BaseApiService implements Creator
 
 	@Override
 	public ResponseBase identities(HttpServletRequest request) {
-		return detail(request);
+		ResponseBase detailResp = detail(request);
+		if (detailResp == null || !Constants.HTTP_RES_CODE_200.equals(detailResp.getCode())) {
+			return detailResp;
+		}
+		// 仅返回身份资质列表，避免把整份账号聚合塞给列表页
+		if (detailResp.getData() instanceof CreatorAccountDetailResp) {
+			CreatorAccountDetailResp detail = (CreatorAccountDetailResp) detailResp.getData();
+			return setResultSuccess(detail.getIdentities() == null
+					? Collections.emptyList() : detail.getIdentities());
+		}
+		return detailResp;
 	}
 
 	@Override

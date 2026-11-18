@@ -99,6 +99,12 @@ public interface DramaAssetDao extends BaseMapper<DramaAssetEntity> {
 	@Update("update drama_asset set like_score = greatest(ifnull(like_score,0) - 1, 0), gmtModified = now() where id = #{assetId}")
 	int decrLikeScore(@Param("assetId") Integer assetId);
 
+	@Update("update drama_asset set discuss_score = ifnull(discuss_score,0) + 1, gmtModified = now() where id = #{assetId}")
+	int incrDiscussScore(@Param("assetId") Integer assetId);
+
+	@Update("update drama_asset set discuss_score = greatest(ifnull(discuss_score,0) - 1, 0), gmtModified = now() where id = #{assetId}")
+	int decrDiscussScore(@Param("assetId") Integer assetId);
+
 	/** 写入七牛 avinfo 解析出的时长 */
 	@Update("update drama_asset set duration_seconds = #{durationSeconds}, gmtModified = now() where id = #{id}")
 	int updateDurationSeconds(@Param("id") Integer id, @Param("durationSeconds") Integer durationSeconds);

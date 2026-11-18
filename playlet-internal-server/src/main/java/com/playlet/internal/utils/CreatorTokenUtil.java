@@ -87,6 +87,25 @@ public class CreatorTokenUtil {
 		redisUtil.del(sessionKey(email));
 	}
 
+	/**
+	 * 登录会话 key 对应的账号：手机号优先（与 issueToken / sys_user.acctive 一致）。
+	 * user_account 可能存联系邮箱，不能直接当会话账号。
+	 */
+	public static String sessionLoginKey(CreatorAccountEntity account) {
+		if (account == null) {
+			return null;
+		}
+		if (StringUtils.hasText(account.getMobileNumber())) {
+			return account.getMobileNumber().trim();
+		}
+		return account.getUserAccount();
+	}
+
+	/** 吊销当前账号登录会话 */
+	public static void invalidateAccountSession(CreatorAccountEntity account) {
+		invalidateSession(sessionLoginKey(account));
+	}
+
 	/** 与 C 端 / 运营过滤器一致：playletInternalServer + 账号 */
 	public static String sessionKey(String email) {
 		return Constants.APP_PACKAGE_NAME + email;

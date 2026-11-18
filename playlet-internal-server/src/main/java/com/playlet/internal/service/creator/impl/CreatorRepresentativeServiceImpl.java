@@ -12,6 +12,7 @@ import com.playlet.internal.entity.creator.CreatorAccountEntity;
 import com.playlet.internal.entity.creator.CreatorRepresentativeEntity;
 import com.playlet.internal.enums.CreatorIdentityAuditStatusEnums;
 import com.playlet.internal.enums.ScriptShelfStatusEnums;
+import com.playlet.internal.exception.BaseException;
 import com.playlet.internal.query.creator.CreatorRepresentativeSaveQuery;
 import com.playlet.internal.query.creator.CreatorRepresentativeShelfQuery;
 import com.playlet.internal.query.pub.PageQueryHelperEntity;
@@ -132,7 +133,7 @@ public class CreatorRepresentativeServiceImpl extends BaseApiService implements 
 			}
 		} catch (Exception e) {
 			log.error("representative save creatorId={}", account.getId(), e);
-			return setResultError(I18nUtil.getMessage("base_error"));
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 		log.info("representative save creatorId={} id={}", account.getId(), entity.getId());
 		return setResultSuccess(I18nUtil.getMessage("base_success"));

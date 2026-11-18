@@ -19,31 +19,21 @@ import com.playlet.internal.dao.drama.DramaVideoCommentDao;
 import com.playlet.internal.dao.drama.UserInteractMessageDao;
 import com.playlet.internal.entity.account.AppAccountEntity;
 import com.playlet.internal.entity.creator.CreatorAccountEntity;
-import com.playlet.internal.entity.drama.DramaAssetEntity;
 import com.playlet.internal.entity.drama.DramaEntity;
 import com.playlet.internal.entity.drama.DramaVideoCommentEntity;
 import com.playlet.internal.entity.drama.UserInteractMessageEntity;
-import com.playlet.internal.enums.CommentTypeEnums;
+import com.playlet.internal.enums.*;
 import com.playlet.internal.exception.BaseException;
-import com.playlet.internal.enums.CreatorCommentSortEnums;
-import com.playlet.internal.enums.DeleteStateEnum;
-import com.playlet.internal.enums.InteractMessageTypeEnums;
-import com.playlet.internal.enums.PublicEnums;
-import com.playlet.internal.enums.SensitiveSourceEnums;
 import com.playlet.internal.query.creator.CreatorCommentListQuery;
 import com.playlet.internal.query.creator.CreatorCommentPinQuery;
 import com.playlet.internal.query.creator.CreatorCommentReplyQuery;
 import com.playlet.internal.security.sensitive.SensitiveDecision;
-import com.playlet.internal.service.creator.CreatorCommentService;
 import com.playlet.internal.service.common.MediaUrlService;
+import com.playlet.internal.service.creator.CreatorCommentService;
 import com.playlet.internal.service.message.PushNotifyService;
 import com.playlet.internal.service.security.SensitiveRecordService;
 import com.playlet.internal.service.security.SensitiveWordService;
-import com.playlet.internal.utils.CreatorTokenUtil;
-import com.playlet.internal.utils.GenericityUtil;
-import com.playlet.internal.utils.HtmlSanitizeUtils;
-import com.playlet.internal.utils.I18nUtil;
-import com.playlet.internal.utils.StringUtils;
+import com.playlet.internal.utils.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,14 +44,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * 作家评论管理：列表 / 置顶 / 软删 / 作者身份回复。
@@ -206,7 +189,7 @@ public class CreatorCommentServiceImpl extends BaseApiService implements Creator
 			}
 		} catch (Exception e) {
 			log.error("creator comment delete failed creatorId={} commentId={}", account.getId(), id, e);
-			throw new RuntimeException(e);
+			throw new BaseException(I18nUtil.getMessage("base_error"), e);
 		}
 		log.info("creator comment delete creatorId={} commentId={}", account.getId(), id);
 		return setResultSuccess(I18nUtil.getMessage("base_success"));
@@ -537,56 +520,37 @@ public class CreatorCommentServiceImpl extends BaseApiService implements Creator
 		return I18nUtil.getMessage(code, title, ep);
 	}
 
+	/** 评论数原子 +1，避免并发先读后写丢更新 */
 	private void addDiscussScore(DramaVideoCommentEntity entity) {
-		DramaEntity drama = dramaDao.selectById(entity.getDramaId());
-		if (drama != null) {
-			long discuss = drama.getDiscussScore() == null ? 0L : drama.getDiscussScore();
-			drama.setDiscussScore(discuss + 1);
-			dramaDao.updateById(drama);
+		if (entity.getDramaId() != null) {
+			dramaDao.incrDiscussScore(entity.getDramaId());
 		}
 		if (entity.getVideoId() != null && entity.getVideoId() > 0) {
-			DramaAssetEntity asset = dramaAssetDao.selectById(entity.getVideoId());
-			if (asset != null) {
-				long discuss = asset.getDiscussScore() == null ? 0L : asset.getDiscussScore();
-				asset.setDiscussScore(discuss + 1);
-				dramaAssetDao.updateById(asset);
-			}
+			dramaAssetDao.incrDiscussScore(entity.getVideoId());
 		}
 	}
 
 	private void decrementDiscussScore(DramaVideoCommentEntity entity) {
-		DramaEntity drama = dramaDao.selectById(entity.getDramaId());
-		if (drama != null && drama.getDiscussScore() != null) {
-			drama.setDiscussScore(Math.max(drama.getDiscussScore() - 1, 0));
-			dramaDao.updateById(drama);
+		if (entity.getDramaId() != null) {
+			dramaDao.decrDiscussScore(entity.getDramaId());
 		}
 		if (entity.getVideoId() != null && entity.getVideoId() > 0) {
-			DramaAssetEntity asset = dramaAssetDao.selectById(entity.getVideoId());
-			if (asset != null && asset.getDiscussScore() != null) {
-				asset.setDiscussScore(Math.max(asset.getDiscussScore() - 1, 0));
-				dramaAssetDao.updateById(asset);
-			}
+			dramaAssetDao.decrDiscussScore(entity.getVideoId());
 		}
 	}
 
 	private void incrementParentReplyCount(Integer parentId) {
-		DramaVideoCommentEntity parent = dramaVideoCommentDao.selectById(parentId);
-		if (parent == null) {
+		if (parentId == null) {
 			return;
 		}
-		int count = parent.getReplyCount() == null ? 0 : parent.getReplyCount();
-		parent.setReplyCount(count + 1);
-		dramaVideoCommentDao.updateById(parent);
+		dramaVideoCommentDao.incrReplyCount(parentId);
 	}
 
 	private void decrementParentReplyCount(Integer parentId) {
-		DramaVideoCommentEntity parent = dramaVideoCommentDao.selectById(parentId);
-		if (parent == null) {
+		if (parentId == null) {
 			return;
 		}
-		int count = parent.getReplyCount() == null ? 0 : parent.getReplyCount();
-		parent.setReplyCount(Math.max(count - 1, 0));
-		dramaVideoCommentDao.updateById(parent);
+		dramaVideoCommentDao.decrReplyCount(parentId);
 	}
 
 	/** 通知被回复观众；fromUid 用占位，C 端可按 comment.from_creator_id 展示作者 */
